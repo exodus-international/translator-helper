@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { signIn, signUp } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { signIn, signUp } from '@/lib/auth-client';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [registerEmail, setRegisterEmail] = useState("");
-  const [registerPassword, setRegisterPassword] = useState("");
-  const [registerName, setRegisterName] = useState("");
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerName, setRegisterName] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,10 +27,10 @@ export default function LoginPage() {
         email: loginEmail,
         password: loginPassword,
       });
-      router.push("/dashboard");
+      router.push('/dashboard');
     } catch (error: any) {
-      console.error("Login error:", error);
-      alert(error.message || "Failed to login");
+      console.error('Login error:', error);
+      alert(error.message || 'Failed to login');
     } finally {
       setLoading(false);
     }
@@ -46,10 +46,10 @@ export default function LoginPage() {
         password: registerPassword,
         name: registerName,
       });
-      router.push("/onboarding/languages");
+      router.push('/onboarding/languages');
     } catch (error: any) {
-      console.error("Register error:", error);
-      alert(error.message || "Failed to register");
+      console.error('Register error:', error);
+      alert(error.message || 'Failed to register');
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Logging in..." : "Login"}
+                {loading ? 'Logging in...' : 'Login'}
               </Button>
             </form>
           </TabsContent>
@@ -135,7 +135,7 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating account..." : "Create Account"}
+                {loading ? 'Creating account...' : 'Create Account'}
               </Button>
             </form>
           </TabsContent>
