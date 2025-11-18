@@ -164,7 +164,10 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
         name: newProjectName.trim(),
       });
       // Add the new project to the list
-      setSourceProjects([...sourceProjects, project]);
+      setSourceProjects([
+        ...sourceProjects,
+        { id: project.id, name: project.name, status: (project as unknown as { status: string }).status ?? 'ACTIVE' },
+      ]);
       setSourceProjectId(project.id);
       setShowNewProjectInput(false);
       setNewProjectName('');
@@ -223,7 +226,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                   <FileText className="h-4 w-4 mr-2" />
                   Create New
                 </Button>
-                <Button variant="default">
+                <Button variant="primary">
                   <Upload className="h-4 w-4 mr-2" />
                   Upload File
                 </Button>
@@ -285,12 +288,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                     {!showNewProjectInput ? (
                       <>
                         <div className="flex gap-2">
-                          <Select
-                            value={sourceProjectId}
-                            onValueChange={setSourceProjectId}
-                            required
-                            className="flex-1"
-                          >
+                          <Select value={sourceProjectId} onValueChange={setSourceProjectId} required>
                             <SelectTrigger>
                               <SelectValue placeholder="Select source project" />
                             </SelectTrigger>
