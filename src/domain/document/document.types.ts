@@ -1,10 +1,13 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const createDocumentSchema = z.object({
-  slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
+  slug: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9\-]+$/),
   title: z.string().min(1),
   content: z.string(),
-  sourceProjectId: z.string().uuid("Source project is required"),
+  sourceProjectId: z.string().uuid('Source project is required'),
   folderId: z.string().optional(), // Deprecated - kept for backward compatibility
   labels: z.array(z.string()).default([]),
   deadline: z.coerce.date().optional(),

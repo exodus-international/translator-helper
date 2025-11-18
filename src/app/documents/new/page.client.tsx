@@ -277,7 +277,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                       onChange={(e) => setSlug(e.target.value)}
                       required
                       placeholder="document-slug"
-                      pattern="[a-z0-9-]+"
+                      pattern="[a-z0-9\-]+"
                     />
                   </div>
                 </div>
