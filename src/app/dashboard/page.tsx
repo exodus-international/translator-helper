@@ -1,3 +1,4 @@
+'use server';
 import { listTargetLanguages } from '@/domain/language/language.repository';
 import { getTranslationProjectsByUserAction } from '@/domain/translation-project/translation-project.actions';
 import { getUserLanguagesCountAction } from '@/domain/user-language/user-language.actions';

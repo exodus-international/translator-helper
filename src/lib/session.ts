@@ -1,6 +1,6 @@
-import { Role } from "@prisma/client";
-import { headers } from "next/headers";
-import { auth } from "./auth";
+import { Role } from '@prisma/client';
+import { headers } from 'next/headers';
+import { auth } from './auth';
 
 export interface SessionUser {
   id: string;
@@ -30,7 +30,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       banned: (session.user as any).banned || false,
     };
   } catch (error) {
-    console.error("Error getting current user:", error);
+    console.error('Error getting current user:', error);
     return null;
   }
 }
@@ -38,7 +38,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) {
-    throw new Error("Unauthorized");
+    throw new Error('Unauthorized');
   }
   return user;
 }
@@ -46,7 +46,7 @@ export async function requireUser(): Promise<SessionUser> {
 export async function requireRole(role: Role): Promise<SessionUser> {
   const user = await requireUser();
   if (user.role !== role) {
-    throw new Error("Forbidden: Insufficient permissions");
+    throw new Error('Forbidden: Insufficient permissions');
   }
   return user;
 }
