@@ -7,7 +7,7 @@ const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding'];
 // Paths that are public (auth pages)
 const publicPaths = ['/login', '/register', '/'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check if path requires authentication
