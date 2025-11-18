@@ -1,0 +1,461 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Upload, FileText, X } from "lucide-react";
+import { createDocumentAction } from "@/domain/document/document.actions";
+import { createSourceProjectAction } from "@/domain/source-project/source-project.actions";
+import matter from "gray-matter";
+
+interface NewDocumentClientProps {
+  sourceProjects: Array<{
+    id: string;
+    name: string;
+    status: string;
+  }>;
+}
+
+export default function NewDocumentClient({
+  sourceProjects: initialSourceProjects,
+}: NewDocumentClientProps) {
+  const router = useRouter();
+  const [sourceProjects, setSourceProjects] = useState(initialSourceProjects);
+  const [mode, setMode] = useState<"upload" | "create">("upload");
+  const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [content, setContent] = useState("");
+  const [sourceProjectId, setSourceProjectId] = useState<string>("");
+  const [newProjectName, setNewProjectName] = useState<string>("");
+  const [showNewProjectInput, setShowNewProjectInput] = useState(false);
+  const [labels, setLabels] = useState<string[]>([]);
+  const [labelInput, setLabelInput] = useState("");
+  const [deadline, setDeadline] = useState<string>("");
+  const [isDragging, setIsDragging] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".md")) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        
+        // Parse frontmatter
+        const { data: frontmatter, content: markdownContent } = matter(text);
+        
+        // Set content (without frontmatter)
+        setContent(markdownContent);
+
+        // Extract title from frontmatter or filename
+        const extractedTitle = frontmatter.title || file.name.replace(".md", "");
+        setTitle(extractedTitle);
+        
+        // Generate slug from title
+        const generatedSlug = extractedTitle
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "");
+        setSlug(generatedSlug);
+
+        // Extract labels from frontmatter
+        const extractedLabels: string[] = [];
+        if (frontmatter.day) extractedLabels.push(`day${frontmatter.day}`);
+        if (frontmatter.verse_tag) extractedLabels.push(frontmatter.verse_tag);
+        if (frontmatter.hero) extractedLabels.push(frontmatter.hero);
+        if (frontmatter.subtitle) extractedLabels.push(frontmatter.subtitle);
+        
+        setLabels(extractedLabels);
+        setMode("create");
+      };
+      reader.readAsText(file);
+    }
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.name.endsWith(".md")) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        
+        // Parse frontmatter
+        const { data: frontmatter, content: markdownContent } = matter(text);
+        
+        // Set content (without frontmatter)
+        setContent(markdownContent);
+
+        // Extract title from frontmatter or filename
+        const extractedTitle = frontmatter.title || file.name.replace(".md", "");
+        setTitle(extractedTitle);
+        
+        // Generate slug from title
+        const generatedSlug = extractedTitle
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "");
+        setSlug(generatedSlug);
+
+        // Extract labels from frontmatter
+        const extractedLabels: string[] = [];
+        if (frontmatter.day) extractedLabels.push(`day${frontmatter.day}`);
+        if (frontmatter.verse_tag) extractedLabels.push(frontmatter.verse_tag);
+        if (frontmatter.hero) extractedLabels.push(frontmatter.hero);
+        if (frontmatter.subtitle) extractedLabels.push(frontmatter.subtitle);
+        
+        setLabels(extractedLabels);
+        setMode("create");
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleTitleChange = (value: string) => {
+    setTitle(value);
+    // Auto-generate slug from title
+    if (!slug) {
+      setSlug(value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
+    }
+  };
+
+  const addLabel = () => {
+    if (labelInput && !labels.includes(labelInput)) {
+      setLabels([...labels, labelInput]);
+      setLabelInput("");
+    }
+  };
+
+  const removeLabel = (label: string) => {
+    setLabels(labels.filter((l) => l !== label));
+  };
+
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) {
+      alert("Please enter a project name");
+      return;
+    }
+
+    setCreatingProject(true);
+    try {
+      const project = await createSourceProjectAction({
+        name: newProjectName.trim(),
+      });
+      // Add the new project to the list
+      setSourceProjects([...sourceProjects, project]);
+      setSourceProjectId(project.id);
+      setShowNewProjectInput(false);
+      setNewProjectName("");
+    } catch (error: any) {
+      console.error("Error creating project:", error);
+      alert(error.message || "Failed to create project");
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (!sourceProjectId) {
+        alert("Please select a source project or create a new one");
+        setLoading(false);
+        return;
+      }
+
+      const document = await createDocumentAction({
+        title,
+        slug,
+        content,
+        sourceProjectId,
+        labels,
+        deadline: deadline ? new Date(deadline) : undefined,
+      });
+
+      router.push("/dashboard");
+    } catch (error: any) {
+      console.error("Error creating document:", error);
+      alert(error.message || "Failed to create document");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="border-b bg-white">
+        <div className="container mx-auto px-4 py-4">
+          <h1 className="text-2xl font-bold">New Document</h1>
+          <p className="text-gray-600">
+            Upload a markdown file or create a new document
+          </p>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        {mode === "upload" ? (
+          <Card className="p-8">
+            <div className="text-center mb-6">
+              <div className="flex justify-center gap-4 mb-6">
+                <Button
+                  variant="outline"
+                  onClick={() => setMode("create")}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Create New
+                </Button>
+                <Button variant="default">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload File
+                </Button>
+              </div>
+            </div>
+
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`
+                border-2 border-dashed rounded-lg p-12 text-center
+                ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"}
+              `}
+            >
+              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-lg font-medium mb-2">
+                Drag and drop your markdown file here
+              </p>
+              <p className="text-gray-600 mb-4">or</p>
+              <label>
+                <input
+                  type="file"
+                  accept=".md"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <Button type="button" variant="outline" asChild>
+                  <span>Browse Files</span>
+                </Button>
+              </label>
+              <p className="text-xs text-gray-500 mt-4">
+                Only .md files are supported
+              </p>
+            </div>
+          </Card>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <Card className="p-6">
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="title">Title *</Label>
+                    <Input
+                      id="title"
+                      value={title}
+                      onChange={(e) => handleTitleChange(e.target.value)}
+                      required
+                      placeholder="Document title"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="slug">Slug *</Label>
+                    <Input
+                      id="slug"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                      required
+                      placeholder="document-slug"
+                      pattern="[a-z0-9-]+"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="sourceProject">Source Project *</Label>
+                    {!showNewProjectInput ? (
+                      <>
+                        <div className="flex gap-2">
+                    <Select
+                      value={sourceProjectId}
+                      onValueChange={setSourceProjectId}
+                      required
+                            className="flex-1"
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sourceProjects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowNewProjectInput(true)}
+                          >
+                            New Project
+                          </Button>
+                        </div>
+                    {sourceProjects.length === 0 && (
+                          <p className="text-sm text-gray-500 mt-1">
+                            No projects available. Create a new one.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={newProjectName}
+                            onChange={(e) => setNewProjectName(e.target.value)}
+                            placeholder="Enter project name"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleCreateProject();
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleCreateProject}
+                            disabled={creatingProject || !newProjectName.trim()}
+                          >
+                            {creatingProject ? "Creating..." : "Create"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setShowNewProjectInput(false);
+                              setNewProjectName("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Press Enter or click Create to add the project
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="deadline">Deadline (Optional)</Label>
+                    <Input
+                      id="deadline"
+                      type="date"
+                      value={deadline}
+                      onChange={(e) => setDeadline(e.target.value)}
+                      placeholder="Select deadline"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="labels">Labels</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="labels"
+                      value={labelInput}
+                      onChange={(e) => setLabelInput(e.target.value)}
+                      placeholder="Add label"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addLabel();
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={addLabel} variant="outline">
+                      Add
+                    </Button>
+                  </div>
+                  {labels.length > 0 && (
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {labels.map((label) => (
+                        <Badge key={label} variant="secondary">
+                          {label}
+                          <button
+                            type="button"
+                            onClick={() => removeLabel(label)}
+                            className="ml-2"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="content">Content (Markdown) *</Label>
+                  <Textarea
+                    id="content"
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    required
+                    placeholder="# Your markdown content here..."
+                    rows={15}
+                    className="font-mono"
+                  />
+                </div>
+
+                <div className="flex justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (mode === "create" && !content) {
+                        setMode("upload");
+                      } else {
+                        router.back();
+                      }
+                    }}
+                  >
+                    {mode === "create" && !content ? "Back to Upload" : "Cancel"}
+                  </Button>
+                  <Button type="submit" disabled={loading || !sourceProjectId || sourceProjects.length === 0}>
+                    {loading ? "Creating..." : "Create Document"}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}

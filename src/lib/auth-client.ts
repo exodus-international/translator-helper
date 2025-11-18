@@ -1,0 +1,38 @@
+"use client";
+
+import { createAuthClient } from "better-auth/react";
+import { adminClient } from "better-auth/client/plugins";
+import { createAccessControl } from "better-auth/plugins/access";
+
+// Create access control (must match server-side)
+const statement = {
+  user: ["create", "read", "update", "delete", "ban", "unban"],
+  session: ["read", "delete", "revoke"],
+} as const;
+
+const ac = createAccessControl(statement);
+
+// Define DEPLOYER role with all admin permissions
+const deployer = ac.newRole({
+  user: ["create", "read", "update", "delete", "ban", "unban"],
+  session: ["read", "delete", "revoke"],
+});
+
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  plugins: [
+    adminClient({
+      ac,
+      roles: {
+        DEPLOYER: deployer,
+      },
+    }),
+  ],
+});
+
+export const {
+  signIn,
+  signUp,
+  signOut,
+  useSession,
+} = authClient;

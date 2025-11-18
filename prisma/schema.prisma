@@ -1,0 +1,274 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TRANSLATOR
+  DEPLOYER
+}
+
+enum ProjectRole {
+  PROJECT_MANAGER
+  REVIEWER
+  EDITOR
+  TRANSLATOR
+}
+
+enum SourceProjectStatus {
+  ACTIVE
+  COMPLETE
+}
+
+enum DocumentStatus {
+  PENDING_TRANSLATION
+  IN_PROGRESS
+  PENDING_REVIEW
+  APPROVED
+  DEPLOYED
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  name                String
+  emailVerified       Boolean              @default(false)
+  image               String?
+  role                Role                 @default(TRANSLATOR)
+  banned              Boolean              @default(false)
+  banReason           String?
+  banExpires          DateTime?
+  sessions            Session[]
+  accounts            Account[]
+  documentVersions    DocumentVersion[]
+  comments            Comment[]
+  activityLogs        ActivityLog[]
+  projectMembers      ProjectMember[]
+  assignedDocuments   DocumentAssignment[] @relation("AssignedTo")
+  assignedByDocuments DocumentAssignment[] @relation("AssignedBy")
+  languages           UserLanguage[]
+
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
+}
+
+model Language {
+  id                      String               @id @default(uuid())
+  code                    String               @unique // e.g., "en", "cs", "de"
+  name                    String // e.g., "English", "Czech", "German"
+  translationInstructions String?              @db.Text
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  documentVersions        DocumentVersion[]
+  translationProjects     TranslationProject[]
+  users                   UserLanguage[]
+
+  @@map("language")
+}
+
+model Folder {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  documents Document[]
+
+  @@map("folder")
+}
+
+model SourceProject {
+  id                  String               @id @default(uuid())
+  name                String               @unique
+  description         String?              @db.Text
+  status              SourceProjectStatus  @default(ACTIVE)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  documents           Document[]
+  translationProjects TranslationProject[]
+
+  @@map("source_project")
+}
+
+model TranslationProject {
+  id                  String               @id @default(uuid())
+  name                String
+  sourceProjectId     String
+  sourceProject       SourceProject        @relation(fields: [sourceProjectId], references: [id], onDelete: Cascade)
+  languageId          String
+  language            Language             @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  members             ProjectMember[]
+  documentAssignments DocumentAssignment[]
+
+  @@unique([sourceProjectId, languageId])
+  @@map("translation_project")
+}
+
+model ProjectMember {
+  id                   String             @id @default(uuid())
+  translationProjectId String
+  translationProject   TranslationProject @relation(fields: [translationProjectId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role                 ProjectRole
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([translationProjectId, userId, role])
+  @@map("project_member")
+}
+
+model DocumentAssignment {
+  id                   String             @id @default(uuid())
+  documentId           String
+  document             Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  translationProjectId String
+  translationProject   TranslationProject @relation(fields: [translationProjectId], references: [id], onDelete: Cascade)
+  userId               String? // null = unassigned (visible to all project members)
+  user                 User?              @relation("AssignedTo", fields: [userId], references: [id], onDelete: SetNull)
+  deadline             DateTime?
+  assignedAt           DateTime           @default(now())
+  assignedById         String
+  assignedBy           User               @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([documentId, translationProjectId])
+  @@map("document_assignment")
+}
+
+model Document {
+  id              String               @id @default(uuid())
+  slug            String               @unique
+  title           String
+  labels          String[] // Array of labels for categorization
+  deadline        DateTime? // Optional deadline for translation completion
+  folderId        String? // Deprecated - kept for migration
+  folder          Folder?              @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  sourceProjectId String?
+  sourceProject   SourceProject?       @relation(fields: [sourceProjectId], references: [id], onDelete: SetNull)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  versions        DocumentVersion[]
+  assignments     DocumentAssignment[]
+
+  @@map("document")
+}
+
+model DocumentVersion {
+  id           String         @id @default(uuid())
+  documentId   String
+  document     Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  languageId   String
+  language     Language       @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  content      String         @db.Text // Markdown content
+  status       DocumentStatus @default(PENDING_TRANSLATION)
+  version      Int            @default(1)
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  comments     Comment[]
+  activityLogs ActivityLog[]
+
+  @@unique([documentId, languageId])
+  @@map("document_version")
+}
+
+model Comment {
+  id                String          @id @default(uuid())
+  documentVersionId String
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content           String          @db.Text
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@map("comment")
+}
+
+model ActivityLog {
+  id                String          @id @default(uuid())
+  documentVersionId String
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action            String // e.g., "created", "edited", "submitted_for_review", "approved", "deployed"
+  details           Json? // Additional details about the action
+  createdAt         DateTime        @default(now())
+
+  @@map("activity_log")
+}
+
+model UserLanguage {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  languageId String
+  language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, languageId])
+  @@map("user_language")
+}
