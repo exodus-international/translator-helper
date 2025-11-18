@@ -1,24 +1,18 @@
-"use client";
+'use client';
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, X } from "lucide-react";
-import { createDocumentAction } from "@/domain/document/document.actions";
-import { createSourceProjectAction } from "@/domain/source-project/source-project.actions";
-import matter from "gray-matter";
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { createDocumentAction } from '@/domain/document/document.actions';
+import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import matter from 'gray-matter';
+import { FileText, Upload, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useState } from 'react';
 
 interface NewDocumentClientProps {
   sourceProjects: Array<{
@@ -28,21 +22,19 @@ interface NewDocumentClientProps {
   }>;
 }
 
-export default function NewDocumentClient({
-  sourceProjects: initialSourceProjects,
-}: NewDocumentClientProps) {
+export default function NewDocumentClient({ sourceProjects: initialSourceProjects }: NewDocumentClientProps) {
   const router = useRouter();
   const [sourceProjects, setSourceProjects] = useState(initialSourceProjects);
-  const [mode, setMode] = useState<"upload" | "create">("upload");
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [content, setContent] = useState("");
-  const [sourceProjectId, setSourceProjectId] = useState<string>("");
-  const [newProjectName, setNewProjectName] = useState<string>("");
+  const [mode, setMode] = useState<'upload' | 'create'>('upload');
+  const [title, setTitle] = useState('');
+  const [slug, setSlug] = useState('');
+  const [content, setContent] = useState('');
+  const [sourceProjectId, setSourceProjectId] = useState<string>('');
+  const [newProjectName, setNewProjectName] = useState<string>('');
   const [showNewProjectInput, setShowNewProjectInput] = useState(false);
   const [labels, setLabels] = useState<string[]>([]);
-  const [labelInput, setLabelInput] = useState("");
-  const [deadline, setDeadline] = useState<string>("");
+  const [labelInput, setLabelInput] = useState('');
+  const [deadline, setDeadline] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -62,26 +54,26 @@ export default function NewDocumentClient({
     setIsDragging(false);
 
     const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith(".md")) {
+    if (file && file.name.endsWith('.md')) {
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        
+
         // Parse frontmatter
         const { data: frontmatter, content: markdownContent } = matter(text);
-        
-        // Set content (without frontmatter)
-        setContent(markdownContent);
+
+        // Set content (preserve original document with metadata)
+        setContent(text);
 
         // Extract title from frontmatter or filename
-        const extractedTitle = frontmatter.title || file.name.replace(".md", "");
+        const extractedTitle = frontmatter.title || file.name.replace('.md', '');
         setTitle(extractedTitle);
-        
+
         // Generate slug from title
         const generatedSlug = extractedTitle
           .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "");
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '');
         setSlug(generatedSlug);
 
         // Extract labels from frontmatter
@@ -90,9 +82,9 @@ export default function NewDocumentClient({
         if (frontmatter.verse_tag) extractedLabels.push(frontmatter.verse_tag);
         if (frontmatter.hero) extractedLabels.push(frontmatter.hero);
         if (frontmatter.subtitle) extractedLabels.push(frontmatter.subtitle);
-        
+
         setLabels(extractedLabels);
-        setMode("create");
+        setMode('create');
       };
       reader.readAsText(file);
     }
@@ -100,26 +92,26 @@ export default function NewDocumentClient({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.name.endsWith(".md")) {
+    if (file && file.name.endsWith('.md')) {
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        
+
         // Parse frontmatter
         const { data: frontmatter, content: markdownContent } = matter(text);
-        
-        // Set content (without frontmatter)
-        setContent(markdownContent);
+
+        // Set content (preserve original document with metadata)
+        setContent(text);
 
         // Extract title from frontmatter or filename
-        const extractedTitle = frontmatter.title || file.name.replace(".md", "");
+        const extractedTitle = frontmatter.title || file.name.replace('.md', '');
         setTitle(extractedTitle);
-        
+
         // Generate slug from title
         const generatedSlug = extractedTitle
           .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "");
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '');
         setSlug(generatedSlug);
 
         // Extract labels from frontmatter
@@ -128,9 +120,9 @@ export default function NewDocumentClient({
         if (frontmatter.verse_tag) extractedLabels.push(frontmatter.verse_tag);
         if (frontmatter.hero) extractedLabels.push(frontmatter.hero);
         if (frontmatter.subtitle) extractedLabels.push(frontmatter.subtitle);
-        
+
         setLabels(extractedLabels);
-        setMode("create");
+        setMode('create');
       };
       reader.readAsText(file);
     }
@@ -140,14 +132,19 @@ export default function NewDocumentClient({
     setTitle(value);
     // Auto-generate slug from title
     if (!slug) {
-      setSlug(value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""));
+      setSlug(
+        value
+          .toLowerCase()
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, ''),
+      );
     }
   };
 
   const addLabel = () => {
     if (labelInput && !labels.includes(labelInput)) {
       setLabels([...labels, labelInput]);
-      setLabelInput("");
+      setLabelInput('');
     }
   };
 
@@ -157,7 +154,7 @@ export default function NewDocumentClient({
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
-      alert("Please enter a project name");
+      alert('Please enter a project name');
       return;
     }
 
@@ -170,10 +167,10 @@ export default function NewDocumentClient({
       setSourceProjects([...sourceProjects, project]);
       setSourceProjectId(project.id);
       setShowNewProjectInput(false);
-      setNewProjectName("");
+      setNewProjectName('');
     } catch (error: any) {
-      console.error("Error creating project:", error);
-      alert(error.message || "Failed to create project");
+      console.error('Error creating project:', error);
+      alert(error.message || 'Failed to create project');
     } finally {
       setCreatingProject(false);
     }
@@ -185,7 +182,7 @@ export default function NewDocumentClient({
 
     try {
       if (!sourceProjectId) {
-        alert("Please select a source project or create a new one");
+        alert('Please select a source project or create a new one');
         setLoading(false);
         return;
       }
@@ -199,10 +196,10 @@ export default function NewDocumentClient({
         deadline: deadline ? new Date(deadline) : undefined,
       });
 
-      router.push("/dashboard");
+      router.push('/dashboard');
     } catch (error: any) {
-      console.error("Error creating document:", error);
-      alert(error.message || "Failed to create document");
+      console.error('Error creating document:', error);
+      alert(error.message || 'Failed to create document');
     } finally {
       setLoading(false);
     }
@@ -213,21 +210,16 @@ export default function NewDocumentClient({
       <div className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
           <h1 className="text-2xl font-bold">New Document</h1>
-          <p className="text-gray-600">
-            Upload a markdown file or create a new document
-          </p>
+          <p className="text-gray-600">Upload a markdown file or create a new document</p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {mode === "upload" ? (
+        {mode === 'upload' ? (
           <Card className="p-8">
             <div className="text-center mb-6">
               <div className="flex justify-center gap-4 mb-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setMode("create")}
-                >
+                <Button variant="outline" onClick={() => setMode('create')}>
                   <FileText className="h-4 w-4 mr-2" />
                   Create New
                 </Button>
@@ -244,28 +236,19 @@ export default function NewDocumentClient({
               onDrop={handleDrop}
               className={`
                 border-2 border-dashed rounded-lg p-12 text-center
-                ${isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"}
+                ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
               `}
             >
               <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-lg font-medium mb-2">
-                Drag and drop your markdown file here
-              </p>
+              <p className="text-lg font-medium mb-2">Drag and drop your markdown file here</p>
               <p className="text-gray-600 mb-4">or</p>
               <label>
-                <input
-                  type="file"
-                  accept=".md"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
+                <input type="file" accept=".md" onChange={handleFileSelect} className="hidden" />
                 <Button type="button" variant="outline" asChild>
                   <span>Browse Files</span>
                 </Button>
               </label>
-              <p className="text-xs text-gray-500 mt-4">
-                Only .md files are supported
-              </p>
+              <p className="text-xs text-gray-500 mt-4">Only .md files are supported</p>
             </div>
           </Card>
         ) : (
@@ -302,35 +285,29 @@ export default function NewDocumentClient({
                     {!showNewProjectInput ? (
                       <>
                         <div className="flex gap-2">
-                    <Select
-                      value={sourceProjectId}
-                      onValueChange={setSourceProjectId}
-                      required
+                          <Select
+                            value={sourceProjectId}
+                            onValueChange={setSourceProjectId}
+                            required
                             className="flex-1"
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sourceProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowNewProjectInput(true)}
                           >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select source project" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sourceProjects.map((project) => (
+                                <SelectItem key={project.id} value={project.id}>
+                                  {project.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button type="button" variant="outline" onClick={() => setShowNewProjectInput(true)}>
                             New Project
                           </Button>
                         </div>
-                    {sourceProjects.length === 0 && (
-                          <p className="text-sm text-gray-500 mt-1">
-                            No projects available. Create a new one.
-                          </p>
+                        {sourceProjects.length === 0 && (
+                          <p className="text-sm text-gray-500 mt-1">No projects available. Create a new one.</p>
                         )}
                       </>
                     ) : (
@@ -341,7 +318,7 @@ export default function NewDocumentClient({
                             onChange={(e) => setNewProjectName(e.target.value)}
                             placeholder="Enter project name"
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") {
+                              if (e.key === 'Enter') {
                                 e.preventDefault();
                                 handleCreateProject();
                               }
@@ -352,22 +329,20 @@ export default function NewDocumentClient({
                             onClick={handleCreateProject}
                             disabled={creatingProject || !newProjectName.trim()}
                           >
-                            {creatingProject ? "Creating..." : "Create"}
+                            {creatingProject ? 'Creating...' : 'Create'}
                           </Button>
                           <Button
                             type="button"
                             variant="outline"
                             onClick={() => {
                               setShowNewProjectInput(false);
-                              setNewProjectName("");
+                              setNewProjectName('');
                             }}
                           >
                             Cancel
                           </Button>
                         </div>
-                        <p className="text-xs text-gray-500">
-                          Press Enter or click Create to add the project
-                        </p>
+                        <p className="text-xs text-gray-500">Press Enter or click Create to add the project</p>
                       </div>
                     )}
                   </div>
@@ -392,7 +367,7 @@ export default function NewDocumentClient({
                       onChange={(e) => setLabelInput(e.target.value)}
                       placeholder="Add label"
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === 'Enter') {
                           e.preventDefault();
                           addLabel();
                         }
@@ -407,11 +382,7 @@ export default function NewDocumentClient({
                       {labels.map((label) => (
                         <Badge key={label} variant="secondary">
                           {label}
-                          <button
-                            type="button"
-                            onClick={() => removeLabel(label)}
-                            className="ml-2"
-                          >
+                          <button type="button" onClick={() => removeLabel(label)} className="ml-2">
                             <X className="h-3 w-3" />
                           </button>
                         </Badge>
@@ -438,17 +409,17 @@ export default function NewDocumentClient({
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      if (mode === "create" && !content) {
-                        setMode("upload");
+                      if (mode === 'create' && !content) {
+                        setMode('upload');
                       } else {
                         router.back();
                       }
                     }}
                   >
-                    {mode === "create" && !content ? "Back to Upload" : "Cancel"}
+                    {mode === 'create' && !content ? 'Back to Upload' : 'Cancel'}
                   </Button>
                   <Button type="submit" disabled={loading || !sourceProjectId || sourceProjects.length === 0}>
-                    {loading ? "Creating..." : "Create Document"}
+                    {loading ? 'Creating...' : 'Create Document'}
                   </Button>
                 </div>
               </div>
