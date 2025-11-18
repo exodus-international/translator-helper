@@ -1,5 +1,0 @@
-onlyBuiltDependencies:
-  - sharp
-  - unrs-resolver
-  - '@prisma/engines'
-  - prisma

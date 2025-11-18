@@ -67,5 +67,13 @@
     "prisma",
     "sharp",
     "unrs-resolver"
-  ]
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "unrs-resolver",
+      "@prisma/engines",
+      "prisma"
+    ]
+  }
 }
