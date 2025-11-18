@@ -1,8 +1,4 @@
-import { PrismaClient, Role } from "@prisma/client";
-
-declare global {
-  var globalPrisma: PrismaClient | undefined;
-}
+import { PrismaClient, Role } from '@prisma/client';
 
 const prismaClient = new PrismaClient().$extends({
   query: {
@@ -32,9 +28,15 @@ const prismaClient = new PrismaClient().$extends({
   },
 });
 
+type ExtendedPrismaClient = typeof prismaClient;
+
+declare global {
+  var globalPrisma: ExtendedPrismaClient | undefined;
+}
+
 const prisma = global.globalPrisma || prismaClient;
 
-if (process.env.NODE_ENV !== "production") {
+if (process.env.NODE_ENV !== 'production') {
   global.globalPrisma = prisma;
 }
 
