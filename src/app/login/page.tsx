@@ -23,11 +23,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signIn.email({
+      const result = await signIn.email({
         email: loginEmail,
         password: loginPassword,
       });
-      router.push('/dashboard');
+      console.log(JSON.stringify(result.data, null, 2));
+      if (result.data) {
+        router.push('/dashboard');
+      } else {
+        alert(result.error.message || 'Failed to login');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       alert(error.message || 'Failed to login');
@@ -41,17 +46,20 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signUp.email({
+      const result = await signUp.email({
         email: registerEmail,
         password: registerPassword,
         name: registerName,
       });
-      router.push('/onboarding/languages');
+      console.log(JSON.stringify(result.data, null, 2));
+      if (result.data) {
+        router.push('/onboarding/languages');
+      } else {
+        alert(result.error.message || 'Failed to register');
+      }
     } catch (error: any) {
       console.error('Register error:', error);
       alert(error.message || 'Failed to register');
-    } finally {
-      setLoading(false);
     }
   };
 
