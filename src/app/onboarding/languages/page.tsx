@@ -22,3 +22,4 @@ export default async function OnboardingLanguagesPage() {
 
   return <OnboardingLanguagesClient languages={languages} />;
 }
+

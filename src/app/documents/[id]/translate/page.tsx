@@ -1,14 +1,14 @@
-import { getDocumentAssignmentByDocumentAndProject } from "@/domain/document-assignment/document-assignment.repository";
+import { getDocumentAssignmentByDocumentAndProject } from '@/domain/document-assignment/document-assignment.repository';
 import {
-    getDocumentVersionByDocumentAndLanguage,
-    getDocumentVersionById,
-} from "@/domain/document-version/document-version.repository";
-import { getDocumentById } from "@/domain/document/document.repository";
-import { getLanguageByCode } from "@/domain/language/language.repository";
-import { getTranslationProjectBySourceAndLanguage } from "@/domain/translation-project/translation-project.repository";
-import { getCurrentUser } from "@/lib/session";
-import { notFound, redirect } from "next/navigation";
-import TranslateClient from "./page.client";
+  getDocumentVersionByDocumentAndLanguage,
+  getDocumentVersionById,
+} from '@/domain/document-version/document-version.repository';
+import { getDocumentById } from '@/domain/document/document.repository';
+import { getLanguageByCode } from '@/domain/language/language.repository';
+import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
+import { getCurrentUser } from '@/lib/session';
+import { notFound, redirect } from 'next/navigation';
+import TranslateClient from './page.client';
 
 export default async function TranslatePage({
   params,
@@ -20,7 +20,7 @@ export default async function TranslatePage({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const { id } = await params;
@@ -33,18 +33,15 @@ export default async function TranslatePage({
   }
 
   // Get the English (source) version
-  const englishLang = await getLanguageByCode("en");
+  const englishLang = await getLanguageByCode('en');
   if (!englishLang) {
-    throw new Error("English language not found");
+    throw new Error('English language not found');
   }
 
-  const sourceVersion = await getDocumentVersionByDocumentAndLanguage(
-    id,
-    englishLang.id
-  );
+  const sourceVersion = await getDocumentVersionByDocumentAndLanguage(id, englishLang.id);
 
   if (!sourceVersion) {
-    throw new Error("Source English version not found");
+    throw new Error('Source English version not found');
   }
 
   // Get the target language version (if it exists)
@@ -60,15 +57,9 @@ export default async function TranslatePage({
   let translationProject = null;
   let assignment = null;
   if (lang && document.sourceProject?.id) {
-    translationProject = await getTranslationProjectBySourceAndLanguage(
-      document.sourceProject.id,
-      lang
-    );
+    translationProject = await getTranslationProjectBySourceAndLanguage(document.sourceProject.id, lang);
     if (translationProject) {
-      assignment = await getDocumentAssignmentByDocumentAndProject(
-        id,
-        translationProject.id
-      );
+      assignment = await getDocumentAssignmentByDocumentAndProject(id, translationProject.id);
     }
   }
 
@@ -77,9 +68,10 @@ export default async function TranslatePage({
       document={document}
       sourceVersion={sourceVersion}
       targetVersion={targetVersion}
-      targetLanguageId={lang || ""}
+      targetLanguageId={lang || ''}
       translationProject={translationProject}
       assignment={assignment}
+      user={user}
     />
   );
 }

@@ -1,13 +1,6 @@
 import { DocumentStatus } from '@prisma/client';
 import type { LucideIcon } from 'lucide-react';
-import {
-  AlertCircle,
-  CheckCircle2,
-  Circle,
-  Clock3,
-  PenLine,
-  Rocket,
-} from 'lucide-react';
+import { AlertCircle, CheckCircle2, Circle, Clock3, PenLine, Rocket } from 'lucide-react';
 
 export type DocumentStatusKey = DocumentStatus | 'NO_STATUS';
 
@@ -50,31 +43,31 @@ export const DOCUMENT_STATUS_SEQUENCE: DocumentStatus[] = [
 export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfig> = {
   [DocumentStatus.PENDING_TRANSLATION]: {
     status: DocumentStatus.PENDING_TRANSLATION,
-    name: 'Pending Translation',
+    name: 'TODO',
     icon: AlertCircle,
     color: {
-      hex: '#0EA5E9',
-      textClass: 'text-sky-600',
-      indicatorClass: '!border-sky-500 !bg-sky-500 !text-white',
-      indicatorInactiveClass: '!border-sky-200 !bg-sky-50 !text-sky-400',
-      badgeClass: 'border border-sky-200 bg-sky-50 text-sky-700',
+      hex: '#BABABA',
+      textClass: 'text-gray-600',
+      indicatorClass: '!border-gray-500 !bg-gray-500 !text-white',
+      indicatorInactiveClass: '!border-gray-200 !bg-gray-50 !text-gray-400',
+      badgeClass: 'border border-gray-200 bg-gray-50 text-gray-700',
     },
   },
   [DocumentStatus.IN_PROGRESS]: {
     status: DocumentStatus.IN_PROGRESS,
-    name: 'In Progress',
+    name: 'Translations in Progress',
     icon: PenLine,
     color: {
-      hex: '#F59E0B',
-      textClass: 'text-amber-600',
-      indicatorClass: '!border-amber-500 !bg-amber-500 !text-white',
-      indicatorInactiveClass: '!border-amber-200 !bg-amber-50 !text-amber-400',
-      badgeClass: 'border border-amber-200 bg-amber-50 text-amber-700',
+      hex: '#0063ed',
+      textClass: 'text-blue-800',
+      indicatorClass: '!border-blue-800 !bg-blue-800 !text-white',
+      indicatorInactiveClass: '!border-blue-200 !bg-blue-50 !text-blue-400',
+      badgeClass: 'border border-blue-200 bg-blue-50 text-blue-700',
     },
   },
   [DocumentStatus.PENDING_REVIEW]: {
     status: DocumentStatus.PENDING_REVIEW,
-    name: 'Pending Review',
+    name: 'Texts in Review',
     icon: Clock3,
     color: {
       hex: '#FACC15',
@@ -86,7 +79,7 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
   },
   [DocumentStatus.APPROVED]: {
     status: DocumentStatus.APPROVED,
-    name: 'Approved',
+    name: 'Approved Texts',
     icon: CheckCircle2,
     color: {
       hex: '#10B981',
@@ -98,7 +91,7 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
   },
   [DocumentStatus.DEPLOYED]: {
     status: DocumentStatus.DEPLOYED,
-    name: 'Deployed',
+    name: 'Deployed Texts',
     icon: Rocket,
     color: {
       hex: '#8B5CF6',
@@ -123,13 +116,10 @@ const NO_STATUS_CONFIG: DocumentStatusConfig = {
   },
 };
 
-const STATUS_STEP_INDEX = DOCUMENT_STATUS_SEQUENCE.reduce<Record<DocumentStatus, number>>(
-  (acc, status, index) => {
-    acc[status] = index + 1;
-    return acc;
-  },
-  {} as Record<DocumentStatus, number>,
-);
+const STATUS_STEP_INDEX = DOCUMENT_STATUS_SEQUENCE.reduce<Record<DocumentStatus, number>>((acc, status, index) => {
+  acc[status] = index + 1;
+  return acc;
+}, {} as Record<DocumentStatus, number>);
 
 export function getDocumentStatusConfig(status?: DocumentStatus | DocumentStatusKey | null): DocumentStatusConfig {
   if (!status || status === 'NO_STATUS') {

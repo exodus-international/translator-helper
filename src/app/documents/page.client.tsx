@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { StatusDropdown } from "@/components/status-dropdown";
 import { SessionUser } from "@/lib/session";
 import { Document, DocumentStatus, Language } from "@prisma/client";
 import { FileText, Plus, Search } from "lucide-react";
@@ -216,27 +217,38 @@ export default function DocumentsClient({
                         const IndicatorIcon = statusConfig.icon;
 
                         return (
-                          <div key={lang.id} className="flex-1 flex justify-center">
+                          <div key={lang.id} className="flex-1 flex justify-center items-center gap-2">
                             {versionId ? (
-                              <Link
-                                href={
-                                  status === "PENDING_TRANSLATION" || status === "IN_PROGRESS"
-                                    ? `/documents/${doc.id}/translate?lang=${lang.id}&version=${versionId}`
-                                    : `/documents/${doc.id}/review?version=${versionId}`
-                                }
-                                className="group"
-                              >
-                                <div
-                                  className={`${statusConfig.color.textClass} transition-transform group-hover:scale-110 cursor-pointer`}
-                                  title={statusConfig.name}
+                              <>
+                                <Link
+                                  href={
+                                    status === "PENDING_TRANSLATION" || status === "IN_PROGRESS"
+                                      ? `/documents/${doc.id}/translate?lang=${lang.id}&version=${versionId}`
+                                      : `/documents/${doc.id}/review?version=${versionId}`
+                                  }
+                                  className="group"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <IndicatorIcon className="h-4 w-4" />
-                                </div>
-                              </Link>
+                                  <div
+                                    className={`${statusConfig.color.textClass} transition-transform group-hover:scale-110 cursor-pointer`}
+                                    title={statusConfig.name}
+                                  >
+                                    <IndicatorIcon className="h-4 w-4" />
+                                  </div>
+                                </Link>
+                                <StatusDropdown
+                                  currentStatus={status}
+                                  versionId={versionId}
+                                  user={user}
+                                  documentId={doc.id}
+                                  languageId={lang.id}
+                                />
+                              </>
                             ) : (
                               <Link
                                 href={`/documents/${doc.id}/translate?lang=${lang.id}`}
                                 className="group"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <div
                                   className={`${statusConfig.color.textClass} transition-transform group-hover:scale-110 cursor-pointer`}

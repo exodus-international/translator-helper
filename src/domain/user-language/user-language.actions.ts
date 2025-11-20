@@ -36,3 +36,4 @@ export async function getUserLanguagesCountAction(): Promise<number> {
   const user = await requireUser();
   return await getUserLanguagesCount(user.id);
 }
+

@@ -46,6 +46,7 @@ export default async function ReviewPage({
       document={document}
       sourceVersion={sourceVersion}
       targetVersion={version}
+      user={user}
     />
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { SourceTranslationViewer, SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
+import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -15,13 +16,14 @@ import {
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import {
-  assignDocumentVersionAction,
   createDocumentVersionAction,
   submitForReviewAction,
   updateDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
 import { translateDocumentAction } from '@/domain/translation/translation.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
+import { SessionUser } from '@/lib/session';
+import { DocumentStatus } from '@prisma/client';
 import matter from 'gray-matter';
 import { AlertCircle, Calendar, Maximize2, Minimize2, Save, Send, Sparkles, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -34,6 +36,7 @@ interface TranslateClientProps {
   targetLanguageId: string;
   translationProject?: any | null;
   assignment?: any | null;
+  user: SessionUser;
 }
 
 function getContentWithoutFrontmatter(text: string) {
@@ -52,6 +55,7 @@ export default function TranslateClient({
   targetLanguageId,
   translationProject,
   assignment,
+  user,
 }: TranslateClientProps) {
   const router = useRouter();
   const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
@@ -73,6 +77,10 @@ export default function TranslateClient({
     () => (content ? getContentWithoutFrontmatter(content) : '*No content yet...*'),
     [content],
   );
+
+  const handleStatusChange = (status: DocumentStatus) => {
+    setTargetVersion((prev: any | null) => (prev ? { ...prev, status } : prev));
+  };
 
   // Extract reviewer and deployer from activity logs
   const reviewer = useMemo(() => {
@@ -103,32 +111,6 @@ export default function TranslateClient({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [zenMode]);
-
-  const handleStartTranslation = async () => {
-    if (!targetLanguageId) {
-      alert('Please select a target language');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Assign the document to the current user and set status to IN_PROGRESS
-      const assigned = await assignDocumentVersionAction({
-        documentId: document.id,
-        languageId: targetLanguageId,
-        content: '',
-      });
-
-      console.log('assigned', assigned);
-
-      // Reload the page with the version ID to get fresh data
-      window.location.href = `/documents/${document.id}/translate?lang=${targetLanguageId}&version=${assigned.id}`;
-    } catch (error: any) {
-      console.error('Error starting translation:', error);
-      alert(error.message || 'Failed to start translation');
-      setLoading(false);
-    }
-  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -227,66 +209,44 @@ export default function TranslateClient({
                   <span className="text-gray-400">→</span>
                   <Badge variant="secondary">{targetVersion?.language.name || 'New Translation'}</Badge>
                 </div>
-                <div className="flex gap-2">
-                  {!targetVersion || targetVersion.status === 'PENDING_TRANSLATION' ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {targetVersion ? (
                     <>
-                      <Button onClick={handleStartTranslation} disabled={loading || translating || !targetLanguageId}>
-                        Start Translation
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAutoTranslate}
-                        disabled={loading || translating || !targetLanguageId}
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        {translating ? 'Translating...' : 'Translate with AI'}
-                      </Button>
-                    </>
-                  ) : targetVersion.status === 'IN_PROGRESS' ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAutoTranslate}
-                        disabled={loading || translating || !targetLanguageId}
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        {translating ? 'Translating...' : 'Translate with AI'}
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setZenMode(true)}>
-                        <Maximize2 className="h-4 w-4 mr-2" />
-                        Zen Mode (F11)
-                      </Button>
-                      <Button variant="outline" onClick={handleSave} disabled={loading || translating}>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Draft
-                      </Button>
-                      <Button onClick={handleSubmitForReview} disabled={loading || translating}>
-                        <Send className="h-4 w-4 mr-2" />
-                        Submit for Review
-                      </Button>
+                      {targetVersion.status !== 'PENDING_TRANSLATION' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAutoTranslate}
+                            disabled={loading || translating || !targetLanguageId}
+                          >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            {translating ? 'Translating...' : 'Translate with AI'}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setZenMode(true)}>
+                            <Maximize2 className="h-4 w-4 mr-2" />
+                            Zen Mode (F11)
+                          </Button>
+                          <Button variant="outline" onClick={handleSave} disabled={loading || translating}>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Draft
+                          </Button>
+                        </>
+                      )}
+                      <StatusDropdown
+                        currentStatus={targetVersion.status}
+                        versionId={targetVersion.id}
+                        user={user}
+                        documentId={document.id}
+                        languageId={targetLanguageId}
+                        disabled={loading || translating}
+                        onStatusChange={handleStatusChange}
+                      />
                     </>
                   ) : (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAutoTranslate}
-                        disabled={loading || translating || !targetLanguageId}
-                      >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        {translating ? 'Translating...' : 'Translate with AI'}
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setZenMode(true)}>
-                        <Maximize2 className="h-4 w-4 mr-2" />
-                        Zen Mode (F11)
-                      </Button>
-                      <Button variant="outline" onClick={handleSave} disabled={loading || translating}>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Draft
-                      </Button>
-                    </>
+                    <span className="text-sm text-gray-500">
+                      Translation not initialized yet. Create a version from the documents page to get started.
+                    </span>
                   )}
                 </div>
               </div>
@@ -372,16 +332,18 @@ export default function TranslateClient({
         <div className="border-b bg-white shadow-sm">
           <div className="px-4 py-2 flex items-center justify-between">
             <div className="text-sm text-gray-600">{document.title} • Zen Mode</div>
-            <div className="flex gap-2">
-              {!targetVersion || targetVersion.status === 'PENDING_TRANSLATION' ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {targetVersion ? (
                 <>
-                  <Button
-                    size="sm"
-                    onClick={handleStartTranslation}
-                    disabled={loading || translating || !targetLanguageId}
-                  >
-                    Start Translation
-                  </Button>
+                  <StatusDropdown
+                    currentStatus={targetVersion.status}
+                    versionId={targetVersion.id}
+                    user={user}
+                    documentId={document.id}
+                    languageId={targetLanguageId}
+                    disabled={loading || translating}
+                    onStatusChange={handleStatusChange}
+                  />
                   <Button
                     variant="outline"
                     size="sm"
@@ -391,43 +353,23 @@ export default function TranslateClient({
                     <Sparkles className="h-4 w-4 mr-2" />
                     {translating ? 'Translating...' : 'Translate'}
                   </Button>
-                </>
-              ) : targetVersion.status === 'IN_PROGRESS' ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAutoTranslate}
-                    disabled={loading || translating || !targetLanguageId}
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    {translating ? 'Translating...' : 'Translate'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                  </Button>
-                  <Button size="sm" onClick={handleSubmitForReview} disabled={loading || translating}>
-                    <Send className="h-4 w-4 mr-2" />
-                    Submit
-                  </Button>
+                  {targetVersion.status !== 'PENDING_TRANSLATION' && (
+                    <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save
+                    </Button>
+                  )}
+                  {targetVersion.status === 'IN_PROGRESS' && (
+                    <Button size="sm" onClick={handleSubmitForReview} disabled={loading || translating}>
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit
+                    </Button>
+                  )}
                 </>
               ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAutoTranslate}
-                    disabled={loading || translating || !targetLanguageId}
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    {translating ? 'Translating...' : 'Translate'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                  </Button>
-                </>
+                <span className="text-sm text-gray-500">
+                  Translation not initialized yet. Create a version from the documents page to get started.
+                </span>
               )}
               <Button variant="outline" size="sm" onClick={() => setZenMode(false)}>
                 <Minimize2 className="h-4 w-4 mr-2" />

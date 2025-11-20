@@ -11,7 +11,7 @@ import { updateDocumentVersionStatusAction } from '@/domain/document-version/doc
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus, Language } from '@prisma/client';
-import { ArrowUpRight, FileText, Plus, Search } from 'lucide-react';
+import { FileText, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -87,6 +87,7 @@ export default function DashboardClient({
   initialFilters,
 }: DashboardClientProps) {
   const router = useRouter();
+  const LANGUAGE_STORAGE_KEY = 'dashboard:selectedLanguage';
   const [selectedLanguage, setSelectedLanguage] = useState<string>(initialFilters.language || languages[0]?.id || '');
   const [selectedTranslationProject, setSelectedTranslationProject] = useState<string>(
     initialFilters.translationProject || 'all',
@@ -97,6 +98,21 @@ export default function DashboardClient({
 
   // Get translation project ID from selected project
   const selectedTranslationProjectId = selectedTranslationProject !== 'all' ? selectedTranslationProject : undefined;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (storedLanguage && languages.some((lang) => lang.id === storedLanguage)) {
+      setSelectedLanguage(storedLanguage);
+    }
+  }, [languages]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (selectedLanguage) {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, selectedLanguage);
+    }
+  }, [selectedLanguage]);
 
   // Get translation projects for the selected language
   const languageTranslationProjects = translationProjects.filter((tp) => tp.languageId === selectedLanguage);
@@ -340,97 +356,104 @@ export default function DashboardClient({
                         };
 
                         return (
-                          <KanbanCard
-                            column={column.id}
-                            id={card.id}
-                            key={card.id}
-                            name={card.name}
-                            onClick={() => {
-                              router.push(getDocumentUrl());
-                            }}
-                          >
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="m-0 flex-1 font-medium text-sm">{doc.title}</p>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {(() => {
-                                    // Helper function to check if user has the selected language
-                                    const userHasLanguage = (user: any) => {
-                                      if (!user?.languages) return false;
-                                      return user.languages.some((ul: any) => ul.languageId === selectedLanguage);
-                                    };
+                          <KanbanCard column={column.id} id={card.id} key={card.id} name={card.name}>
+                            <Link
+                              href={getDocumentUrl()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              title="Open document"
+                            >
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="m-0 flex-1 font-medium text-sm">{doc.title}</p>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {(() => {
+                                      // Helper function to check if user has the selected language
+                                      const userHasLanguage = (user: any) => {
+                                        if (!user?.languages) return false;
+                                        return user.languages.some((ul: any) => ul.languageId === selectedLanguage);
+                                      };
 
-                                    // Filter users based on language preference
-                                    const assignmentUser =
-                                      assignment?.user && userHasLanguage(assignment.user) ? assignment.user : null;
-                                    const versionUser =
-                                      version?.user && userHasLanguage(version.user) ? version.user : null;
-                                    const shouldShowVersionUser =
-                                      versionUser && (!assignmentUser || versionUser.id !== assignmentUser.id);
+                                      // Filter users based on language preference
+                                      const assignmentUser =
+                                        assignment?.user && userHasLanguage(assignment.user) ? assignment.user : null;
+                                      const versionUser =
+                                        version?.user && userHasLanguage(version.user) ? version.user : null;
+                                      const shouldShowVersionUser =
+                                        versionUser && (!assignmentUser || versionUser.id !== assignmentUser.id);
 
-                                    if (!assignmentUser && !shouldShowVersionUser) {
-                                      return null;
-                                    }
+                                      if (!assignmentUser && !shouldShowVersionUser) {
+                                        return null;
+                                      }
 
-                                    return (
-                                      <div className="flex items-center gap-1 -space-x-1">
-                                        {assignmentUser && (
-                                          <Avatar
-                                            size="sm"
-                                            name={assignmentUser.name || undefined}
-                                            className="border-2 border-background"
-                                            title={assignmentUser.name || undefined}
-                                          >
-                                            <AvatarFallback name={assignmentUser.name || undefined}>
-                                              {assignmentUser.name?.slice(0, 2).toUpperCase()}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                        )}
-                                        {shouldShowVersionUser && (
-                                          <Avatar
-                                            size="sm"
-                                            name={versionUser.name || undefined}
-                                            className="border-2 border-background"
-                                            title={versionUser.name || undefined}
-                                          >
-                                            <AvatarFallback name={versionUser.name || undefined}>
-                                              {versionUser.name?.slice(0, 2).toUpperCase()}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                  <Link
-                                    href={getDocumentUrl()}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                    }}
-                                    className="text-muted-foreground hover:text-foreground transition-colors"
-                                    title="Open document"
-                                  >
-                                    <ArrowUpRight className="h-4 w-4" />
-                                  </Link>
+                                      return (
+                                        <div className="flex items-center gap-1 -space-x-1">
+                                          {assignmentUser && (
+                                            <Avatar
+                                              size="sm"
+                                              name={assignmentUser.name || undefined}
+                                              className="border-2 border-background"
+                                              title={assignmentUser.name || undefined}
+                                            >
+                                              <AvatarFallback name={assignmentUser.name || undefined}>
+                                                {assignmentUser.name?.slice(0, 2).toUpperCase()}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                          )}
+                                          {shouldShowVersionUser && (
+                                            <Avatar
+                                              size="sm"
+                                              name={versionUser.name || undefined}
+                                              className="border-2 border-background"
+                                              title={versionUser.name || undefined}
+                                            >
+                                              <AvatarFallback name={versionUser.name || undefined}>
+                                                {versionUser.name?.slice(0, 2).toUpperCase()}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap gap-1 items-center">
+                                  {doc.sourceProject && (
+                                    <Badge variant="secondary" size="xs">
+                                      {doc.sourceProject.name}
+                                    </Badge>
+                                  )}
+                                  {language && (
+                                    <Badge variant="secondary" size="xs">
+                                      {language.name}
+                                    </Badge>
+                                  )}
+                                  {deadline && (
+                                    <Badge variant="outline" size="xs">
+                                      {shortDateFormatter.format(new Date(deadline))}
+                                    </Badge>
+                                  )}
+                                  {version && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                      className="ml-auto"
+                                    >
+                                      {/* <StatusDropdown
+                                      currentStatus={version.status}
+                                      versionId={version.id}
+                                      user={user}
+                                      documentId={doc.id}
+                                      languageId={selectedLanguage}
+                                    /> */}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                              <div className="flex flex-wrap gap-1">
-                                {doc.sourceProject && (
-                                  <Badge variant="secondary" size="xs">
-                                    {doc.sourceProject.name}
-                                  </Badge>
-                                )}
-                                {language && (
-                                  <Badge variant="secondary" size="xs">
-                                    {language.name}
-                                  </Badge>
-                                )}
-                                {deadline && (
-                                  <Badge variant="outline" size="xs">
-                                    {shortDateFormatter.format(new Date(deadline))}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
+                            </Link>
                           </KanbanCard>
                         );
                       }}

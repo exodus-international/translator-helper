@@ -23,6 +23,8 @@ import {
   updateDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
+import { SessionUser } from '@/lib/session';
+import { StatusDropdown } from '@/components/status-dropdown';
 import { cn } from '@/lib/utils';
 import matter from 'gray-matter';
 import { CheckCircle, Download, MessageSquare, XCircle } from 'lucide-react';
@@ -33,6 +35,7 @@ interface ReviewClientProps {
   document: any;
   sourceVersion: any;
   targetVersion: any;
+  user: SessionUser;
 }
 
 function getContentWithoutFrontmatter(text: string) {
@@ -48,6 +51,7 @@ export default function ReviewClient({
   document,
   sourceVersion,
   targetVersion: initialTargetVersion,
+  user,
 }: ReviewClientProps) {
   const router = useRouter();
   const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
@@ -209,15 +213,27 @@ export default function ReviewClient({
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h1 className="text-2xl font-bold">{document.title}</h1>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="secondary">{sourceVersion.language.name}</Badge>
-                  <span className="text-gray-400">→</span>
-                  <Badge variant="secondary">{targetVersion.language.name}</Badge>
-                  <Badge variant="secondary" className={cn('gap-1', currentStatusConfig.color.badgeClass)}>
-                    <currentStatusConfig.icon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
-                    {currentStatusConfig.name}
-                  </Badge>
+              <div className="flex items-center flex-col gap-2">
+                <div className="flex justify-between w-full">
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary">{sourceVersion.language.name}</Badge>
+                    <span className="text-gray-400">→</span>
+                    <Badge variant="secondary">{targetVersion.language.name}</Badge>
+                    <Badge variant="secondary" className={cn('gap-1', currentStatusConfig.color.badgeClass)}>
+                      <currentStatusConfig.icon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
+                      {currentStatusConfig.name}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    <StatusDropdown
+                      currentStatus={targetVersion.status}
+                      versionId={targetVersion.id}
+                      user={user}
+                      documentId={document.id}
+                      languageId={targetVersion.languageId}
+                      disabled={loading}
+                    />
+                  </div>
                 </div>
                 <div className="mt-4 w-full">
                   <Stepper value={getStatusStep(targetVersion.status)} orientation="horizontal">
@@ -235,26 +251,6 @@ export default function ReviewClient({
                   </Stepper>
                 </div>
               </div>
-            </div>
-            <div className="flex gap-2 ml-4">
-              {canDeploy && (
-                <Button onClick={handleDeploy} disabled={loading}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Deploy
-                </Button>
-              )}
-              {isPendingReview && (
-                <>
-                  <Button variant="outline" onClick={handleRequestChanges} disabled={loading}>
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Request Changes
-                  </Button>
-                  <Button onClick={handleApprove} disabled={loading}>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Approve
-                  </Button>
-                </>
-              )}
             </div>
           </div>
         </div>

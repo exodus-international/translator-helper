@@ -1,41 +1,41 @@
-"use server";
+'use server';
 
-import prisma from "@/lib/db";
-import { canDeploy, canReviewInProject, canTranslateInProject, isProjectMember } from "@/lib/permissions";
-import { requireUser } from "@/lib/session";
-import { DocumentStatus, ProjectRole } from "@prisma/client";
-import { createActivityLog } from "../activity-log/activity-log.repository";
-import { createComment } from "../comment/comment.repository";
-import { getDocumentAssignmentByDocumentAndProject } from "../document-assignment/document-assignment.repository";
-import { getDocumentById } from "../document/document.repository";
-import { getLanguageById } from "../language/language.repository";
-import { createProjectMember } from "../project-member/project-member.repository";
-import { getSourceProjectById } from "../source-project/source-project.repository";
-import { createTranslationProject, getTranslationProjectBySourceAndLanguage } from "../translation-project/translation-project.repository";
+import prisma from '@/lib/db';
+import { canDeploy, canReviewInProject, canTranslateInProject, isProjectMember } from '@/lib/permissions';
+import { requireUser } from '@/lib/session';
+import { DocumentStatus, ProjectRole } from '@prisma/client';
+import { createActivityLog } from '../activity-log/activity-log.repository';
+import { createComment } from '../comment/comment.repository';
+import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
+import { getDocumentById } from '../document/document.repository';
+import { getLanguageById } from '../language/language.repository';
+import { createProjectMember } from '../project-member/project-member.repository';
+import { getSourceProjectById } from '../source-project/source-project.repository';
 import {
-    createDocumentVersion,
-    deleteDocumentVersion,
-    getDocumentVersionByDocumentAndLanguage,
-    getDocumentVersionById,
-    updateDocumentVersion,
-    updateDocumentVersionStatus,
-} from "./document-version.repository";
+  createTranslationProject,
+  getTranslationProjectBySourceAndLanguage,
+} from '../translation-project/translation-project.repository';
 import {
-    createDocumentVersionSchema,
-    reviewVersionSchema,
-    submitForReviewSchema,
-    updateDocumentVersionSchema,
-} from "./document-version.types";
+  createDocumentVersion,
+  deleteDocumentVersion,
+  getDocumentVersionByDocumentAndLanguage,
+  getDocumentVersionById,
+  updateDocumentVersion,
+  updateDocumentVersionStatus,
+} from './document-version.repository';
+import {
+  createDocumentVersionSchema,
+  reviewVersionSchema,
+  submitForReviewSchema,
+  updateDocumentVersionSchema,
+} from './document-version.types';
 
 export async function getDocumentVersionAction(id: string) {
   await requireUser();
   return await getDocumentVersionById(id);
 }
 
-export async function getDocumentVersionByDocumentAndLanguageAction(
-  documentId: string,
-  languageId: string
-) {
+export async function getDocumentVersionByDocumentAndLanguageAction(documentId: string, languageId: string) {
   await requireUser();
   return await getDocumentVersionByDocumentAndLanguage(documentId, languageId);
 }
@@ -55,7 +55,7 @@ export async function createDocumentVersionAction(input: unknown) {
   await createActivityLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: "created_translation",
+    action: 'created_translation',
     details: { language: version.language.name },
   });
 
@@ -69,36 +69,38 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   // Get existing version to check permissions
   const existingVersion = await getDocumentVersionById(id);
   if (!existingVersion) {
-    throw new Error("Document version not found");
+    throw new Error('Document version not found');
   }
 
   // Get document to find source project
   const document = await getDocumentById(existingVersion.documentId);
   if (!document) {
-    throw new Error("Document not found");
+    throw new Error('Document not found');
   }
   if (!document.sourceProject?.id) {
-    throw new Error("This document is not associated with a source project. Please assign a source project to the document before editing translations.");
+    throw new Error(
+      'This document is not associated with a source project. Please assign a source project to the document before editing translations.',
+    );
   }
 
   // Get translation project
   const translationProject = await getTranslationProjectBySourceAndLanguage(
     document.sourceProject.id,
-    existingVersion.languageId
+    existingVersion.languageId,
   );
 
   if (translationProject) {
     // Check if user is a project member
     const isMember = await isProjectMember(user, translationProject.id);
     if (!isMember) {
-      throw new Error("You are not a member of this translation project");
+      throw new Error('You are not a member of this translation project');
     }
 
     // Only the owner of the version or users with higher permissions can edit
     if (existingVersion.userId !== user.id) {
       const canTranslate = await canTranslateInProject(user, translationProject.id);
       if (!canTranslate) {
-        throw new Error("You do not have permission to edit this translation");
+        throw new Error('You do not have permission to edit this translation');
       }
     }
   }
@@ -109,7 +111,7 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   await createActivityLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: "edited",
+    action: 'edited',
     details: { version: version.version },
   });
 
@@ -123,44 +125,41 @@ export async function submitForReviewAction(input: unknown) {
   // Get existing version to check permissions
   const existingVersion = await getDocumentVersionById(validated.versionId);
   if (!existingVersion) {
-    throw new Error("Document version not found");
+    throw new Error('Document version not found');
   }
 
   // Only the owner can submit for review
   if (existingVersion.userId !== user.id) {
-    throw new Error("Only the translator can submit this version for review");
+    throw new Error('Only the translator can submit this version for review');
   }
 
   // Get document to find source project
   const document = await getDocumentById(existingVersion.documentId);
   if (!document || !document.sourceProject?.id) {
-    throw new Error("Document not found or not associated with a source project");
+    throw new Error('Document not found or not associated with a source project');
   }
 
   // Get translation project
   const translationProject = await getTranslationProjectBySourceAndLanguage(
     document.sourceProject.id,
-    existingVersion.languageId
+    existingVersion.languageId,
   );
 
   if (translationProject) {
     // Check if user is a project member
     const isMember = await isProjectMember(user, translationProject.id);
     if (!isMember) {
-      throw new Error("You are not a member of this translation project");
+      throw new Error('You are not a member of this translation project');
     }
   }
 
-  const version = await updateDocumentVersionStatus(
-    validated.versionId,
-    DocumentStatus.PENDING_REVIEW
-  );
+  const version = await updateDocumentVersionStatus(validated.versionId, DocumentStatus.PENDING_REVIEW);
 
   // Log the activity
   await createActivityLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: "submitted_for_review",
+    action: 'submitted_for_review',
     details: {},
   });
 
@@ -173,28 +172,28 @@ export async function reviewVersionAction(input: unknown) {
 
   // Get current version to check if it has content
   const currentVersion = await getDocumentVersionById(validated.versionId);
-  
+
   if (!currentVersion) {
-    throw new Error("Document version not found");
+    throw new Error('Document version not found');
   }
 
   // Get document to find source project
   const document = await getDocumentById(currentVersion.documentId);
   if (!document || !document.sourceProjectId) {
-    throw new Error("Document not found or not associated with a source project");
+    throw new Error('Document not found or not associated with a source project');
   }
 
   // Get translation project
   const translationProject = await getTranslationProjectBySourceAndLanguage(
     document.sourceProjectId,
-    currentVersion.languageId
+    currentVersion.languageId,
   );
 
   if (translationProject) {
     // Check if user can review in this project
     const canReview = await canReviewInProject(user, translationProject.id, validated.versionId);
     if (!canReview) {
-      throw new Error("You do not have permission to review translations in this project");
+      throw new Error('You do not have permission to review translations in this project');
     }
   }
 
@@ -204,10 +203,7 @@ export async function reviewVersionAction(input: unknown) {
     : // If changes are requested, always go back to IN_PROGRESS (since it was being reviewed, it must have content)
       DocumentStatus.IN_PROGRESS;
 
-  const version = await updateDocumentVersionStatus(
-    validated.versionId,
-    newStatus
-  );
+  const version = await updateDocumentVersionStatus(validated.versionId, newStatus);
 
   // Add comment if provided
   if (validated.comment) {
@@ -222,7 +218,7 @@ export async function reviewVersionAction(input: unknown) {
   await createActivityLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: validated.approved ? "approved" : "requested_changes",
+    action: validated.approved ? 'approved' : 'requested_changes',
     details: { hasComment: !!validated.comment },
   });
 
@@ -233,19 +229,16 @@ export async function deployVersionAction(versionId: string) {
   const user = await requireUser();
 
   if (!canDeploy(user)) {
-    throw new Error("Forbidden: Only deployers can deploy documents");
+    throw new Error('Forbidden: Only deployers can deploy documents');
   }
 
-  const version = await updateDocumentVersionStatus(
-    versionId,
-    DocumentStatus.DEPLOYED
-  );
+  const version = await updateDocumentVersionStatus(versionId, DocumentStatus.DEPLOYED);
 
   // Log the activity
   await createActivityLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: "deployed",
+    action: 'deployed',
     details: {},
   });
 
@@ -257,16 +250,18 @@ export async function deleteDocumentVersionAction(id: string) {
   return await deleteDocumentVersion(id);
 }
 
-export async function updateDocumentVersionStatusAction(
-  versionId: string,
-  status: DocumentStatus
-) {
+export async function updateDocumentVersionStatusAction(versionId: string, status: DocumentStatus) {
   const user = await requireUser();
-  
+
+  // Check permission for DEPLOYED status
+  if (status === DocumentStatus.DEPLOYED && !canDeploy(user)) {
+    throw new Error('Forbidden: Only deployers can deploy documents');
+  }
+
   // Get existing version to check permissions
   const existingVersion = await getDocumentVersionById(versionId);
   if (!existingVersion) {
-    throw new Error("Document version not found");
+    throw new Error('Document version not found');
   }
 
   const version = await updateDocumentVersionStatus(versionId, status);
@@ -275,7 +270,7 @@ export async function updateDocumentVersionStatusAction(
   await createActivityLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: "status_updated",
+    action: 'status_updated',
     details: { status: status },
   });
 
@@ -289,28 +284,30 @@ export async function assignDocumentVersionAction(input: unknown) {
   // Get document to find source project
   const document = await getDocumentById(validated.documentId);
   if (!document) {
-    throw new Error("Document not found");
+    throw new Error('Document not found');
   }
   if (!document.sourceProject?.id) {
-    throw new Error("This document is not associated with a source project. Please assign a source project to the document before translating it.");
+    throw new Error(
+      'This document is not associated with a source project. Please assign a source project to the document before translating it.',
+    );
   }
 
   // Get translation project, or create it if it doesn't exist
   let translationProject = await getTranslationProjectBySourceAndLanguage(
     document.sourceProject.id,
-    validated.languageId
+    validated.languageId,
   );
 
   if (!translationProject) {
     // Auto-create the translation project if it doesn't exist
     const sourceProject = await getSourceProjectById(document.sourceProject.id);
     if (!sourceProject) {
-      throw new Error("Source project not found");
+      throw new Error('Source project not found');
     }
 
     const language = await getLanguageById(validated.languageId);
     if (!language) {
-      throw new Error("Language not found");
+      throw new Error('Language not found');
     }
 
     // Create translation project with a name like "{SourceProjectName} - {LanguageName}"
@@ -326,7 +323,7 @@ export async function assignDocumentVersionAction(input: unknown) {
       // Fetch the created project to get its ID
       const createdProject = await getTranslationProjectBySourceAndLanguage(
         document.sourceProject.id,
-        validated.languageId
+        validated.languageId,
       );
       if (createdProject) {
         await createProjectMember({
@@ -340,58 +337,52 @@ export async function assignDocumentVersionAction(input: unknown) {
     // Fetch the translation project again to get the full structure with members
     translationProject = await getTranslationProjectBySourceAndLanguage(
       document.sourceProject.id,
-      validated.languageId
+      validated.languageId,
     );
   }
 
   // At this point, translationProject should never be null
   if (!translationProject) {
-    throw new Error("Failed to create or retrieve translation project");
+    throw new Error('Failed to create or retrieve translation project');
   }
 
   // Check if user is a project member
   const isMember = await isProjectMember(user, translationProject.id);
   if (!isMember) {
-    throw new Error("You are not a member of this translation project");
+    throw new Error('You are not a member of this translation project');
   }
 
   // Check if user can translate in this project
   const canTranslate = await canTranslateInProject(user, translationProject.id);
   if (!canTranslate) {
-    throw new Error("You do not have permission to translate in this project");
+    throw new Error('You do not have permission to translate in this project');
   }
 
   // Check document assignment
-  const assignment = await getDocumentAssignmentByDocumentAndProject(
-    validated.documentId,
-    translationProject.id
-  );
+  const assignment = await getDocumentAssignmentByDocumentAndProject(validated.documentId, translationProject.id);
 
   if (assignment) {
     // If document is assigned to a specific user, only that user can translate
     if (assignment.userId && assignment.userId !== user.id) {
-      throw new Error("This document is assigned to another user");
+      throw new Error('This document is assigned to another user');
     }
     // If unassigned (userId is null), any project member can translate
   }
 
   // Check if version already exists
-  const existingVersion = await getDocumentVersionByDocumentAndLanguage(
-    validated.documentId,
-    validated.languageId
-  );
+  const existingVersion = await getDocumentVersionByDocumentAndLanguage(validated.documentId, validated.languageId);
 
   if (existingVersion) {
     // If version is already IN_PROGRESS and assigned to current user, return it
     if (existingVersion.status === DocumentStatus.IN_PROGRESS && existingVersion.userId === user.id) {
       return existingVersion;
     }
-    
+
     // If version is IN_PROGRESS but assigned to different user, don't reassign
     if (existingVersion.status === DocumentStatus.IN_PROGRESS && existingVersion.userId !== user.id) {
-      throw new Error("This translation is already assigned to another user");
+      throw new Error('This translation is already assigned to another user');
     }
-    
+
     // For any other status (PENDING_TRANSLATION, PENDING_REVIEW, etc.), assign to current user and set to IN_PROGRESS
     // This handles the "Start Translation" action
     // Update the version to assign it to current user and set status to IN_PROGRESS
@@ -418,7 +409,7 @@ export async function assignDocumentVersionAction(input: unknown) {
     await createActivityLog({
       documentVersionId: version.id,
       userId: user.id,
-      action: "started_translation",
+      action: 'started_translation',
       details: { language: version.language.name, progress: `${existingVersion.status} -> IN_PROGRESS` },
     });
 
@@ -429,7 +420,7 @@ export async function assignDocumentVersionAction(input: unknown) {
   const version = await createDocumentVersion({
     documentId: validated.documentId,
     languageId: validated.languageId,
-    content: validated.content || "",
+    content: validated.content || '',
     status: DocumentStatus.IN_PROGRESS,
     userId: user.id,
   });
@@ -438,7 +429,7 @@ export async function assignDocumentVersionAction(input: unknown) {
   await createActivityLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: "assigned_translation",
+    action: 'assigned_translation',
     details: { language: version.language.name },
   });
 
