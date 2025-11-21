@@ -111,11 +111,12 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
           options={{
             readOnly,
             minimap: { enabled: false },
-            lineNumbers: "on",
             glyphMargin: false,
             folding: false,
-            lineDecorationsWidth: 0,
-            lineNumbersMinChars: 3,
+            lineDecorationsWidth: 10,
+            lineNumbers: "on",
+            lineNumbersMinChars: 4,
+            occurrencesHighlight: "off",
             scrollBeyondLastLine: false,
             wordWrap: "on",
             wrappingStrategy: "advanced",
@@ -123,9 +124,10 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
             fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
             lineHeight: 22,
             padding: {
-              top: 8,
-              bottom: 8,
+              top: 22,
+              bottom: 22,
             },
+            
             scrollbar: {
               vertical: "visible",
               horizontal: "visible",
