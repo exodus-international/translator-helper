@@ -2,3 +2,4 @@
 ALTER TABLE "language"
 ADD COLUMN IF NOT EXISTS "translationInstructions" TEXT;
 
+
