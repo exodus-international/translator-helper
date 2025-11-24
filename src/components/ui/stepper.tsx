@@ -354,8 +354,8 @@ function StepperStatusIndicator({ status, className, iconClassName, children, ..
     state === 'completed'
       ? statusConfig.color.indicatorClass
       : state === 'active'
-      ? statusConfig.color.indicatorClass
-      : statusConfig.color.indicatorInactiveClass;
+        ? statusConfig.color.indicatorClass
+        : statusConfig.color.indicatorInactiveClass;
 
   const iconColorClass =
     state === 'completed' || state === 'active' ? 'text-white' : statusConfig.color.textClass.replace('600', '400');

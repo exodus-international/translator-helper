@@ -1,4 +1,4 @@
-import prisma from "@/lib/db";
+import prisma from '@/lib/db';
 
 export async function getUserLanguages(userId: string) {
   return prisma.userLanguage.findMany({
@@ -10,7 +10,7 @@ export async function getUserLanguages(userId: string) {
     },
     orderBy: {
       language: {
-        name: "asc",
+        name: 'asc',
       },
     },
   });
@@ -71,6 +71,3 @@ export async function getUserLanguagesCount(userId: string): Promise<number> {
     },
   });
 }
-
-
-

@@ -1,16 +1,13 @@
-import prisma from "@/lib/db";
+import prisma from '@/lib/db';
 
-export async function listTranslationProjects(filters?: {
-  sourceProjectId?: string;
-  languageId?: string;
-}) {
+export async function listTranslationProjects(filters?: { sourceProjectId?: string; languageId?: string }) {
   return prisma.translationProject.findMany({
     where: {
       ...(filters?.sourceProjectId && { sourceProjectId: filters.sourceProjectId }),
       ...(filters?.languageId && { languageId: filters.languageId }),
     },
     orderBy: {
-      name: "asc",
+      name: 'asc',
     },
     include: {
       sourceProject: true,
@@ -69,10 +66,7 @@ export async function getTranslationProjectById(id: string) {
   });
 }
 
-export async function getTranslationProjectBySourceAndLanguage(
-  sourceProjectId: string,
-  languageId: string
-) {
+export async function getTranslationProjectBySourceAndLanguage(sourceProjectId: string, languageId: string) {
   return prisma.translationProject.findUnique({
     where: {
       sourceProjectId_languageId: {
@@ -98,11 +92,7 @@ export async function getTranslationProjectBySourceAndLanguage(
   });
 }
 
-export async function createTranslationProject(data: {
-  name: string;
-  sourceProjectId: string;
-  languageId: string;
-}) {
+export async function createTranslationProject(data: { name: string; sourceProjectId: string; languageId: string }) {
   return prisma.translationProject.create({
     data,
     include: {
@@ -162,7 +152,7 @@ export async function getTranslationProjectsByUser(userId: string) {
       },
     },
     orderBy: {
-      name: "asc",
+      name: 'asc',
     },
   });
 }

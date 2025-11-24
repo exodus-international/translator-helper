@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const translateDocumentSchema = z.object({
   documentTitle: z.string().min(1),

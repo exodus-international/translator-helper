@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const createSourceProjectSchema = z.object({
   name: z.string().min(2),
@@ -8,7 +8,7 @@ export const createSourceProjectSchema = z.object({
 export const updateSourceProjectSchema = z.object({
   name: z.string().min(2).optional(),
   description: z.string().optional().nullable(),
-  status: z.enum(["ACTIVE", "COMPLETE"]).optional(),
+  status: z.enum(['ACTIVE', 'COMPLETE']).optional(),
 });
 
 export type CreateSourceProjectInput = z.infer<typeof createSourceProjectSchema>;

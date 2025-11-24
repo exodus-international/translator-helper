@@ -1,4 +1,4 @@
-import prisma from "@/lib/db";
+import prisma from '@/lib/db';
 
 export async function getCommentsByDocumentVersion(documentVersionId: string) {
   return prisma.comment.findMany({
@@ -14,7 +14,7 @@ export async function getCommentsByDocumentVersion(documentVersionId: string) {
       },
     },
     orderBy: {
-      createdAt: "desc",
+      createdAt: 'desc',
     },
   });
 }
@@ -35,11 +35,7 @@ export async function getCommentById(id: string) {
   });
 }
 
-export async function createComment(data: {
-  documentVersionId: string;
-  userId: string;
-  content: string;
-}) {
+export async function createComment(data: { documentVersionId: string; userId: string; content: string }) {
   return prisma.comment.create({
     data,
     include: {

@@ -1,4 +1,4 @@
-import prisma from "@/lib/db";
+import prisma from '@/lib/db';
 
 export async function listDocumentAssignments(filters?: {
   translationProjectId?: string;
@@ -46,7 +46,7 @@ export async function listDocumentAssignments(filters?: {
       },
     },
     orderBy: {
-      assignedAt: "desc",
+      assignedAt: 'desc',
     },
   });
 }
@@ -89,10 +89,7 @@ export async function getDocumentAssignmentById(id: string) {
   });
 }
 
-export async function getDocumentAssignmentByDocumentAndProject(
-  documentId: string,
-  translationProjectId: string
-) {
+export async function getDocumentAssignmentByDocumentAndProject(documentId: string, translationProjectId: string) {
   return prisma.documentAssignment.findUnique({
     where: {
       documentId_translationProjectId: {
@@ -174,7 +171,7 @@ export async function updateDocumentAssignment(
   data: {
     userId?: string | null;
     deadline?: Date | null;
-  }
+  },
 ) {
   return prisma.documentAssignment.update({
     where: { id },
@@ -238,10 +235,7 @@ export async function getUnassignedDocuments(translationProjectId: string) {
   return assignments.map((a) => a.document);
 }
 
-export async function getAssignedDocumentsForUser(
-  userId: string,
-  translationProjectId?: string
-) {
+export async function getAssignedDocumentsForUser(userId: string, translationProjectId?: string) {
   return prisma.documentAssignment.findMany({
     where: {
       userId,
@@ -274,8 +268,8 @@ export async function getAssignedDocumentsForUser(
     },
     orderBy: {
       deadline: {
-        sort: "asc",
-        nulls: "last",
+        sort: 'asc',
+        nulls: 'last',
       },
     },
   });

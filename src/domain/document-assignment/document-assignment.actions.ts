@@ -1,10 +1,7 @@
-"use server";
+'use server';
 
-import { requireUser } from "@/lib/session";
-import {
-  createDocumentAssignmentSchema,
-  updateDocumentAssignmentSchema,
-} from "./document-assignment.types";
+import { requireUser } from '@/lib/session';
+import { createDocumentAssignmentSchema, updateDocumentAssignmentSchema } from './document-assignment.types';
 import {
   listDocumentAssignments,
   getDocumentAssignmentById,
@@ -14,7 +11,7 @@ import {
   deleteDocumentAssignment,
   getUnassignedDocuments,
   getAssignedDocumentsForUser,
-} from "./document-assignment.repository";
+} from './document-assignment.repository';
 
 export async function listDocumentAssignmentsAction(filters?: {
   translationProjectId?: string;
@@ -32,7 +29,7 @@ export async function getDocumentAssignmentAction(id: string) {
 
 export async function getDocumentAssignmentByDocumentAndProjectAction(
   documentId: string,
-  translationProjectId: string
+  translationProjectId: string,
 ) {
   await requireUser();
   return await getDocumentAssignmentByDocumentAndProject(documentId, translationProjectId);
@@ -59,7 +56,7 @@ export async function updateDocumentAssignmentAction(id: string, input: unknown)
 
   const validated = updateDocumentAssignmentSchema.parse(input);
   const updateData: { userId?: string | null; deadline?: Date | null } = {};
-  
+
   if (validated.userId !== undefined) {
     updateData.userId = validated.userId ?? null;
   }

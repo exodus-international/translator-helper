@@ -2,8 +2,8 @@ import {
   getDocumentStatusByStep,
   getDocumentStatusConfig,
   getStepForDocumentStatus,
-} from "@/constants/document-status";
-import { DocumentStatus } from "@prisma/client";
+} from '@/constants/document-status';
+import { DocumentStatus } from '@prisma/client';
 
 /**
  * Maps DocumentStatus to stepper step number (1-5)
@@ -18,7 +18,7 @@ export function getStatusStep(status: DocumentStatus | null): number {
 export function getStepLabel(step: number): string {
   const status = getDocumentStatusByStep(step);
   if (!status) {
-    return "";
+    return '';
   }
 
   return getDocumentStatusConfig(status).name;

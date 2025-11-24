@@ -1,9 +1,9 @@
-import { getDocumentsWithAllVersionsAction } from "@/domain/document/document.actions";
-import { listTargetLanguages } from "@/domain/language/language.repository";
-import { listSourceProjectsAction } from "@/domain/source-project/source-project.actions";
-import { getCurrentUser } from "@/lib/session";
-import { redirect } from "next/navigation";
-import DocumentsClient from "./page.client";
+import { getDocumentsWithAllVersionsAction } from '@/domain/document/document.actions';
+import { listTargetLanguages } from '@/domain/language/language.repository';
+import { listSourceProjectsAction } from '@/domain/source-project/source-project.actions';
+import { getCurrentUser } from '@/lib/session';
+import { redirect } from 'next/navigation';
+import DocumentsClient from './page.client';
 
 export default async function DocumentsPage({
   searchParams,
@@ -16,7 +16,7 @@ export default async function DocumentsPage({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const params = await searchParams;

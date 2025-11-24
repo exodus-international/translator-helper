@@ -1,18 +1,16 @@
-"use server";
+'use server';
 
-import { requireUser } from "@/lib/session";
-import { createCommentSchema, updateCommentSchema } from "./comment.types";
+import { requireUser } from '@/lib/session';
+import { createCommentSchema, updateCommentSchema } from './comment.types';
 import {
   getCommentsByDocumentVersion,
   getCommentById,
   createComment,
   updateComment,
   deleteComment,
-} from "./comment.repository";
+} from './comment.repository';
 
-export async function getCommentsByDocumentVersionAction(
-  documentVersionId: string
-) {
+export async function getCommentsByDocumentVersionAction(documentVersionId: string) {
   await requireUser();
   return await getCommentsByDocumentVersion(documentVersionId);
 }
@@ -40,7 +38,7 @@ export async function updateCommentAction(id: string, input: unknown) {
   // Check if user owns the comment
   const comment = await getCommentById(id);
   if (!comment || comment.userId !== user.id) {
-    throw new Error("Forbidden: You can only edit your own comments");
+    throw new Error('Forbidden: You can only edit your own comments');
   }
 
   return await updateComment(id, validated.content);
@@ -52,7 +50,7 @@ export async function deleteCommentAction(id: string) {
   // Check if user owns the comment
   const comment = await getCommentById(id);
   if (!comment || comment.userId !== user.id) {
-    throw new Error("Forbidden: You can only delete your own comments");
+    throw new Error('Forbidden: You can only delete your own comments');
   }
 
   return await deleteComment(id);

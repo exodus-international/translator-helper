@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { DocumentStatus } from "@prisma/client";
+import { z } from 'zod';
+import { DocumentStatus } from '@prisma/client';
 
 export const createDocumentVersionSchema = z.object({
   documentId: z.string(),
@@ -21,11 +21,7 @@ export const reviewVersionSchema = z.object({
   comment: z.string().optional(),
 });
 
-export type CreateDocumentVersionInput = z.infer<
-  typeof createDocumentVersionSchema
->;
-export type UpdateDocumentVersionInput = z.infer<
-  typeof updateDocumentVersionSchema
->;
+export type CreateDocumentVersionInput = z.infer<typeof createDocumentVersionSchema>;
+export type UpdateDocumentVersionInput = z.infer<typeof updateDocumentVersionSchema>;
 export type SubmitForReviewInput = z.infer<typeof submitForReviewSchema>;
 export type ReviewVersionInput = z.infer<typeof reviewVersionSchema>;

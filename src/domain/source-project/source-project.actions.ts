@@ -1,17 +1,17 @@
-"use server";
+'use server';
 
-import { requireUser } from "@/lib/session";
-import { canManageFolders, canManageSourceProject } from "@/lib/permissions";
-import { listTargetLanguages } from "../language/language.repository";
-import { createTranslationProject } from "../translation-project/translation-project.repository";
-import { createSourceProjectSchema, updateSourceProjectSchema } from "./source-project.types";
+import { requireUser } from '@/lib/session';
+import { canManageFolders, canManageSourceProject } from '@/lib/permissions';
+import { listTargetLanguages } from '../language/language.repository';
+import { createTranslationProject } from '../translation-project/translation-project.repository';
+import { createSourceProjectSchema, updateSourceProjectSchema } from './source-project.types';
 import {
   listSourceProjects,
   getSourceProjectById,
   createSourceProject,
   updateSourceProject,
   deleteSourceProject,
-} from "./source-project.repository";
+} from './source-project.repository';
 
 export async function listSourceProjectsAction(options?: { includeComplete?: boolean }) {
   await requireUser();
@@ -34,7 +34,7 @@ export async function createSourceProjectAction(input: unknown) {
 
   // Auto-create translation projects for all target languages (excluding English)
   const targetLanguages = await listTargetLanguages();
-  
+
   for (const language of targetLanguages) {
     await createTranslationProject({
       name: `${sourceProject.name} - ${language.name}`,
@@ -56,12 +56,12 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
     // If not a deployer, check if user is a project manager for this source project
     const canManage = await canManageSourceProject(user, id);
     if (!canManage) {
-      throw new Error("Forbidden: Only deployers and project managers can manage source projects");
+      throw new Error('Forbidden: Only deployers and project managers can manage source projects');
     }
 
     // Project managers can only update status, not name or description
     if (validated.name !== undefined || validated.description !== undefined) {
-      throw new Error("Forbidden: Project managers can only update project status");
+      throw new Error('Forbidden: Project managers can only update project status');
     }
   }
 
@@ -76,7 +76,7 @@ export async function deleteSourceProjectAction(id: string) {
   const user = await requireUser();
 
   if (!canManageFolders(user)) {
-    throw new Error("Forbidden: Only deployers can manage source projects");
+    throw new Error('Forbidden: Only deployers can manage source projects');
   }
 
   return await deleteSourceProject(id);

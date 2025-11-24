@@ -1,10 +1,10 @@
-import { Role, ProjectRole } from "@prisma/client";
-import { SessionUser } from "./session";
+import { Role, ProjectRole } from '@prisma/client';
+import { SessionUser } from './session';
 import {
   getUserRoleInProject as getUserRoleInProjectRepo,
   getUserRolesInProject as getUserRolesInProjectRepo,
   isUserProjectManagerForSourceProject as isUserProjectManagerForSourceProjectRepo,
-} from "@/domain/project-member/project-member.repository";
+} from '@/domain/project-member/project-member.repository';
 
 export function isTranslator(user: SessionUser): boolean {
   return user.role === Role.TRANSLATOR;
@@ -35,10 +35,7 @@ export function canManageFolders(user: SessionUser): boolean {
 }
 
 // Project-scoped permissions
-export async function isProjectManager(
-  user: SessionUser,
-  translationProjectId: string
-): Promise<boolean> {
+export async function isProjectManager(user: SessionUser, translationProjectId: string): Promise<boolean> {
   // Deployers have all permissions
   if (user.role === Role.DEPLOYER) {
     return true;
@@ -48,10 +45,7 @@ export async function isProjectManager(
   return roles.includes(ProjectRole.PROJECT_MANAGER);
 }
 
-export async function isReviewer(
-  user: SessionUser,
-  translationProjectId: string
-): Promise<boolean> {
+export async function isReviewer(user: SessionUser, translationProjectId: string): Promise<boolean> {
   // Deployers have all permissions
   if (user.role === Role.DEPLOYER) {
     return true;
@@ -65,26 +59,17 @@ export async function isReviewer(
   );
 }
 
-export async function isEditor(
-  user: SessionUser,
-  translationProjectId: string
-): Promise<boolean> {
+export async function isEditor(user: SessionUser, translationProjectId: string): Promise<boolean> {
   // Deployers have all permissions
   if (user.role === Role.DEPLOYER) {
     return true;
   }
 
   const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return (
-    roles.includes(ProjectRole.EDITOR) ||
-    roles.includes(ProjectRole.PROJECT_MANAGER)
-  );
+  return roles.includes(ProjectRole.EDITOR) || roles.includes(ProjectRole.PROJECT_MANAGER);
 }
 
-export async function canAssignDocuments(
-  user: SessionUser,
-  translationProjectId: string
-): Promise<boolean> {
+export async function canAssignDocuments(user: SessionUser, translationProjectId: string): Promise<boolean> {
   // Deployers have all permissions
   if (user.role === Role.DEPLOYER) {
     return true;
@@ -97,7 +82,7 @@ export async function canAssignDocuments(
 export async function canReviewInProject(
   user: SessionUser,
   translationProjectId: string,
-  documentVersionId?: string
+  documentVersionId?: string,
 ): Promise<boolean> {
   // Deployers have all permissions
   if (user.role === Role.DEPLOYER) {
@@ -115,7 +100,7 @@ export async function canReviewInProject(
 export async function canEditInProject(
   user: SessionUser,
   translationProjectId: string,
-  documentVersionId?: string
+  documentVersionId?: string,
 ): Promise<boolean> {
   // Deployers have all permissions
   if (user.role === Role.DEPLOYER) {
@@ -123,16 +108,10 @@ export async function canEditInProject(
   }
 
   const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return (
-    roles.includes(ProjectRole.EDITOR) ||
-    roles.includes(ProjectRole.PROJECT_MANAGER)
-  );
+  return roles.includes(ProjectRole.EDITOR) || roles.includes(ProjectRole.PROJECT_MANAGER);
 }
 
-export async function canTranslateInProject(
-  user: SessionUser,
-  translationProjectId: string
-): Promise<boolean> {
+export async function canTranslateInProject(user: SessionUser, translationProjectId: string): Promise<boolean> {
   // Deployers have all permissions
   if (user.role === Role.DEPLOYER) {
     return true;
@@ -147,10 +126,7 @@ export async function canTranslateInProject(
   );
 }
 
-export async function isProjectMember(
-  user: SessionUser,
-  translationProjectId: string
-): Promise<boolean> {
+export async function isProjectMember(user: SessionUser, translationProjectId: string): Promise<boolean> {
   // Deployers have access to all projects
   if (user.role === Role.DEPLOYER) {
     return true;
@@ -160,10 +136,7 @@ export async function isProjectMember(
   return roles.length > 0;
 }
 
-export async function getUserRolesInProject(
-  user: SessionUser,
-  translationProjectId: string
-): Promise<ProjectRole[]> {
+export async function getUserRolesInProject(user: SessionUser, translationProjectId: string): Promise<ProjectRole[]> {
   // Deployers are treated as PROJECT_MANAGER for all projects
   if (user.role === Role.DEPLOYER) {
     return [ProjectRole.PROJECT_MANAGER];
@@ -174,7 +147,7 @@ export async function getUserRolesInProject(
 
 export async function getUserRoleInProject(
   user: SessionUser,
-  translationProjectId: string
+  translationProjectId: string,
 ): Promise<ProjectRole | null> {
   // Deployers are treated as PROJECT_MANAGER for all projects
   if (user.role === Role.DEPLOYER) {
@@ -185,10 +158,7 @@ export async function getUserRoleInProject(
   return roles.length > 0 ? roles[0] : null;
 }
 
-export async function canManageSourceProject(
-  user: SessionUser,
-  sourceProjectId: string
-): Promise<boolean> {
+export async function canManageSourceProject(user: SessionUser, sourceProjectId: string): Promise<boolean> {
   // Deployers can manage all source projects
   if (user.role === Role.DEPLOYER) {
     return true;

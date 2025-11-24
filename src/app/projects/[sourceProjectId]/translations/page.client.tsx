@@ -1,29 +1,17 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { SourceProject, Language } from "@prisma/client";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Plus, Languages, Users, ArrowLeft, ExternalLink } from "lucide-react";
-import Link from "next/link";
-import { createTranslationProjectAction } from "@/domain/translation-project/translation-project.actions";
-import { useRouter } from "next/navigation";
+import { useState } from 'react';
+import { SourceProject, Language } from '@prisma/client';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Plus, Languages, Users, ArrowLeft, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
+import { createTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
+import { useRouter } from 'next/navigation';
 
 interface TranslationsClientProps {
   sourceProject: SourceProject & {
@@ -40,12 +28,10 @@ export default function TranslationsClient({
   languages,
 }: TranslationsClientProps) {
   const router = useRouter();
-  const [translationProjects, setTranslationProjects] = useState(
-    initialTranslationProjects
-  );
+  const [translationProjects, setTranslationProjects] = useState(initialTranslationProjects);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [selectedLanguageId, setSelectedLanguageId] = useState<string>("");
+  const [name, setName] = useState('');
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,23 +49,20 @@ export default function TranslationsClient({
       resetForm();
       router.refresh();
     } catch (error: any) {
-      console.error("Error creating translation project:", error);
-      alert(error.message || "Failed to create translation project");
+      console.error('Error creating translation project:', error);
+      alert(error.message || 'Failed to create translation project');
     } finally {
       setLoading(false);
     }
   };
 
   const resetForm = () => {
-    setName("");
-    setSelectedLanguageId("");
+    setName('');
+    setSelectedLanguageId('');
   };
 
   // Get languages that don't have a translation project yet
-  const availableLanguages = languages.filter(
-    (lang) =>
-      !translationProjects.some((tp) => tp.languageId === lang.id)
-  );
+  const availableLanguages = languages.filter((lang) => !translationProjects.some((tp) => tp.languageId === lang.id));
 
   // Check if we have any languages at all
   const hasNoLanguages = languages.length === 0;
@@ -130,11 +113,7 @@ export default function TranslationsClient({
                   </div>
                   <div>
                     <Label htmlFor="language">Target Language *</Label>
-                    <Select
-                      value={selectedLanguageId}
-                      onValueChange={setSelectedLanguageId}
-                      required
-                    >
+                    <Select value={selectedLanguageId} onValueChange={setSelectedLanguageId} required>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a language" />
                       </SelectTrigger>
@@ -147,24 +126,15 @@ export default function TranslationsClient({
                       </SelectContent>
                     </Select>
                     {availableLanguages.length === 0 && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        All languages already have translation projects
-                      </p>
+                      <p className="text-sm text-gray-500 mt-1">All languages already have translation projects</p>
                     )}
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setDialogOpen(false)}
-                    >
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                       Cancel
                     </Button>
-                    <Button
-                      type="submit"
-                      disabled={loading || !selectedLanguageId}
-                    >
-                      {loading ? "Creating..." : "Create"}
+                    <Button type="submit" disabled={loading || !selectedLanguageId}>
+                      {loading ? 'Creating...' : 'Create'}
                     </Button>
                   </div>
                 </form>
@@ -173,19 +143,14 @@ export default function TranslationsClient({
             {hasNoLanguages && (
               <div className="text-sm text-gray-500 mt-2 flex items-center gap-2">
                 <span>No target languages available.</span>
-                <Link
-                  href="/admin/languages"
-                  className="text-blue-600 hover:underline flex items-center gap-1"
-                >
+                <Link href="/admin/languages" className="text-blue-600 hover:underline flex items-center gap-1">
                   Add languages
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
             )}
             {!hasNoLanguages && availableLanguages.length === 0 && (
-              <div className="text-sm text-gray-500 mt-2">
-                All languages already have translation projects.
-              </div>
+              <div className="text-sm text-gray-500 mt-2">All languages already have translation projects.</div>
             )}
           </div>
         </div>
@@ -224,9 +189,7 @@ export default function TranslationsClient({
           {translationProjects.length === 0 && (
             <Card className="p-8 text-center">
               <Languages className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">
-                No translation projects yet. Create one to get started.
-              </p>
+              <p className="text-gray-600">No translation projects yet. Create one to get started.</p>
             </Card>
           )}
         </div>

@@ -1,5 +1,5 @@
-import prisma from "@/lib/db";
-import { ProjectRole } from "@prisma/client";
+import prisma from '@/lib/db';
+import { ProjectRole } from '@prisma/client';
 
 export async function listProjectMembers(translationProjectId: string) {
   return prisma.projectMember.findMany({
@@ -16,7 +16,7 @@ export async function listProjectMembers(translationProjectId: string) {
       },
     },
     orderBy: {
-      createdAt: "asc",
+      createdAt: 'asc',
     },
   });
 }
@@ -42,10 +42,7 @@ export async function getProjectMemberById(id: string) {
   });
 }
 
-export async function getProjectMembersByUserAndProject(
-  userId: string,
-  translationProjectId: string
-) {
+export async function getProjectMembersByUserAndProject(userId: string, translationProjectId: string) {
   return prisma.projectMember.findMany({
     where: {
       translationProjectId,
@@ -69,11 +66,7 @@ export async function getProjectMembersByUserAndProject(
   });
 }
 
-export async function createProjectMember(data: {
-  translationProjectId: string;
-  userId: string;
-  role: ProjectRole;
-}) {
+export async function createProjectMember(data: { translationProjectId: string; userId: string; role: ProjectRole }) {
   return prisma.projectMember.create({
     data,
     include: {
@@ -122,10 +115,7 @@ export async function deleteProjectMember(id: string) {
   });
 }
 
-export async function getUserRolesInProject(
-  userId: string,
-  translationProjectId: string
-): Promise<ProjectRole[]> {
+export async function getUserRolesInProject(userId: string, translationProjectId: string): Promise<ProjectRole[]> {
   const members = await prisma.projectMember.findMany({
     where: {
       translationProjectId,
@@ -140,18 +130,12 @@ export async function getUserRolesInProject(
 }
 
 // Legacy function for backward compatibility - returns first role or null
-export async function getUserRoleInProject(
-  userId: string,
-  translationProjectId: string
-): Promise<ProjectRole | null> {
+export async function getUserRoleInProject(userId: string, translationProjectId: string): Promise<ProjectRole | null> {
   const roles = await getUserRolesInProject(userId, translationProjectId);
   return roles.length > 0 ? roles[0] : null;
 }
 
-export async function isUserProjectManagerForSourceProject(
-  userId: string,
-  sourceProjectId: string
-): Promise<boolean> {
+export async function isUserProjectManagerForSourceProject(userId: string, sourceProjectId: string): Promise<boolean> {
   const projectMember = await prisma.projectMember.findFirst({
     where: {
       userId,

@@ -1,15 +1,9 @@
-"use server";
+'use server';
 
-import { requireUser } from "@/lib/session";
-import {
-  getActivityLogsByDocumentVersion,
-  getActivityLogById,
-  getRecentActivityLogs,
-} from "./activity-log.repository";
+import { requireUser } from '@/lib/session';
+import { getActivityLogsByDocumentVersion, getActivityLogById, getRecentActivityLogs } from './activity-log.repository';
 
-export async function getActivityLogsByDocumentVersionAction(
-  documentVersionId: string
-) {
+export async function getActivityLogsByDocumentVersionAction(documentVersionId: string) {
   await requireUser();
   return await getActivityLogsByDocumentVersion(documentVersionId);
 }

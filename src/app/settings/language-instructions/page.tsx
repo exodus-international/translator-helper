@@ -1,24 +1,21 @@
-import { listLanguages } from "@/domain/language/language.repository";
-import { canManageLanguages } from "@/lib/permissions";
-import { getCurrentUser } from "@/lib/session";
-import { redirect } from "next/navigation";
-import LanguageInstructionsClient from "./page.client";
+import { listLanguages } from '@/domain/language/language.repository';
+import { canManageLanguages } from '@/lib/permissions';
+import { getCurrentUser } from '@/lib/session';
+import { redirect } from 'next/navigation';
+import LanguageInstructionsClient from './page.client';
 
 export default async function LanguageInstructionsPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   if (!canManageLanguages(user)) {
-    redirect("/dashboard");
+    redirect('/dashboard');
   }
 
   const languages = await listLanguages();
 
   return <LanguageInstructionsClient languages={languages} />;
 }
-
-
-

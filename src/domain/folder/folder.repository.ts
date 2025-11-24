@@ -1,9 +1,9 @@
-import prisma from "@/lib/db";
+import prisma from '@/lib/db';
 
 export async function listFolders() {
   return prisma.folder.findMany({
     orderBy: {
-      name: "asc",
+      name: 'asc',
     },
     include: {
       _count: {
@@ -21,7 +21,7 @@ export async function getFolderById(id: string) {
     include: {
       documents: {
         orderBy: {
-          title: "asc",
+          title: 'asc',
         },
       },
     },

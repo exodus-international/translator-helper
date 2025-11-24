@@ -1,14 +1,14 @@
-import prisma from "@/lib/db";
+import prisma from '@/lib/db';
 
 export async function listSourceProjects(options?: { includeComplete?: boolean }) {
   return prisma.sourceProject.findMany({
     where: options?.includeComplete
       ? undefined
       : {
-          status: "ACTIVE",
+          status: 'ACTIVE',
         },
     orderBy: {
-      name: "asc",
+      name: 'asc',
     },
     include: {
       _count: {
@@ -27,7 +27,7 @@ export async function getSourceProjectById(id: string) {
     include: {
       documents: {
         orderBy: {
-          title: "asc",
+          title: 'asc',
         },
       },
       translationProjects: {
@@ -52,7 +52,7 @@ export async function createSourceProject(data: { name: string; description?: st
 
 export async function updateSourceProject(
   id: string,
-  data: { name?: string; description?: string | null; status?: "ACTIVE" | "COMPLETE" }
+  data: { name?: string; description?: string | null; status?: 'ACTIVE' | 'COMPLETE' },
 ) {
   return prisma.sourceProject.update({
     where: { id },

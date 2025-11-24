@@ -76,12 +76,14 @@ Visit [http://localhost:3000](http://localhost:3000)
 ## User Roles
 
 ### Translator (Default)
+
 - Create and translate documents
 - Submit translations for review
 - Review and approve other translators' work
 - Add comments to translations
 
 ### Deployer
+
 - All Translator permissions
 - Deploy approved translations
 - Manage languages and folders

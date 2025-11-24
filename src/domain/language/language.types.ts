@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const createLanguageSchema = z.object({
   code: z.string().min(2).max(5), // e.g., "en", "cs", "en-US"
@@ -15,6 +15,4 @@ export const updateLanguageInstructionsSchema = z.object({
 
 export type CreateLanguageInput = z.infer<typeof createLanguageSchema>;
 export type UpdateLanguageInput = z.infer<typeof updateLanguageSchema>;
-export type UpdateLanguageInstructionsInput = z.infer<
-  typeof updateLanguageInstructionsSchema
->;
+export type UpdateLanguageInstructionsInput = z.infer<typeof updateLanguageInstructionsSchema>;

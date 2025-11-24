@@ -1,23 +1,17 @@
-"use client";
+'use client';
 
-import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from "@/constants/document-status";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { StatusDropdown } from "@/components/status-dropdown";
-import { SessionUser } from "@/lib/session";
-import { Document, DocumentStatus, Language } from "@prisma/client";
-import { FileText, Plus, Search } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
+import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { StatusDropdown } from '@/components/status-dropdown';
+import { SessionUser } from '@/lib/session';
+import { Document, DocumentStatus, Language } from '@prisma/client';
+import { FileText, Plus, Search } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
 
 type DocumentWithVersions = Document & {
   folder: any | null; // Deprecated - kept for backward compatibility
@@ -54,24 +48,17 @@ export default function DocumentsClient({
   sourceProjects,
   initialFilters,
 }: DocumentsClientProps) {
-  const [selectedSourceProject, setSelectedSourceProject] = useState<string>(
-    initialFilters.sourceProject || "all"
-  );
-  const [searchQuery, setSearchQuery] = useState<string>(
-    initialFilters.search || ""
-  );
+  const [selectedSourceProject, setSelectedSourceProject] = useState<string>(initialFilters.sourceProject || 'all');
+  const [searchQuery, setSearchQuery] = useState<string>(initialFilters.search || '');
 
   // Filter documents based on source project and search
   const filteredDocuments = documents.filter((doc) => {
-    if (selectedSourceProject !== "all" && doc.sourceProjectId !== selectedSourceProject) {
+    if (selectedSourceProject !== 'all' && doc.sourceProjectId !== selectedSourceProject) {
       return false;
     }
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return (
-        doc.title.toLowerCase().includes(query) ||
-        doc.slug.toLowerCase().includes(query)
-      );
+      return doc.title.toLowerCase().includes(query) || doc.slug.toLowerCase().includes(query);
     }
     return true;
   });
@@ -95,9 +82,7 @@ export default function DocumentsClient({
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Documents Overview</h1>
-              <p className="text-gray-600">
-                View translation status across all languages
-              </p>
+              <p className="text-gray-600">View translation status across all languages</p>
             </div>
             <Link href="/documents/new">
               <Button>
@@ -120,10 +105,7 @@ export default function DocumentsClient({
               </div>
             </div>
             <div className="w-48">
-              <Select
-                value={selectedSourceProject}
-                onValueChange={setSelectedSourceProject}
-              >
+              <Select value={selectedSourceProject} onValueChange={setSelectedSourceProject}>
                 <SelectTrigger>
                   <SelectValue placeholder="All projects" />
                 </SelectTrigger>
@@ -159,9 +141,7 @@ export default function DocumentsClient({
                   <div className="flex gap-6">
                     {languages.map((lang) => (
                       <div key={lang.id} className="flex-1 text-center">
-                        <span className="text-sm font-medium text-gray-700">
-                          {lang.name}
-                        </span>
+                        <span className="text-sm font-medium text-gray-700">{lang.name}</span>
                       </div>
                     ))}
                   </div>
@@ -177,27 +157,20 @@ export default function DocumentsClient({
                   <div className="col-span-4">
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base truncate">
-                          {doc.title}
-                        </h3>
+                        <h3 className="font-semibold text-base truncate">{doc.title}</h3>
                         <p className="text-sm text-gray-600 truncate">
                           {doc.slug}
                           {doc.sourceProject && (
                             <>
-                              {" "}
-                              <span className="text-gray-400">•</span>{" "}
-                              {doc.sourceProject.name}
+                              {' '}
+                              <span className="text-gray-400">•</span> {doc.sourceProject.name}
                             </>
                           )}
                         </p>
                         {doc.labels && doc.labels.length > 0 && (
                           <div className="flex gap-1 mt-1 flex-wrap">
                             {doc.labels.map((label: string) => (
-                              <Badge
-                                key={label}
-                                variant="secondary"
-                                className="text-xs"
-                              >
+                              <Badge key={label} variant="secondary" className="text-xs">
                                 {label}
                               </Badge>
                             ))}
@@ -222,7 +195,7 @@ export default function DocumentsClient({
                               <>
                                 <Link
                                   href={
-                                    status === "PENDING_TRANSLATION" || status === "IN_PROGRESS"
+                                    status === 'PENDING_TRANSLATION' || status === 'IN_PROGRESS'
                                       ? `/documents/${doc.id}/translate?lang=${lang.id}&version=${versionId}`
                                       : `/documents/${doc.id}/review?version=${versionId}`
                                   }

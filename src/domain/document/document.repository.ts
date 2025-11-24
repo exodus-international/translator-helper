@@ -1,5 +1,5 @@
-import prisma from "@/lib/db";
-import { DocumentStatus } from "@prisma/client";
+import prisma from '@/lib/db';
+import { DocumentStatus } from '@prisma/client';
 
 export async function listDocuments(filters?: {
   sourceProjectId?: string;
@@ -19,8 +19,8 @@ export async function listDocuments(filters?: {
         }),
       ...(filters?.search && {
         OR: [
-          { title: { contains: filters.search, mode: "insensitive" } },
-          { slug: { contains: filters.search, mode: "insensitive" } },
+          { title: { contains: filters.search, mode: 'insensitive' } },
+          { slug: { contains: filters.search, mode: 'insensitive' } },
         ],
       }),
     },
@@ -44,12 +44,12 @@ export async function listDocuments(filters?: {
           },
         },
         orderBy: {
-          updatedAt: "desc",
+          updatedAt: 'desc',
         },
       },
     },
     orderBy: {
-      updatedAt: "desc",
+      updatedAt: 'desc',
     },
   });
 }
@@ -98,7 +98,7 @@ export async function getDocumentById(id: string) {
           },
         },
         orderBy: {
-          updatedAt: "desc",
+          updatedAt: 'desc',
         },
       },
     },
@@ -165,7 +165,7 @@ export async function updateDocument(
     folderId?: string | null; // Deprecated - kept for backward compatibility
     labels?: string[];
     deadline?: Date | null;
-  }
+  },
 ) {
   return prisma.document.update({
     where: { id },
@@ -188,10 +188,7 @@ export async function deleteDocument(id: string) {
 // Includes documents without a version AND documents with PENDING_TRANSLATION status
 // Filters out documents past deadline + 2 weeks grace period if untranslated
 // Sorts by deadline (earliest first, null deadlines last)
-export async function getDocumentsNeedingTranslation(
-  languageId: string,
-  translationProjectId?: string
-) {
+export async function getDocumentsNeedingTranslation(languageId: string, translationProjectId?: string) {
   const allDocuments = await prisma.document.findMany({
     where: {
       ...(translationProjectId && {
@@ -255,22 +252,20 @@ export async function getDocumentsNeedingTranslation(
   // Return documents without a version OR with PENDING_TRANSLATION status
   const needsTranslation = allDocuments.filter((doc) => {
     const hasNoVersion = doc.versions.length === 0;
-    const hasPendingTranslation = doc.versions.some(
-      (v) => v.status === DocumentStatus.PENDING_TRANSLATION
-    );
-    
+    const hasPendingTranslation = doc.versions.some((v) => v.status === DocumentStatus.PENDING_TRANSLATION);
+
     const needsTranslationStatus = hasNoVersion || hasPendingTranslation;
-    
+
     // If document doesn't need translation, exclude it
     if (!needsTranslationStatus) return false;
-    
+
     // If document has a deadline, check if it's expired (deadline + 2 weeks < now)
     if (doc.deadline) {
       const deadlineWithGrace = new Date(doc.deadline.getTime() + twoWeeksInMs);
       // If past the grace period, exclude the document
       if (now > deadlineWithGrace) return false;
     }
-    
+
     return true;
   });
 
@@ -284,10 +279,7 @@ export async function getDocumentsNeedingTranslation(
 }
 
 // Get documents pending review
-export async function getDocumentsPendingReview(
-  languageId?: string,
-  translationProjectId?: string
-) {
+export async function getDocumentsPendingReview(languageId?: string, translationProjectId?: string) {
   return prisma.document.findMany({
     where: {
       versions: {
@@ -354,10 +346,7 @@ export async function getDocumentsPendingReview(
 }
 
 // Get approved documents ready for deployment
-export async function getDocumentsReadyToDeploy(
-  languageId?: string,
-  translationProjectId?: string
-) {
+export async function getDocumentsReadyToDeploy(languageId?: string, translationProjectId?: string) {
   return prisma.document.findMany({
     where: {
       versions: {
@@ -446,22 +435,18 @@ export async function getDocumentsWithAllVersions() {
           },
         },
         orderBy: {
-          updatedAt: "desc",
+          updatedAt: 'desc',
         },
       },
     },
     orderBy: {
-      updatedAt: "desc",
+      updatedAt: 'desc',
     },
   });
 }
 
 // Get documents where a specific user has created/edited versions
-export async function getDocumentsByUser(
-  userId: string,
-  languageId?: string,
-  translationProjectId?: string
-) {
+export async function getDocumentsByUser(userId: string, languageId?: string, translationProjectId?: string) {
   return prisma.document.findMany({
     where: {
       versions: {
@@ -523,12 +508,12 @@ export async function getDocumentsByUser(
           },
         },
         orderBy: {
-          updatedAt: "desc",
+          updatedAt: 'desc',
         },
       },
     },
     orderBy: {
-      updatedAt: "desc",
+      updatedAt: 'desc',
     },
   });
 }
@@ -588,20 +573,17 @@ export async function getDocumentsByTranslationProject(translationProjectId: str
           },
         },
         orderBy: {
-          updatedAt: "desc",
+          updatedAt: 'desc',
         },
       },
     },
     orderBy: {
-      updatedAt: "desc",
+      updatedAt: 'desc',
     },
   });
 }
 
-export async function getDashboardDocuments(
-  languageId: string,
-  translationProjectId?: string
-) {
+export async function getDashboardDocuments(languageId: string, translationProjectId?: string) {
   return prisma.document.findMany({
     where: {
       ...(translationProjectId && {
@@ -660,12 +642,12 @@ export async function getDashboardDocuments(
           },
         },
         orderBy: {
-          updatedAt: "desc",
+          updatedAt: 'desc',
         },
       },
     },
     orderBy: {
-      updatedAt: "desc",
+      updatedAt: 'desc',
     },
   });
 }

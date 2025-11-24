@@ -1,5 +1,5 @@
-import { ProjectRole } from "@prisma/client";
-import { z } from "zod";
+import { ProjectRole } from '@prisma/client';
+import { z } from 'zod';
 
 export const createProjectMemberSchema = z.object({
   translationProjectId: z.string().uuid(),

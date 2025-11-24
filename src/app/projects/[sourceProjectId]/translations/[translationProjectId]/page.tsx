@@ -1,12 +1,12 @@
-import { redirect, notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/session";
-import { canManageFolders, canAssignDocuments } from "@/lib/permissions";
-import { getTranslationProjectAction } from "@/domain/translation-project/translation-project.actions";
-import { listProjectMembersAction } from "@/domain/project-member/project-member.actions";
-import { listDocumentAssignmentsAction } from "@/domain/document-assignment/document-assignment.actions";
-import { listDocumentsAction } from "@/domain/document/document.actions";
-import { listUsersAction } from "@/domain/user/user.actions";
-import TranslationProjectClient from "./page.client";
+import { redirect, notFound } from 'next/navigation';
+import { getCurrentUser } from '@/lib/session';
+import { canManageFolders, canAssignDocuments } from '@/lib/permissions';
+import { getTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
+import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import { listDocumentAssignmentsAction } from '@/domain/document-assignment/document-assignment.actions';
+import { listDocumentsAction } from '@/domain/document/document.actions';
+import { listUsersAction } from '@/domain/user/user.actions';
+import TranslationProjectClient from './page.client';
 
 export default async function TranslationProjectPage({
   params,
@@ -16,7 +16,7 @@ export default async function TranslationProjectPage({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const { sourceProjectId, translationProjectId } = await params;
@@ -29,7 +29,7 @@ export default async function TranslationProjectPage({
   // Check if user can manage this project (must be PM or DEPLOYER)
   const canManage = await canAssignDocuments(user, translationProjectId);
   if (!canManage) {
-    redirect("/dashboard");
+    redirect('/dashboard');
   }
 
   const [members, assignments, documents, users] = await Promise.all([

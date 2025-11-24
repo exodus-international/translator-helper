@@ -1,14 +1,14 @@
-"use server";
+'use server';
 
-import { requireUser } from "@/lib/session";
+import { requireUser } from '@/lib/session';
 import {
   getUserLanguages,
   getUserLanguageIds,
   setUserLanguages,
   userHasLanguage,
   getUserLanguagesCount,
-} from "./user-language.repository";
-import { setUserLanguagesSchema } from "./user-language.types";
+} from './user-language.repository';
+import { setUserLanguagesSchema } from './user-language.types';
 
 export async function getUserLanguagesAction() {
   const user = await requireUser();
@@ -36,6 +36,3 @@ export async function getUserLanguagesCountAction(): Promise<number> {
   const user = await requireUser();
   return await getUserLanguagesCount(user.id);
 }
-
-
-

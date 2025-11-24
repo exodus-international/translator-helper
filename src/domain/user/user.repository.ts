@@ -1,5 +1,5 @@
-import prisma from "@/lib/db";
-import { Role } from "@prisma/client";
+import prisma from '@/lib/db';
+import { Role } from '@prisma/client';
 
 export async function getUserById(id: string) {
   return prisma.user.findUnique({
@@ -52,7 +52,7 @@ export async function listUsers() {
       updatedAt: true,
     },
     orderBy: {
-      createdAt: "desc",
+      createdAt: 'desc',
     },
   });
 }

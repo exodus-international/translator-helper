@@ -22,7 +22,7 @@ function getColorFromString(str: string): { bg: string; text: string } {
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   // Use HSL to generate a color with good saturation and lightness
   // Hue: 0-360 (use hash modulo 360)
   // Saturation: 60-80% for vibrant colors
@@ -30,7 +30,7 @@ function getColorFromString(str: string): { bg: string; text: string } {
   const hue = Math.abs(hash) % 360;
   const saturation = 65 + (Math.abs(hash) % 15); // 65-80%
   const lightness = 45 + (Math.abs(hash) % 10); // 45-55%
-  
+
   return {
     bg: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
     text: '#ffffff', // White text for contrast
@@ -46,9 +46,7 @@ const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
     };
 
     // Generate color from name if provided, otherwise use default muted background
-    const colorStyle = name && !src 
-      ? getColorFromString(name)
-      : null;
+    const colorStyle = name && !src ? getColorFromString(name) : null;
 
     return (
       <div
@@ -57,36 +55,27 @@ const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
           'relative flex shrink-0 items-center justify-center overflow-hidden rounded-full',
           !colorStyle && 'bg-muted',
           sizeClasses[size],
-          className
+          className,
         )}
         style={colorStyle ? { backgroundColor: colorStyle.bg } : undefined}
         {...props}
       >
         {src && <img src={src} alt={alt} className="h-full w-full object-cover" />}
         {fallback && !src && (
-          <span 
-            className="font-medium"
-            style={colorStyle ? { color: colorStyle.text } : undefined}
-          >
+          <span className="font-medium" style={colorStyle ? { color: colorStyle.text } : undefined}>
             {fallback}
           </span>
         )}
         {children}
       </div>
     );
-  }
+  },
 );
 Avatar.displayName = 'Avatar';
 
-const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
-  ({ className, ...props }, ref) => (
-    <img
-      ref={ref}
-      className={cn('h-full w-full object-cover', className)}
-      {...props}
-    />
-  )
-);
+const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(({ className, ...props }, ref) => (
+  <img ref={ref} className={cn('h-full w-full object-cover', className)} {...props} />
+));
 AvatarImage.displayName = 'AvatarImage';
 
 const AvatarFallback = React.forwardRef<HTMLDivElement, AvatarFallbackProps>(
@@ -100,7 +89,7 @@ const AvatarFallback = React.forwardRef<HTMLDivElement, AvatarFallbackProps>(
         className={cn(
           'flex h-full w-full items-center justify-center font-medium',
           !colorStyle && 'text-muted-foreground',
-          className
+          className,
         )}
         style={colorStyle ? { color: colorStyle.text } : undefined}
         {...props}
@@ -108,7 +97,7 @@ const AvatarFallback = React.forwardRef<HTMLDivElement, AvatarFallbackProps>(
         {children}
       </div>
     );
-  }
+  },
 );
 AvatarFallback.displayName = 'AvatarFallback';
 

@@ -1,10 +1,13 @@
 # Translation Helper - Application Summary
 
 ## Overview
+
 Translation Helper is a comprehensive web-based translation management system designed for managing multi-language document translations with a structured workflow. It enables teams to create, translate, review, and deploy markdown documents across multiple languages with role-based access control and full audit trails.
 
 ## Core Purpose
+
 The application manages the complete lifecycle of document translations:
+
 1. **Document Creation**: Create source documents (English) via upload or in-app editor
 2. **Translation**: Translate documents into target languages
 3. **Review**: Review translations with comments and approval workflow
@@ -13,12 +16,14 @@ The application manages the complete lifecycle of document translations:
 ## Key Features
 
 ### 1. Authentication & Authorization
+
 - Email/password authentication using Better-auth
 - Two user roles:
   - **Translator** (default): Can create, translate, review, and comment on documents
   - **Deployer**: All translator permissions + deploy translations, manage languages/folders, access admin panel
 
 ### 2. Dashboard
+
 - **Status-based filtering** with tabs:
   - "Needs Translation" - Documents requiring translation in selected language
   - "Needs Review" - Translations pending review
@@ -34,6 +39,7 @@ The application manages the complete lifecycle of document translations:
   - Action buttons (Start Translation, Review, Continue Draft, etc.)
 
 ### 3. Documents Overview Page
+
 - **Matrix view**: Shows all documents with translation status across all languages
 - **Visual status indicators**:
   - ⏰ Pending Review (yellow)
@@ -45,6 +51,7 @@ The application manages the complete lifecycle of document translations:
 - Folder and search filtering
 
 ### 4. Document Creation
+
 - **Two modes**:
   - **Upload**: Drag & drop or file picker for markdown files
   - **Create**: In-app markdown editor
@@ -57,6 +64,7 @@ The application manages the complete lifecycle of document translations:
 - **Frontmatter parsing**: Extracts metadata from markdown frontmatter (title, day, verse_tag, hero, subtitle)
 
 ### 5. Translation Interface
+
 - **Side-by-side layout**:
   - **Left panel**: Source document (English)
   - **Right panel**: Translation editor
@@ -76,6 +84,7 @@ The application manages the complete lifecycle of document translations:
   - AI Translate (generates initial translation)
 
 ### 6. Review Interface
+
 - **Side-by-side comparison**:
   - Source document (left)
   - Translation (right)
@@ -92,16 +101,19 @@ The application manages the complete lifecycle of document translations:
 - **Activity log**: Track all changes with user attribution
 
 ### 7. Admin Features (Deployers only)
+
 - **Language Management**: Add/edit languages, set translation instructions per language
 - **Folder Management**: Organize documents into folders
 - **Language Instructions**: Configure translation guidelines per language
 
 ### 8. Settings
+
 - **Language Instructions**: View and manage translation instructions for each language
 
 ## Technical Architecture
 
 ### Tech Stack
+
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Database**: PostgreSQL with Prisma ORM
@@ -112,6 +124,7 @@ The application manages the complete lifecycle of document translations:
 - **Icons**: Lucide React
 
 ### Architecture Pattern
+
 - **Domain-Driven Design** with clear separation:
   - `domain/` - Business logic (types, repositories, actions)
   - `app/` - Next.js pages (server/client split)
@@ -119,6 +132,7 @@ The application manages the complete lifecycle of document translations:
   - `lib/` - Utilities (auth, db, session, permissions)
 
 ### Data Model
+
 - **User**: Authentication, roles
 - **Language**: Supported languages with translation instructions
 - **Folder**: Document organization
@@ -132,6 +146,7 @@ The application manages the complete lifecycle of document translations:
 - **ActivityLog**: Audit trail for all actions
 
 ### Status Workflow
+
 ```
 PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
                           ↓
@@ -141,7 +156,9 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 ## Current UI Components
 
 ### Main Components
+
 1. **SourceTranslationViewer**: Core side-by-side viewer component
+
    - Supports "translate" and "review" variants
    - Line number synchronization
    - Raw/Formatted view toggles
@@ -149,12 +166,14 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
    - Edit/Preview modes
 
 2. **RawEditorPane**: Code editor with line numbers
+
    - Monaco editor integration
    - Line highlighting
    - Cursor position tracking
    - Read-only mode
 
 3. **Navigation**: Top navigation bar
+
    - Links to Dashboard, Documents, New Document
    - Admin links (for Deployers)
    - User info and logout
@@ -163,12 +182,14 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
    - Button, Card, Badge, Input, Textarea, Select, Tabs, Dialog, Label
 
 ### Page Structure
+
 - **Server Components** (`page.tsx`): Fetch data, handle authentication
 - **Client Components** (`page.client.tsx`): Handle interactivity, state management
 
 ## User Workflows
 
 ### Workflow 1: Create & Translate
+
 1. User creates new document (upload or editor)
 2. Document created with English source version
 3. Translator selects language on dashboard
@@ -177,6 +198,7 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 6. Translates content, saves draft or submits for review
 
 ### Workflow 2: Review & Approve
+
 1. Reviewer sees document in "Needs Review" tab
 2. Opens review interface
 3. Compares source and translation side-by-side
@@ -185,6 +207,7 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 6. If approved, appears in "Ready to Deploy" (for Deployers)
 
 ### Workflow 3: Deploy
+
 1. Deployer views "Ready to Deploy" tab
 2. Opens document review page
 3. Clicks "Deploy" button
@@ -194,6 +217,7 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 ## Current UI Characteristics
 
 ### Design Style
+
 - Clean, minimal interface
 - Gray/white color scheme
 - Card-based layouts
@@ -201,6 +225,7 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 - Responsive design
 
 ### Key UI Patterns
+
 - **Tabs**: Status filtering, view mode switching
 - **Cards**: Document listings, content panels
 - **Badges**: Status indicators, labels
@@ -209,6 +234,7 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 - **Search & filters**: Language, folder, text search
 
 ### Interaction Patterns
+
 - Click-to-navigate (documents → translate/review)
 - Tab switching (status, view modes)
 - Toggle buttons (edit/preview, raw/formatted)
@@ -218,6 +244,7 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 ## Areas for UI Improvement
 
 ### Potential Enhancement Areas
+
 1. **Visual Design**: Modernize color scheme, improve typography, add animations
 2. **Information Architecture**: Better organization of navigation, filters, and actions
 3. **User Experience**: Streamline workflows, reduce clicks, improve feedback
@@ -228,7 +255,5 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 8. **Performance**: Loading states, optimistic updates, caching strategies
 
 ## Context for AI Model
+
 This summary is intended to help AI models understand the application's purpose, features, and current state to generate creative and practical UI improvement suggestions. The application is functional but could benefit from modern UI/UX enhancements, better visual hierarchy, improved workflows, and enhanced user experience patterns.
-
-
-

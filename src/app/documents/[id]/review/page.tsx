@@ -1,9 +1,9 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/session";
-import { getDocumentById } from "@/domain/document/document.repository";
-import { getDocumentVersionById } from "@/domain/document-version/document-version.repository";
-import { notFound } from "next/navigation";
-import ReviewClient from "./page.client";
+import { redirect } from 'next/navigation';
+import { getCurrentUser } from '@/lib/session';
+import { getDocumentById } from '@/domain/document/document.repository';
+import { getDocumentVersionById } from '@/domain/document-version/document-version.repository';
+import { notFound } from 'next/navigation';
+import ReviewClient from './page.client';
 
 export default async function ReviewPage({
   params,
@@ -15,7 +15,7 @@ export default async function ReviewPage({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect('/login');
   }
 
   const { id } = await params;
@@ -33,20 +33,11 @@ export default async function ReviewPage({
   }
 
   // Get the source (English) version
-  const sourceVersion = document.versions.find(
-    (v: any) => v.language.code === "en"
-  );
+  const sourceVersion = document.versions.find((v: any) => v.language.code === 'en');
 
   if (!sourceVersion) {
-    throw new Error("Source English version not found");
+    throw new Error('Source English version not found');
   }
 
-  return (
-    <ReviewClient
-      document={document}
-      sourceVersion={sourceVersion}
-      targetVersion={version}
-      user={user}
-    />
-  );
+  return <ReviewClient document={document} sourceVersion={sourceVersion} targetVersion={version} user={user} />;
 }

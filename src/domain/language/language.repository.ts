@@ -1,9 +1,9 @@
-import prisma from "@/lib/db";
+import prisma from '@/lib/db';
 
 export async function listLanguages() {
   return prisma.language.findMany({
     orderBy: {
-      name: "asc",
+      name: 'asc',
     },
   });
 }
@@ -12,11 +12,11 @@ export async function listTargetLanguages() {
   return prisma.language.findMany({
     where: {
       code: {
-        not: "en",
+        not: 'en',
       },
     },
     orderBy: {
-      name: "asc",
+      name: 'asc',
     },
   });
 }
@@ -49,10 +49,7 @@ export async function updateLanguage(id: string, name: string) {
   });
 }
 
-export async function updateLanguageInstructions(
-  id: string,
-  translationInstructions: string | null
-) {
+export async function updateLanguageInstructions(id: string, translationInstructions: string | null) {
   return prisma.language.update({
     where: { id },
     data: { translationInstructions },

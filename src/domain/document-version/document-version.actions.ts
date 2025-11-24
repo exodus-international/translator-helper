@@ -261,7 +261,7 @@ export async function deployVersionAction(versionId: string) {
 
 export async function deleteDocumentVersionAction(id: string) {
   const user = await requireUser();
-  
+
   // Get existing version to check permissions
   const existingVersion = await getDocumentVersionById(id);
   if (!existingVersion) {

@@ -1,15 +1,9 @@
-"use server";
+'use server';
 
-import { requireUser } from "@/lib/session";
-import { canManageFolders } from "@/lib/permissions";
-import { createFolderSchema, updateFolderSchema } from "./folder.types";
-import {
-  listFolders,
-  getFolderById,
-  createFolder,
-  updateFolder,
-  deleteFolder,
-} from "./folder.repository";
+import { requireUser } from '@/lib/session';
+import { canManageFolders } from '@/lib/permissions';
+import { createFolderSchema, updateFolderSchema } from './folder.types';
+import { listFolders, getFolderById, createFolder, updateFolder, deleteFolder } from './folder.repository';
 
 export async function listFoldersAction() {
   await requireUser();
@@ -25,7 +19,7 @@ export async function createFolderAction(input: unknown) {
   const user = await requireUser();
 
   if (!canManageFolders(user)) {
-    throw new Error("Forbidden: Only deployers can manage folders");
+    throw new Error('Forbidden: Only deployers can manage folders');
   }
 
   const validated = createFolderSchema.parse(input);
@@ -36,7 +30,7 @@ export async function updateFolderAction(id: string, input: unknown) {
   const user = await requireUser();
 
   if (!canManageFolders(user)) {
-    throw new Error("Forbidden: Only deployers can manage folders");
+    throw new Error('Forbidden: Only deployers can manage folders');
   }
 
   const validated = updateFolderSchema.parse(input);
@@ -47,7 +41,7 @@ export async function deleteFolderAction(id: string) {
   const user = await requireUser();
 
   if (!canManageFolders(user)) {
-    throw new Error("Forbidden: Only deployers can manage folders");
+    throw new Error('Forbidden: Only deployers can manage folders');
   }
 
   return await deleteFolder(id);

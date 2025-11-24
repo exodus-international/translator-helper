@@ -1,20 +1,18 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { setUserLanguagesAction } from "@/domain/user-language/user-language.actions";
-import { Language } from "@prisma/client";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { setUserLanguagesAction } from '@/domain/user-language/user-language.actions';
+import { Language } from '@prisma/client';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 interface OnboardingLanguagesClientProps {
   languages: Language[];
 }
 
-export default function OnboardingLanguagesClient({
-  languages,
-}: OnboardingLanguagesClientProps) {
+export default function OnboardingLanguagesClient({ languages }: OnboardingLanguagesClientProps) {
   const router = useRouter();
   const [selectedLanguageIds, setSelectedLanguageIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -22,9 +20,7 @@ export default function OnboardingLanguagesClient({
 
   const toggleLanguage = (languageId: string) => {
     setSelectedLanguageIds((prev) =>
-      prev.includes(languageId)
-        ? prev.filter((id) => id !== languageId)
-        : [...prev, languageId]
+      prev.includes(languageId) ? prev.filter((id) => id !== languageId) : [...prev, languageId],
     );
     setError(null);
   };
@@ -34,17 +30,17 @@ export default function OnboardingLanguagesClient({
     setError(null);
 
     if (selectedLanguageIds.length === 0) {
-      setError("Please select at least one language");
+      setError('Please select at least one language');
       return;
     }
 
     setLoading(true);
     try {
       await setUserLanguagesAction({ languageIds: selectedLanguageIds });
-      router.push("/dashboard");
+      router.push('/dashboard');
     } catch (error: any) {
-      console.error("Error setting languages:", error);
-      setError(error.message || "Failed to save language preferences");
+      console.error('Error setting languages:', error);
+      setError(error.message || 'Failed to save language preferences');
     } finally {
       setLoading(false);
     }
@@ -56,8 +52,8 @@ export default function OnboardingLanguagesClient({
         <div className="mb-6">
           <h1 className="text-2xl font-bold mb-2">Welcome! Select Your Languages</h1>
           <p className="text-gray-600">
-            Please select the languages you work with. This helps us filter and show you relevant
-            people and tasks in the kanban board.
+            Please select the languages you work with. This helps us filter and show you relevant people and tasks in
+            the kanban board.
           </p>
         </div>
 
@@ -90,9 +86,7 @@ export default function OnboardingLanguagesClient({
                 })
               )}
             </div>
-            {error && (
-              <p className="text-sm text-red-500 mt-2">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
             <p className="text-xs text-gray-500 mt-2">
               You can select multiple languages. You can update these preferences later in settings.
             </p>
@@ -100,7 +94,7 @@ export default function OnboardingLanguagesClient({
 
           <div className="flex justify-end gap-2">
             <Button type="submit" disabled={loading || selectedLanguageIds.length === 0}>
-              {loading ? "Saving..." : "Continue to Dashboard"}
+              {loading ? 'Saving...' : 'Continue to Dashboard'}
             </Button>
           </div>
         </form>
@@ -108,6 +102,3 @@ export default function OnboardingLanguagesClient({
     </div>
   );
 }
-
-
-

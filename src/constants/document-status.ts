@@ -116,10 +116,13 @@ const NO_STATUS_CONFIG: DocumentStatusConfig = {
   },
 };
 
-const STATUS_STEP_INDEX = DOCUMENT_STATUS_SEQUENCE.reduce<Record<DocumentStatus, number>>((acc, status, index) => {
-  acc[status] = index + 1;
-  return acc;
-}, {} as Record<DocumentStatus, number>);
+const STATUS_STEP_INDEX = DOCUMENT_STATUS_SEQUENCE.reduce<Record<DocumentStatus, number>>(
+  (acc, status, index) => {
+    acc[status] = index + 1;
+    return acc;
+  },
+  {} as Record<DocumentStatus, number>,
+);
 
 export function getDocumentStatusConfig(status?: DocumentStatus | DocumentStatusKey | null): DocumentStatusConfig {
   if (!status || status === 'NO_STATUS') {

@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test src/domain/translation/translation.service.test.ts",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "format": "prettier --write ."
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

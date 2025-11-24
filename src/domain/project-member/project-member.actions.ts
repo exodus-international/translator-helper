@@ -1,7 +1,7 @@
-"use server";
+'use server';
 
-import { getUserById } from "@/domain/user/user.repository";
-import { requireUser } from "@/lib/session";
+import { getUserById } from '@/domain/user/user.repository';
+import { requireUser } from '@/lib/session';
 import {
   createProjectMember,
   deleteProjectMember,
@@ -10,8 +10,8 @@ import {
   getUserRoleInProject,
   listProjectMembers,
   updateProjectMember,
-} from "./project-member.repository";
-import { createProjectMemberSchema, updateProjectMemberSchema } from "./project-member.types";
+} from './project-member.repository';
+import { createProjectMemberSchema, updateProjectMemberSchema } from './project-member.types';
 
 export async function listProjectMembersAction(translationProjectId: string) {
   await requireUser();
@@ -23,9 +23,7 @@ export async function getProjectMemberAction(id: string) {
   return await getProjectMemberById(id);
 }
 
-export async function getProjectMembersByUserAndProjectAction(
-  translationProjectId: string
-) {
+export async function getProjectMembersByUserAndProjectAction(translationProjectId: string) {
   const user = await requireUser();
   return await getProjectMembersByUserAndProject(user.id, translationProjectId);
 }
@@ -36,13 +34,13 @@ export async function createProjectMemberAction(input: unknown) {
   // This will be implemented after permissions system is updated
 
   const validated = createProjectMemberSchema.parse(input);
-  
+
   // Check if user exists in database
   const targetUser = await getUserById(validated.userId);
   if (!targetUser) {
-    throw new Error("User not found in database");
+    throw new Error('User not found in database');
   }
-  
+
   return await createProjectMember({
     translationProjectId: validated.translationProjectId,
     userId: validated.userId,

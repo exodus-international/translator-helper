@@ -1,8 +1,6 @@
-import prisma from "@/lib/db";
+import prisma from '@/lib/db';
 
-export async function getActivityLogsByDocumentVersion(
-  documentVersionId: string
-) {
+export async function getActivityLogsByDocumentVersion(documentVersionId: string) {
   return prisma.activityLog.findMany({
     where: { documentVersionId },
     include: {
@@ -16,7 +14,7 @@ export async function getActivityLogsByDocumentVersion(
       },
     },
     orderBy: {
-      createdAt: "desc",
+      createdAt: 'desc',
     },
   });
 }
@@ -94,7 +92,7 @@ export async function getRecentActivityLogs(limit: number = 50) {
       },
     },
     orderBy: {
-      createdAt: "desc",
+      createdAt: 'desc',
     },
     take: limit,
   });
