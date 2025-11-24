@@ -1,6 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/session";
+import { isDeployer } from "@/lib/permissions";
 import { createDocumentSchema, updateDocumentSchema } from "./document.types";
 import {
   listDocuments,
@@ -86,6 +87,12 @@ export async function createDocumentAction(input: unknown) {
 
 export async function updateDocumentAction(id: string, input: unknown) {
   const user = await requireUser();
+  
+  // Only deployers can update documents (since documents contain source versions)
+  if (!isDeployer(user)) {
+    throw new Error('Forbidden: Only deployers can edit documents');
+  }
+  
   const validated = updateDocumentSchema.parse(input);
 
   const document = await updateDocument(id, validated);
@@ -95,6 +102,12 @@ export async function updateDocumentAction(id: string, input: unknown) {
 
 export async function deleteDocumentAction(id: string) {
   const user = await requireUser();
+  
+  // Only deployers can delete documents
+  if (!isDeployer(user)) {
+    throw new Error('Forbidden: Only deployers can delete documents');
+  }
+  
   return await deleteDocument(id);
 }
 

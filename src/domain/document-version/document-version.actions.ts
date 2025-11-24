@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { canDeploy, canReviewInProject, canTranslateInProject, isProjectMember } from '@/lib/permissions';
+import { canDeploy, canReviewInProject, canTranslateInProject, isDeployer, isProjectMember } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 import { DocumentStatus, ProjectRole } from '@prisma/client';
 import { createActivityLog } from '../activity-log/activity-log.repository';
@@ -72,35 +72,49 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
     throw new Error('Document version not found');
   }
 
-  // Get document to find source project
-  const document = await getDocumentById(existingVersion.documentId);
-  if (!document) {
-    throw new Error('Document not found');
-  }
-  if (!document.sourceProject?.id) {
-    throw new Error(
-      'This document is not associated with a source project. Please assign a source project to the document before editing translations.',
-    );
+  // Check if this is a source (English) version
+  const language = await getLanguageById(existingVersion.languageId);
+  if (!language) {
+    throw new Error('Language not found');
   }
 
-  // Get translation project
-  const translationProject = await getTranslationProjectBySourceAndLanguage(
-    document.sourceProject.id,
-    existingVersion.languageId,
-  );
-
-  if (translationProject) {
-    // Check if user is a project member
-    const isMember = await isProjectMember(user, translationProject.id);
-    if (!isMember) {
-      throw new Error('You are not a member of this translation project');
+  // If this is a source (English) version, only deployers can edit it
+  if (language.code === 'en') {
+    if (!isDeployer(user)) {
+      throw new Error('Forbidden: Only deployers can edit source (English) document versions');
+    }
+  } else {
+    // For translation versions, use existing permission logic
+    // Get document to find source project
+    const document = await getDocumentById(existingVersion.documentId);
+    if (!document) {
+      throw new Error('Document not found');
+    }
+    if (!document.sourceProject?.id) {
+      throw new Error(
+        'This document is not associated with a source project. Please assign a source project to the document before editing translations.',
+      );
     }
 
-    // Only the owner of the version or users with higher permissions can edit
-    if (existingVersion.userId !== user.id) {
-      const canTranslate = await canTranslateInProject(user, translationProject.id);
-      if (!canTranslate) {
-        throw new Error('You do not have permission to edit this translation');
+    // Get translation project
+    const translationProject = await getTranslationProjectBySourceAndLanguage(
+      document.sourceProject.id,
+      existingVersion.languageId,
+    );
+
+    if (translationProject) {
+      // Check if user is a project member
+      const isMember = await isProjectMember(user, translationProject.id);
+      if (!isMember) {
+        throw new Error('You are not a member of this translation project');
+      }
+
+      // Only the owner of the version or users with higher permissions can edit
+      if (existingVersion.userId !== user.id) {
+        const canTranslate = await canTranslateInProject(user, translationProject.id);
+        if (!canTranslate) {
+          throw new Error('You do not have permission to edit this translation');
+        }
       }
     }
   }
@@ -247,6 +261,27 @@ export async function deployVersionAction(versionId: string) {
 
 export async function deleteDocumentVersionAction(id: string) {
   const user = await requireUser();
+  
+  // Get existing version to check permissions
+  const existingVersion = await getDocumentVersionById(id);
+  if (!existingVersion) {
+    throw new Error('Document version not found');
+  }
+
+  // Check if this is a source (English) version
+  const language = await getLanguageById(existingVersion.languageId);
+  if (!language) {
+    throw new Error('Language not found');
+  }
+
+  // If this is a source (English) version, only deployers can delete it
+  if (language.code === 'en') {
+    if (!isDeployer(user)) {
+      throw new Error('Forbidden: Only deployers can delete source (English) document versions');
+    }
+  }
+  // For translation versions, allow deletion (or add appropriate checks if needed)
+
   return await deleteDocumentVersion(id);
 }
 

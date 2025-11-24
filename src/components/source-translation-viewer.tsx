@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Eye, FileEdit } from "lucide-react";
+import { Eye, FileEdit, Save, Trash2, X } from "lucide-react";
 import {
   ReactNode,
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useState,
@@ -36,6 +37,12 @@ interface SourceTranslationViewerProps {
   translationBadge?: ReactNode;
   sourceHeaderExtra?: ReactNode;
   translationHeaderExtra?: ReactNode;
+  // Source editing props
+  canEditSource?: boolean;
+  onSourceChange?: (value: string) => void;
+  onSourceSave?: () => void | Promise<void>;
+  onSourceDelete?: () => void | Promise<void>;
+  sourceEditContent?: string;
   reviewConfig?: {
     canEdit?: boolean;
     editButtonLabel?: string;
@@ -68,6 +75,11 @@ export const SourceTranslationViewer = forwardRef<
     translationBadge,
     sourceHeaderExtra,
     translationHeaderExtra,
+    canEditSource = false,
+    onSourceChange,
+    onSourceSave,
+    onSourceDelete,
+    sourceEditContent,
     reviewConfig,
   },
   ref
@@ -79,6 +91,9 @@ export const SourceTranslationViewer = forwardRef<
   const [isReviewEditing, setIsReviewEditing] = useState(
     reviewConfig?.editingDefault ?? false
   );
+  const [isSourceEditing, setIsSourceEditing] = useState(false);
+  const [sourceEditValue, setSourceEditValue] = useState(sourceEditContent ?? sourceContent);
+  const [sourceSaving, setSourceSaving] = useState(false);
   const [sourceLine, setSourceLine] = useState(1);
   const [translationLine, setTranslationLine] = useState(1);
   const [syncedSourceLine, setSyncedSourceLine] = useState<number | undefined>(undefined);
@@ -91,6 +106,55 @@ export const SourceTranslationViewer = forwardRef<
     variant === "translate"
       ? translateTab === "edit"
       : isReviewEditing || reviewViewMode === "raw";
+
+  // Update source edit value when sourceEditContent prop changes
+  useEffect(() => {
+    if (sourceEditContent !== undefined) {
+      setSourceEditValue(sourceEditContent);
+    }
+  }, [sourceEditContent]);
+
+  const handleSourceEditChange = (value: string) => {
+    setSourceEditValue(value);
+    onSourceChange?.(value);
+  };
+
+  const handleSourceSave = async () => {
+    if (!onSourceSave) return;
+    setSourceSaving(true);
+    try {
+      await onSourceSave();
+      setIsSourceEditing(false);
+    } catch (error) {
+      console.error('Error saving source:', error);
+    } finally {
+      setSourceSaving(false);
+    }
+  };
+
+  const handleSourceCancel = () => {
+    setSourceEditValue(sourceEditContent ?? sourceContent);
+    setIsSourceEditing(false);
+  };
+
+  const handleSourceDelete = async () => {
+    if (!onSourceDelete) return;
+    if (!confirm('Are you sure you want to delete this source version? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      await onSourceDelete();
+    } catch (error) {
+      console.error('Error deleting source:', error);
+    }
+  };
+
+  const enterSourceEditMode = () => {
+    if (!canEditSource) return;
+    setSourceEditValue(sourceEditContent ?? sourceContent);
+    setIsSourceEditing(true);
+    setSourceViewMode("raw");
+  };
 
   const handleSourceCursorChange = (lineNumber: number) => {
     setSourceLine(lineNumber);
@@ -179,18 +243,60 @@ export const SourceTranslationViewer = forwardRef<
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Source (English)</h2>
           <div className="flex items-center gap-2">
-            <Tabs value={sourceViewMode} onValueChange={(value) => setSourceViewMode(value as "formatted" | "raw")}>
-              <TabsList>
-                <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                <TabsTrigger value="raw">Raw</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {!isSourceEditing && (
+              <Tabs value={sourceViewMode} onValueChange={(value) => setSourceViewMode(value as "formatted" | "raw")}>
+                <TabsList>
+                  <TabsTrigger value="formatted">Formatted</TabsTrigger>
+                  <TabsTrigger value="raw">Raw</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
             {sourceBadge}
+            {canEditSource && !isSourceEditing && (
+              <>
+                <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
+                  <FileEdit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+                {/* <Button variant="outline" size="sm" onClick={handleSourceDelete}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button> */}
+              </>
+            )}
+            {isSourceEditing && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleSourceSave} disabled={sourceSaving}>
+                  <Save className="h-4 w-4 mr-2" />
+                  {sourceSaving ? 'Saving...' : 'Save'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleSourceCancel} disabled={sourceSaving}>
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </>
+            )}
             {sourceHeaderExtra}
           </div>
         </div>
         <div className={bodyClassName}>
-          {sourceViewMode === "formatted" ? (
+          {isSourceEditing ? (
+            <RawEditorPane
+              value={sourceEditValue}
+              onChange={handleSourceEditChange}
+              currentLine={sourceLine}
+              highlightLine={syncedSourceLine}
+              onCursorChange={handleSourceCursorChange}
+              fullHeight={isZen}
+              lineInfo={{
+                primaryLabel: "Source Line",
+                primaryValue: sourceLine,
+                secondaryLabel: translationRawVisible ? "Translation Line" : undefined,
+                secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
+                direction: "to",
+              }}
+            />
+          ) : sourceViewMode === "formatted" ? (
             <div className="prose max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {sourceFormattedContent}

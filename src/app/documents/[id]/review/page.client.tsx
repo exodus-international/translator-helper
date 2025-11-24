@@ -1,6 +1,7 @@
 'use client';
 
 import { SourceTranslationViewer } from '@/components/source-translation-viewer';
+import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,12 +23,13 @@ import {
   reviewVersionAction,
   updateDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
+import { deleteDocumentAction } from '@/domain/document/document.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
+import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { StatusDropdown } from '@/components/status-dropdown';
 import { cn } from '@/lib/utils';
 import matter from 'gray-matter';
-import { CheckCircle, Download, MessageSquare, XCircle } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -58,6 +60,11 @@ export default function ReviewClient({
   const [content, setContent] = useState(initialTargetVersion.content);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
+  const [sourceSaving, setSourceSaving] = useState(false);
+
+  // Check if user can edit source (deployer only)
+  const canEditSource = isDeployerClient(user);
   const sourceFormattedContent = useMemo(
     () => getContentWithoutFrontmatter(sourceVersion.content),
     [sourceVersion.content],
@@ -181,6 +188,48 @@ export default function ReviewClient({
     }
   };
 
+  const handleSourceChange = (value: string) => {
+    setSourceEditContent(value);
+  };
+
+  const handleSourceSave = async () => {
+    setSourceSaving(true);
+    try {
+      const updated = await updateDocumentVersionAction(sourceVersion.id, {
+        content: sourceEditContent,
+      });
+      // Update the source version in the component
+      sourceVersion.content = updated.content;
+      sourceVersion.status = updated.status;
+      alert('Source document saved successfully!');
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error saving source:', error);
+      alert(error.message || 'Failed to save source document');
+    } finally {
+      setSourceSaving(false);
+    }
+  };
+
+  const handleSourceDelete = async () => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this document? This will delete the source version and all translation versions. This action cannot be undone.',
+      )
+    ) {
+      return;
+    }
+    try {
+      // Delete the entire document, which will cascade delete all versions
+      await deleteDocumentAction(document.id);
+      alert('Document deleted successfully!');
+      router.push('/documents');
+    } catch (error: any) {
+      console.error('Error deleting document:', error);
+      alert(error.message || 'Failed to delete document');
+    }
+  };
+
   const reviewEditActions = ({ exitEditMode }: { exitEditMode: () => void }) => (
     <div className="flex gap-2">
       <Button
@@ -266,6 +315,11 @@ export default function ReviewClient({
           onTranslationChange={setContent}
           sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
           translationBadge={<Badge variant="secondary">{targetVersion.language.name}</Badge>}
+          canEditSource={canEditSource}
+          onSourceChange={handleSourceChange}
+          onSourceSave={handleSourceSave}
+          onSourceDelete={handleSourceDelete}
+          sourceEditContent={sourceEditContent}
           reviewConfig={{
             canEdit: isPendingReview,
             renderEditActions: reviewEditActions,

@@ -13,7 +13,6 @@ import { SessionUser } from '@/lib/session';
 import { DocumentStatus, Language } from '@prisma/client';
 import { FileText, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 interface DashboardClientProps {
@@ -86,7 +85,6 @@ export default function DashboardClient({
   translationProjects,
   initialFilters,
 }: DashboardClientProps) {
-  const router = useRouter();
   const LANGUAGE_STORAGE_KEY = 'dashboard:selectedLanguage';
   const [selectedLanguage, setSelectedLanguage] = useState<string>(initialFilters.language || languages[0]?.id || '');
   const [selectedTranslationProject, setSelectedTranslationProject] = useState<string>(
@@ -167,16 +165,13 @@ export default function DashboardClient({
       color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.APPROVED].color.hex,
       status: DocumentStatus.APPROVED,
     },
-  ];
-
-  if (user.role === 'DEPLOYER') {
-    columns.push({
+    {
       id: 'deployed',
       name: 'Deployed',
       color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.DEPLOYED].color.hex,
       status: DocumentStatus.DEPLOYED,
-    });
-  }
+    },
+  ];
 
   const activeColumnIds = new Set(columns.map((column) => column.id));
 
@@ -225,12 +220,6 @@ export default function DashboardClient({
       }
     }
   }
-
-  const dateFormatter = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
 
   const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
     month: 'short',

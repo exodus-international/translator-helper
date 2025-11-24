@@ -16,16 +16,20 @@ import {
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import {
+  assignDocumentVersionAction,
   createDocumentVersionAction,
+  deleteDocumentVersionAction,
   submitForReviewAction,
   updateDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
+import { deleteDocumentAction } from '@/domain/document/document.actions';
 import { translateDocumentAction } from '@/domain/translation/translation.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
+import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@prisma/client';
 import matter from 'gray-matter';
-import { AlertCircle, Calendar, Maximize2, Minimize2, Save, Send, Sparkles, User } from 'lucide-react';
+import { AlertCircle, Calendar, Maximize2, Minimize2, Save, Send, Sparkles, Trash2, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -63,6 +67,11 @@ export default function TranslateClient({
   const [loading, setLoading] = useState(false);
   const [zenMode, setZenMode] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
+  const [sourceSaving, setSourceSaving] = useState(false);
+
+  // Check if user can edit source (deployer only)
+  const canEditSource = isDeployerClient(user);
   const statusSteps = DOCUMENT_STATUS_SEQUENCE.map((status, index) => ({
     status,
     step: index + 1,
@@ -158,6 +167,54 @@ export default function TranslateClient({
     }
   };
 
+  const handleStartTranslation = async () => {
+    if (!targetLanguageId) {
+      alert('Please select a target language first');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const version = await assignDocumentVersionAction({
+        documentId: document.id,
+        languageId: targetLanguageId,
+        content: '',
+      });
+      setTargetVersion(version);
+      setContent(version.content || '');
+    } catch (error: any) {
+      console.error('Error starting translation:', error);
+      alert(error.message || 'Failed to start translation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTranslation = async () => {
+    if (!targetVersion) {
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this translation version? This action cannot be undone.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await deleteDocumentVersionAction(targetVersion.id);
+      alert('Translation version deleted successfully!');
+      // Reset state and redirect back to documents page
+      setTargetVersion(null);
+      setContent('');
+      router.push('/documents');
+    } catch (error: any) {
+      console.error('Error deleting translation:', error);
+      alert(error.message || 'Failed to delete translation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAutoTranslate = async () => {
     if (!targetLanguageId) {
       alert('Select a target language before requesting an AI translation.');
@@ -190,6 +247,48 @@ export default function TranslateClient({
       alert(error.message || 'Failed to generate AI translation');
     } finally {
       setTranslating(false);
+    }
+  };
+
+  const handleSourceChange = (value: string) => {
+    setSourceEditContent(value);
+  };
+
+  const handleSourceSave = async () => {
+    setSourceSaving(true);
+    try {
+      const updated = await updateDocumentVersionAction(sourceVersion.id, {
+        content: sourceEditContent,
+      });
+      // Update the source version in the component
+      sourceVersion.content = updated.content;
+      sourceVersion.status = updated.status;
+      alert('Source document saved successfully!');
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error saving source:', error);
+      alert(error.message || 'Failed to save source document');
+    } finally {
+      setSourceSaving(false);
+    }
+  };
+
+  const handleSourceDelete = async () => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this document? This will delete the source version and all translation versions. This action cannot be undone.',
+      )
+    ) {
+      return;
+    }
+    try {
+      // Delete the entire document, which will cascade delete all versions
+      await deleteDocumentAction(document.id);
+      alert('Document deleted successfully!');
+      router.push('/documents');
+    } catch (error: any) {
+      console.error('Error deleting document:', error);
+      alert(error.message || 'Failed to delete document');
     }
   };
 
@@ -242,10 +341,20 @@ export default function TranslateClient({
                         disabled={loading || translating}
                         onStatusChange={handleStatusChange}
                       />
+                      {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
+                        <Button variant="outline" size="sm" onClick={handleDeleteTranslation} disabled={loading}>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      )}
                     </>
+                  ) : targetLanguageId ? (
+                    <Button onClick={handleStartTranslation} disabled={loading}>
+                      Start Translation
+                    </Button>
                   ) : (
                     <span className="text-sm text-gray-500">
-                      Translation not initialized yet. Create a version from the documents page to get started.
+                      Please select a target language from the documents page to start translating.
                     </span>
                   )}
                 </div>
@@ -365,10 +474,20 @@ export default function TranslateClient({
                       Submit
                     </Button>
                   )}
+                  {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
+                    <Button variant="outline" size="sm" onClick={handleDeleteTranslation} disabled={loading}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
                 </>
+              ) : targetLanguageId ? (
+                <Button onClick={handleStartTranslation} disabled={loading} size="sm">
+                  Start Translation
+                </Button>
               ) : (
                 <span className="text-sm text-gray-500">
-                  Translation not initialized yet. Create a version from the documents page to get started.
+                  Please select a target language from the documents page to start translating.
                 </span>
               )}
               <Button variant="outline" size="sm" onClick={() => setZenMode(false)}>
@@ -395,6 +514,11 @@ export default function TranslateClient({
           onTranslationChange={setContent}
           sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
           translationBadge={<Badge variant="secondary">{targetVersion?.language.name || 'New Translation'}</Badge>}
+          canEditSource={canEditSource}
+          onSourceChange={handleSourceChange}
+          onSourceSave={handleSourceSave}
+          onSourceDelete={handleSourceDelete}
+          sourceEditContent={sourceEditContent}
         />
         {/* Activity Log */}
         {!zenMode && targetVersion && targetVersion.activityLogs && (
