@@ -1,4 +1,4 @@
-import { getDocumentsWithAllVersionsAction } from '@/domain/document/document.actions';
+import { deleteDocumentActionVoid, getDocumentsWithAllVersionsAction } from '@/domain/document/document.actions';
 import { listTargetLanguages } from '@/domain/language/language.repository';
 import { listSourceProjectsAction } from '@/domain/source-project/source-project.actions';
 import { getCurrentUser } from '@/lib/session';
@@ -32,6 +32,7 @@ export default async function DocumentsPage({
       documents={documents}
       languages={languages}
       sourceProjects={sourceProjects}
+      handleDeleteDocument={deleteDocumentActionVoid}
       initialFilters={{
         sourceProject: params.sourceProject,
         search: params.search,

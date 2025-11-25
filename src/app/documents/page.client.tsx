@@ -1,15 +1,16 @@
 'use client';
 
-import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
+import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { StatusDropdown } from '@/components/status-dropdown';
+import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
+import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { Document, DocumentStatus, Language } from '@prisma/client';
-import { FileText, Plus, Search } from 'lucide-react';
+import { FileText, Plus, Search, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -39,6 +40,7 @@ interface DocumentsClientProps {
     sourceProject?: string;
     search?: string;
   };
+  handleDeleteDocument: (id: string) => Promise<void>;
 }
 
 export default function DocumentsClient({
@@ -47,6 +49,7 @@ export default function DocumentsClient({
   languages,
   sourceProjects,
   initialFilters,
+  handleDeleteDocument,
 }: DocumentsClientProps) {
   const [selectedSourceProject, setSelectedSourceProject] = useState<string>(initialFilters.sourceProject || 'all');
   const [searchQuery, setSearchQuery] = useState<string>(initialFilters.search || '');
@@ -209,13 +212,13 @@ export default function DocumentsClient({
                                     <IndicatorIcon className="h-4 w-4" />
                                   </div>
                                 </Link>
-                                <StatusDropdown
+                                {/* <StatusDropdown
                                   currentStatus={status}
                                   versionId={versionId}
                                   user={user}
                                   documentId={doc.id}
                                   languageId={lang.id}
-                                />
+                                /> */}
                               </>
                             ) : (
                               <Link
@@ -234,6 +237,11 @@ export default function DocumentsClient({
                           </div>
                         );
                       })}
+                      {isDeployerClient(user) && (
+                        <Button variant="secondary" size="sm" onClick={() => handleDeleteDocument(doc.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

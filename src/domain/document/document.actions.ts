@@ -1,26 +1,30 @@
 'use server';
 
-import { requireUser } from '@/lib/session';
+import prisma from '@/lib/db';
 import { isDeployer } from '@/lib/permissions';
-import { createDocumentSchema, updateDocumentSchema } from './document.types';
+import { requireUser } from '@/lib/session';
+import { DocumentStatus } from '@prisma/client';
+import { revalidatePath } from 'next/cache';
+import { createActivityLog } from '../activity-log/activity-log.repository';
 import {
-  listDocuments,
+  createDocumentVersion,
+  deleteDocumentVersionsByDocumentId,
+} from '../document-version/document-version.repository';
+import {
+  createDocument,
+  deleteDocument,
+  getDashboardDocuments,
   getDocumentById,
   getDocumentBySlug,
-  createDocument,
-  updateDocument,
-  deleteDocument,
+  getDocumentsByUser,
   getDocumentsNeedingTranslation,
   getDocumentsPendingReview,
   getDocumentsReadyToDeploy,
-  getDocumentsByUser,
   getDocumentsWithAllVersions,
-  getDashboardDocuments,
+  listDocuments,
+  updateDocument,
 } from './document.repository';
-import { createDocumentVersion } from '../document-version/document-version.repository';
-import { DocumentStatus } from '@prisma/client';
-import { createActivityLog } from '../activity-log/activity-log.repository';
-import prisma from '@/lib/db';
+import { createDocumentSchema, updateDocumentSchema } from './document.types';
 
 export async function listDocumentsAction(filters?: {
   sourceProjectId?: string;
@@ -109,6 +113,20 @@ export async function deleteDocumentAction(id: string) {
   }
 
   return await deleteDocument(id);
+}
+
+// Wrapper that returns void for client component compatibility
+export async function deleteDocumentActionVoid(id: string): Promise<void> {
+  const user = await requireUser();
+
+  // Only deployers can delete documents
+  if (!isDeployer(user)) {
+    throw new Error('Forbidden: Only deployers can delete documents');
+  }
+
+  await deleteDocumentAction(id);
+  await deleteDocumentVersionsByDocumentId(id);
+  revalidatePath('/documents');
 }
 
 export async function getDocumentsNeedingTranslationAction(languageId: string, translationProjectId?: string) {

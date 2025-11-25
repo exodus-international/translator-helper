@@ -206,3 +206,9 @@ export async function deleteDocumentVersion(id: string) {
     where: { id },
   });
 }
+
+export async function deleteDocumentVersionsByDocumentId(documentId: string) {
+  return prisma.documentVersion.deleteMany({
+    where: { documentId },
+  });
+}
