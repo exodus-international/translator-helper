@@ -1,5 +1,16 @@
 'use client';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -18,6 +29,7 @@ import { ArrowLeft, Calendar, FileText, Plus, Trash2, User, Users, X } from 'luc
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface TranslationProjectClientProps {
   translationProject: any;
@@ -56,11 +68,11 @@ export default function TranslationProjectClient({
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUserId || selectedUserId.trim() === '') {
-      alert('Please select a user');
+      toast.warning('Please select a user');
       return;
     }
     if (selectedRoles.length === 0) {
-      alert('Please select at least one role');
+      toast.warning('Please select at least one role');
       return;
     }
 
@@ -86,11 +98,11 @@ export default function TranslationProjectClient({
       // Handle validation errors - server will check if user exists
       if (error?.issues) {
         const errorMessages = error.issues.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`).join('\n');
-        alert(`Error: ${errorMessages}`);
+        toast.error(`Error: ${errorMessages}`);
       } else if (error?.message) {
-        alert(error.message);
+        toast.error(error.message);
       } else {
-        alert('Failed to add member. The user may not exist or may already have these roles.');
+        toast.error('Failed to add member. The user may not exist or may already have these roles.');
       }
     } finally {
       setLoading(false);
@@ -109,28 +121,29 @@ export default function TranslationProjectClient({
       router.refresh();
     } catch (error: any) {
       console.error('Error adding role:', error);
-      alert(error.message || 'Failed to add role');
+      toast.error(error.message || 'Failed to add role');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteMember = async (memberId: string) => {
-    if (!confirm('Are you sure you want to remove this member?')) {
-      return;
-    }
-
     setLoading(true);
     try {
       await deleteProjectMemberAction(memberId);
       setMembers(members.filter((m) => m.id !== memberId));
       router.refresh();
+      toast.success('Member removed successfully');
     } catch (error: any) {
       console.error('Error removing member:', error);
-      alert(error.message || 'Failed to remove member');
+      toast.error(error.message || 'Failed to remove member');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteMemberConfirm = async (memberId: string) => {
+    await handleDeleteMember(memberId);
   };
 
   const handleAssignDocument = async (e: React.FormEvent) => {
@@ -150,7 +163,7 @@ export default function TranslationProjectClient({
       router.refresh();
     } catch (error: any) {
       console.error('Error assigning document:', error);
-      alert(error.message || 'Failed to assign document');
+      toast.error(error.message || 'Failed to assign document');
     } finally {
       setLoading(false);
     }
@@ -167,25 +180,22 @@ export default function TranslationProjectClient({
       router.refresh();
     } catch (error: any) {
       console.error('Error updating assignment:', error);
-      alert(error.message || 'Failed to update assignment');
+      toast.error(error.message || 'Failed to update assignment');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteAssignment = async (assignmentId: string) => {
-    if (!confirm('Are you sure you want to remove this assignment?')) {
-      return;
-    }
-
     setLoading(true);
     try {
       await deleteDocumentAssignmentAction(assignmentId);
       setAssignments(assignments.filter((a) => a.id !== assignmentId));
       router.refresh();
+      toast.success('Assignment removed successfully');
     } catch (error: any) {
       console.error('Error removing assignment:', error);
-      alert(error.message || 'Failed to remove assignment');
+      toast.error(error.message || 'Failed to remove assignment');
     } finally {
       setLoading(false);
     }
@@ -210,19 +220,16 @@ export default function TranslationProjectClient({
   const unassignedDocuments = documents.filter((doc) => !assignments.some((a) => a.documentId === doc.id));
 
   // Group members by user
-  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce(
-    (acc, member) => {
-      if (!acc[member.userId]) {
-        acc[member.userId] = {
-          user: member.user,
-          roles: [],
-        };
-      }
-      acc[member.userId].roles.push(member);
-      return acc;
-    },
-    {} as Record<string, { user: any; roles: any[] }>,
-  );
+  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce((acc, member) => {
+    if (!acc[member.userId]) {
+      acc[member.userId] = {
+        user: member.user,
+        roles: [],
+      };
+    }
+    acc[member.userId].roles.push(member);
+    return acc;
+  }, {} as Record<string, { user: any; roles: any[] }>);
 
   // Get users that are not yet members
   const availableUsers = users.filter((user) => !membersByUser[user.id]);
@@ -373,13 +380,28 @@ export default function TranslationProjectClient({
                           {roles.map((member: any) => (
                             <Badge key={member.id} variant="secondary" className="flex items-center gap-1">
                               {ROLE_LABELS[member.role as ProjectRole]}
-                              <button
-                                onClick={() => handleDeleteMember(member.id)}
-                                disabled={loading}
-                                className="ml-1 hover:text-red-600"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <button disabled={loading} className="ml-1 hover:text-red-600">
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to remove this member? This will remove the{' '}
+                                      {ROLE_LABELS[member.role as ProjectRole]} role from {user.name}.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteMemberConfirm(member.id)}>
+                                      Remove
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </Badge>
                           ))}
                           {availableRolesToAdd.length > 0 && (
@@ -526,14 +548,28 @@ export default function TranslationProjectClient({
                                 )}
                               </div>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteAssignment(assignment.id)}
-                              disabled={loading}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={loading}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Remove Assignment</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to remove this assignment? This will remove the document from
+                                    this translation project.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteAssignment(assignment.id)}>
+                                    Remove
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </Card>
                       );
@@ -558,14 +594,28 @@ export default function TranslationProjectClient({
                                 Unassigned
                               </Badge>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteAssignment(assignment.id)}
-                              disabled={loading}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={loading}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Remove Assignment</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to remove this assignment? This will remove the document from
+                                    this translation project.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteAssignment(assignment.id)}>
+                                    Remove
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </Card>
                       );

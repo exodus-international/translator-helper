@@ -9,6 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Plus, Edit, Trash2, FolderOpen, Languages, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -17,6 +28,7 @@ import {
   updateSourceProjectAction,
   deleteSourceProjectAction,
 } from '@/domain/source-project/source-project.actions';
+import { toast } from 'sonner';
 
 interface ProjectsClientProps {
   sourceProjects: (SourceProject & {
@@ -78,7 +90,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
       resetForm();
     } catch (error: any) {
       console.error('Error saving source project:', error);
-      alert(error.message || 'Failed to save source project');
+      toast.error(error.message || 'Failed to save source project');
     } finally {
       setLoading(false);
     }
@@ -113,27 +125,28 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
       );
     } catch (error: any) {
       console.error('Error updating project status:', error);
-      alert(error.message || 'Failed to update project status');
+      toast.error(error.message || 'Failed to update project status');
     }
   };
 
   const handleDelete = async (id: string, documentCount: number) => {
     if (documentCount > 0) {
-      alert('Cannot delete source project with documents. Please move or delete documents first.');
-      return;
-    }
-
-    if (!confirm('Are you sure you want to delete this source project?')) {
+      toast.warning('Cannot delete source project with documents. Please move or delete documents first.');
       return;
     }
 
     try {
       await deleteSourceProjectAction(id);
       setSourceProjects(sourceProjects.filter((p) => p.id !== id));
+      toast.success('Source project deleted successfully');
     } catch (error: any) {
       console.error('Error deleting source project:', error);
-      alert(error.message || 'Failed to delete source project');
+      toast.error(error.message || 'Failed to delete source project');
     }
+  };
+
+  const handleDeleteConfirm = async (id: string, documentCount: number) => {
+    await handleDelete(id, documentCount);
   };
 
   const resetForm = () => {
@@ -247,13 +260,29 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
                   <Button variant="outline" size="sm" onClick={() => handleEdit(project)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(project.id, project._count.documents)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Source Project</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{project.name}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteConfirm(project.id, project._count.documents)}
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </Card>

@@ -155,19 +155,19 @@ export default function DashboardClient({
     },
     {
       id: 'review',
-      name: 'Review',
+      name: 'Texts in review',
       color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.PENDING_REVIEW].color.hex,
       status: DocumentStatus.PENDING_REVIEW,
     },
     {
       id: 'approved',
-      name: 'Approved',
+      name: 'Texts approved',
       color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.APPROVED].color.hex,
       status: DocumentStatus.APPROVED,
     },
     {
       id: 'deployed',
-      name: 'Deployed',
+      name: 'Texts deployed',
       color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.DEPLOYED].color.hex,
       status: DocumentStatus.DEPLOYED,
     },

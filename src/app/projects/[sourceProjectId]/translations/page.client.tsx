@@ -12,6 +12,7 @@ import { Plus, Languages, Users, ArrowLeft, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { createTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface TranslationsClientProps {
   sourceProject: SourceProject & {
@@ -50,7 +51,7 @@ export default function TranslationsClient({
       router.refresh();
     } catch (error: any) {
       console.error('Error creating translation project:', error);
-      alert(error.message || 'Failed to create translation project');
+      toast.error(error.message || 'Failed to create translation project');
     } finally {
       setLoading(false);
     }

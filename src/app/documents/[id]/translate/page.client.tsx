@@ -32,6 +32,18 @@ import matter from 'gray-matter';
 import { AlertCircle, Calendar, Maximize2, Minimize2, Save, Send, Sparkles, Trash2, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface TranslateClientProps {
   document: any;
@@ -139,10 +151,10 @@ export default function TranslateClient({
         });
         setTargetVersion(created);
       }
-      alert('Translation saved successfully!');
+      toast.success('Translation saved successfully!');
     } catch (error: any) {
       console.error('Error saving translation:', error);
-      alert(error.message || 'Failed to save translation');
+      toast.error(error.message || 'Failed to save translation');
     } finally {
       setLoading(false);
     }
@@ -157,11 +169,11 @@ export default function TranslateClient({
     setLoading(true);
     try {
       await submitForReviewAction({ versionId: targetVersion.id });
-      alert('Translation submitted for review!');
+      toast.success('Translation submitted for review!');
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Error submitting for review:', error);
-      alert(error.message || 'Failed to submit for review');
+      toast.error(error.message || 'Failed to submit for review');
     } finally {
       setLoading(false);
     }
@@ -169,7 +181,7 @@ export default function TranslateClient({
 
   const handleStartTranslation = async () => {
     if (!targetLanguageId) {
-      alert('Please select a target language first');
+      toast.warning('Please select a target language first');
       return;
     }
 
@@ -184,7 +196,7 @@ export default function TranslateClient({
       setContent(version.content || '');
     } catch (error: any) {
       console.error('Error starting translation:', error);
-      alert(error.message || 'Failed to start translation');
+      toast.error(error.message || 'Failed to start translation');
     } finally {
       setLoading(false);
     }
@@ -195,39 +207,30 @@ export default function TranslateClient({
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this translation version? This action cannot be undone.')) {
-      return;
-    }
-
     setLoading(true);
     try {
       await deleteDocumentVersionAction(targetVersion.id);
-      alert('Translation version deleted successfully!');
+      toast.success('Translation version deleted successfully!');
       // Reset state and redirect back to documents page
       setTargetVersion(null);
       setContent('');
       router.push('/documents');
     } catch (error: any) {
       console.error('Error deleting translation:', error);
-      alert(error.message || 'Failed to delete translation');
+      toast.error(error.message || 'Failed to delete translation');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDeleteTranslationConfirm = async () => {
+    await handleDeleteTranslation();
+  };
+
   const handleAutoTranslate = async () => {
     if (!targetLanguageId) {
-      alert('Select a target language before requesting an AI translation.');
+      toast.warning('Select a target language before requesting an AI translation.');
       return;
-    }
-
-    if (content.trim().length > 0) {
-      const confirmed = window.confirm(
-        'This will overwrite the current translation with a new AI-generated version. Continue?',
-      );
-      if (!confirmed) {
-        return;
-      }
     }
 
     setTranslating(true);
@@ -242,12 +245,17 @@ export default function TranslateClient({
 
       setContent(result.translatedContent);
       viewerRef.current?.enterTranslationEditMode();
+      toast.success('AI translation generated successfully!');
     } catch (error: any) {
       console.error('AI translation failed:', error);
-      alert(error.message || 'Failed to generate AI translation');
+      toast.error(error.message || 'Failed to generate AI translation');
     } finally {
       setTranslating(false);
     }
+  };
+
+  const handleAutoTranslateConfirm = async () => {
+    await handleAutoTranslate();
   };
 
   const handleSourceChange = (value: string) => {
@@ -263,32 +271,25 @@ export default function TranslateClient({
       // Update the source version in the component
       sourceVersion.content = updated.content;
       sourceVersion.status = updated.status;
-      alert('Source document saved successfully!');
+      toast.success('Source document saved successfully!');
       router.refresh();
     } catch (error: any) {
       console.error('Error saving source:', error);
-      alert(error.message || 'Failed to save source document');
+      toast.error(error.message || 'Failed to save source document');
     } finally {
       setSourceSaving(false);
     }
   };
 
   const handleSourceDelete = async () => {
-    if (
-      !confirm(
-        'Are you sure you want to delete this document? This will delete the source version and all translation versions. This action cannot be undone.',
-      )
-    ) {
-      return;
-    }
     try {
       // Delete the entire document, which will cascade delete all versions
       await deleteDocumentAction(document.id);
-      alert('Document deleted successfully!');
+      toast.success('Document deleted successfully!');
       router.push('/documents');
     } catch (error: any) {
       console.error('Error deleting document:', error);
-      alert(error.message || 'Failed to delete document');
+      toast.error(error.message || 'Failed to delete document');
     }
   };
 
@@ -453,15 +454,38 @@ export default function TranslateClient({
                     disabled={loading || translating}
                     onStatusChange={handleStatusChange}
                   />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAutoTranslate}
-                    disabled={loading || translating || !targetLanguageId}
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    {translating ? 'Translating...' : 'Translate'}
-                  </Button>
+                  {content.trim().length > 0 ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={loading || translating || !targetLanguageId}>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          {translating ? 'Translating...' : 'Translate'}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Overwrite Translation?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will overwrite the current translation with a new AI-generated version. Continue?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleAutoTranslateConfirm}>Continue</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAutoTranslate}
+                      disabled={loading || translating || !targetLanguageId}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {translating ? 'Translating...' : 'Translate'}
+                    </Button>
+                  )}
                   {targetVersion.status !== 'PENDING_TRANSLATION' && (
                     <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
                       <Save className="h-4 w-4 mr-2" />
@@ -475,10 +499,26 @@ export default function TranslateClient({
                     </Button>
                   )}
                   {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
-                    <Button variant="outline" size="sm" onClick={handleDeleteTranslation} disabled={loading}>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={loading}>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Translation Version</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this translation version? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleDeleteTranslationConfirm}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                 </>
               ) : targetLanguageId ? (

@@ -32,6 +32,18 @@ import matter from 'gray-matter';
 import { MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface ReviewClientProps {
   document: any;
@@ -80,6 +92,10 @@ export default function ReviewClient({
     config: getDocumentStatusConfig(status),
   }));
 
+  const handleStatusChange = (status: DocumentStatus) => {
+    setTargetVersion((prev: any) => (prev ? { ...prev, status } : prev));
+  };
+
   const handleSaveEdit = async () => {
     setLoading(true);
     try {
@@ -87,11 +103,11 @@ export default function ReviewClient({
         content,
       });
       setTargetVersion(updated);
-      alert('Changes saved successfully!');
+      toast.success('Changes saved successfully!');
       return true;
     } catch (error: any) {
       console.error('Error saving changes:', error);
-      alert(error.message || 'Failed to save changes');
+      toast.error(error.message || 'Failed to save changes');
       return false;
     } finally {
       setLoading(false);
@@ -108,12 +124,12 @@ export default function ReviewClient({
         content: comment,
       });
       setComment('');
-      alert('Comment added!');
+      toast.success('Comment added!');
       // Reload to show new comment
       window.location.reload();
     } catch (error: any) {
       console.error('Error adding comment:', error);
-      alert(error.message || 'Failed to add comment');
+      toast.error(error.message || 'Failed to add comment');
     } finally {
       setLoading(false);
     }
@@ -127,11 +143,11 @@ export default function ReviewClient({
         approved: true,
         comment: comment || undefined,
       });
-      alert('Translation approved!');
+      toast.success('Translation approved!');
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Error approving:', error);
-      alert(error.message || 'Failed to approve');
+      toast.error(error.message || 'Failed to approve');
     } finally {
       setLoading(false);
     }
@@ -139,7 +155,7 @@ export default function ReviewClient({
 
   const handleRequestChanges = async () => {
     if (!comment.trim()) {
-      alert('Please add a comment explaining the changes needed');
+      toast.warning('Please add a comment explaining the changes needed');
       return;
     }
 
@@ -150,21 +166,17 @@ export default function ReviewClient({
         approved: false,
         comment,
       });
-      alert('Changes requested!');
+      toast.success('Changes requested!');
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Error requesting changes:', error);
-      alert(error.message || 'Failed to request changes');
+      toast.error(error.message || 'Failed to request changes');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeploy = async () => {
-    if (!confirm('Are you sure you want to deploy this document?')) {
-      return;
-    }
-
     setLoading(true);
     try {
       await deployVersionAction(targetVersion.id);
@@ -178,14 +190,18 @@ export default function ReviewClient({
       a.click();
       URL.revokeObjectURL(url);
 
-      alert('Document deployed and downloaded!');
+      toast.success('Document deployed and downloaded!');
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Error deploying:', error);
-      alert(error.message || 'Failed to deploy');
+      toast.error(error.message || 'Failed to deploy');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeployConfirm = async () => {
+    await handleDeploy();
   };
 
   const handleSourceChange = (value: string) => {
@@ -201,33 +217,30 @@ export default function ReviewClient({
       // Update the source version in the component
       sourceVersion.content = updated.content;
       sourceVersion.status = updated.status;
-      alert('Source document saved successfully!');
+      toast.success('Source document saved successfully!');
       router.refresh();
     } catch (error: any) {
       console.error('Error saving source:', error);
-      alert(error.message || 'Failed to save source document');
+      toast.error(error.message || 'Failed to save source document');
     } finally {
       setSourceSaving(false);
     }
   };
 
   const handleSourceDelete = async () => {
-    if (
-      !confirm(
-        'Are you sure you want to delete this document? This will delete the source version and all translation versions. This action cannot be undone.',
-      )
-    ) {
-      return;
-    }
     try {
       // Delete the entire document, which will cascade delete all versions
       await deleteDocumentAction(document.id);
-      alert('Document deleted successfully!');
+      toast.success('Document deleted successfully!');
       router.push('/documents');
     } catch (error: any) {
       console.error('Error deleting document:', error);
-      alert(error.message || 'Failed to delete document');
+      toast.error(error.message || 'Failed to delete document');
     }
+  };
+
+  const handleSourceDeleteConfirm = async () => {
+    await handleSourceDelete();
   };
 
   const reviewEditActions = ({ exitEditMode }: { exitEditMode: () => void }) => (
@@ -281,6 +294,7 @@ export default function ReviewClient({
                       documentId={document.id}
                       languageId={targetVersion.languageId}
                       disabled={loading}
+                      onStatusChange={handleStatusChange}
                     />
                   </div>
                 </div>
@@ -318,7 +332,7 @@ export default function ReviewClient({
           canEditSource={canEditSource}
           onSourceChange={handleSourceChange}
           onSourceSave={handleSourceSave}
-          onSourceDelete={handleSourceDelete}
+          onSourceDelete={handleSourceDeleteConfirm}
           sourceEditContent={sourceEditContent}
           reviewConfig={{
             canEdit: isPendingReview,

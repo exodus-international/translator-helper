@@ -7,8 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { createLanguageAction, updateLanguageAction, deleteLanguageAction } from '@/domain/language/language.actions';
+import { toast } from 'sonner';
 
 interface LanguagesClientProps {
   languages: Language[];
@@ -39,7 +51,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
       resetForm();
     } catch (error: any) {
       console.error('Error saving language:', error);
-      alert(error.message || 'Failed to save language');
+      toast.error(error.message || 'Failed to save language');
     } finally {
       setLoading(false);
     }
@@ -53,17 +65,18 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this language?')) {
-      return;
-    }
-
     try {
       await deleteLanguageAction(id);
       setLanguages(languages.filter((l) => l.id !== id));
+      toast.success('Language deleted successfully');
     } catch (error: any) {
       console.error('Error deleting language:', error);
-      alert(error.message || 'Failed to delete language');
+      toast.error(error.message || 'Failed to delete language');
     }
+  };
+
+  const handleDeleteConfirm = async (id: string) => {
+    await handleDelete(id);
   };
 
   const resetForm = () => {
@@ -148,9 +161,26 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
                   <Button variant="outline" size="sm" onClick={() => handleEdit(language)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDelete(language.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Language</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{language.name}" ({language.code})? This action cannot be
+                          undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteConfirm(language.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </Card>

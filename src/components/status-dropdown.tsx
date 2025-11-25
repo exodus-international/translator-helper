@@ -13,6 +13,7 @@ import { ArrowRight, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface StatusDropdownProps {
   currentStatus: DocumentStatus | null;
@@ -39,12 +40,18 @@ export function StatusDropdown({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
+  const [displayedStatus, setDisplayedStatus] = React.useState<DocumentStatus | null>(currentStatus);
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-  const currentStatusConfig = getDocumentStatusConfig(currentStatus);
+  // Sync displayed status with prop when it changes
+  React.useEffect(() => {
+    setDisplayedStatus(currentStatus);
+  }, [currentStatus]);
+
+  const currentStatusConfig = getDocumentStatusConfig(displayedStatus);
   const CurrentStatusIcon = currentStatusConfig.icon;
 
   // Filter available statuses based on permissions and allowedStatuses prop
@@ -76,39 +83,50 @@ export function StatusDropdown({
   };
 
   const handleStatusChange = async (newStatus: DocumentStatus) => {
-    if (newStatus === currentStatus || loading) return;
+    if (newStatus === displayedStatus || loading) return;
 
     // Check permission for DEPLOYED
     if (newStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
-      alert('Only deployers can deploy documents');
+      toast.warning('Only deployers can deploy documents');
       return;
     }
 
-    if (currentStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
-      // alert('Only deployers can change the status of a deployed document');
+    if (displayedStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
+      toast.warning('Only deployers can change the status of a deployed document');
       return;
     }
 
     setLoading(true);
     try {
       await updateDocumentVersionStatusAction(versionId, newStatus);
+      // Update displayed status immediately for optimistic UI update
+      setDisplayedStatus(newStatus);
+      // Update parent state first so stepper and other components update immediately
       onStatusChange?.(newStatus);
       setOpen(false);
 
-      // Navigate to the correct page based on the new status
+      // Navigate to the correct page based on the new status (only if needed)
       if (documentId) {
         const isTranslateStatus =
           newStatus === DocumentStatus.PENDING_TRANSLATION || newStatus === DocumentStatus.IN_PROGRESS;
 
-        if (isTranslateStatus && languageId) {
+        // Check current pathname to avoid unnecessary navigation
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+        const shouldBeOnTranslatePage = isTranslateStatus && languageId;
+        const isOnTranslatePage = currentPath.includes('/translate');
+        const isOnReviewPage = currentPath.includes('/review');
+
+        // Only navigate if we need to switch between translate and review pages
+        if (shouldBeOnTranslatePage && !isOnTranslatePage) {
           // Navigate to translate page
           router.push(`/documents/${documentId}/translate?lang=${languageId}&version=${versionId}`);
-        } else {
+        } else if (!shouldBeOnTranslatePage && !isOnReviewPage) {
           // Navigate to review page for other statuses
           router.push(`/documents/${documentId}/review?version=${versionId}`);
+        } else {
+          // Already on the correct page, just refresh to get updated data
+          router.refresh();
         }
-        // Refresh to get updated data
-        router.refresh();
       } else {
         // If no documentId provided, just reload
         if (typeof window !== 'undefined') {
@@ -117,14 +135,14 @@ export function StatusDropdown({
       }
     } catch (error: any) {
       console.error('Error updating status:', error);
-      alert(error.message || 'Failed to update status');
+      toast.error(error.message || 'Failed to update status');
     } finally {
       setLoading(false);
     }
   };
 
   const translatorCannotChangeDeployedDocumentStatus =
-    user.role === 'TRANSLATOR' && currentStatus === DocumentStatus.DEPLOYED;
+    user.role === 'TRANSLATOR' && displayedStatus === DocumentStatus.DEPLOYED;
 
   // Prevent hydration mismatch by only rendering after mount
   if (!mounted) {
@@ -176,7 +194,7 @@ export function StatusDropdown({
           {availableStatuses.map((status) => {
             const statusConfig = getDocumentStatusConfig(status);
             const StatusIcon = statusConfig.icon;
-            const isCurrentStatus = status === currentStatus;
+            const isCurrentStatus = status === displayedStatus;
 
             const isDisabled =
               isCurrentStatus || loading || (user.role === 'TRANSLATOR' && status === DocumentStatus.DEPLOYED);
@@ -200,7 +218,7 @@ export function StatusDropdown({
               >
                 {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
                 <div className="flex w-full justify-between items-center gap-2">
-                  <span className="text-gray-500">{getTransitionLabel(currentStatus, status)}</span>
+                  <span className="text-gray-500">{getTransitionLabel(displayedStatus, status)}</span>
                   <div className="flex items-center gap-2">
                     <ArrowRight className="h-3.5 w-3.5 text-gray-400" />
                     <Badge variant="secondary" className={cn('gap-1', statusConfig.color.badgeClass, 'justify-start')}>

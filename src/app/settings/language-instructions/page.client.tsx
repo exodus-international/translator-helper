@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { updateLanguageInstructionsAction } from '@/domain/language/language.actions';
+import { toast } from 'sonner';
 
 interface LanguageInstructionsClientProps {
   languages: Language[];
@@ -41,7 +42,7 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
       }));
     } catch (error: any) {
       console.error('Failed to save instructions', error);
-      alert(error.message || 'Failed to save instructions');
+      toast.error(error.message || 'Failed to save instructions');
     } finally {
       setSavingLanguageId(null);
     }

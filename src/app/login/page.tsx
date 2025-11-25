@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { signIn, signUp } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,11 +32,11 @@ export default function LoginPage() {
       if (result.data) {
         router.push('/dashboard');
       } else {
-        alert(result.error.message || 'Failed to login');
+        toast.error(result.error.message || 'Failed to login');
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      alert(error.message || 'Failed to login');
+      toast.error(error.message || 'Failed to login');
     } finally {
       setLoading(false);
     }
@@ -55,11 +56,11 @@ export default function LoginPage() {
       if (result.data) {
         router.push('/onboarding/languages');
       } else {
-        alert(result.error.message || 'Failed to register');
+        toast.error(result.error.message || 'Failed to register');
       }
     } catch (error: any) {
       console.error('Register error:', error);
-      alert(error.message || 'Failed to register');
+      toast.error(error.message || 'Failed to register');
     }
   };
 

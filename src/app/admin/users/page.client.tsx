@@ -4,12 +4,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { updateUserRoleAction } from '@/domain/user/user.actions';
 import { authClient } from '@/lib/auth-client';
 import { Role } from '@prisma/client';
 import { Ban, Shield, Unlock } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface User {
   id: string;
@@ -40,19 +52,16 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
     try {
       await updateUserRoleAction(userId, newRole);
       setUsers(users.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
+      toast.success('User role updated successfully');
     } catch (error: any) {
       console.error('Error updating role:', error);
-      alert(error.message || 'Failed to update user role');
+      toast.error(error.message || 'Failed to update user role');
     } finally {
       setLoading(false);
     }
   };
 
   const handleBanUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to ban this user?')) {
-      return;
-    }
-
     setLoading(true);
     try {
       const result = await authClient.admin.banUser({
@@ -75,19 +84,20 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
             : u,
         ),
       );
+      toast.success('User banned successfully');
     } catch (error: any) {
       console.error('Error banning user:', error);
-      alert(error.message || 'Failed to ban user');
+      toast.error(error.message || 'Failed to ban user');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUnbanUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to unban this user?')) {
-      return;
-    }
+  const handleBanUserConfirm = async (userId: string) => {
+    await handleBanUser(userId);
+  };
 
+  const handleUnbanUser = async (userId: string) => {
     setLoading(true);
     try {
       const result = await authClient.admin.unbanUser({
@@ -99,12 +109,17 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
       }
 
       setUsers(users.map((u) => (u.id === userId ? { ...u, banned: false, banReason: null, banExpires: null } : u)));
+      toast.success('User unbanned successfully');
     } catch (error: any) {
       console.error('Error unbanning user:', error);
-      alert(error.message || 'Failed to unban user');
+      toast.error(error.message || 'Failed to unban user');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUnbanUserConfirm = async (userId: string) => {
+    await handleUnbanUser(userId);
   };
 
   const openRoleDialog = (user: User) => {
@@ -125,7 +140,7 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
       setSelectedRole('');
     } catch (error: any) {
       console.error('Error updating role:', error);
-      alert(error.message || 'Failed to update user role');
+      toast.error(error.message || 'Failed to update user role');
     } finally {
       setLoading(false);
     }
@@ -177,15 +192,47 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
                     Change Role
                   </Button>
                   {user.banned ? (
-                    <Button variant="outline" size="sm" onClick={() => handleUnbanUser(user.id)} disabled={loading}>
-                      <Unlock className="h-4 w-4 mr-2" />
-                      Unban
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={loading}>
+                          <Unlock className="h-4 w-4 mr-2" />
+                          Unban
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Unban User</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to unban {user.name}? They will be able to access the system again.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleUnbanUserConfirm(user.id)}>Unban</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   ) : (
-                    <Button variant="outline" size="sm" onClick={() => handleBanUser(user.id)} disabled={loading}>
-                      <Ban className="h-4 w-4 mr-2" />
-                      Ban
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={loading}>
+                          <Ban className="h-4 w-4 mr-2" />
+                          Ban
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Ban User</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to ban {user.name}? This will prevent them from accessing the system.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleBanUserConfirm(user.id)}>Ban</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                 </div>
               </div>

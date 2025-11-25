@@ -2,6 +2,17 @@ import { RawEditorPane } from '@/components/raw-editor-panel';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { Eye, FileEdit, Save, Trash2, X } from 'lucide-react';
 import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
@@ -129,9 +140,6 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
 
     const handleSourceDelete = async () => {
       if (!onSourceDelete) return;
-      if (!confirm('Are you sure you want to delete this source version? This action cannot be undone.')) {
-        return;
-      }
       try {
         await onSourceDelete();
       } catch (error) {
@@ -259,10 +267,26 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                     <FileEdit className="h-4 w-4 mr-2" />
                     Edit
                   </Button>
-                  {/* <Button variant="outline" size="sm" onClick={handleSourceDelete}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button> */}
+                  {/* <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Source Version</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this source version? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSourceDelete}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog> */}
                 </>
               )}
               {isSourceEditing && (
