@@ -583,15 +583,28 @@ export async function getDocumentsByTranslationProject(translationProjectId: str
   });
 }
 
-export async function getDashboardDocuments(languageId: string, translationProjectId?: string) {
+export async function getDashboardDocuments(languageId: string, sourceProjectId?: string) {
+  // If sourceProjectId is provided, find the translation project for that source project and language
+  let translationProjectId: string | undefined;
+  if (sourceProjectId) {
+    const translationProject = await prisma.translationProject.findUnique({
+      where: {
+        sourceProjectId_languageId: {
+          sourceProjectId,
+          languageId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+    translationProjectId = translationProject?.id;
+  }
+
   return prisma.document.findMany({
     where: {
-      ...(translationProjectId && {
-        assignments: {
-          some: {
-            translationProjectId,
-          },
-        },
+      ...(sourceProjectId && {
+        sourceProjectId,
       }),
     },
     include: {

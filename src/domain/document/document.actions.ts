@@ -154,7 +154,7 @@ export async function getDocumentsWithAllVersionsAction() {
   return await getDocumentsWithAllVersions();
 }
 
-export async function getDashboardDocumentsAction(languageId: string, translationProjectId?: string) {
+export async function getDashboardDocumentsAction(languageId: string, sourceProjectId?: string) {
   await requireUser();
-  return await getDashboardDocuments(languageId, translationProjectId);
+  return await getDashboardDocuments(languageId, sourceProjectId);
 }

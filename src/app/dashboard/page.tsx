@@ -12,7 +12,7 @@ export default async function DashboardPage({
   searchParams: Promise<{
     language?: string;
     status?: string;
-    translationProject?: string;
+    sourceProject?: string;
     search?: string;
   }>;
 }) {
@@ -45,7 +45,7 @@ export default async function DashboardPage({
       initialFilters={{
         language: defaultLanguage,
         status: params.status || 'needs-translation',
-        translationProject: params.translationProject,
+        sourceProject: params.sourceProject,
         search: params.search,
       }}
     />

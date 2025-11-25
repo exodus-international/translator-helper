@@ -13,7 +13,8 @@ import { SessionUser } from '@/lib/session';
 import { DocumentStatus, Language } from '@prisma/client';
 import { FileText, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface DashboardClientProps {
   user: SessionUser;
@@ -22,7 +23,7 @@ interface DashboardClientProps {
   initialFilters: {
     language?: string;
     status?: string;
-    translationProject?: string;
+    sourceProject?: string;
     search?: string;
   };
 }
@@ -85,17 +86,24 @@ export default function DashboardClient({
   translationProjects,
   initialFilters,
 }: DashboardClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const LANGUAGE_STORAGE_KEY = 'dashboard:selectedLanguage';
+
+  // Initialize from URL searchParams as fallback if initialFilters doesn't have it
+  const urlSourceProject = searchParams.get('sourceProject');
+  const initialSourceProject = initialFilters.sourceProject || urlSourceProject || 'all';
+
   const [selectedLanguage, setSelectedLanguage] = useState<string>(initialFilters.language || languages[0]?.id || '');
-  const [selectedTranslationProject, setSelectedTranslationProject] = useState<string>(
-    initialFilters.translationProject || 'all',
-  );
+  const [selectedSourceProject, setSelectedSourceProject] = useState<string>(initialSourceProject);
+  const isInitialMount = useRef(true);
+
   const [searchQuery, setSearchQuery] = useState<string>(initialFilters.search || '');
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Get translation project ID from selected project
-  const selectedTranslationProjectId = selectedTranslationProject !== 'all' ? selectedTranslationProject : undefined;
+  // Get source project ID from selected project
+  const selectedSourceProjectId = selectedSourceProject !== 'all' ? selectedSourceProject : undefined;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -112,17 +120,52 @@ export default function DashboardClient({
     }
   }, [selectedLanguage]);
 
-  // Get translation projects for the selected language
-  const languageTranslationProjects = translationProjects.filter((tp) => tp.languageId === selectedLanguage);
+  // Sync source project selection to URL (skip on initial mount)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    const currentUrlValue = params.get('sourceProject');
+
+    // Only update if the value actually changed
+    if (selectedSourceProject && selectedSourceProject !== 'all') {
+      if (currentUrlValue !== selectedSourceProject) {
+        params.set('sourceProject', selectedSourceProject);
+        const newUrl = `/dashboard?${params.toString()}`;
+        router.replace(newUrl, { scroll: false });
+      }
+    } else {
+      if (currentUrlValue) {
+        params.delete('sourceProject');
+        const newUrl = `/dashboard?${params.toString()}`;
+        router.replace(newUrl, { scroll: false });
+      }
+    }
+  }, [selectedSourceProject, router, searchParams]);
+
+  // Get unique source projects that the user has access to (through any translation project)
+  // This shows all source projects the user can access, regardless of the selected language
+  const languageSourceProjects = useMemo(() => {
+    const sourceProjectsMap = new Map();
+    translationProjects.forEach((tp) => {
+      if (tp.sourceProject && !sourceProjectsMap.has(tp.sourceProject.id)) {
+        sourceProjectsMap.set(tp.sourceProject.id, tp.sourceProject);
+      }
+    });
+    return Array.from(sourceProjectsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [translationProjects, selectedLanguage]);
 
   useEffect(() => {
     loadDocuments();
-  }, [selectedLanguage, selectedTranslationProjectId]);
+  }, [selectedLanguage, selectedSourceProjectId]);
 
   async function loadDocuments() {
     setLoading(true);
     try {
-      const docs = await getDashboardDocumentsAction(selectedLanguage, selectedTranslationProjectId);
+      const docs = await getDashboardDocumentsAction(selectedLanguage, selectedSourceProjectId);
       setDocuments(docs);
     } catch (error) {
       console.error('Error loading documents:', error);
@@ -267,34 +310,37 @@ export default function DashboardClient({
                 />
               </div>
             </div>
-            <div className="w-48">
-              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  {languages.map((lang) => (
-                    <SelectItem key={lang.id} value={lang.id}>
-                      {lang.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-64">
-              <Select value={selectedTranslationProject} onValueChange={setSelectedTranslationProject}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All translation projects</SelectItem>
-                  {languageTranslationProjects.map((tp) => (
-                    <SelectItem key={tp.id} value={tp.id}>
-                      {tp.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex gap-4 items-center justify-end text-sm text-gray-600 ml-32">
+              <div className="flex gap-4 items-center justify-end">Filters:</div>
+              <div className="justify-end flex">
+                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang.id} value={lang.id}>
+                        {lang.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="justify-end flex">
+                <Select value={selectedSourceProject} onValueChange={setSelectedSourceProject}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All projects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All source projects</SelectItem>
+                    {languageSourceProjects.map((sp) => (
+                      <SelectItem key={sp.id} value={sp.id}>
+                        {sp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>
