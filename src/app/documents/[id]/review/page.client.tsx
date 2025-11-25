@@ -28,22 +28,12 @@ import { getStatusStep, isStepCompleted } from '@/lib/document-status';
 import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { DocumentStatus } from '@prisma/client';
 import matter from 'gray-matter';
-import { MessageSquare } from 'lucide-react';
+import { Download, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 
 interface ReviewClientProps {
   document: any;
@@ -204,6 +194,22 @@ export default function ReviewClient({
     await handleDeploy();
   };
 
+  const handleDownload = () => {
+    try {
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = `${document.slug}-${targetVersion.language.code}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Document downloaded!');
+    } catch (error: any) {
+      console.error('Error downloading:', error);
+      toast.error('Failed to download document');
+    }
+  };
+
   const handleSourceChange = (value: string) => {
     setSourceEditContent(value);
   };
@@ -287,6 +293,10 @@ export default function ReviewClient({
                     </Badge>
                   </div>
                   <div className="flex gap-2 ml-4">
+                    <Button variant="default" size="sm" onClick={handleDownload} disabled={loading}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </Button>
                     <StatusDropdown
                       currentStatus={targetVersion.status}
                       versionId={targetVersion.id}
