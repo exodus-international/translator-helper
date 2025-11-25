@@ -38,6 +38,11 @@ export function StatusDropdown({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const currentStatusConfig = getDocumentStatusConfig(currentStatus);
   const CurrentStatusIcon = currentStatusConfig.icon;
@@ -79,6 +84,11 @@ export function StatusDropdown({
       return;
     }
 
+    if (currentStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
+      // alert('Only deployers can change the status of a deployed document');
+      return;
+    }
+
     setLoading(true);
     try {
       await updateDocumentVersionStatusAction(versionId, newStatus);
@@ -113,12 +123,36 @@ export function StatusDropdown({
     }
   };
 
+  const translatorCannotChangeDeployedDocumentStatus =
+    user.role === 'TRANSLATOR' && currentStatus === DocumentStatus.DEPLOYED;
+
+  // Prevent hydration mismatch by only rendering after mount
+  if (!mounted) {
+    return (
+      <Button
+        variant="outline"
+        disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
+        className={cn(
+          'gap-2 h-auto py-1.5 px-3',
+          currentStatusConfig.color.badgeClass,
+          'border',
+          'hover:opacity-90',
+          'font-medium',
+        )}
+      >
+        <CurrentStatusIcon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
+        <span className={cn('font-medium', currentStatusConfig.color.textClass)}>{currentStatusConfig.name}</span>
+        <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+      </Button>
+    );
+  }
+
   return (
     <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
       <DropdownMenuPrimitive.Trigger asChild>
         <Button
           variant="outline"
-          disabled={disabled || loading}
+          disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
           className={cn(
             'gap-2 h-auto py-1.5 px-3',
             currentStatusConfig.color.badgeClass,
@@ -143,7 +177,9 @@ export function StatusDropdown({
             const statusConfig = getDocumentStatusConfig(status);
             const StatusIcon = statusConfig.icon;
             const isCurrentStatus = status === currentStatus;
-            const isDisabled = isCurrentStatus || loading;
+
+            const isDisabled =
+              isCurrentStatus || loading || (user.role === 'TRANSLATOR' && status === DocumentStatus.DEPLOYED);
 
             return (
               <DropdownMenuPrimitive.Item

@@ -226,7 +226,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                   <FileText className="h-4 w-4 mr-2" />
                   Create New
                 </Button>
-                <Button variant="primary">
+                <Button variant="default">
                   <Upload className="h-4 w-4 mr-2" />
                   Upload File
                 </Button>

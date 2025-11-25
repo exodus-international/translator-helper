@@ -1,6 +1,5 @@
 'use client';
 
-import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -140,7 +139,7 @@ export default function DocumentsClient({
                 <div className="col-span-4">
                   <h3 className="font-semibold text-sm text-gray-700">Document</h3>
                 </div>
-                <div className="col-span-8">
+                <div className="col-span-7">
                   <div className="flex gap-6">
                     {languages.map((lang) => (
                       <div key={lang.id} className="flex-1 text-center">
@@ -149,6 +148,9 @@ export default function DocumentsClient({
                     ))}
                   </div>
                 </div>
+                {isDeployerClient(user) && (
+                  <div className="flex justify-end col-span-1 text-sm font-medium text-gray-700"> Options </div>
+                )}
               </div>
             </Card>
 
@@ -184,7 +186,7 @@ export default function DocumentsClient({
                   </div>
 
                   {/* Language Status Indicators */}
-                  <div className="col-span-8">
+                  <div className="col-span-7">
                     <div className="flex gap-6">
                       {languages.map((lang) => {
                         const status = getLanguageStatus(doc, lang.id);
@@ -212,13 +214,6 @@ export default function DocumentsClient({
                                     <IndicatorIcon className="h-4 w-4" />
                                   </div>
                                 </Link>
-                                {/* <StatusDropdown
-                                  currentStatus={status}
-                                  versionId={versionId}
-                                  user={user}
-                                  documentId={doc.id}
-                                  languageId={lang.id}
-                                /> */}
                               </>
                             ) : (
                               <Link
@@ -237,13 +232,15 @@ export default function DocumentsClient({
                           </div>
                         );
                       })}
-                      {isDeployerClient(user) && (
-                        <Button variant="secondary" size="sm" onClick={() => handleDeleteDocument(doc.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
                   </div>
+                  {isDeployerClient(user) && (
+                    <div className="flex justify-end col-span-1">
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteDocument(doc.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}

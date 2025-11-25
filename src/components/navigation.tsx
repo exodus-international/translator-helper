@@ -1,12 +1,12 @@
 'use client';
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { SessionUser } from '@/lib/session';
 import { signOut } from '@/lib/auth-client';
-import { LogOut, Settings } from 'lucide-react';
+import { SessionUser } from '@/lib/session';
+import { LogOut } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface NavigationProps {
   user: SessionUser | null;
@@ -62,7 +62,12 @@ export function Navigation({ user }: NavigationProps) {
           </div>
           <div className="flex items-center gap-3">
             <Avatar size="sm" name={user.name || undefined}>
-              <AvatarFallback name={user.name || undefined}>{user.name?.slice(0, 2).toUpperCase()}</AvatarFallback>
+              <AvatarFallback name={user.name || undefined}>
+                {user.name
+                  .split(' ')
+                  .map((name) => name.charAt(0))
+                  .join('')}
+              </AvatarFallback>
             </Avatar>
             <span className="text-sm text-gray-600">{user.name}</span>
             <Button variant="outline" size="sm" onClick={handleSignOut}>

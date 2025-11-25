@@ -76,6 +76,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     ref,
   ) {
     const isZen = layout === 'zen';
+    const [mounted, setMounted] = useState(false);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
     const [reviewViewMode, setReviewViewMode] = useState<'formatted' | 'raw'>('raw');
@@ -87,6 +88,10 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     const [translationLine, setTranslationLine] = useState(1);
     const [syncedSourceLine, setSyncedSourceLine] = useState<number | undefined>(undefined);
     const [syncedTranslationLine, setSyncedTranslationLine] = useState<number | undefined>(undefined);
+
+    useEffect(() => {
+      setMounted(true);
+    }, []);
 
     const translationPreview = translationFormattedContent ?? translationContent;
     const translationRawVisible =
@@ -215,12 +220,37 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             <h2 className="text-lg font-semibold">Source (English)</h2>
             <div className="flex items-center gap-2">
               {!isSourceEditing && (
-                <Tabs value={sourceViewMode} onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}>
-                  <TabsList>
-                    <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                    <TabsTrigger value="raw">Raw</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                mounted ? (
+                  <Tabs value={sourceViewMode} onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}>
+                    <TabsList>
+                      <TabsTrigger value="formatted">Formatted</TabsTrigger>
+                      <TabsTrigger value="raw">Raw</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                ) : (
+                  <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                    <button
+                      type="button"
+                      disabled
+                      className={cn(
+                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                        sourceViewMode === 'formatted' && 'bg-background shadow-sm',
+                      )}
+                    >
+                      Formatted
+                    </button>
+                    <button
+                      type="button"
+                      disabled
+                      className={cn(
+                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                        sourceViewMode === 'raw' && 'bg-background shadow-sm',
+                      )}
+                    >
+                      Raw
+                    </button>
+                  </div>
+                )
               )}
               {sourceBadge}
               {canEditSource && !isSourceEditing && (
@@ -296,25 +326,77 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             <h2 className="text-lg font-semibold">Translation</h2>
             <div className="flex items-center gap-2">
               {variant === 'translate' ? (
-                <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
-                  <TabsList>
-                    <TabsTrigger value="edit">
+                mounted ? (
+                  <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
+                    <TabsList>
+                      <TabsTrigger value="edit">
+                        <FileEdit className="h-4 w-4 mr-2" />
+                        Edit
+                      </TabsTrigger>
+                      <TabsTrigger value="preview">
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                ) : (
+                  <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                    <button
+                      type="button"
+                      disabled
+                      className={cn(
+                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                        translateTab === 'edit' && 'bg-background shadow-sm',
+                      )}
+                    >
                       <FileEdit className="h-4 w-4 mr-2" />
                       Edit
-                    </TabsTrigger>
-                    <TabsTrigger value="preview">
+                    </button>
+                    <button
+                      type="button"
+                      disabled
+                      className={cn(
+                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                        translateTab === 'preview' && 'bg-background shadow-sm',
+                      )}
+                    >
                       <Eye className="h-4 w-4 mr-2" />
                       Preview
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                    </button>
+                  </div>
+                )
               ) : !isReviewEditing ? (
-                <Tabs value={reviewViewMode} onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'raw')}>
-                  <TabsList>
-                    <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                    <TabsTrigger value="raw">Raw</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                mounted ? (
+                  <Tabs value={reviewViewMode} onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'raw')}>
+                    <TabsList>
+                      <TabsTrigger value="formatted">Formatted</TabsTrigger>
+                      <TabsTrigger value="raw">Raw</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                ) : (
+                  <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                    <button
+                      type="button"
+                      disabled
+                      className={cn(
+                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                        reviewViewMode === 'formatted' && 'bg-background shadow-sm',
+                      )}
+                    >
+                      Formatted
+                    </button>
+                    <button
+                      type="button"
+                      disabled
+                      className={cn(
+                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                        reviewViewMode === 'raw' && 'bg-background shadow-sm',
+                      )}
+                    >
+                      Raw
+                    </button>
+                  </div>
+                )
               ) : null}
               {translationBadge}
               {variant === 'review' && !isReviewEditing && reviewConfig?.canEdit && (

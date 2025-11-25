@@ -237,7 +237,10 @@ export default function DashboardClient({
                 <div className="flex items-center gap-2 mt-1">
                   <Avatar size="sm" name={user.name || undefined}>
                     <AvatarFallback name={user.name || undefined}>
-                      {user.name?.slice(0, 2).toUpperCase()}
+                      {user.name
+                        .split(' ')
+                        .map((name) => name.charAt(0))
+                        .join('')}
                     </AvatarFallback>
                   </Avatar>
                   <p className="text-gray-600">Welcome back, {user.name}</p>
@@ -387,7 +390,10 @@ export default function DashboardClient({
                                               title={assignmentUser.name || undefined}
                                             >
                                               <AvatarFallback name={assignmentUser.name || undefined}>
-                                                {assignmentUser.name?.slice(0, 2).toUpperCase()}
+                                                {assignmentUser.name
+                                                  .split(' ')
+                                                  .map((name: string) => name.charAt(0))
+                                                  .join('')}
                                               </AvatarFallback>
                                             </Avatar>
                                           )}
@@ -399,7 +405,10 @@ export default function DashboardClient({
                                               title={versionUser.name || undefined}
                                             >
                                               <AvatarFallback name={versionUser.name || undefined}>
-                                                {versionUser.name?.slice(0, 2).toUpperCase()}
+                                                {versionUser.name
+                                                  .split(' ')
+                                                  .map((name: string) => name.charAt(0))
+                                                  .join('')}
                                               </AvatarFallback>
                                             </Avatar>
                                           )}
