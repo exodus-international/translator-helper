@@ -99,6 +99,7 @@ export default function DashboardClient({
   const isInitialMount = useRef(true);
 
   const [searchQuery, setSearchQuery] = useState<string>(initialFilters.search || '');
+  const [selectedUser, setSelectedUser] = useState<string>('all');
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -174,12 +175,62 @@ export default function DashboardClient({
     }
   }
 
+  // Extract unique users from documents (from assignments and versions)
+  const availableUsers = useMemo(() => {
+    const userMap = new Map<string, { id: string; name: string; email: string }>();
+
+    documents.forEach((doc) => {
+      // Add users from assignments
+      doc.assignments?.forEach((assignment: any) => {
+        if (assignment?.user) {
+          userMap.set(assignment.user.id, {
+            id: assignment.user.id,
+            name: assignment.user.name,
+            email: assignment.user.email,
+          });
+        }
+      });
+
+      // Add users from versions
+      doc.versions?.forEach((version: any) => {
+        if (version?.user) {
+          userMap.set(version.user.id, {
+            id: version.user.id,
+            name: version.user.name,
+            email: version.user.email,
+          });
+        }
+      });
+    });
+
+    return Array.from(userMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [documents]);
+
   const filteredDocuments = documents.filter((doc) => {
+    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return doc.title.toLowerCase().includes(query) || doc.slug.toLowerCase().includes(query);
+      if (!doc.title.toLowerCase().includes(query) && !doc.slug.toLowerCase().includes(query)) {
+        return false;
+      }
     }
-    return true;
+
+    // User filter
+    if (selectedUser === 'all') {
+      return true;
+    }
+
+    if (selectedUser === 'me') {
+      // Check if current user is in assignments or versions
+      const hasAssignment = doc.assignments?.some((assignment: any) => assignment?.user?.id === user.id);
+      const hasVersion = doc.versions?.some((version: any) => version?.user?.id === user.id);
+      return hasAssignment || hasVersion;
+    }
+
+    // Filter by specific user
+    const hasAssignment = doc.assignments?.some((assignment: any) => assignment?.user?.id === selectedUser);
+    const hasVersion = doc.versions?.some((version: any) => version?.user?.id === selectedUser);
+    return hasAssignment || hasVersion;
   });
 
   // Define Kanban columns based on active tab
@@ -338,6 +389,48 @@ export default function DashboardClient({
                         {sp.name}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="justify-end flex">
+                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                  <SelectTrigger className="min-w-[200px]">
+                    <div className="flex items-center gap-2">
+                      <SelectValue placeholder="All users" className="[&_div]:!hidden [&_span:last-child]:!inline" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All users</SelectItem>
+                    <SelectItem value="me">
+                      <div className="flex items-center gap-2">
+                        <Avatar size="sm" name={user.name || undefined} className="pointer-events-none">
+                          <AvatarFallback name={user.name || undefined}>
+                            {user.name
+                              .split(' ')
+                              .map((name) => name.charAt(0))
+                              .join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>Me</span>
+                      </div>
+                    </SelectItem>
+                    {availableUsers
+                      .filter((u) => u.id !== user.id)
+                      .map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar size="sm" name={u.name || undefined} className="pointer-events-none">
+                              <AvatarFallback name={u.name || undefined}>
+                                {u.name
+                                  .split(' ')
+                                  .map((name) => name.charAt(0))
+                                  .join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span>{u.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
