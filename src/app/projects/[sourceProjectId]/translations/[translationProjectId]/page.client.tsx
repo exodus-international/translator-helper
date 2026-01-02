@@ -220,16 +220,19 @@ export default function TranslationProjectClient({
   const unassignedDocuments = documents.filter((doc) => !assignments.some((a) => a.documentId === doc.id));
 
   // Group members by user
-  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce((acc, member) => {
-    if (!acc[member.userId]) {
-      acc[member.userId] = {
-        user: member.user,
-        roles: [],
-      };
-    }
-    acc[member.userId].roles.push(member);
-    return acc;
-  }, {} as Record<string, { user: any; roles: any[] }>);
+  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce(
+    (acc, member) => {
+      if (!acc[member.userId]) {
+        acc[member.userId] = {
+          user: member.user,
+          roles: [],
+        };
+      }
+      acc[member.userId].roles.push(member);
+      return acc;
+    },
+    {} as Record<string, { user: any; roles: any[] }>,
+  );
 
   // Get users that are not yet members
   const availableUsers = users.filter((user) => !membersByUser[user.id]);

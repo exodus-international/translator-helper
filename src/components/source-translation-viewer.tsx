@@ -227,9 +227,12 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Source (English)</h2>
             <div className="flex items-center gap-2">
-              {!isSourceEditing && (
-                mounted ? (
-                  <Tabs value={sourceViewMode} onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}>
+              {!isSourceEditing &&
+                (mounted ? (
+                  <Tabs
+                    value={sourceViewMode}
+                    onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}
+                  >
                     <TabsList>
                       <TabsTrigger value="formatted">Formatted</TabsTrigger>
                       <TabsTrigger value="raw">Raw</TabsTrigger>
@@ -258,8 +261,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                       Raw
                     </button>
                   </div>
-                )
-              )}
+                ))}
               {sourceBadge}
               {canEditSource && !isSourceEditing && (
                 <>
@@ -391,7 +393,10 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 )
               ) : !isReviewEditing ? (
                 mounted ? (
-                  <Tabs value={reviewViewMode} onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'raw')}>
+                  <Tabs
+                    value={reviewViewMode}
+                    onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'raw')}
+                  >
                     <TabsList>
                       <TabsTrigger value="formatted">Formatted</TabsTrigger>
                       <TabsTrigger value="raw">Raw</TabsTrigger>

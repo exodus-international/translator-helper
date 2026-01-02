@@ -275,9 +275,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeleteConfirm(project.id, project._count.documents)}
-                        >
+                        <AlertDialogAction onClick={() => handleDeleteConfirm(project.id, project._count.documents)}>
                           Delete
                         </AlertDialogAction>
                       </AlertDialogFooter>
