@@ -1,25 +1,55 @@
 'use client';
 
-import { useState } from 'react';
-import { SourceProject, Language } from '@prisma/client';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Languages, Users, ArrowLeft, ExternalLink } from 'lucide-react';
-import Link from 'next/link';
 import { createTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
+import { Language, Prisma } from '@prisma/client';
+import { ArrowLeft, ExternalLink, Languages, Plus, Users } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
-interface TranslationsClientProps {
-  sourceProject: SourceProject & {
-    documents: any[];
-    translationProjects: any[];
+type TranslationProjectListItem = Prisma.TranslationProjectGetPayload<{
+  include: {
+    sourceProject: true;
+    language: true;
+    members: {
+      select: {
+        userId: true;
+      };
+    };
+    _count: {
+      select: {
+        documentAssignments: true;
+      };
+    };
   };
-  translationProjects: any[];
+}>;
+
+type SourceProjectWithDetails = Prisma.SourceProjectGetPayload<{
+  include: {
+    documents: true;
+    translationProjects: {
+      include: {
+        language: true;
+        _count: {
+          select: {
+            members: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
+interface TranslationsClientProps {
+  sourceProject: SourceProjectWithDetails;
+  translationProjects: TranslationProjectListItem[];
   languages: Language[];
 }
 
@@ -40,12 +70,11 @@ export default function TranslationsClient({
     setLoading(true);
 
     try {
-      const created = await createTranslationProjectAction({
+      await createTranslationProjectAction({
         name,
         sourceProjectId: sourceProject.id,
         languageId: selectedLanguageId,
       });
-      setTranslationProjects([...translationProjects, created]);
       setDialogOpen(false);
       resetForm();
       router.refresh();
@@ -179,8 +208,8 @@ export default function TranslationsClient({
                       {tp.language.name} ({tp.language.code})
                     </p>
                     <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                      <span>{tp._count?.members || 0} member(s)</span>
-                      <span>{tp._count?.documentAssignments || 0} document(s)</span>
+                      <span>{new Set(tp.members.map((m) => m.userId)).size} member(s)</span>
+                      <span>{tp._count.documentAssignments} document(s)</span>
                     </div>
                   </div>
                 </div>

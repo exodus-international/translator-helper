@@ -12,9 +12,13 @@ export async function listTranslationProjects(filters?: { sourceProjectId?: stri
     include: {
       sourceProject: true,
       language: true,
+      members: {
+        select: {
+          userId: true,
+        },
+      },
       _count: {
         select: {
-          members: true,
           documentAssignments: true,
         },
       },
