@@ -207,6 +207,18 @@ export async function deleteProjectMember(id: string): Promise<Prisma.ProjectMem
   });
 }
 
+export async function deleteProjectMembersByUser(
+  userId: string,
+  translationProjectId: string,
+): Promise<Prisma.BatchPayload> {
+  return prisma.projectMember.deleteMany({
+    where: {
+      userId,
+      translationProjectId,
+    },
+  });
+}
+
 export async function getUserRolesInProject(userId: string, translationProjectId: string): Promise<ProjectRole[]> {
   const members = await prisma.projectMember.findMany({
     where: {

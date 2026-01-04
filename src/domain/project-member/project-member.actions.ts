@@ -5,6 +5,7 @@ import { requireUser } from '@/lib/session';
 import {
   createProjectMember,
   deleteProjectMember,
+  deleteProjectMembersByUser,
   getProjectMemberById,
   getProjectMembersByUserAndProject,
   getUserRoleInProject,
@@ -63,6 +64,13 @@ export async function deleteProjectMemberAction(id: string) {
   // TODO: Add permission check - only PROJECT_MANAGER or DEPLOYER can remove members
 
   return await deleteProjectMember(id);
+}
+
+export async function deleteProjectMembersByUserAction(userId: string, translationProjectId: string) {
+  const user = await requireUser();
+  // TODO: Add permission check - only PROJECT_MANAGER or DEPLOYER can remove members
+
+  return await deleteProjectMembersByUser(userId, translationProjectId);
 }
 
 export async function getUserRoleInProjectAction(translationProjectId: string) {

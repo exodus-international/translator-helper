@@ -23,7 +23,11 @@ import {
   deleteDocumentAssignmentAction,
   updateDocumentAssignmentAction,
 } from '@/domain/document-assignment/document-assignment.actions';
-import { createProjectMemberAction, deleteProjectMemberAction } from '@/domain/project-member/project-member.actions';
+import {
+  createProjectMemberAction,
+  deleteProjectMemberAction,
+  deleteProjectMembersByUserAction,
+} from '@/domain/project-member/project-member.actions';
 import { Prisma, ProjectRole } from '@prisma/client';
 import { ArrowLeft, Calendar, FileText, Plus, Trash2, User, Users, X } from 'lucide-react';
 import Link from 'next/link';
@@ -210,6 +214,21 @@ export default function TranslationProjectClient({
     await handleDeleteMember(memberId);
   };
 
+  const handleRemoveUserFromProject = async (userId: string) => {
+    setLoading(true);
+    try {
+      await deleteProjectMembersByUserAction(userId, translationProject.id);
+      setMembers(members.filter((m) => m.userId !== userId));
+      router.refresh();
+      toast.success('User removed from project successfully');
+    } catch (error: any) {
+      console.error('Error removing user from project:', error);
+      toast.error(error.message || 'Failed to remove user from project');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAssignDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -284,22 +303,32 @@ export default function TranslationProjectClient({
   const unassignedDocuments = documents.filter((doc) => !assignments.some((a) => a.documentId === doc.id));
 
   // Group members by user
-  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce(
-    (acc, member) => {
-      if (!acc[member.userId]) {
-        acc[member.userId] = {
-          user: member.user,
-          roles: [],
-        };
-      }
-      acc[member.userId].roles.push(member);
-      return acc;
-    },
-    {} as Record<string, { user: any; roles: any[] }>,
-  );
+  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce((acc, member) => {
+    if (!acc[member.userId]) {
+      acc[member.userId] = {
+        user: member.user,
+        roles: [],
+      };
+    }
+    acc[member.userId].roles.push(member);
+    return acc;
+  }, {} as Record<string, { user: any; roles: any[] }>);
 
   // Get users that are not yet members
-  const availableUsers = users.filter((user) => !membersByUser[user.id]);
+  const availableUsers = users
+    .filter((user) => !membersByUser[user.id])
+    .sort((a, b) => {
+      const projectLanguageCode = translationProject.language.code;
+      const aHasLanguage = a.languages.some((ul) => ul.language.code === projectLanguageCode);
+      const bHasLanguage = b.languages.some((ul) => ul.language.code === projectLanguageCode);
+
+      // Users with the project language come first
+      if (aHasLanguage && !bHasLanguage) return -1;
+      if (!aHasLanguage && bHasLanguage) return 1;
+
+      // If both have or both don't have the language, sort alphabetically by name
+      return (a.name || '').localeCompare(b.name || '');
+    });
 
   const assignedDocuments = assignments.filter((a) => a.userId);
   const unassignedAssignments = assignments.filter((a) => !a.userId);
@@ -365,25 +394,25 @@ export default function TranslationProjectClient({
                           }
                         }}
                         required
+                        disabled={availableUsers.length === 0}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a user" />
+                          <SelectValue
+                            placeholder={availableUsers.length === 0 ? 'No users available' : 'Select a user'}
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          {users.map((user) => {
-                            const userRoles = membersByUser[user.id]?.roles.map((r: any) => r.role) || [];
-                            const hasAllRoles = userRoles.length === Object.keys(ROLE_LABELS).length;
-                            return (
-                              <SelectItem key={user.id} value={user.id} disabled={hasAllRoles}>
-                                {user.name} ({user.email}) -{' '}
-                                <Badge variant="secondary">
-                                  {user.languages.map((l) => l.language.code).join(', ')}
-                                </Badge>
-                                {userRoles.length > 0 &&
-                                  ` - ${userRoles.map((r: ProjectRole) => ROLE_LABELS[r]).join(', ')}`}
+                          {availableUsers.length > 0 ? (
+                            availableUsers.map((user) => (
+                              <SelectItem key={user.id} value={user.id}>
+                                {user.name} ({user.email}) - {user.languages.map((l) => l.language.code).join(', ')}
                               </SelectItem>
-                            );
-                          })}
+                            ))
+                          ) : (
+                            <div className="p-2 text-center text-sm text-muted-foreground">
+                              No users available to add
+                            </div>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -458,9 +487,9 @@ export default function TranslationProjectClient({
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Remove Member</AlertDialogTitle>
+                                    <AlertDialogTitle>Remove Role</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Are you sure you want to remove this member? This will remove the{' '}
+                                      Are you sure you want to remove this role? This will remove the{' '}
                                       {ROLE_LABELS[member.role as ProjectRole]} role from {user.name}.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
@@ -493,6 +522,28 @@ export default function TranslationProjectClient({
                           )}
                         </div>
                       </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm" disabled={loading} className="ml-4">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remove User from Project</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to remove {user.name} from this project? This will remove all their
+                              roles ({userRoles.map((r: ProjectRole) => ROLE_LABELS[r]).join(', ')}).
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleRemoveUserFromProject(user.id)}>
+                              Remove from Project
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </Card>
                 );
