@@ -302,10 +302,13 @@ export default function ReviewClient({
                     </Badge>
                   </div>
                   <div className="flex gap-2 ml-4">
-                    <Button variant="default" size="sm" onClick={handleDownload} disabled={loading}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
+                    {(targetVersion.status === DocumentStatus.APPROVED ||
+                      targetVersion.status === DocumentStatus.DEPLOYED) && (
+                      <Button variant="default" size="sm" onClick={handleDownload} disabled={loading}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    )}
                     <StatusDropdown
                       currentStatus={targetVersion.status}
                       versionId={targetVersion.id}
