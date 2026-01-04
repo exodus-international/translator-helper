@@ -11,6 +11,7 @@ export const createDocumentSchema = z.object({
   folderId: z.string().optional(), // Deprecated - kept for backward compatibility
   labels: z.array(z.string()).default([]),
   deadline: z.coerce.date().optional(),
+  originalFilename: z.string().optional(),
 });
 
 export const updateDocumentSchema = z.object({

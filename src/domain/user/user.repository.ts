@@ -39,17 +39,12 @@ export async function getUserByEmail(email: string) {
 
 export async function listUsers() {
   return prisma.user.findMany({
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      image: true,
-      banned: true,
-      banReason: true,
-      banExpires: true,
-      createdAt: true,
-      updatedAt: true,
+    include: {
+      languages: {
+        include: {
+          language: true,
+        },
+      },
     },
     orderBy: {
       createdAt: 'desc',

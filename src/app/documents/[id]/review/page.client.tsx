@@ -51,6 +51,15 @@ function getContentWithoutFrontmatter(text: string) {
   }
 }
 
+function getDownloadFilename(document: any): string {
+  // If originalFilename exists, use it as-is for all languages
+  if (document.originalFilename) {
+    return document.originalFilename;
+  }
+  // Fallback to current format if no originalFilename
+  return `${document.slug}.md`;
+}
+
 export default function ReviewClient({
   document,
   sourceVersion,
@@ -176,7 +185,7 @@ export default function ReviewClient({
       const url = URL.createObjectURL(blob);
       const a = window.document.createElement('a');
       a.href = url;
-      a.download = `${document.slug}-${targetVersion.language.code}.md`;
+      a.download = getDownloadFilename(document);
       a.click();
       URL.revokeObjectURL(url);
 
@@ -200,10 +209,10 @@ export default function ReviewClient({
       const url = URL.createObjectURL(blob);
       const a = window.document.createElement('a');
       a.href = url;
-      a.download = `${document.slug}-${targetVersion.language.code}.md`;
+      a.download = getDownloadFilename(document);
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Document downloaded!');
+      toast.success('Document downloaded as ' + getDownloadFilename(document));
     } catch (error: any) {
       console.error('Error downloading:', error);
       toast.error('Failed to download document');

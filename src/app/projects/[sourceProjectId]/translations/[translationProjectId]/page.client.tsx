@@ -24,7 +24,7 @@ import {
   updateDocumentAssignmentAction,
 } from '@/domain/document-assignment/document-assignment.actions';
 import { createProjectMemberAction, deleteProjectMemberAction } from '@/domain/project-member/project-member.actions';
-import { ProjectRole } from '@prisma/client';
+import { Prisma, ProjectRole } from '@prisma/client';
 import { ArrowLeft, Calendar, FileText, Plus, Trash2, User, Users, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -32,11 +32,71 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 interface TranslationProjectClientProps {
-  translationProject: any;
-  members: any[];
-  assignments: any[];
-  documents: any[];
-  users: any[];
+  translationProject: Prisma.TranslationProjectGetPayload<{
+    include: {
+      language: true;
+      sourceProject: true;
+    };
+  }>;
+  members: Prisma.ProjectMemberGetPayload<{
+    include: {
+      user: {
+        select: {
+          id: true;
+          name: true;
+          email: true;
+        };
+      };
+    };
+  }>[];
+  assignments: Prisma.DocumentAssignmentGetPayload<{
+    include: {
+      document: {
+        include: {
+          sourceProject: true;
+          versions: {
+            include: {
+              language: true;
+            };
+          };
+        };
+      };
+      translationProject: {
+        include: {
+          sourceProject: true;
+          language: true;
+        };
+      };
+      user: {
+        select: {
+          id: true;
+          name: true;
+          email: true;
+        };
+      };
+      assignedBy: {
+        select: {
+          id: true;
+          name: true;
+          email: true;
+        };
+      };
+    };
+  }>[];
+  documents: Prisma.DocumentGetPayload<{
+    include: {
+      versions: true;
+    };
+  }>[];
+  users: Prisma.UserGetPayload<{
+    include: {
+      languages: {
+        include: {
+          language: true;
+        };
+      };
+    };
+  }>[];
 }
 
 const ROLE_LABELS: Record<ProjectRole, string> = {
@@ -89,7 +149,9 @@ export default function TranslationProjectClient({
           }),
         ),
       );
-      setMembers([...members, ...createdMembers]);
+      // Strip translationProject field to match the members state type
+      const membersToAdd = createdMembers.map(({ translationProject: _, ...member }) => member) as typeof members;
+      setMembers([...members, ...membersToAdd]);
       setMemberDialogOpen(false);
       resetMemberForm();
       router.refresh();
@@ -117,7 +179,9 @@ export default function TranslationProjectClient({
         userId,
         role,
       });
-      setMembers([...members, created]);
+      // Strip translationProject field to match the members state type
+      const { translationProject: _, ...memberToAdd } = created;
+      setMembers([...members, memberToAdd as (typeof members)[0]]);
       router.refresh();
     } catch (error: any) {
       console.error('Error adding role:', error);
@@ -157,7 +221,7 @@ export default function TranslationProjectClient({
         userId: selectedAssigneeId || null,
         deadline: deadline ? new Date(deadline) : null,
       });
-      setAssignments([...assignments, created]);
+      setAssignments([...assignments, created as (typeof assignments)[0]]);
       setAssignmentDialogOpen(false);
       resetAssignmentForm();
       router.refresh();
@@ -176,7 +240,7 @@ export default function TranslationProjectClient({
         userId,
         deadline,
       });
-      setAssignments(assignments.map((a) => (a.id === updated.id ? updated : a)));
+      setAssignments(assignments.map((a) => (a.id === updated.id ? (updated as (typeof assignments)[0]) : a)));
       router.refresh();
     } catch (error: any) {
       console.error('Error updating assignment:', error);
@@ -220,19 +284,16 @@ export default function TranslationProjectClient({
   const unassignedDocuments = documents.filter((doc) => !assignments.some((a) => a.documentId === doc.id));
 
   // Group members by user
-  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce(
-    (acc, member) => {
-      if (!acc[member.userId]) {
-        acc[member.userId] = {
-          user: member.user,
-          roles: [],
-        };
-      }
-      acc[member.userId].roles.push(member);
-      return acc;
-    },
-    {} as Record<string, { user: any; roles: any[] }>,
-  );
+  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce((acc, member) => {
+    if (!acc[member.userId]) {
+      acc[member.userId] = {
+        user: member.user,
+        roles: [],
+      };
+    }
+    acc[member.userId].roles.push(member);
+    return acc;
+  }, {} as Record<string, { user: any; roles: any[] }>);
 
   // Get users that are not yet members
   const availableUsers = users.filter((user) => !membersByUser[user.id]);
@@ -311,7 +372,10 @@ export default function TranslationProjectClient({
                             const hasAllRoles = userRoles.length === Object.keys(ROLE_LABELS).length;
                             return (
                               <SelectItem key={user.id} value={user.id} disabled={hasAllRoles}>
-                                {user.name} ({user.email})
+                                {user.name} ({user.email}) -{' '}
+                                <Badge variant="secondary">
+                                  {user.languages.map((l) => l.language.code).join(', ')}
+                                </Badge>
                                 {userRoles.length > 0 &&
                                   ` - ${userRoles.map((r: ProjectRole) => ROLE_LABELS[r]).join(', ')}`}
                               </SelectItem>

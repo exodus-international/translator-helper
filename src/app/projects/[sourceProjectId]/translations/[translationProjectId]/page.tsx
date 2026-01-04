@@ -1,11 +1,11 @@
-import { redirect, notFound } from 'next/navigation';
-import { getCurrentUser } from '@/lib/session';
-import { canManageFolders, canAssignDocuments } from '@/lib/permissions';
-import { getTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
-import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
 import { listDocumentAssignmentsAction } from '@/domain/document-assignment/document-assignment.actions';
 import { listDocumentsAction } from '@/domain/document/document.actions';
+import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import { getTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
 import { listUsersAction } from '@/domain/user/user.actions';
+import { canAssignDocuments } from '@/lib/permissions';
+import { getCurrentUser } from '@/lib/session';
+import { notFound, redirect } from 'next/navigation';
 import TranslationProjectClient from './page.client';
 
 export default async function TranslationProjectPage({

@@ -43,6 +43,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [labels, setLabels] = useState<string[]>([]);
   const [labelInput, setLabelInput] = useState('');
   const [deadline, setDeadline] = useState<string>('');
+  const [originalFilename, setOriginalFilename] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -63,6 +64,9 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
     const file = e.dataTransfer.files[0];
     if (file && file.name.endsWith('.md')) {
+      // Store original filename
+      setOriginalFilename(file.name);
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
@@ -101,6 +105,9 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.name.endsWith('.md')) {
+      // Store original filename
+      setOriginalFilename(file.name);
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
@@ -205,6 +212,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
         sourceProjectId,
         labels,
         deadline: deadline ? new Date(deadline) : undefined,
+        originalFilename: originalFilename || undefined,
       });
 
       router.push('/dashboard');

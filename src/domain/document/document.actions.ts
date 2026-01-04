@@ -58,6 +58,7 @@ export async function createDocumentAction(input: unknown) {
     folderId: validated.folderId, // Deprecated - kept for backward compatibility
     labels: validated.labels,
     deadline: validated.deadline,
+    originalFilename: validated.originalFilename,
   });
 
   // Create the English (source) version with APPROVED status

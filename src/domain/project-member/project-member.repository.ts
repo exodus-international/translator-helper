@@ -1,7 +1,19 @@
 import prisma from '@/lib/db';
-import { ProjectRole } from '@prisma/client';
+import { Prisma, ProjectRole } from '@prisma/client';
 
-export async function listProjectMembers(translationProjectId: string) {
+export async function listProjectMembers(translationProjectId: string): Promise<
+  Prisma.ProjectMemberGetPayload<{
+    include: {
+      user: {
+        select: {
+          id: true;
+          name: true;
+          email: true;
+        };
+      };
+    };
+  }>[]
+> {
   return prisma.projectMember.findMany({
     where: {
       translationProjectId,
@@ -21,7 +33,23 @@ export async function listProjectMembers(translationProjectId: string) {
   });
 }
 
-export async function getProjectMemberById(id: string) {
+export async function getProjectMemberById(id: string): Promise<Prisma.ProjectMemberGetPayload<{
+  include: {
+    user: {
+      select: {
+        id: true;
+        name: true;
+        email: true;
+      };
+    };
+    translationProject: {
+      include: {
+        sourceProject: true;
+        language: true;
+      };
+    };
+  };
+}> | null> {
   return prisma.projectMember.findUnique({
     where: { id },
     include: {
@@ -42,7 +70,28 @@ export async function getProjectMemberById(id: string) {
   });
 }
 
-export async function getProjectMembersByUserAndProject(userId: string, translationProjectId: string) {
+export async function getProjectMembersByUserAndProject(
+  userId: string,
+  translationProjectId: string,
+): Promise<
+  Prisma.ProjectMemberGetPayload<{
+    include: {
+      user: {
+        select: {
+          id: true;
+          name: true;
+          email: true;
+        };
+      };
+      translationProject: {
+        include: {
+          sourceProject: true;
+          language: true;
+        };
+      };
+    };
+  }>[]
+> {
   return prisma.projectMember.findMany({
     where: {
       translationProjectId,
@@ -66,7 +115,29 @@ export async function getProjectMembersByUserAndProject(userId: string, translat
   });
 }
 
-export async function createProjectMember(data: { translationProjectId: string; userId: string; role: ProjectRole }) {
+export async function createProjectMember(data: {
+  translationProjectId: string;
+  userId: string;
+  role: ProjectRole;
+}): Promise<
+  Prisma.ProjectMemberGetPayload<{
+    include: {
+      user: {
+        select: {
+          id: true;
+          name: true;
+          email: true;
+        };
+      };
+      translationProject: {
+        include: {
+          sourceProject: true;
+          language: true;
+        };
+      };
+    };
+  }>
+> {
   return prisma.projectMember.create({
     data,
     include: {
@@ -87,7 +158,28 @@ export async function createProjectMember(data: { translationProjectId: string; 
   });
 }
 
-export async function updateProjectMember(id: string, data: { role: ProjectRole }) {
+export async function updateProjectMember(
+  id: string,
+  data: { role: ProjectRole },
+): Promise<
+  Prisma.ProjectMemberGetPayload<{
+    include: {
+      user: {
+        select: {
+          id: true;
+          name: true;
+          email: true;
+        };
+      };
+      translationProject: {
+        include: {
+          sourceProject: true;
+          language: true;
+        };
+      };
+    };
+  }>
+> {
   return prisma.projectMember.update({
     where: { id },
     data,
@@ -109,7 +201,7 @@ export async function updateProjectMember(id: string, data: { role: ProjectRole 
   });
 }
 
-export async function deleteProjectMember(id: string) {
+export async function deleteProjectMember(id: string): Promise<Prisma.ProjectMemberGetPayload<{}>> {
   return prisma.projectMember.delete({
     where: { id },
   });

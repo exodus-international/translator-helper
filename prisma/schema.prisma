@@ -197,19 +197,20 @@ model DocumentAssignment {
 }
 
 model Document {
-  id              String               @id @default(uuid())
-  slug            String               @unique
-  title           String
-  labels          String[] // Array of labels for categorization
-  deadline        DateTime? // Optional deadline for translation completion
-  folderId        String? // Deprecated - kept for migration
-  folder          Folder?              @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  sourceProjectId String?
-  sourceProject   SourceProject?       @relation(fields: [sourceProjectId], references: [id], onDelete: SetNull)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  versions        DocumentVersion[]
-  assignments     DocumentAssignment[]
+  id               String               @id @default(uuid())
+  slug             String               @unique
+  title            String
+  labels           String[] // Array of labels for categorization
+  deadline         DateTime? // Optional deadline for translation completion
+  folderId         String? // Deprecated - kept for migration
+  folder           Folder?              @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  sourceProjectId  String?
+  sourceProject    SourceProject?       @relation(fields: [sourceProjectId], references: [id], onDelete: SetNull)
+  originalFilename String? // Original filename when uploaded (e.g., "1.md")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  versions         DocumentVersion[]
+  assignments      DocumentAssignment[]
 
   @@map("document")
 }

@@ -1,12 +1,36 @@
 import prisma from '@/lib/db';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus, Prisma } from '@prisma/client';
 
 export async function listDocuments(filters?: {
   sourceProjectId?: string;
   folderId?: string; // Deprecated - kept for backward compatibility
   labels?: string[];
   search?: string;
-}) {
+}): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      folder: true;
+      sourceProject: true;
+      versions: {
+        include: {
+          language: true;
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>[]
+> {
   return prisma.document.findMany({
     where: {
       ...(filters?.sourceProjectId && { sourceProjectId: filters.sourceProjectId }),
@@ -54,7 +78,50 @@ export async function listDocuments(filters?: {
   });
 }
 
-export async function getDocumentById(id: string) {
+export async function getDocumentById(id: string): Promise<Prisma.DocumentGetPayload<{
+  include: {
+    folder: true;
+    sourceProject: true;
+    assignments: {
+      include: {
+        translationProject: {
+          include: {
+            language: true;
+          };
+        };
+        user: {
+          select: {
+            id: true;
+            name: true;
+            email: true;
+            languages: {
+              select: {
+                languageId: true;
+              };
+            };
+          };
+        };
+      };
+    };
+    versions: {
+      include: {
+        language: true;
+        user: {
+          select: {
+            id: true;
+            name: true;
+            email: true;
+            languages: {
+              select: {
+                languageId: true;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+}> | null> {
   return prisma.document.findUnique({
     where: { id },
     include: {
@@ -105,7 +172,29 @@ export async function getDocumentById(id: string) {
   });
 }
 
-export async function getDocumentBySlug(slug: string) {
+export async function getDocumentBySlug(slug: string): Promise<Prisma.DocumentGetPayload<{
+  include: {
+    folder: true;
+    sourceProject: true;
+    versions: {
+      include: {
+        language: true;
+        user: {
+          select: {
+            id: true;
+            name: true;
+            email: true;
+            languages: {
+              select: {
+                languageId: true;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+}> | null> {
   return prisma.document.findUnique({
     where: { slug },
     include: {
@@ -139,7 +228,16 @@ export async function createDocument(data: {
   folderId?: string; // Deprecated - kept for backward compatibility
   labels: string[];
   deadline?: Date;
-}) {
+  originalFilename?: string;
+}): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      folder: true;
+      sourceProject: true;
+      versions: true;
+    };
+  }>
+> {
   return prisma.document.create({
     data: {
       slug: data.slug,
@@ -148,6 +246,7 @@ export async function createDocument(data: {
       folderId: data.folderId, // Deprecated
       labels: data.labels,
       deadline: data.deadline,
+      originalFilename: data.originalFilename,
     },
     include: {
       folder: true, // Deprecated
@@ -166,7 +265,15 @@ export async function updateDocument(
     labels?: string[];
     deadline?: Date | null;
   },
-) {
+): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      folder: true;
+      sourceProject: true;
+      versions: true;
+    };
+  }>
+> {
   return prisma.document.update({
     where: { id },
     data,
@@ -178,7 +285,7 @@ export async function updateDocument(
   });
 }
 
-export async function deleteDocument(id: string) {
+export async function deleteDocument(id: string): Promise<Prisma.DocumentGetPayload<{}>> {
   return prisma.document.delete({
     where: { id },
   });
@@ -188,7 +295,50 @@ export async function deleteDocument(id: string) {
 // Includes documents without a version AND documents with PENDING_TRANSLATION status
 // Filters out documents past deadline + 2 weeks grace period if untranslated
 // Sorts by deadline (earliest first, null deadlines last)
-export async function getDocumentsNeedingTranslation(languageId: string, translationProjectId?: string) {
+export async function getDocumentsNeedingTranslation(
+  languageId: string,
+  translationProjectId?: string,
+): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      folder: true;
+      sourceProject: true;
+      assignments: {
+        include: {
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+      versions: {
+        include: {
+          language: true;
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>[]
+> {
   const allDocuments = await prisma.document.findMany({
     where: {
       ...(translationProjectId && {
@@ -279,7 +429,50 @@ export async function getDocumentsNeedingTranslation(languageId: string, transla
 }
 
 // Get documents pending review
-export async function getDocumentsPendingReview(languageId?: string, translationProjectId?: string) {
+export async function getDocumentsPendingReview(
+  languageId?: string,
+  translationProjectId?: string,
+): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      folder: true;
+      sourceProject: true;
+      assignments: {
+        include: {
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+      versions: {
+        include: {
+          language: true;
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>[]
+> {
   return prisma.document.findMany({
     where: {
       versions: {
@@ -346,7 +539,50 @@ export async function getDocumentsPendingReview(languageId?: string, translation
 }
 
 // Get approved documents ready for deployment
-export async function getDocumentsReadyToDeploy(languageId?: string, translationProjectId?: string) {
+export async function getDocumentsReadyToDeploy(
+  languageId?: string,
+  translationProjectId?: string,
+): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      folder: true;
+      sourceProject: true;
+      assignments: {
+        include: {
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+      versions: {
+        include: {
+          language: true;
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>[]
+> {
   return prisma.document.findMany({
     where: {
       versions: {
@@ -413,7 +649,31 @@ export async function getDocumentsReadyToDeploy(languageId?: string, translation
 }
 
 // Get all versions of documents for overview (showing translation status per language)
-export async function getDocumentsWithAllVersions() {
+export async function getDocumentsWithAllVersions(): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      folder: true;
+      sourceProject: true;
+      versions: {
+        include: {
+          language: true;
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>[]
+> {
   return prisma.document.findMany({
     include: {
       folder: true, // Deprecated
@@ -446,7 +706,51 @@ export async function getDocumentsWithAllVersions() {
 }
 
 // Get documents where a specific user has created/edited versions
-export async function getDocumentsByUser(userId: string, languageId?: string, translationProjectId?: string) {
+export async function getDocumentsByUser(
+  userId: string,
+  languageId?: string,
+  translationProjectId?: string,
+): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      folder: true;
+      sourceProject: true;
+      assignments: {
+        include: {
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+      versions: {
+        include: {
+          language: true;
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>[]
+> {
   return prisma.document.findMany({
     where: {
       versions: {
@@ -519,7 +823,53 @@ export async function getDocumentsByUser(userId: string, languageId?: string, tr
 }
 
 // Get documents by translation project
-export async function getDocumentsByTranslationProject(translationProjectId: string) {
+export async function getDocumentsByTranslationProject(translationProjectId: string): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      sourceProject: true;
+      assignments: {
+        include: {
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+          assignedBy: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+            };
+          };
+        };
+      };
+      versions: {
+        include: {
+          language: true;
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>[]
+> {
   return prisma.document.findMany({
     where: {
       assignments: {
@@ -583,7 +933,54 @@ export async function getDocumentsByTranslationProject(translationProjectId: str
   });
 }
 
-export async function getDashboardDocuments(languageId: string, sourceProjectId?: string) {
+export async function getDashboardDocuments(
+  languageId: string,
+  sourceProjectId?: string,
+): Promise<
+  Prisma.DocumentGetPayload<{
+    include: {
+      sourceProject: true;
+      assignments: {
+        include: {
+          translationProject: {
+            include: {
+              language: true;
+            };
+          };
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+      versions: {
+        include: {
+          language: true;
+          user: {
+            select: {
+              id: true;
+              name: true;
+              email: true;
+              languages: {
+                select: {
+                  languageId: true;
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  }>[]
+> {
   // If sourceProjectId is provided, find the translation project for that source project and language
   let translationProjectId: string | undefined;
   if (sourceProjectId) {
