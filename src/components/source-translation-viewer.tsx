@@ -2,19 +2,8 @@ import { RawEditorPane } from '@/components/raw-editor-panel';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { Eye, FileEdit, Save, Trash2, X } from 'lucide-react';
+import { Edit, Eye, FileEdit, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -266,7 +255,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
               {canEditSource && !isSourceEditing && (
                 <>
                   <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
-                    <FileEdit className="h-4 w-4 mr-2" />
+                    <Edit className="h-4 w-4 mr-2" />
                     Edit
                   </Button>
                   {/* <AlertDialog>
@@ -319,7 +308,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   primaryLabel: 'Source Line',
                   primaryValue: sourceLine,
                   secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                  secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
+                  secondaryValue: translationRawVisible ? syncedTranslationLine ?? translationLine : undefined,
                   direction: 'to',
                 }}
               />
@@ -339,7 +328,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   primaryLabel: 'Source Line',
                   primaryValue: sourceLine,
                   secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                  secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
+                  secondaryValue: translationRawVisible ? syncedTranslationLine ?? translationLine : undefined,
                   direction: 'to',
                 }}
               />
@@ -430,6 +419,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
               {translationBadge}
               {variant === 'review' && !isReviewEditing && reviewConfig?.canEdit && (
                 <Button variant="outline" size="sm" onClick={enterReviewEditMode}>
+                  <Edit className="h-4 w-4 mr-2" />
                   {reviewConfig?.editButtonLabel || 'Edit'}
                 </Button>
               )}
@@ -453,7 +443,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                     primaryLabel: 'Translation Line',
                     primaryValue: translationLine,
                     secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                    secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
+                    secondaryValue: sourceViewMode === 'raw' ? syncedSourceLine ?? sourceLine : undefined,
                     direction: 'from',
                   }}
                 />
@@ -502,7 +492,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   primaryLabel: 'Translation Line',
                   primaryValue: translationLine,
                   secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                  secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
+                  secondaryValue: sourceViewMode === 'raw' ? syncedSourceLine ?? sourceLine : undefined,
                   direction: 'from',
                 }}
               />

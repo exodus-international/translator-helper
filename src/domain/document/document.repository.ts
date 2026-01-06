@@ -1050,6 +1050,11 @@ export async function getDashboardDocuments(
               },
             },
           },
+          activityLogs: {
+            orderBy: {
+              createdAt: 'desc',
+            },
+          },
         },
         orderBy: {
           updatedAt: 'desc',

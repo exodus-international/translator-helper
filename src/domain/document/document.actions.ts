@@ -159,3 +159,40 @@ export async function getDashboardDocumentsAction(languageId: string, sourceProj
   await requireUser();
   return await getDashboardDocuments(languageId, sourceProjectId);
 }
+
+export async function toggleDocumentLabelAction(documentId: string, label: string) {
+  const user = await requireUser();
+  
+  // Get the document to check its current labels
+  const document = await getDocumentById(documentId);
+  if (!document) {
+    throw new Error('Document not found');
+  }
+
+  // Check if label exists
+  const currentLabels = document.labels || [];
+  const hasLabel = currentLabels.includes(label);
+  
+  // Toggle the label
+  const newLabels = hasLabel
+    ? currentLabels.filter((l) => l !== label)
+    : [...currentLabels, label];
+
+  // Update the document directly (bypassing deployer check for label toggling)
+  // This allows reviewers to toggle labels when documents are in PENDING_REVIEW
+  const updated = await prisma.document.update({
+    where: { id: documentId },
+    data: { labels: newLabels },
+    include: {
+      folder: true,
+      sourceProject: true,
+      versions: true,
+    },
+  });
+
+  // Revalidate paths
+  revalidatePath('/dashboard');
+  revalidatePath(`/documents/${documentId}`);
+
+  return updated;
+}

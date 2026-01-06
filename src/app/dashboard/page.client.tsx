@@ -11,7 +11,7 @@ import { updateDocumentVersionStatusAction } from '@/domain/document-version/doc
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus, Language } from '@prisma/client';
-import { FileText, Plus, Search } from 'lucide-react';
+import { FileCheck, FileText, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -269,6 +269,30 @@ export default function DashboardClient({
 
   const activeColumnIds = new Set(columns.map((column) => column.id));
 
+  // Helper function to get deployed timestamp from activity logs
+  const getDeployedTimestamp = (version: any): Date | null => {
+    if (!version?.activityLogs || version.activityLogs.length === 0) {
+      return null;
+    }
+
+    // Find the first activity log entry where:
+    // 1. action is "deployed", OR
+    // 2. action is "status_updated" and details.status is "DEPLOYED"
+    for (const log of version.activityLogs) {
+      if (log.action === 'deployed') {
+        return new Date(log.createdAt);
+      }
+      if (log.action === 'status_updated' && log.details) {
+        const details = log.details as { status?: string };
+        if (details.status === 'DEPLOYED') {
+          return new Date(log.createdAt);
+        }
+      }
+    }
+
+    return null;
+  };
+
   // Transform documents to Kanban card format
   const kanbanData: KanbanCardData[] = filteredDocuments
     .map((doc) => {
@@ -285,7 +309,32 @@ export default function DashboardClient({
         versionId: version?.id,
       };
     })
-    .filter((card) => activeColumnIds.has(card.column));
+    .filter((card) => activeColumnIds.has(card.column))
+    .sort((a, b) => {
+      // Only sort cards in the "deployed" column by deployed timestamp
+      if (a.column === 'deployed' && b.column === 'deployed') {
+        const aVersion = a.document.versions?.[0];
+        const bVersion = b.document.versions?.[0];
+        const aTimestamp = aVersion ? getDeployedTimestamp(aVersion) : null;
+        const bTimestamp = bVersion ? getDeployedTimestamp(bVersion) : null;
+
+        // If both have timestamps, sort by timestamp (newest first)
+        if (aTimestamp && bTimestamp) {
+          return bTimestamp.getTime() - aTimestamp.getTime();
+        }
+        // If only one has timestamp, prioritize it
+        if (aTimestamp && !bTimestamp) {
+          return -1;
+        }
+        if (!aTimestamp && bTimestamp) {
+          return 1;
+        }
+        // If neither has timestamp, maintain original order
+        return 0;
+      }
+      // For other columns, maintain original order
+      return 0;
+    });
 
   // Handle drag and drop
   async function handleDataChange(newData: KanbanCardData[]) {
@@ -469,6 +518,9 @@ export default function DashboardClient({
                         const assignment = doc.assignments?.[0];
                         const language = version?.language || languages.find((l) => l.id === selectedLanguage);
                         const deadline = assignment?.deadline || doc.deadline;
+                        const hasWaitingForFinalLabel =
+                          version?.status === DocumentStatus.PENDING_REVIEW &&
+                          doc.labels?.includes('Waiting for final label');
 
                         const getDocumentUrl = () => {
                           if (
@@ -486,112 +538,132 @@ export default function DashboardClient({
                           return `/documents/${doc.id}/translate?lang=${selectedLanguage}`;
                         };
 
+                        // Get all cards in this column to check previous card
+                        const cardsInColumn = kanbanData.filter((c) => c.column === column.id);
+                        const cardIndexInColumn = cardsInColumn.findIndex((c) => c.id === card.id);
+                        const prevCardInColumn = cardIndexInColumn > 0 ? cardsInColumn[cardIndexInColumn - 1] : null;
+                        const prevCardHasLabel =
+                          prevCardInColumn &&
+                          prevCardInColumn.document.versions?.[0]?.status === DocumentStatus.PENDING_REVIEW &&
+                          prevCardInColumn.document.labels?.includes('Waiting for final label');
+                        const shouldShowSeparator = hasWaitingForFinalLabel && !prevCardHasLabel && prevCardInColumn;
+
                         return (
-                          <KanbanCard column={column.id} id={card.id} key={card.id} name={card.name}>
-                            <Link
-                              href={getDocumentUrl()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                              }}
-                              className="text-muted-foreground hover:text-foreground transition-colors"
-                              title="Open document"
+                          <>
+                            {shouldShowSeparator && <div className="border-t-2 border-gray-300 my-2" />}
+                            <KanbanCard
+                              column={column.id}
+                              id={card.id}
+                              key={card.id}
+                              name={card.name}
+                              className={hasWaitingForFinalLabel ? 'bg-green-50/50 border-green-800/40' : ''}
                             >
-                              <div className="flex flex-col gap-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="m-0 flex-1 font-medium text-sm">{doc.title}</p>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    {(() => {
-                                      // Helper function to check if user has the selected language
-                                      const userHasLanguage = (user: any) => {
-                                        if (!user?.languages) return false;
-                                        return user.languages.some((ul: any) => ul.languageId === selectedLanguage);
-                                      };
+                              <Link
+                                href={getDocumentUrl()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                className="hover:text-muted-foreground transition-colors"
+                                title="Open document"
+                              >
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2">
+                                    {hasWaitingForFinalLabel && <FileCheck className="h-4 w-4" />}
+                                    <p className="m-0 flex-1 font-medium text-sm">{doc.title}</p>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {(() => {
+                                        // Helper function to check if user has the selected language
+                                        const userHasLanguage = (user: any) => {
+                                          if (!user?.languages) return false;
+                                          return user.languages.some((ul: any) => ul.languageId === selectedLanguage);
+                                        };
 
-                                      // Filter users based on language preference
-                                      const assignmentUser =
-                                        assignment?.user && userHasLanguage(assignment.user) ? assignment.user : null;
-                                      const versionUser =
-                                        version?.user && userHasLanguage(version.user) ? version.user : null;
-                                      const shouldShowVersionUser =
-                                        versionUser && (!assignmentUser || versionUser.id !== assignmentUser.id);
+                                        // Filter users based on language preference
+                                        const assignmentUser =
+                                          assignment?.user && userHasLanguage(assignment.user) ? assignment.user : null;
+                                        const versionUser =
+                                          version?.user && userHasLanguage(version.user) ? version.user : null;
+                                        const shouldShowVersionUser =
+                                          versionUser && (!assignmentUser || versionUser.id !== assignmentUser.id);
 
-                                      if (!assignmentUser && !shouldShowVersionUser) {
-                                        return null;
-                                      }
+                                        if (!assignmentUser && !shouldShowVersionUser) {
+                                          return null;
+                                        }
 
-                                      return (
-                                        <div className="flex items-center gap-1 -space-x-1">
-                                          {assignmentUser && (
-                                            <Avatar
-                                              size="sm"
-                                              name={assignmentUser.name || undefined}
-                                              className="border-2 border-background"
-                                              title={assignmentUser.name || undefined}
-                                            >
-                                              <AvatarFallback name={assignmentUser.name || undefined}>
-                                                {assignmentUser.name
-                                                  .split(' ')
-                                                  .map((name: string) => name.charAt(0))
-                                                  .join('')}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                          )}
-                                          {shouldShowVersionUser && (
-                                            <Avatar
-                                              size="sm"
-                                              name={versionUser.name || undefined}
-                                              className="border-2 border-background"
-                                              title={versionUser.name || undefined}
-                                            >
-                                              <AvatarFallback name={versionUser.name || undefined}>
-                                                {versionUser.name
-                                                  .split(' ')
-                                                  .map((name: string) => name.charAt(0))
-                                                  .join('')}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                          )}
-                                        </div>
-                                      );
-                                    })()}
+                                        return (
+                                          <div className="flex items-center gap-1 -space-x-1">
+                                            {assignmentUser && (
+                                              <Avatar
+                                                size="sm"
+                                                name={assignmentUser.name || undefined}
+                                                className="border-2 border-background"
+                                                title={assignmentUser.name || undefined}
+                                              >
+                                                <AvatarFallback name={assignmentUser.name || undefined}>
+                                                  {assignmentUser.name
+                                                    .split(' ')
+                                                    .map((name: string) => name.charAt(0))
+                                                    .join('')}
+                                                </AvatarFallback>
+                                              </Avatar>
+                                            )}
+                                            {shouldShowVersionUser && (
+                                              <Avatar
+                                                size="sm"
+                                                name={versionUser.name || undefined}
+                                                className="border-2 border-background"
+                                                title={versionUser.name || undefined}
+                                              >
+                                                <AvatarFallback name={versionUser.name || undefined}>
+                                                  {versionUser.name
+                                                    .split(' ')
+                                                    .map((name: string) => name.charAt(0))
+                                                    .join('')}
+                                                </AvatarFallback>
+                                              </Avatar>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
                                   </div>
-                                </div>
-                                <div className="flex flex-wrap gap-1 items-center">
-                                  {doc.sourceProject && (
-                                    <Badge variant="secondary" size="xs">
-                                      {doc.sourceProject.name}
-                                    </Badge>
-                                  )}
-                                  {language && (
-                                    <Badge variant="secondary" size="xs">
-                                      {language.name}
-                                    </Badge>
-                                  )}
-                                  {deadline && (
-                                    <Badge variant="outline" size="xs">
-                                      {shortDateFormatter.format(new Date(deadline))}
-                                    </Badge>
-                                  )}
-                                  {version && (
-                                    <div
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                      className="ml-auto"
-                                    >
-                                      {/* <StatusDropdown
+                                  <div className="flex flex-wrap gap-1 items-center">
+                                    {doc.sourceProject && (
+                                      <Badge variant="secondary" size="xs">
+                                        {doc.sourceProject.name}
+                                      </Badge>
+                                    )}
+                                    {language && (
+                                      <Badge variant="secondary" size="xs">
+                                        {language.name}
+                                      </Badge>
+                                    )}
+                                    {deadline && (
+                                      <Badge variant="outline" size="xs">
+                                        {shortDateFormatter.format(new Date(deadline))}
+                                      </Badge>
+                                    )}
+                                    {version && (
+                                      <div
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                        }}
+                                        className="ml-auto"
+                                      >
+                                        {/* <StatusDropdown
                                       currentStatus={version.status}
                                       versionId={version.id}
                                       user={user}
                                       documentId={doc.id}
                                       languageId={selectedLanguage}
                                     /> */}
-                                    </div>
-                                  )}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </Link>
-                          </KanbanCard>
+                              </Link>
+                            </KanbanCard>
+                          </>
                         );
                       }}
                     </KanbanCards>

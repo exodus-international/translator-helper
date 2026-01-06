@@ -18,6 +18,11 @@ const deployer = ac.newRole({
   session: ['read', 'delete', 'revoke'],
 });
 
+const translator = ac.newRole({
+  user: ['create', 'read'],
+  session: ['read', 'delete', 'revoke'],
+});
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -39,6 +44,7 @@ export const auth = betterAuth({
       ac,
       roles: {
         DEPLOYER: deployer,
+        TRANSLATOR: translator,
       },
     }),
   ],

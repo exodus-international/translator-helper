@@ -23,14 +23,14 @@ import {
   reviewVersionAction,
   updateDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
-import { deleteDocumentAction } from '@/domain/document/document.actions';
+import { deleteDocumentAction, toggleDocumentLabelAction } from '@/domain/document/document.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
 import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { DocumentStatus } from '@prisma/client';
 import matter from 'gray-matter';
-import { Download, MessageSquare } from 'lucide-react';
+import { Download, FileCheck, FilePlus, MessageCircle, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -73,6 +73,10 @@ export default function ReviewClient({
   const [loading, setLoading] = useState(false);
   const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
   const [sourceSaving, setSourceSaving] = useState(false);
+  const [waitingForFinalLabel, setWaitingForFinalLabel] = useState(
+    document.labels?.includes('Waiting for final label') || false,
+  );
+  const [labelLoading, setLabelLoading] = useState(false);
 
   // Check if user can edit source (deployer only)
   const canEditSource = isDeployerClient(user);
@@ -258,6 +262,25 @@ export default function ReviewClient({
     await handleSourceDelete();
   };
 
+  const handleToggleWaitingForFinalLabel = async () => {
+    setLabelLoading(true);
+    try {
+      const updated = await toggleDocumentLabelAction(document.id, 'Waiting for final label');
+      setWaitingForFinalLabel(updated.labels.includes('Waiting for final label'));
+      toast.success(
+        updated.labels.includes('Waiting for final label')
+          ? 'Waiting for final approve label added'
+          : 'Waiting for final approve label removed',
+      );
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error toggling label:', error);
+      toast.error(error.message || 'Failed to toggle label');
+    } finally {
+      setLabelLoading(false);
+    }
+  };
+
   const reviewEditActions = ({ exitEditMode }: { exitEditMode: () => void }) => (
     <div className="flex gap-2">
       <Button
@@ -307,6 +330,22 @@ export default function ReviewClient({
                       <Button variant="default" size="sm" onClick={handleDownload} disabled={loading}>
                         <Download className="h-4 w-4 mr-2" />
                         Download
+                      </Button>
+                    )}
+                    {targetVersion.status === DocumentStatus.PENDING_REVIEW && (
+                      <Button
+                        variant={waitingForFinalLabel ? 'outline' : 'default'}
+                        size="sm"
+                        onClick={handleToggleWaitingForFinalLabel}
+                        disabled={labelLoading}
+                        className={
+                          waitingForFinalLabel
+                            ? 'bg-green-700 text-white border-green-200 hover:bg-green-700/80 hover:text-white'
+                            : ''
+                        }
+                      >
+                        {waitingForFinalLabel ? <FileCheck className="h-4 w-4" /> : <FilePlus className="h-4 w-4" />}
+                        {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
                       </Button>
                     )}
                     <StatusDropdown
@@ -393,6 +432,7 @@ export default function ReviewClient({
               rows={3}
             />
             <Button onClick={handleAddComment} disabled={loading || !comment.trim()}>
+              <MessageCircle />
               Add Comment
             </Button>
           </div>
