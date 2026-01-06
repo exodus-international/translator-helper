@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { auth } from '@/lib/auth';
+import { PrismaClient, Role } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -45,6 +46,32 @@ async function main() {
       create: folder,
     });
     console.log(`✓ Folder ${folder.name} created/updated`);
+  }
+
+  const users = [
+    {
+      email: 'cervik49@gmail.com',
+      name: 'Vojta Admin',
+      password: 'Hello123456',
+      role: Role.DEPLOYER,
+    },
+    {
+      email: 'vojta@vojta.cz',
+      name: 'Vojta User',
+      password: 'Hello123456',
+      role: Role.TRANSLATOR,
+    },
+  ];
+
+  for (const user of users) {
+    auth.api.createUser({
+      body: {
+        email: user.email,
+        name: user.name,
+        password: user.password,
+        role: user.role as Role,
+      },
+    });
   }
 
   console.log('Database seeding completed!');
