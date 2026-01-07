@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation';
-import { getCurrentUser } from '@/lib/session';
-import { getDocumentById } from '@/domain/document/document.repository';
 import { getDocumentVersionById } from '@/domain/document-version/document-version.repository';
-import { notFound } from 'next/navigation';
+import { getDocumentById } from '@/domain/document/document.repository';
+import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.repository';
+import { getCurrentUser } from '@/lib/session';
+import { notFound, redirect } from 'next/navigation';
 import ReviewClient from './page.client';
 
 export default async function ReviewPage({
@@ -39,5 +39,16 @@ export default async function ReviewPage({
     throw new Error('Source English version not found');
   }
 
-  return <ReviewClient document={document} sourceVersion={sourceVersion} targetVersion={version} user={user} />;
+  // Load suggestions for the target version
+  const suggestions = await getSuggestionsByDocumentVersion(version.id);
+
+  return (
+    <ReviewClient
+      document={document}
+      sourceVersion={sourceVersion}
+      targetVersion={version}
+      user={user}
+      initialSuggestions={suggestions}
+    />
+  );
 }

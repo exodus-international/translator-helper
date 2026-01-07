@@ -210,3 +210,49 @@
 .monaco-editor .view-lines {
   padding-left: 12px !important;
 } */
+
+/* Suggestion decorations */
+.monaco-editor .suggestion-comment-open {
+  background-color: rgba(251, 191, 36, 0.15) !important; /* yellow-400 with opacity */
+  border-bottom: 2px solid rgba(251, 191, 36, 0.4);
+}
+
+.monaco-editor .suggestion-change-open {
+  background-color: rgba(251, 191, 36, 0.15) !important;
+  border-bottom: 2px solid rgba(251, 191, 36, 0.4);
+}
+
+.monaco-editor .suggestion-applied {
+  background-color: rgba(34, 197, 94, 0.15) !important; /* green-500 with opacity */
+  border-bottom: 2px solid rgba(34, 197, 94, 0.4);
+}
+
+.monaco-editor .suggestion-dismissed {
+  background-color: rgba(156, 163, 175, 0.1) !important; /* gray-400 with opacity */
+  border-bottom: 1px solid rgba(156, 163, 175, 0.3);
+}
+
+/* Gutter icons for suggestions */
+.monaco-editor .suggestion-gutter-comment::before {
+  content: '💬';
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.monaco-editor .suggestion-gutter-change::before {
+  content: '✎';
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.monaco-editor .suggestion-gutter-applied::before {
+  content: '✓';
+  font-size: 12px;
+  color: #22c55e;
+}
+
+.monaco-editor .suggestion-gutter-dismissed::before {
+  content: '✗';
+  font-size: 12px;
+  color: #9ca3af;
+}

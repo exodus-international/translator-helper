@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import { DocumentStatus, Prisma } from '@prisma/client';
+import { DocumentStatus, Prisma, SuggestionStatus } from '@prisma/client';
 
 export async function listDocuments(filters?: {
   sourceProjectId?: string;
@@ -998,7 +998,7 @@ export async function getDashboardDocuments(
     translationProjectId = translationProject?.id;
   }
 
-  return prisma.document.findMany({
+  const documents = await prisma.document.findMany({
     where: {
       ...(sourceProjectId && {
         sourceProjectId,
@@ -1065,4 +1065,32 @@ export async function getDashboardDocuments(
       updatedAt: 'desc',
     },
   });
+
+  const versionIds = documents.flatMap((doc) => doc.versions.map((v) => v.id));
+  if (versionIds.length === 0) {
+    return documents;
+  }
+
+  const grouped = await prisma.suggestion.groupBy({
+    by: ['documentVersionId'],
+    where: {
+      documentVersionId: {
+        in: versionIds,
+      },
+      status: SuggestionStatus.OPEN,
+    },
+    _count: {
+      _all: true,
+    },
+  });
+
+  const countByVersionId = new Map(grouped.map((g) => [g.documentVersionId, g._count._all]));
+
+  return documents.map((doc) => ({
+    ...doc,
+    versions: doc.versions.map((v) => ({
+      ...v,
+      openSuggestionsCount: countByVersionId.get(v.id) ?? 0,
+    })),
+  }));
 }

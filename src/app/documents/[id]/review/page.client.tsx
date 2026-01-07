@@ -1,5 +1,6 @@
 'use client';
 
+import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
 import { SourceTranslationViewer } from '@/components/source-translation-viewer';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
@@ -24,15 +25,21 @@ import {
   updateDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
 import { deleteDocumentAction, toggleDocumentLabelAction } from '@/domain/document/document.actions';
+import {
+  applySuggestionAction,
+  createSuggestionAction,
+  dismissSuggestionAction,
+  getSuggestionsByDocumentVersionAction,
+} from '@/domain/suggestion/suggestion.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
-import { isDeployerClient } from '@/lib/permissions-client';
+import { canReviewClient, isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus, SuggestionType } from '@prisma/client';
 import matter from 'gray-matter';
 import { Download, FileCheck, FilePlus, MessageCircle, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface ReviewClientProps {
@@ -40,6 +47,7 @@ interface ReviewClientProps {
   sourceVersion: any;
   targetVersion: any;
   user: SessionUser;
+  initialSuggestions?: any[];
 }
 
 function getContentWithoutFrontmatter(text: string) {
@@ -65,6 +73,7 @@ export default function ReviewClient({
   sourceVersion,
   targetVersion: initialTargetVersion,
   user,
+  initialSuggestions = [],
 }: ReviewClientProps) {
   const router = useRouter();
   const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
@@ -77,14 +86,42 @@ export default function ReviewClient({
     document.labels?.includes('Waiting for final label') || false,
   );
   const [labelLoading, setLabelLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestionWithUser[]>(
+    initialSuggestions.map((s: any) => ({
+      ...s,
+      createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+    })) as SuggestionWithUser[],
+  );
+  const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
+  const [isDismissingSuggestion, setIsDismissingSuggestion] = useState(false);
 
   // Check if user can edit source (deployer only)
   const canEditSource = isDeployerClient(user);
+  // Check if user can create suggestions (reviewers)
+  const canCreateSuggestions = canReviewClient(user);
   const sourceFormattedContent = useMemo(
     () => getContentWithoutFrontmatter(sourceVersion.content),
     [sourceVersion.content],
   );
   const translationFormattedContent = useMemo(() => getContentWithoutFrontmatter(content), [content]);
+
+  // Refresh suggestions when content changes
+  useEffect(() => {
+    const loadSuggestions = async () => {
+      try {
+        const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+        // Convert Date to string for createdAt
+        const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+          ...s,
+          createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        }));
+        setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+      } catch (error) {
+        console.error('Error loading suggestions:', error);
+      }
+    };
+    loadSuggestions();
+  }, [targetVersion.id, content]);
 
   const canDeploy = targetVersion.status === 'APPROVED';
   const isPendingReview = targetVersion.status === 'PENDING_REVIEW';
@@ -281,6 +318,89 @@ export default function ReviewClient({
     }
   };
 
+  const handleCreateSuggestion = async (data: {
+    comment: string;
+    proposedText?: string;
+    type: SuggestionType;
+    range: { startLine: number; startColumn: number; endLine: number; endColumn: number };
+    version: number;
+  }) => {
+    setLoading(true);
+    try {
+      await createSuggestionAction({
+        documentVersionId: targetVersion.id,
+        startLine: data.range.startLine,
+        startColumn: data.range.startColumn,
+        endLine: data.range.endLine,
+        endColumn: data.range.endColumn,
+        type: data.type,
+        comment: data.comment,
+        proposedText: data.proposedText,
+        version: data.version,
+      });
+      toast.success('Suggestion created!');
+      // Reload suggestions
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error creating suggestion:', error);
+      toast.error(error.message || 'Failed to create suggestion');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApplySuggestion = async (suggestionId: string) => {
+    setIsApplyingSuggestion(true);
+    try {
+      const updatedVersion = await applySuggestionAction({ suggestionId });
+      setTargetVersion(updatedVersion);
+      setContent(updatedVersion.content);
+      toast.success('Suggestion applied!');
+      // Reload suggestions
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error applying suggestion:', error);
+      toast.error(error.message || 'Failed to apply suggestion');
+    } finally {
+      setIsApplyingSuggestion(false);
+    }
+  };
+
+  const handleDismissSuggestion = async (suggestionId: string, reason?: string) => {
+    setIsDismissingSuggestion(true);
+    try {
+      await dismissSuggestionAction({ suggestionId, dismissedReason: reason });
+      toast.success('Suggestion dismissed!');
+      // Reload suggestions
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error dismissing suggestion:', error);
+      toast.error(error.message || 'Failed to dismiss suggestion');
+    } finally {
+      setIsDismissingSuggestion(false);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: SuggestionWithUser) => {
+    // Scroll to suggestion range - this would be handled by the Monaco editor
+    // The decoration hook should handle this
+  };
+
   const reviewEditActions = ({ exitEditMode }: { exitEditMode: () => void }) => (
     <div className="flex gap-2">
       <Button
@@ -399,6 +519,16 @@ export default function ReviewClient({
             canEdit: isPendingReview,
             renderEditActions: reviewEditActions,
           }}
+          suggestions={suggestions}
+          canCreateSuggestions={canCreateSuggestions}
+          currentUserId={user.id}
+          onSuggestionClick={handleSuggestionClick}
+          onApplySuggestion={handleApplySuggestion}
+          onDismissSuggestion={handleDismissSuggestion}
+          onCreateSuggestion={handleCreateSuggestion}
+          documentVersion={targetVersion.version}
+          isApplyingSuggestion={isApplyingSuggestion}
+          isDismissingSuggestion={isDismissingSuggestion}
         />
 
         {/* Comments Section */}

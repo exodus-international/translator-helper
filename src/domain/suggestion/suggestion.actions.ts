@@ -1,0 +1,284 @@
+'use server';
+
+import { canReviewInProject, canTranslateInProject, isDeployer } from '@/lib/permissions';
+import { requireUser } from '@/lib/session';
+import { SuggestionStatus, SuggestionType } from '@prisma/client';
+import { createActivityLog } from '../activity-log/activity-log.repository';
+import { getDocumentById } from '../document/document.repository';
+import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
+import { getTranslationProjectBySourceAndLanguage } from '../translation-project/translation-project.repository';
+import {
+  applySuggestionSchema,
+  createSuggestionSchema,
+  dismissSuggestionSchema,
+  updateSuggestionStatusSchema,
+} from './suggestion.types';
+import {
+  checkSuggestionConflict,
+  createSuggestion,
+  deleteSuggestion,
+  getSuggestionById,
+  getSuggestionsByDocumentVersion,
+  updateSuggestionStatus,
+} from './suggestion.repository';
+
+export async function getSuggestionsByDocumentVersionAction(documentVersionId: string, filters?: any) {
+  await requireUser();
+  return await getSuggestionsByDocumentVersion(documentVersionId, filters);
+}
+
+export async function getSuggestionByIdAction(id: string) {
+  await requireUser();
+  return await getSuggestionById(id);
+}
+
+export async function createSuggestionAction(input: unknown) {
+  const user = await requireUser();
+  const validated = createSuggestionSchema.parse(input);
+
+  // Get document version to check permissions
+  const documentVersion = await getDocumentVersionById(validated.documentVersionId);
+  if (!documentVersion) {
+    throw new Error('Document version not found');
+  }
+
+  // Get document to find source project
+  const document = await getDocumentById(documentVersion.documentId);
+  if (!document || !document.sourceProjectId) {
+    throw new Error('Document not found or not associated with a source project');
+  }
+
+  // Get translation project
+  const translationProject = await getTranslationProjectBySourceAndLanguage(
+    document.sourceProjectId,
+    documentVersion.languageId,
+  );
+
+  if (translationProject) {
+    // Check if user can review in this project (only reviewers can create suggestions)
+    const canReview = await canReviewInProject(user, translationProject.id, validated.documentVersionId);
+    if (!canReview) {
+      throw new Error('You do not have permission to create suggestions in this project');
+    }
+  } else {
+    // Fallback: check basic review permission
+    if (!isDeployer(user)) {
+      throw new Error('You do not have permission to create suggestions');
+    }
+  }
+
+  // Validate that proposedText is provided for CHANGE type
+  if (validated.type === SuggestionType.CHANGE && !validated.proposedText) {
+    throw new Error('Proposed text is required for CHANGE type suggestions');
+  }
+
+  // Validate that proposedText is not provided for COMMENT type
+  if (validated.type === SuggestionType.COMMENT && validated.proposedText) {
+    throw new Error('Proposed text should not be provided for COMMENT type suggestions');
+  }
+
+  return await createSuggestion({
+    ...validated,
+    comment: validated.comment ?? '',
+    userId: user.id,
+    proposedText: validated.proposedText || null,
+  });
+}
+
+export async function applySuggestionAction(input: unknown) {
+  const user = await requireUser();
+  const validated = applySuggestionSchema.parse(input);
+
+  // Get suggestion
+  const suggestion = await getSuggestionById(validated.suggestionId);
+  if (!suggestion) {
+    throw new Error('Suggestion not found');
+  }
+
+  if (suggestion.status !== SuggestionStatus.OPEN) {
+    throw new Error('Only open suggestions can be applied');
+  }
+
+  if (suggestion.type !== SuggestionType.CHANGE) {
+    throw new Error('Only CHANGE type suggestions can be applied');
+  }
+
+  if (!suggestion.proposedText) {
+    throw new Error('Suggestion does not have proposed text');
+  }
+
+  // Get document version
+  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
+  if (!documentVersion) {
+    throw new Error('Document version not found');
+  }
+
+  // Get document to find source project
+  const document = await getDocumentById(documentVersion.documentId);
+  if (!document || !document.sourceProjectId) {
+    throw new Error('Document not found or not associated with a source project');
+  }
+
+  // Get translation project
+  const translationProject = await getTranslationProjectBySourceAndLanguage(
+    document.sourceProjectId,
+    documentVersion.languageId,
+  );
+
+  if (translationProject) {
+    // Check if user can translate/edit in this project
+    const canTranslate = await canTranslateInProject(user, translationProject.id);
+    if (!canTranslate) {
+      throw new Error('You do not have permission to apply suggestions in this project');
+    }
+  } else {
+    // Fallback: check basic permissions
+    if (!isDeployer(user)) {
+      throw new Error('You do not have permission to apply suggestions');
+    }
+  }
+
+  // Apply the suggestion by replacing the text at the range
+  const lines = documentVersion.content.split('\n');
+  const startLine = suggestion.startLine - 1; // Convert to 0-based
+  const endLine = suggestion.endLine - 1;
+  const startColumn = suggestion.startColumn - 1;
+  const endColumn = suggestion.endColumn - 1;
+
+  if (startLine >= lines.length || endLine >= lines.length) {
+    throw new Error('Suggestion range is out of bounds');
+  }
+
+  // Replace the text
+  if (startLine === endLine) {
+    // Single line replacement
+    const line = lines[startLine];
+    const before = line.substring(0, startColumn);
+    const after = line.substring(endColumn);
+    lines[startLine] = before + suggestion.proposedText + after;
+  } else {
+    // Multi-line replacement
+    const firstLine = lines[startLine];
+    const lastLine = lines[endLine];
+    const before = firstLine.substring(0, startColumn);
+    const after = lastLine.substring(endColumn);
+    const newLines = [before + suggestion.proposedText + after];
+    lines.splice(startLine, endLine - startLine + 1, ...newLines);
+  }
+
+  const newContent = lines.join('\n');
+
+  // Update document version
+  const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, newContent, user.id);
+
+  // Update suggestion status
+  await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.APPLIED);
+
+  // Log the activity
+  await createActivityLog({
+    documentVersionId: suggestion.documentVersionId,
+    userId: user.id,
+    action: 'applied_suggestion',
+    details: {
+      suggestionId: suggestion.id,
+      type: suggestion.type,
+      range: {
+        startLine: suggestion.startLine,
+        startColumn: suggestion.startColumn,
+        endLine: suggestion.endLine,
+        endColumn: suggestion.endColumn,
+      },
+    },
+  });
+
+  return updatedVersion;
+}
+
+export async function dismissSuggestionAction(input: unknown) {
+  const user = await requireUser();
+  const validated = dismissSuggestionSchema.parse(input);
+
+  // Get suggestion
+  const suggestion = await getSuggestionById(validated.suggestionId);
+  if (!suggestion) {
+    throw new Error('Suggestion not found');
+  }
+
+  if (suggestion.status !== SuggestionStatus.OPEN) {
+    throw new Error('Only open suggestions can be dismissed');
+  }
+
+  // Get document version
+  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
+  if (!documentVersion) {
+    throw new Error('Document version not found');
+  }
+
+  // Get document to find source project
+  const document = await getDocumentById(documentVersion.documentId);
+  if (!document || !document.sourceProjectId) {
+    throw new Error('Document not found or not associated with a source project');
+  }
+
+  // Get translation project
+  const translationProject = await getTranslationProjectBySourceAndLanguage(
+    document.sourceProjectId,
+    documentVersion.languageId,
+  );
+
+  if (translationProject) {
+    // Check if user can translate/edit in this project
+    const canTranslate = await canTranslateInProject(user, translationProject.id);
+    if (!canTranslate) {
+      throw new Error('You do not have permission to dismiss suggestions in this project');
+    }
+  } else {
+    // Fallback: check basic permissions
+    if (!isDeployer(user)) {
+      throw new Error('You do not have permission to dismiss suggestions');
+    }
+  }
+
+  // Update suggestion status
+  return await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.DISMISSED, validated.dismissedReason);
+}
+
+export async function deleteSuggestionAction(id: string) {
+  const user = await requireUser();
+
+  // Get suggestion
+  const suggestion = await getSuggestionById(id);
+  if (!suggestion) {
+    throw new Error('Suggestion not found');
+  }
+
+  // Only the author can delete their suggestion
+  if (suggestion.userId !== user.id) {
+    throw new Error('Forbidden: You can only delete your own suggestions');
+  }
+
+  return await deleteSuggestion(id);
+}
+
+export async function updateSuggestionAction(id: string, input: unknown) {
+  const user = await requireUser();
+  const validated = updateSuggestionStatusSchema.parse(input);
+
+  // Get suggestion
+  const suggestion = await getSuggestionById(id);
+  if (!suggestion) {
+    throw new Error('Suggestion not found');
+  }
+
+  // Only the author can update their suggestion
+  if (suggestion.userId !== user.id) {
+    throw new Error('Forbidden: You can only edit your own suggestions');
+  }
+
+  // Only allow updating OPEN suggestions
+  if (suggestion.status !== SuggestionStatus.OPEN) {
+    throw new Error('Only open suggestions can be updated');
+  }
+
+  return await updateSuggestionStatus(id, validated.status, validated.dismissedReason);
+}

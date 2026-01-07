@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import Editor from '@monaco-editor/react';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { SuggestionWithUser, useMonacoSuggestions } from './monaco-suggestion-decorations';
 
 interface TextareaWithLineNumbersProps {
   value: string;
@@ -14,17 +15,43 @@ interface TextareaWithLineNumbersProps {
   className?: string;
   currentLine?: number;
   highlightLine?: number; // Line to highlight from external source
+  suggestions?: SuggestionWithUser[];
+  onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
+  onSelectionChange?: (
+    range: { startLine: number; startColumn: number; endLine: number; endColumn: number } | null,
+  ) => void;
 }
 
 export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersProps>(function TextareaWithLineNumbers(
-  { value, onChange, onCursorChange, readOnly = false, placeholder, rows = 20, className, currentLine, highlightLine },
+  {
+    value,
+    onChange,
+    onCursorChange,
+    readOnly = false,
+    placeholder,
+    rows = 20,
+    className,
+    currentLine,
+    highlightLine,
+    suggestions = [],
+    onSuggestionClick,
+    onSelectionChange,
+  },
   forwardedRef,
 ) {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
+  const ignoreNextCursorEventRef = useRef(false);
 
-  // Expose editor ref to parent
-  useImperativeHandle(forwardedRef, () => editorRef.current, []);
+  // Expose editor and monaco refs to parent
+  useImperativeHandle(
+    forwardedRef,
+    () => ({
+      editor: editorRef.current,
+      monaco: monacoRef.current,
+    }),
+    [],
+  );
 
   // Sync cursor position to show blue highlight on the specified line
   // This works for both readonly and editable editors
@@ -42,6 +69,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
 
     // Set cursor position to the highlighted line
     // This will trigger Monaco's native blue line highlight
+    ignoreNextCursorEventRef.current = true;
     editor.setPosition({ lineNumber: highlightLine, column: 1 });
     editor.revealLineInCenter(highlightLine);
   }, [highlightLine]);
@@ -78,6 +106,15 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
 
     // Listen for cursor position changes
     editor.onDidChangeCursorPosition((e: any) => {
+      // Prevent sync loops: when we move the cursor programmatically (e.g. highlightLine sync),
+      // Monaco emits a cursor position change which would feed back into React state updates.
+      if (ignoreNextCursorEventRef.current) {
+        ignoreNextCursorEventRef.current = false;
+        return;
+      }
+      if (e?.source === 'api') {
+        return;
+      }
       if (onCursorChange && e.position) {
         // Pass line number directly
         onCursorChange(e.position.lineNumber);
@@ -88,7 +125,32 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
     if (currentLine) {
       editor.revealLineInCenter(currentLine);
     }
+
+    // Listen for selection changes
+    if (onSelectionChange) {
+      editor.onDidChangeCursorSelection((e: any) => {
+        const selection = e.selection;
+        if (selection && !selection.isEmpty()) {
+          onSelectionChange({
+            startLine: selection.startLineNumber,
+            startColumn: selection.startColumn,
+            endLine: selection.endLineNumber,
+            endColumn: selection.endColumn,
+          });
+        } else {
+          onSelectionChange(null);
+        }
+      });
+    }
   };
+
+  // Apply suggestion decorations
+  useMonacoSuggestions({
+    editor: editorRef.current,
+    monaco: monacoRef.current,
+    suggestions,
+    onSuggestionClick,
+  });
 
   return (
     <div className={cn('border rounded-md overflow-hidden h-full', className)}>
@@ -101,7 +163,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
         options={{
           readOnly,
           minimap: { enabled: false },
-          glyphMargin: false,
+          glyphMargin: suggestions.length > 0, // Enable glyph margin when there are suggestions
           folding: false,
           lineDecorationsWidth: 10,
           lineNumbers: 'on',
@@ -125,7 +187,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
             verticalScrollbarSize: 10,
             horizontalScrollbarSize: 10,
           },
-          overviewRulerLanes: 0,
+          overviewRulerLanes: suggestions.length > 0 ? 2 : 0,
           hideCursorInOverviewRuler: true,
           overviewRulerBorder: false,
           renderLineHighlight: 'all',

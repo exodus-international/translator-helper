@@ -14,7 +14,7 @@ import { DocumentStatus, Language } from '@prisma/client';
 import { FileCheck, FileText, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 interface DashboardClientProps {
   user: SessionUser;
@@ -456,7 +456,7 @@ export default function DashboardClient({
                 <Select value={selectedUser} onValueChange={setSelectedUser}>
                   <SelectTrigger className="min-w-[200px]">
                     <div className="flex items-center gap-2">
-                      <SelectValue placeholder="All users" className="[&_div]:!hidden [&_span:last-child]:!inline" />
+                      <SelectValue placeholder="All users" className="[&_div]:hidden! [&_span:last-child]:inline!" />
                     </div>
                   </SelectTrigger>
                   <SelectContent>
@@ -559,13 +559,17 @@ export default function DashboardClient({
                           prevCardInColumn.document.labels?.includes('Waiting for final label');
                         const shouldShowSeparator = hasWaitingForFinalLabel && !prevCardHasLabel && prevCardInColumn;
 
+                        // Get open suggestions count for this document
+                        const openSuggestionsCount = version ? (version as any).openSuggestionsCount ?? 0 : 0;
+
                         return (
-                          <>
-                            {shouldShowSeparator && <div className="border-t-2 border-gray-300 my-2" />}
+                          <Fragment key={card.id}>
+                            {shouldShowSeparator && (
+                              <div key={`${card.id}__separator`} className="border-t-2 border-gray-300 my-2" />
+                            )}
                             <KanbanCard
                               column={column.id}
                               id={card.id}
-                              key={card.id}
                               name={card.name}
                               className={hasWaitingForFinalLabel ? 'bg-green-50/50 border-green-800/40' : ''}
                             >
@@ -581,6 +585,11 @@ export default function DashboardClient({
                                   <div className="flex items-center gap-2">
                                     {hasWaitingForFinalLabel && <FileCheck className="h-4 w-4" />}
                                     <p className="m-0 flex-1 font-medium text-sm">{doc.title}</p>
+                                    {openSuggestionsCount > 0 && (
+                                      <Badge variant="primary" size="xs" className="shrink-0">
+                                        {openSuggestionsCount}
+                                      </Badge>
+                                    )}
                                     <div className="flex items-center gap-1.5 shrink-0">
                                       {(() => {
                                         // Helper function to check if user has the selected language
@@ -674,7 +683,7 @@ export default function DashboardClient({
                                 </div>
                               </Link>
                             </KanbanCard>
-                          </>
+                          </Fragment>
                         );
                       }}
                     </KanbanCards>

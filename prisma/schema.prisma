@@ -39,6 +39,17 @@ enum DocumentStatus {
   DEPLOYED
 }
 
+enum SuggestionType {
+  COMMENT // Pouze komentář
+  CHANGE  // Návrh změny s proposedText
+}
+
+enum SuggestionStatus {
+  OPEN      // Otevřený návrh
+  APPLIED   // Aplikován překladatelem
+  DISMISSED // Odmítnut
+}
+
 model User {
   id                  String               @id @default(uuid())
   email               String               @unique
@@ -60,6 +71,7 @@ model User {
   assignedDocuments   DocumentAssignment[] @relation("AssignedTo")
   assignedByDocuments DocumentAssignment[] @relation("AssignedBy")
   languages           UserLanguage[]
+  suggestions         Suggestion[]
 
   @@map("user")
 }
@@ -230,6 +242,7 @@ model DocumentVersion {
   updatedAt    DateTime       @updatedAt
   comments     Comment[]
   activityLogs ActivityLog[]
+  suggestions  Suggestion[]
 
   @@unique([documentId, languageId])
   @@map("document_version")
@@ -272,4 +285,36 @@ model UserLanguage {
 
   @@unique([userId, languageId])
   @@map("user_language")
+}
+
+model Suggestion {
+  id                String           @id @default(uuid())
+  documentVersionId String
+  documentVersion   DocumentVersion  @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Range v textu (Monaco formát)
+  startLine         Int
+  startColumn       Int
+  endLine           Int
+  endColumn         Int
+  
+  // Typ suggestion
+  type              SuggestionType   @default(COMMENT)
+  
+  // Obsah
+  comment           String           @db.Text
+  proposedText      String?          @db.Text // null pro COMMENT, vyplněno pro CHANGE
+  
+  // Stav
+  status            SuggestionStatus @default(OPEN)
+  dismissedReason  String?          @db.Text
+  
+  // Metadata
+  version           Int              // Verze dokumentu, na které vznikl návrh
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@map("suggestion")
 }

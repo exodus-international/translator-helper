@@ -1,12 +1,26 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { SuggestionStatus } from '@prisma/client';
 import { Edit, Eye, FileEdit, Save, X } from 'lucide-react';
-import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { toast } from 'sonner';
+import { SuggestionWithUser } from './monaco-suggestion-decorations';
+import { SuggestionDiffViewer } from './suggestion-diff-viewer';
+import { SuggestionForm } from './suggestion-form';
+import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
+import { SuggestionPanel } from './suggestion-panel';
+// SuggestionType enum values
+const SuggestionType = {
+  COMMENT: 'COMMENT' as const,
+  CHANGE: 'CHANGE' as const,
+};
+type SuggestionType = 'COMMENT' | 'CHANGE';
 
 type ViewerVariant = 'translate' | 'review';
 
@@ -43,6 +57,24 @@ interface SourceTranslationViewerProps {
     editingDefault?: boolean;
     headerExtra?: ReactNode;
   };
+  // Suggestion props
+  suggestions?: SuggestionWithUser[];
+  canCreateSuggestions?: boolean;
+  currentUserId?: string;
+  onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
+  onApplySuggestion?: (suggestionId: string) => void;
+  onDismissSuggestion?: (suggestionId: string, reason?: string) => void;
+  onCreateSuggestion?: (data: {
+    comment: string;
+    proposedText?: string;
+    type: SuggestionType;
+    range: { startLine: number; startColumn: number; endLine: number; endColumn: number };
+    version: number;
+  }) => void;
+  documentVersion?: number;
+  isApplyingSuggestion?: boolean;
+  isDismissingSuggestion?: boolean;
+  editorRef?: React.RefObject<any>; // Ref to the Monaco editor to get cursor position
 }
 
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
@@ -72,6 +104,17 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       onSourceDelete,
       sourceEditContent,
       reviewConfig,
+      suggestions = [],
+      canCreateSuggestions = false,
+      currentUserId,
+      onSuggestionClick,
+      onApplySuggestion,
+      onDismissSuggestion,
+      onCreateSuggestion,
+      documentVersion = 1,
+      isApplyingSuggestion = false,
+      isDismissingSuggestion = false,
+      editorRef: externalEditorRef,
     },
     ref,
   ) {
@@ -79,8 +122,20 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     const [mounted, setMounted] = useState(false);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
-    const [reviewViewMode, setReviewViewMode] = useState<'formatted' | 'raw'>('raw');
+    const [reviewViewMode, setReviewViewMode] = useState<'formatted' | 'raw' | 'review'>('raw');
     const [isReviewEditing, setIsReviewEditing] = useState(reviewConfig?.editingDefault ?? false);
+    const [showSuggestionForm, setShowSuggestionForm] = useState(false);
+    const [suggestionFormType, setSuggestionFormType] = useState<SuggestionType>(SuggestionType.COMMENT);
+    const [selectedRange, setSelectedRange] = useState<{
+      startLine: number;
+      startColumn: number;
+      endLine: number;
+      endColumn: number;
+    } | null>(null);
+    const [selectedText, setSelectedText] = useState<string>(''); // Store selected text for pre-filling
+    const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
+    const translationEditorRef = useRef<any>(null);
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null); // Filter by user for diff view
     const [isSourceEditing, setIsSourceEditing] = useState(false);
     const [sourceEditValue, setSourceEditValue] = useState(sourceEditContent ?? sourceContent);
     const [sourceSaving, setSourceSaving] = useState(false);
@@ -93,9 +148,17 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       setMounted(true);
     }, []);
 
+    // Count open suggestions
+    const openSuggestionsCount = useMemo(() => {
+      return suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length;
+    }, [suggestions]);
+
     const translationPreview = translationFormattedContent ?? translationContent;
     const translationRawVisible =
-      variant === 'translate' ? translateTab === 'edit' : isReviewEditing || reviewViewMode === 'raw';
+      variant === 'translate'
+        ? translateTab === 'edit'
+        : isReviewEditing || reviewViewMode === 'raw' || reviewViewMode === 'review';
+    const isReviewMode = variant === 'review' && reviewViewMode === 'review';
 
     // Update source edit value when sourceEditContent prop changes
     useEffect(() => {
@@ -169,6 +232,37 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       setSyncedSourceLine(sourceTargetLine);
     };
 
+    const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
+      try {
+        const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
+        const editor = editorWrapper?.editor;
+        const monaco = editorWrapper?.monaco;
+        if (editor && monaco) {
+          const range = new monaco.Range(
+            suggestion.startLine,
+            suggestion.startColumn,
+            suggestion.endLine,
+            suggestion.endColumn,
+          );
+          editor.focus();
+          editor.setSelection(range);
+          editor.revealRangeInCenter(range);
+          setTranslationLine(suggestion.startLine);
+          setSyncedTranslationLine(suggestion.startLine);
+          if (sourceViewMode === 'raw') {
+            const sourceTotalLines = sourceContent.split('\n').length;
+            const translationTotalLines = translationContent.split('\n').length;
+            const sourceTargetLine = mapLineNumber(suggestion.startLine, translationTotalLines, sourceTotalLines);
+            setSyncedSourceLine(sourceTargetLine);
+          }
+        }
+      } catch (error) {
+        console.error('Error selecting suggestion in editor:', error);
+      } finally {
+        onSuggestionClick?.(suggestion);
+      }
+    };
+
     const cardClassName = isZen ? 'p-4 h-full flex flex-col' : 'p-6';
     const bodyClassName = isZen ? 'flex-1 overflow-hidden' : undefined;
 
@@ -209,6 +303,134 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       }),
       [variant, enterReviewEditMode, exitReviewEditMode],
     );
+
+    const handleSelectionChange = (
+      range: {
+        startLine: number;
+        startColumn: number;
+        endLine: number;
+        endColumn: number;
+      } | null,
+    ) => {
+      setSelectedRange(range);
+      console.log('range', range);
+      // Get selected text from editor
+      if (range) {
+        const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
+        const editor = editorWrapper?.editor;
+        const monaco = editorWrapper?.monaco;
+
+        if (editor && monaco && typeof editor.getModel === 'function') {
+          try {
+            const model = editor.getModel();
+            if (model) {
+              const monacoRange = new monaco.Range(range.startLine, range.startColumn, range.endLine, range.endColumn);
+              const text = model.getValueInRange(monacoRange);
+              setSelectedText(text);
+            }
+          } catch (error) {
+            console.error('Error getting selected text from Monaco:', error);
+            // Fallback to content extraction
+            extractTextFromContent(range);
+          }
+        } else {
+          // Fallback: extract text from content
+          extractTextFromContent(range);
+        }
+      } else {
+        setSelectedText('');
+      }
+
+      function extractTextFromContent(range: {
+        startLine: number;
+        startColumn: number;
+        endLine: number;
+        endColumn: number;
+      }) {
+        const lines = translationContent.split('\n');
+        if (range.startLine === range.endLine) {
+          const line = lines[range.startLine - 1] || '';
+          const text = line.substring(range.startColumn - 1, range.endColumn - 1);
+          setSelectedText(text);
+        } else {
+          // Multi-line selection
+          const firstLine = lines[range.startLine - 1] || '';
+          const lastLine = lines[range.endLine - 1] || '';
+          const firstPart = firstLine.substring(range.startColumn - 1);
+          const lastPart = lastLine.substring(0, range.endColumn - 1);
+          const middleLines = lines.slice(range.startLine, range.endLine - 1);
+          setSelectedText([firstPart, ...middleLines, lastPart].join('\n'));
+        }
+      }
+
+      if (range && isReviewMode) {
+        // Show toolbar near selection (simplified - would need actual mouse position)
+        setToolbarPosition({ x: 180, y: 20 });
+      } else {
+        setToolbarPosition(null);
+      }
+    };
+
+    const handleCreateSuggestion = (type: SuggestionType) => {
+      if (!selectedRange) return;
+      setSuggestionFormType(type);
+      setShowSuggestionForm(true);
+      setToolbarPosition(null);
+    };
+
+    const handleSuggestionFormSubmit = (data: { comment: string; proposedText?: string }) => {
+      if (!selectedRange || !onCreateSuggestion) return;
+      onCreateSuggestion({
+        ...data,
+        type: suggestionFormType,
+        range: selectedRange,
+        version: documentVersion,
+      });
+      setShowSuggestionForm(false);
+      setSelectedRange(null);
+      setSelectedText('');
+    };
+
+    const handleAddSuggestionClick = () => {
+      // Try to get cursor position from editor
+      const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
+      const editor = editorWrapper?.editor;
+      if (editor && typeof editor.getPosition === 'function') {
+        try {
+          const position = editor.getPosition();
+          if (position) {
+            // Create a range at the current cursor position (single character)
+            const range = {
+              startLine: position.lineNumber,
+              startColumn: position.column,
+              endLine: position.lineNumber,
+              endColumn: position.column,
+            };
+            setSelectedRange(range);
+            setSuggestionFormType(SuggestionType.COMMENT);
+            setShowSuggestionForm(true);
+            return;
+          }
+        } catch (error) {
+          console.error('Error getting editor position:', error);
+        }
+      }
+      // If no editor or position, use current translation line
+      if (translationLine > 0) {
+        const range = {
+          startLine: translationLine,
+          startColumn: 1,
+          endLine: translationLine,
+          endColumn: 1,
+        };
+        setSelectedRange(range);
+        setSuggestionFormType('COMMENT');
+        setShowSuggestionForm(true);
+        return;
+      }
+      // If no line info, show instructions
+      toast.info('Please select text in the translation editor, or click on a line to add a comment');
+    };
 
     return (
       <div className={cn('grid grid-cols-2 gap-6', className, isZen && 'gap-4 h-full')}>
@@ -384,11 +606,22 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 mounted ? (
                   <Tabs
                     value={reviewViewMode}
-                    onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'raw')}
+                    onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'raw' | 'review')}
                   >
                     <TabsList>
                       <TabsTrigger value="formatted">Formatted</TabsTrigger>
                       <TabsTrigger value="raw">Raw</TabsTrigger>
+                      <TabsTrigger value="review" className="relative">
+                        Review
+                        {openSuggestionsCount > 0 && (
+                          <Badge
+                            variant="primary"
+                            className="absolute -top-3 -right-3 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
+                          >
+                            {openSuggestionsCount}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
                     </TabsList>
                   </Tabs>
                 ) : (
@@ -412,6 +645,24 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                       )}
                     >
                       Raw
+                    </button>
+                    <button
+                      type="button"
+                      disabled
+                      className={cn(
+                        'relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                        reviewViewMode === 'review' && 'bg-background shadow-sm',
+                      )}
+                    >
+                      Review
+                      {openSuggestionsCount > 0 && (
+                        <Badge
+                          variant="primary"
+                          className="absolute -top-1 -left-1 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
+                        >
+                          {openSuggestionsCount}
+                        </Badge>
+                      )}
                     </button>
                   </div>
                 )
@@ -481,6 +732,62 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
               <div className="prose max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
               </div>
+            ) : reviewViewMode === 'review' ? (
+              <div className="relative h-full">
+                {selectedUserId ? (
+                  // Show diff view when user filter is active
+                  <SuggestionDiffViewer
+                    originalContent={translationContent}
+                    suggestions={suggestions}
+                    selectedUserId={selectedUserId}
+                    className="h-full"
+                    onSuggestionClick={handleSuggestionClickInternal}
+                  />
+                ) : (
+                  // Show normal editor with suggestions
+                  <>
+                    <RawEditorPane
+                      ref={translationEditorRef}
+                      value={translationContent}
+                      readOnly
+                      currentLine={translationLine}
+                      highlightLine={syncedTranslationLine}
+                      onCursorChange={handleTranslationCursorChange}
+                      suggestions={suggestions}
+                      onSuggestionClick={handleSuggestionClickInternal}
+                      onSelectionChange={handleSelectionChange}
+                      lineInfo={{
+                        primaryLabel: 'Translation Line',
+                        primaryValue: translationLine,
+                        secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
+                        secondaryValue: sourceViewMode === 'raw' ? syncedSourceLine ?? sourceLine : undefined,
+                        direction: 'from',
+                      }}
+                    />
+                    {toolbarPosition && canCreateSuggestions && (
+                      <SuggestionInlineToolbar
+                        position={toolbarPosition}
+                        onComment={() => handleCreateSuggestion(SuggestionType.COMMENT)}
+                        onSuggestEdit={() => handleCreateSuggestion(SuggestionType.CHANGE)}
+                      />
+                    )}
+                    {showSuggestionForm && selectedRange && (
+                      <div className="absolute top-4 right-4 w-96 bg-white border rounded-lg shadow-lg p-4 z-50">
+                        <SuggestionForm
+                          type={suggestionFormType}
+                          initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
+                          onSubmit={handleSuggestionFormSubmit}
+                          onCancel={() => {
+                            setShowSuggestionForm(false);
+                            setSelectedRange(null);
+                            setSelectedText('');
+                          }}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             ) : (
               <RawEditorPane
                 value={translationContent}
@@ -499,6 +806,24 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             )}
           </div>
         </Card>
+
+        {isReviewMode && (
+          <div className="col-span-2">
+            <SuggestionPanel
+              suggestions={suggestions}
+              currentUserId={currentUserId || ''}
+              canCreate={canCreateSuggestions}
+              content={translationContent}
+              onSuggestionClick={handleSuggestionClickInternal}
+              onApply={onApplySuggestion}
+              onDismiss={onDismissSuggestion}
+              onAddClick={handleAddSuggestionClick}
+              onUserFilterChange={setSelectedUserId}
+              isApplying={isApplyingSuggestion}
+              isDismissing={isDismissingSuggestion}
+            />
+          </div>
+        )}
       </div>
     );
   },

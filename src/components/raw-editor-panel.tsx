@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 import { forwardRef } from 'react';
 import { TextareaWithLineNumbers } from './textarea-with-line-numbers';
+import { SuggestionWithUser } from './monaco-suggestion-decorations';
 
 interface LineInfo {
   primaryLabel: string;
@@ -22,6 +23,9 @@ interface RawEditorPaneProps {
   fullHeight?: boolean;
   className?: string;
   editorContainerClassName?: string;
+  suggestions?: SuggestionWithUser[];
+  onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
+  onSelectionChange?: (range: { startLine: number; startColumn: number; endLine: number; endColumn: number } | null) => void;
 }
 
 export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEditorPane(
@@ -37,6 +41,9 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
     fullHeight = false,
     className,
     editorContainerClassName,
+    suggestions,
+    onSuggestionClick,
+    onSelectionChange,
   },
   ref,
 ) {
@@ -67,6 +74,9 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
           placeholder={placeholder}
           currentLine={currentLine}
           highlightLine={highlightLine}
+          suggestions={suggestions}
+          onSuggestionClick={onSuggestionClick}
+          onSelectionChange={onSelectionChange}
         />
       </div>
     </div>

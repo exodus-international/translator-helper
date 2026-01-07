@@ -167,6 +167,36 @@ Each page follows a server/client split:
 2. Click "View & Deploy"
 3. Click "Deploy" to change status and download the file
 
+## Document Status Workflow
+
+The translation process follows a structured workflow with five main statuses:
+
+```mermaid
+flowchart LR
+    A[PENDING_TRANSLATION<br/>TODO] -->|Translator starts work| B[IN_PROGRESS<br/>Translations in Progress]
+    B -->|Translator completes translation| C[PENDING_REVIEW<br/>Texts in Review]
+    C -->|Reviewer reviews text| D{Reviewer requests<br/>final check}
+    D -->|Approving final version| E[APPROVED<br/>Texts Approved]
+    E -->|Deployer deploys| F[DEPLOYED<br/>Texts Deployed]
+    
+    style A fill:#BABABA,color:#000
+    style B fill:#0063ed,color:#fff
+    style C fill:#FACC15,color:#000
+    style D fill:#FACC15,color:#000
+    style E fill:#10B981,color:#fff
+    style F fill:#8B5CF6,color:#fff
+```
+
+### Status Flow Details
+
+1. **PENDING_TRANSLATION (TODO)**: Initial state when a document needs translation
+2. **IN_PROGRESS (Translations in Progress)**: Translator takes the text and starts working on it
+3. **PENDING_REVIEW (Texts in Review)**: After translation, the translator submits it for review
+4. **Communication Step**: Reviewer reviews the text and requests a final check from the translator (or another team member) via messages in the Dashboard
+5. **APPROVED (Texts Approved)**: Translator performs the final check and approves the translation
+- Also AUDIO file is generated and added to the document
+6. **DEPLOYED (Texts Deployed)**: Deployer (e.g., Pavel) moves the approved text to deployed status
+
 ## Database Schema
 
 - **User**: Authentication and roles
