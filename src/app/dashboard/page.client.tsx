@@ -315,7 +315,7 @@ export default function DashboardClient({
   const deployedCards = allCards.filter((card) => card.column === 'deployed');
   const otherCards = allCards.filter((card) => card.column !== 'deployed');
 
-  // Sort only deployed cards by deployed timestamp
+  // Sort deployed cards by deployed timestamp (newest first)
   const sortedDeployedCards = deployedCards.sort((a, b) => {
     const aVersion = a.document.versions?.[0];
     const bVersion = b.document.versions?.[0];
@@ -337,8 +337,15 @@ export default function DashboardClient({
     return 0;
   });
 
-  // Combine: deployed cards (sorted) + other cards (original order)
-  const kanbanData: KanbanCardData[] = [...sortedDeployedCards, ...otherCards];
+  // Sort other cards alphabetically Z-A by name
+  const sortedOtherCards = otherCards.sort((a, b) => {
+    const aName = a.name || a.document.title || '';
+    const bName = b.name || b.document.title || '';
+    return bName.localeCompare(aName, undefined, { sensitivity: 'base' });
+  });
+
+  // Combine: deployed cards (sorted by timestamp) + other cards (sorted Z-A)
+  const kanbanData: KanbanCardData[] = [...sortedDeployedCards, ...sortedOtherCards];
 
   // Handle drag and drop
   async function handleDataChange(newData: KanbanCardData[]) {
