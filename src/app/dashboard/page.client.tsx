@@ -294,7 +294,7 @@ export default function DashboardClient({
   };
 
   // Transform documents to Kanban card format
-  const kanbanData: KanbanCardData[] = filteredDocuments
+  const allCards: KanbanCardData[] = filteredDocuments
     .map((doc) => {
       const hasVersion = doc.versions && doc.versions.length > 0;
       const version = hasVersion ? doc.versions[0] : null;
@@ -309,32 +309,36 @@ export default function DashboardClient({
         versionId: version?.id,
       };
     })
-    .filter((card) => activeColumnIds.has(card.column))
-    .sort((a, b) => {
-      // Only sort cards in the "deployed" column by deployed timestamp
-      if (a.column === 'deployed' && b.column === 'deployed') {
-        const aVersion = a.document.versions?.[0];
-        const bVersion = b.document.versions?.[0];
-        const aTimestamp = aVersion ? getDeployedTimestamp(aVersion) : null;
-        const bTimestamp = bVersion ? getDeployedTimestamp(bVersion) : null;
+    .filter((card) => activeColumnIds.has(card.column));
 
-        // If both have timestamps, sort by timestamp (newest first)
-        if (aTimestamp && bTimestamp) {
-          return bTimestamp.getTime() - aTimestamp.getTime();
-        }
-        // If only one has timestamp, prioritize it
-        if (aTimestamp && !bTimestamp) {
-          return -1;
-        }
-        if (!aTimestamp && bTimestamp) {
-          return 1;
-        }
-        // If neither has timestamp, maintain original order
-        return 0;
-      }
-      // For other columns, maintain original order
-      return 0;
-    });
+  // Separate cards by column
+  const deployedCards = allCards.filter((card) => card.column === 'deployed');
+  const otherCards = allCards.filter((card) => card.column !== 'deployed');
+
+  // Sort only deployed cards by deployed timestamp
+  const sortedDeployedCards = deployedCards.sort((a, b) => {
+    const aVersion = a.document.versions?.[0];
+    const bVersion = b.document.versions?.[0];
+    const aTimestamp = aVersion ? getDeployedTimestamp(aVersion) : null;
+    const bTimestamp = bVersion ? getDeployedTimestamp(bVersion) : null;
+
+    // If both have timestamps, sort by timestamp (newest first)
+    if (aTimestamp && bTimestamp) {
+      return bTimestamp.getTime() - aTimestamp.getTime();
+    }
+    // If only one has timestamp, prioritize it
+    if (aTimestamp && !bTimestamp) {
+      return -1;
+    }
+    if (!aTimestamp && bTimestamp) {
+      return 1;
+    }
+    // If neither has timestamp, maintain original order
+    return 0;
+  });
+
+  // Combine: deployed cards (sorted) + other cards (original order)
+  const kanbanData: KanbanCardData[] = [...sortedDeployedCards, ...otherCards];
 
   // Handle drag and drop
   async function handleDataChange(newData: KanbanCardData[]) {
