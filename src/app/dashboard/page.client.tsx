@@ -6,22 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
-import type { DocumentStatusConfig } from '@/constants/document-status';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
-import { DocumentStatus } from '@/constants/document-status-client';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { SessionUser } from '@/lib/session';
+import { DocumentStatus, Language } from '@prisma/client';
 import { FileCheck, FileText, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-
-type Language = {
-  id: string;
-  name: string;
-  code: string;
-};
 
 interface DashboardClientProps {
   user: SessionUser;
@@ -241,38 +234,35 @@ export default function DashboardClient({
   });
 
   // Define Kanban columns based on active tab
-  // Type assertion needed because DOCUMENT_STATUS_CONFIGS uses Prisma enum,
-  // but we use client-safe enum with same string values
-  const configs = DOCUMENT_STATUS_CONFIGS as Record<string, DocumentStatusConfig>;
   const columns: KanbanColumn[] = [
     {
       id: 'pending',
       name: 'To Do',
-      color: configs[DocumentStatus.PENDING_TRANSLATION].color.hex,
+      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.PENDING_TRANSLATION].color.hex,
       status: DocumentStatus.PENDING_TRANSLATION,
     },
     {
       id: 'in-progress',
       name: 'In Progress',
-      color: configs[DocumentStatus.IN_PROGRESS].color.hex,
+      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.IN_PROGRESS].color.hex,
       status: DocumentStatus.IN_PROGRESS,
     },
     {
       id: 'review',
       name: 'Texts in review',
-      color: configs[DocumentStatus.PENDING_REVIEW].color.hex,
+      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.PENDING_REVIEW].color.hex,
       status: DocumentStatus.PENDING_REVIEW,
     },
     {
       id: 'approved',
       name: 'Texts approved',
-      color: configs[DocumentStatus.APPROVED].color.hex,
+      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.APPROVED].color.hex,
       status: DocumentStatus.APPROVED,
     },
     {
       id: 'deployed',
       name: 'Texts deployed',
-      color: configs[DocumentStatus.DEPLOYED].color.hex,
+      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.DEPLOYED].color.hex,
       status: DocumentStatus.DEPLOYED,
     },
   ];
