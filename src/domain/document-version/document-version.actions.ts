@@ -4,7 +4,7 @@ import prisma from '@/lib/db';
 import { canDeploy, canReviewInProject, canTranslateInProject, isDeployer, isProjectMember } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 import { DocumentStatus, ProjectRole } from '@prisma/client';
-import { createActivityLog } from '../activity-log/activity-log.repository';
+import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { createComment } from '../comment/comment.repository';
 import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
@@ -121,11 +121,10 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
 
   const version = await updateDocumentVersion(id, validated.content, user.id);
 
-  // Log the activity
-  await createActivityLog({
+  // Log the activity (coalesce rapid edits within 5 minutes)
+  await coalesceEditLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: 'edited',
     details: { version: version.version },
   });
 

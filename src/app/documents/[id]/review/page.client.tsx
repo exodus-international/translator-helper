@@ -1,5 +1,6 @@
 'use client';
 
+import { ActivityLog } from '@/components/activity-log';
 import { GitHubStatus } from '@/components/github-status';
 import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
 import { SourceTranslationViewer } from '@/components/source-translation-viewer';
@@ -578,23 +579,7 @@ export default function ReviewClient({
 
         {/* Activity Log */}
         {targetVersion.activityLogs && targetVersion.activityLogs.length > 0 && (
-          <Card className="mt-6 p-6">
-            <h3 className="text-lg font-semibold mb-4">Activity Log</h3>
-            <div className="space-y-3">
-              {targetVersion.activityLogs.map((log: any) => (
-                <div key={log.id} className="flex items-start gap-3 text-sm">
-                  <div className="flex-1">
-                    <span className="font-medium">{log.user.name}</span>
-                    <span className="text-gray-600 ml-2">{log.action}</span>
-                    {log.details && Object.keys(log.details).length > 0 && (
-                      <span className="text-gray-500 ml-2">{JSON.stringify(log.details)}</span>
-                    )}
-                  </div>
-                  <span className="text-gray-500">{new Date(log.createdAt).toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <ActivityLog entries={targetVersion.activityLogs} />
         )}
       </div>
     </div>
