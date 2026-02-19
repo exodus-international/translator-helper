@@ -2,6 +2,22 @@ import prisma from '@/lib/db';
 import { SuggestionFilters } from './suggestion.types';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 
+const userSelect = {
+  id: true,
+  name: true,
+  email: true,
+  image: true,
+};
+
+const repliesInclude = {
+  replies: {
+    include: {
+      user: { select: userSelect },
+    },
+    orderBy: { createdAt: 'asc' as const },
+  },
+};
+
 export async function getSuggestionsByDocumentVersion(
   documentVersionId: string,
   filters?: SuggestionFilters,
@@ -23,14 +39,8 @@ export async function getSuggestionsByDocumentVersion(
   return prisma.suggestion.findMany({
     where,
     include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-        },
-      },
+      user: { select: userSelect },
+      ...repliesInclude,
     },
     orderBy: {
       createdAt: 'desc',
@@ -42,14 +52,8 @@ export async function getSuggestionById(id: string) {
   return prisma.suggestion.findUnique({
     where: { id },
     include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-        },
-      },
+      user: { select: userSelect },
+      ...repliesInclude,
       documentVersion: {
         select: {
           id: true,
@@ -64,10 +68,10 @@ export async function getSuggestionById(id: string) {
 export async function createSuggestion(data: {
   documentVersionId: string;
   userId: string;
-  startLine: number;
-  startColumn: number;
-  endLine: number;
-  endColumn: number;
+  startLine?: number | null;
+  startColumn?: number | null;
+  endLine?: number | null;
+  endColumn?: number | null;
   type: SuggestionType;
   comment: string;
   proposedText?: string | null;
@@ -76,14 +80,8 @@ export async function createSuggestion(data: {
   return prisma.suggestion.create({
     data,
     include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-        },
-      },
+      user: { select: userSelect },
+      ...repliesInclude,
     },
   });
 }
@@ -100,14 +98,8 @@ export async function updateSuggestionStatus(
       dismissedReason: dismissedReason ?? null,
     },
     include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-        },
-      },
+      user: { select: userSelect },
+      ...repliesInclude,
     },
   });
 }
@@ -118,9 +110,41 @@ export async function deleteSuggestion(id: string) {
   });
 }
 
+export async function createSuggestionReply(data: {
+  suggestionId: string;
+  userId: string;
+  content: string;
+}) {
+  return prisma.suggestionReply.create({
+    data,
+    include: {
+      user: { select: userSelect },
+    },
+  });
+}
+
+export async function deleteSuggestionReply(id: string) {
+  return prisma.suggestionReply.delete({
+    where: { id },
+  });
+}
+
+export async function getSuggestionReplyById(id: string) {
+  return prisma.suggestionReply.findUnique({
+    where: { id },
+    include: {
+      user: { select: userSelect },
+    },
+  });
+}
+
 export async function checkSuggestionConflict(suggestionId: string, currentContent: string) {
   const suggestion = await getSuggestionById(suggestionId);
   if (!suggestion) {
+    return { hasConflict: false };
+  }
+
+  if (suggestion.startLine == null || suggestion.endLine == null || suggestion.startColumn == null || suggestion.endColumn == null) {
     return { hasConflict: false };
   }
 

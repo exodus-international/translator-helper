@@ -14,7 +14,7 @@ import { SuggestionWithUser } from './monaco-suggestion-decorations';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
-import { SuggestionPanel } from './suggestion-panel';
+import { ThreadSidebar } from './thread-sidebar';
 // SuggestionType enum values
 const SuggestionType = {
   COMMENT: 'COMMENT' as const,
@@ -75,6 +75,8 @@ interface SourceTranslationViewerProps {
   isApplyingSuggestion?: boolean;
   isDismissingSuggestion?: boolean;
   editorRef?: React.RefObject<any>; // Ref to the Monaco editor to get cursor position
+  onReply?: (suggestionId: string, content: string) => void;
+  onCreateGeneralThread?: (comment: string) => void;
 }
 
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
@@ -115,14 +117,17 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       isApplyingSuggestion = false,
       isDismissingSuggestion = false,
       editorRef: externalEditorRef,
+      onReply,
+      onCreateGeneralThread,
     },
     ref,
   ) {
     const isZen = layout === 'zen';
     const [mounted, setMounted] = useState(false);
+    const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
-    const [reviewViewMode, setReviewViewMode] = useState<'formatted' | 'raw' | 'review'>('raw');
+    const [reviewViewMode, setReviewViewMode] = useState<'formatted' | 'review'>('review');
     const [isReviewEditing, setIsReviewEditing] = useState(reviewConfig?.editingDefault ?? false);
     const [showSuggestionForm, setShowSuggestionForm] = useState(false);
     const [suggestionFormType, setSuggestionFormType] = useState<SuggestionType>(SuggestionType.COMMENT);
@@ -157,7 +162,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     const translationRawVisible =
       variant === 'translate'
         ? translateTab === 'edit'
-        : isReviewEditing || reviewViewMode === 'raw' || reviewViewMode === 'review';
+        : isReviewEditing || reviewViewMode === 'review';
     const isReviewMode = variant === 'review' && reviewViewMode === 'review';
 
     // Update source edit value when sourceEditContent prop changes
@@ -233,28 +238,38 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     };
 
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
+      setActiveThreadId(suggestion.id);
       try {
-        const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-        const editor = editorWrapper?.editor;
-        const monaco = editorWrapper?.monaco;
-        if (editor && monaco) {
-          const range = new monaco.Range(
-            suggestion.startLine,
-            suggestion.startColumn,
-            suggestion.endLine,
-            suggestion.endColumn,
-          );
-          editor.focus();
-          editor.setSelection(range);
-          editor.revealRangeInCenter(range);
+        // Only scroll editor for anchored suggestions
+        if (suggestion.startLine != null && suggestion.startColumn != null && suggestion.endLine != null && suggestion.endColumn != null) {
+          const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
+          const editor = editorWrapper?.editor;
+          const monaco = editorWrapper?.monaco;
+          if (editor && monaco) {
+            const range = new monaco.Range(
+              suggestion.startLine,
+              suggestion.startColumn,
+              suggestion.endLine,
+              suggestion.endColumn,
+            );
+            editor.revealRangeInCenter(range);
+            editor.setSelection(range);
+            editor.focus();
+          }
+
+          // Always sync both panes for context
           setTranslationLine(suggestion.startLine);
           setSyncedTranslationLine(suggestion.startLine);
-          if (sourceViewMode === 'raw') {
-            const sourceTotalLines = sourceContent.split('\n').length;
-            const translationTotalLines = translationContent.split('\n').length;
-            const sourceTargetLine = mapLineNumber(suggestion.startLine, translationTotalLines, sourceTotalLines);
-            setSyncedSourceLine(sourceTargetLine);
+
+          // Sync source pane — switch to raw view if needed so the line highlight is visible
+          const sourceTotalLines = sourceContent.split('\n').length;
+          const translationTotalLines = translationContent.split('\n').length;
+          const sourceTargetLine = mapLineNumber(suggestion.startLine, translationTotalLines, sourceTotalLines);
+
+          if (sourceViewMode !== 'raw') {
+            setSourceViewMode('raw');
           }
+          setSyncedSourceLine(sourceTargetLine);
         }
       } catch (error) {
         console.error('Error selecting suggestion in editor:', error);
@@ -268,7 +283,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
-      setReviewViewMode('raw');
+      setReviewViewMode('review');
       setSyncedTranslationLine(undefined);
     };
 
@@ -363,9 +378,25 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
         }
       }
 
-      if (range && isReviewMode) {
-        // Show toolbar near selection (simplified - would need actual mouse position)
-        setToolbarPosition({ x: 180, y: 20 });
+      const showToolbar = range && canCreateSuggestions && (isReviewMode || suggestions.length > 0);
+      if (showToolbar) {
+        // Try to get actual position from editor
+        const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
+        const editor = editorWrapper?.editor;
+        if (editor && typeof editor.getScrolledVisiblePosition === 'function') {
+          try {
+            const pos = editor.getScrolledVisiblePosition({ lineNumber: range.endLine, column: range.endColumn });
+            if (pos) {
+              setToolbarPosition({ x: pos.left + 20, y: pos.top + pos.height + 4 });
+            } else {
+              setToolbarPosition({ x: 180, y: 20 });
+            }
+          } catch {
+            setToolbarPosition({ x: 180, y: 20 });
+          }
+        } else {
+          setToolbarPosition({ x: 180, y: 20 });
+        }
       } else {
         setToolbarPosition(null);
       }
@@ -432,8 +463,19 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       toast.info('Please select text in the translation editor, or click on a line to add a comment');
     };
 
+    const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
+
+    // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
+    const showSuggestionDecorations = suggestions.length > 0;
+    const showSelectionToolbar = canCreateSuggestions && (isReviewMode || showSuggestionDecorations);
+
     return (
-      <div className={cn('grid grid-cols-2 gap-6', className, isZen && 'gap-4 h-full')}>
+      <div className={cn(
+        'grid gap-4',
+        hasSidebar ? 'grid-cols-[1fr_1fr_340px]' : 'grid-cols-2 gap-6',
+        className,
+        isZen && 'h-full',
+      )}>
         <Card className={cn(cardClassName)}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Source (English)</h2>
@@ -606,11 +648,10 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 mounted ? (
                   <Tabs
                     value={reviewViewMode}
-                    onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'raw' | 'review')}
+                    onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'review')}
                   >
                     <TabsList>
                       <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                      <TabsTrigger value="raw">Raw</TabsTrigger>
                       <TabsTrigger value="review" className="relative">
                         Review
                         {openSuggestionsCount > 0 && (
@@ -635,16 +676,6 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                       )}
                     >
                       Formatted
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      className={cn(
-                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                        reviewViewMode === 'raw' && 'bg-background shadow-sm',
-                      )}
-                    >
-                      Raw
                     </button>
                     <button
                       type="button"
@@ -682,22 +713,49 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
           <div className={bodyClassName}>
             {variant === 'translate' ? (
               translateTab === 'edit' ? (
-                <RawEditorPane
-                  value={translationContent}
-                  onChange={onTranslationChange}
-                  onCursorChange={handleTranslationCursorChange}
-                  placeholder={translationPlaceholder}
-                  currentLine={translationLine}
-                  highlightLine={syncedTranslationLine}
-                  fullHeight={isZen}
-                  lineInfo={{
-                    primaryLabel: 'Translation Line',
-                    primaryValue: translationLine,
-                    secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                    secondaryValue: sourceViewMode === 'raw' ? syncedSourceLine ?? sourceLine : undefined,
-                    direction: 'from',
-                  }}
-                />
+                <div className="relative h-full">
+                  <RawEditorPane
+                    ref={translationEditorRef}
+                    value={translationContent}
+                    onChange={onTranslationChange}
+                    onCursorChange={handleTranslationCursorChange}
+                    placeholder={translationPlaceholder}
+                    currentLine={translationLine}
+                    highlightLine={syncedTranslationLine}
+                    fullHeight={isZen}
+                    suggestions={showSuggestionDecorations ? suggestions : undefined}
+                    onSuggestionClick={showSuggestionDecorations ? handleSuggestionClickInternal : undefined}
+                    onSelectionChange={showSelectionToolbar ? handleSelectionChange : undefined}
+                    lineInfo={{
+                      primaryLabel: 'Translation Line',
+                      primaryValue: translationLine,
+                      secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
+                      secondaryValue: sourceViewMode === 'raw' ? syncedSourceLine ?? sourceLine : undefined,
+                      direction: 'from',
+                    }}
+                  />
+                  {toolbarPosition && canCreateSuggestions && (
+                    <SuggestionInlineToolbar
+                      position={toolbarPosition}
+                      onComment={() => handleCreateSuggestion(SuggestionType.COMMENT)}
+                      onSuggestEdit={() => handleCreateSuggestion(SuggestionType.CHANGE)}
+                    />
+                  )}
+                  {showSuggestionForm && selectedRange && (
+                    <div className="absolute top-4 right-4 w-96 bg-white border rounded-lg shadow-lg p-4 z-50">
+                      <SuggestionForm
+                        type={suggestionFormType}
+                        initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
+                        onSubmit={handleSuggestionFormSubmit}
+                        onCancel={() => {
+                          setShowSuggestionForm(false);
+                          setSelectedRange(null);
+                          setSelectedText('');
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="prose max-w-none min-h-[500px]">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -732,7 +790,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
               <div className="prose max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
               </div>
-            ) : reviewViewMode === 'review' ? (
+            ) : (
               <div className="relative h-full">
                 {selectedUserId ? (
                   // Show diff view when user filter is active
@@ -788,41 +846,23 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   </>
                 )}
               </div>
-            ) : (
-              <RawEditorPane
-                value={translationContent}
-                readOnly
-                currentLine={translationLine}
-                highlightLine={syncedTranslationLine}
-                onCursorChange={handleTranslationCursorChange}
-                lineInfo={{
-                  primaryLabel: 'Translation Line',
-                  primaryValue: translationLine,
-                  secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                  secondaryValue: sourceViewMode === 'raw' ? syncedSourceLine ?? sourceLine : undefined,
-                  direction: 'from',
-                }}
-              />
             )}
           </div>
         </Card>
 
-        {isReviewMode && (
-          <div className="col-span-2">
-            <SuggestionPanel
-              suggestions={suggestions}
-              currentUserId={currentUserId || ''}
-              canCreate={canCreateSuggestions}
-              content={translationContent}
-              onSuggestionClick={handleSuggestionClickInternal}
-              onApply={onApplySuggestion}
-              onDismiss={onDismissSuggestion}
-              onAddClick={handleAddSuggestionClick}
-              onUserFilterChange={setSelectedUserId}
-              isApplying={isApplyingSuggestion}
-              isDismissing={isDismissingSuggestion}
-            />
-          </div>
+        {hasSidebar && (
+          <ThreadSidebar
+            suggestions={suggestions}
+            currentUserId={currentUserId || ''}
+            translationContent={translationContent}
+            canCreateSuggestions={canCreateSuggestions}
+            onReply={onReply}
+            onApply={onApplySuggestion}
+            onDismiss={(id) => onDismissSuggestion?.(id)}
+            onSuggestionClick={handleSuggestionClickInternal}
+            onCreateGeneralThread={onCreateGeneralThread}
+            activeThreadId={activeThreadId}
+          />
         )}
       </div>
     );

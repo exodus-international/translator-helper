@@ -84,6 +84,7 @@ model User {
   assignedByDocuments DocumentAssignment[] @relation("AssignedBy")
   languages           UserLanguage[]
   suggestions         Suggestion[]
+  suggestionReplies   SuggestionReply[]
 
   @@map("user")
 }
@@ -310,11 +311,11 @@ model Suggestion {
   userId            String
   user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // Range v textu (Monaco formát)
-  startLine         Int
-  startColumn       Int
-  endLine           Int
-  endColumn         Int
+  // Range v textu (Monaco formát) - optional for general (unanchored) threads
+  startLine         Int?
+  startColumn       Int?
+  endLine           Int?
+  endColumn         Int?
   
   // Typ suggestion
   type              SuggestionType   @default(COMMENT)
@@ -331,8 +332,22 @@ model Suggestion {
   version           Int              // Verze dokumentu, na které vznikl návrh
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+  replies           SuggestionReply[]
 
   @@map("suggestion")
+}
+
+model SuggestionReply {
+  id           String     @id @default(uuid())
+  suggestionId String
+  suggestion   Suggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content      String     @db.Text
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("suggestion_reply")
 }
 
 model GitHubCommit {

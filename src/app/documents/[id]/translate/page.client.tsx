@@ -1,6 +1,7 @@
 'use client';
 
 import { ActivityLog } from '@/components/activity-log';
+import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
 import { SourceTranslationViewer, SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
@@ -23,11 +24,18 @@ import {
   updateDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
 import { deleteDocumentAction } from '@/domain/document/document.actions';
+import {
+  applySuggestionAction,
+  createSuggestionAction,
+  createSuggestionReplyAction,
+  dismissSuggestionAction,
+  getSuggestionsByDocumentVersionAction,
+} from '@/domain/suggestion/suggestion.actions';
 import { translateDocumentAction } from '@/domain/translation/translation.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
 import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus, SuggestionType } from '@prisma/client';
 import matter from 'gray-matter';
 import { AlertCircle, Calendar, Check, Cloud, CloudOff, Loader2, Maximize2, Minimize2, Save, Send, Sparkles, Trash2, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -53,6 +61,7 @@ interface TranslateClientProps {
   translationProject?: any | null;
   assignment?: any | null;
   user: SessionUser;
+  initialSuggestions?: any[];
 }
 
 function SaveStatusIndicator({ status, lastSavedAt }: { status: 'saved' | 'unsaved' | 'saving' | 'error'; lastSavedAt: Date | null }) {
@@ -109,12 +118,23 @@ export default function TranslateClient({
   translationProject,
   assignment,
   user,
+  initialSuggestions = [],
 }: TranslateClientProps) {
   const router = useRouter();
   const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
   const [content, setContent] = useState(initialTargetVersion?.content || '');
   const [loading, setLoading] = useState(false);
   const [zenMode, setZenMode] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestionWithUser[]>(
+    initialSuggestions.map((s: any) => ({
+      ...s,
+      createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+      replies: (s.replies || []).map((r: any) => ({
+        ...r,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      })),
+    })) as SuggestionWithUser[],
+  );
   const [translating, setTranslating] = useState(false);
   const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
   const [sourceSaving, setSourceSaving] = useState(false);
@@ -414,6 +434,109 @@ export default function TranslateClient({
     }
   };
 
+  const reloadSuggestions = async () => {
+    if (!targetVersion) return;
+    try {
+      const updated = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formatted = updated.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        replies: (s.replies || []).map((r: any) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        })),
+      }));
+      setSuggestions(formatted as SuggestionWithUser[]);
+    } catch (error) {
+      console.error('Error loading suggestions:', error);
+    }
+  };
+
+  const handleApplySuggestion = async (suggestionId: string) => {
+    try {
+      const updatedVersion = await applySuggestionAction({ suggestionId });
+      setTargetVersion(updatedVersion);
+      setContent(updatedVersion.content);
+      savedContentRef.current = updatedVersion.content;
+      setSaveStatus('saved');
+      toast.success('Suggestion applied!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error applying suggestion:', error);
+      toast.error(error.message || 'Failed to apply suggestion');
+    }
+  };
+
+  const handleDismissSuggestion = async (suggestionId: string, reason?: string) => {
+    try {
+      await dismissSuggestionAction({ suggestionId, dismissedReason: reason });
+      toast.success('Suggestion dismissed!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error dismissing suggestion:', error);
+      toast.error(error.message || 'Failed to dismiss suggestion');
+    }
+  };
+
+  const handleCreateSuggestion = async (data: {
+    comment: string;
+    proposedText?: string;
+    type: SuggestionType;
+    range: { startLine: number; startColumn: number; endLine: number; endColumn: number };
+    version: number;
+  }) => {
+    if (!targetVersion) return;
+    try {
+      await createSuggestionAction({
+        documentVersionId: targetVersion.id,
+        startLine: data.range.startLine,
+        startColumn: data.range.startColumn,
+        endLine: data.range.endLine,
+        endColumn: data.range.endColumn,
+        type: data.type,
+        comment: data.comment,
+        proposedText: data.proposedText,
+        version: data.version,
+      });
+      toast.success('Suggestion created!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error creating suggestion:', error);
+      toast.error(error.message || 'Failed to create suggestion');
+    }
+  };
+
+  const handleReply = async (suggestionId: string, content: string) => {
+    try {
+      await createSuggestionReplyAction({ suggestionId, content });
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error replying:', error);
+      toast.error(error.message || 'Failed to post reply');
+    }
+  };
+
+  const handleCreateGeneralThread = async (comment: string) => {
+    if (!targetVersion) return;
+    try {
+      await createSuggestionAction({
+        documentVersionId: targetVersion.id,
+        startLine: null,
+        startColumn: null,
+        endLine: null,
+        endColumn: null,
+        type: 'COMMENT' as SuggestionType,
+        comment,
+        version: targetVersion.version ?? 1,
+      });
+      toast.success('Comment added!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error creating general thread:', error);
+      toast.error(error.message || 'Failed to create comment');
+    }
+  };
+
   return (
     <div className={zenMode ? 'fixed inset-0 bg-white z-50' : 'min-h-screen bg-gray-50'}>
       {!zenMode && (
@@ -684,6 +807,14 @@ export default function TranslateClient({
           onSourceSave={handleSourceSave}
           onSourceDelete={handleSourceDelete}
           sourceEditContent={sourceEditContent}
+          suggestions={suggestions}
+          currentUserId={user.id}
+          onApplySuggestion={handleApplySuggestion}
+          onDismissSuggestion={handleDismissSuggestion}
+          onCreateSuggestion={handleCreateSuggestion}
+          onReply={handleReply}
+          onCreateGeneralThread={handleCreateGeneralThread}
+          documentVersion={targetVersion?.version ?? 1}
         />
         {/* Activity Log */}
         {!zenMode && targetVersion && targetVersion.activityLogs && (

@@ -3,12 +3,25 @@
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 import { useEffect, useRef } from 'react';
 
+export interface SuggestionReplyWithUser {
+  id: string;
+  suggestionId: string;
+  content: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    image: string | null;
+  };
+}
+
 export interface SuggestionWithUser {
   id: string;
-  startLine: number;
-  startColumn: number;
-  endLine: number;
-  endColumn: number;
+  startLine?: number | null;
+  startColumn?: number | null;
+  endLine?: number | null;
+  endColumn?: number | null;
   type: SuggestionType;
   status: SuggestionStatus;
   comment: string;
@@ -21,6 +34,7 @@ export interface SuggestionWithUser {
   };
   createdAt: string;
   version: number;
+  replies?: SuggestionReplyWithUser[];
 }
 
 interface UseMonacoSuggestionsProps {
@@ -52,7 +66,12 @@ export function useMonacoSuggestions({ editor, monaco, suggestions, onSuggestion
     const decorations: any[] = [];
     const gutterDecorations: any[] = [];
 
-    suggestions.forEach((suggestion) => {
+    // Filter to only anchored suggestions (with valid ranges)
+    const anchoredSuggestions = suggestions.filter(
+      (s) => s.startLine != null && s.startColumn != null && s.endLine != null && s.endColumn != null,
+    );
+
+    anchoredSuggestions.forEach((suggestion) => {
       // Determine color based on status
       let className = '';
       let glyphMarginClassName = '';
@@ -80,10 +99,10 @@ export function useMonacoSuggestions({ editor, monaco, suggestions, onSuggestion
 
       // Create range decoration
       const range = new monaco.Range(
-        suggestion.startLine,
-        suggestion.startColumn,
-        suggestion.endLine,
-        suggestion.endColumn,
+        suggestion.startLine!,
+        suggestion.startColumn!,
+        suggestion.endLine!,
+        suggestion.endColumn!,
       );
 
       decorations.push({
@@ -107,7 +126,7 @@ export function useMonacoSuggestions({ editor, monaco, suggestions, onSuggestion
       // Create gutter decoration (icon on the line number)
       if (suggestion.status === SuggestionStatus.OPEN) {
         gutterDecorations.push({
-          range: new monaco.Range(suggestion.startLine, 1, suggestion.startLine, 1),
+          range: new monaco.Range(suggestion.startLine!, 1, suggestion.startLine!, 1),
           options: {
             glyphMarginClassName,
             glyphMarginHoverMessage: {
@@ -138,7 +157,7 @@ export function useMonacoSuggestions({ editor, monaco, suggestions, onSuggestion
       const disposable = editor.onMouseDown((e: any) => {
         if (e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
           const lineNumber = e.target.position.lineNumber;
-          const suggestion = suggestions.find((s) => s.startLine === lineNumber && s.status === SuggestionStatus.OPEN);
+          const suggestion = anchoredSuggestions.find((s) => s.startLine === lineNumber && s.status === SuggestionStatus.OPEN);
           if (suggestion) {
             onSuggestionClick(suggestion);
             // Scroll to the suggestion

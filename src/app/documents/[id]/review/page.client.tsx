@@ -7,8 +7,6 @@ import { SourceTranslationViewer } from '@/components/source-translation-viewer'
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import {
   Stepper,
   StepperItem,
@@ -18,9 +16,7 @@ import {
   StepperTitle,
   StepperTrigger,
 } from '@/components/ui/stepper';
-import { Textarea } from '@/components/ui/textarea';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
-import { createCommentAction } from '@/domain/comment/comment.actions';
 import {
   deployVersionAction,
   reviewVersionAction,
@@ -30,6 +26,7 @@ import { deleteDocumentAction, toggleDocumentLabelAction } from '@/domain/docume
 import {
   applySuggestionAction,
   createSuggestionAction,
+  createSuggestionReplyAction,
   dismissSuggestionAction,
   getSuggestionsByDocumentVersionAction,
 } from '@/domain/suggestion/suggestion.actions';
@@ -39,7 +36,7 @@ import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { DocumentStatus, SuggestionType } from '@prisma/client';
 import matter from 'gray-matter';
-import { Download, FileCheck, FilePlus, MessageCircle, MessageSquare } from 'lucide-react';
+import { Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -80,7 +77,6 @@ export default function ReviewClient({
   const router = useRouter();
   const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
   const [content, setContent] = useState(initialTargetVersion.content);
-  const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
   const [sourceSaving, setSourceSaving] = useState(false);
@@ -92,6 +88,10 @@ export default function ReviewClient({
     initialSuggestions.map((s: any) => ({
       ...s,
       createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+      replies: (s.replies || []).map((r: any) => ({
+        ...r,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      })),
     })) as SuggestionWithUser[],
   );
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
@@ -116,6 +116,10 @@ export default function ReviewClient({
         const formattedSuggestions = updatedSuggestions.map((s: any) => ({
           ...s,
           createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+          replies: (s.replies || []).map((r: any) => ({
+            ...r,
+            createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+          })),
         }));
         setSuggestions(formattedSuggestions as SuggestionWithUser[]);
       } catch (error) {
@@ -156,34 +160,12 @@ export default function ReviewClient({
     }
   };
 
-  const handleAddComment = async () => {
-    if (!comment.trim()) return;
-
-    setLoading(true);
-    try {
-      await createCommentAction({
-        documentVersionId: targetVersion.id,
-        content: comment,
-      });
-      setComment('');
-      toast.success('Comment added!');
-      // Reload to show new comment
-      window.location.reload();
-    } catch (error: any) {
-      console.error('Error adding comment:', error);
-      toast.error(error.message || 'Failed to add comment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleApprove = async () => {
     setLoading(true);
     try {
       await reviewVersionAction({
         versionId: targetVersion.id,
         approved: true,
-        comment: comment || undefined,
       });
       toast.success('Translation approved!');
       router.push('/dashboard');
@@ -196,17 +178,11 @@ export default function ReviewClient({
   };
 
   const handleRequestChanges = async () => {
-    if (!comment.trim()) {
-      toast.warning('Please add a comment explaining the changes needed');
-      return;
-    }
-
     setLoading(true);
     try {
       await reviewVersionAction({
         versionId: targetVersion.id,
         approved: false,
-        comment,
       });
       toast.success('Changes requested!');
       router.push('/dashboard');
@@ -399,9 +375,54 @@ export default function ReviewClient({
     }
   };
 
-  const handleSuggestionClick = (suggestion: SuggestionWithUser) => {
-    // Scroll to suggestion range - this would be handled by the Monaco editor
-    // The decoration hook should handle this
+  const handleReply = async (suggestionId: string, replyContent: string) => {
+    try {
+      await createSuggestionReplyAction({ suggestionId, content: replyContent });
+      // Reload suggestions
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        replies: (s.replies || []).map((r: any) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        })),
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error replying:', error);
+      toast.error(error.message || 'Failed to post reply');
+    }
+  };
+
+  const handleCreateGeneralThread = async (generalComment: string) => {
+    try {
+      await createSuggestionAction({
+        documentVersionId: targetVersion.id,
+        startLine: null,
+        startColumn: null,
+        endLine: null,
+        endColumn: null,
+        type: 'COMMENT' as SuggestionType,
+        comment: generalComment,
+        version: targetVersion.version ?? 1,
+      });
+      toast.success('Comment added!');
+      // Reload suggestions
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        replies: (s.replies || []).map((r: any) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        })),
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error creating general thread:', error);
+      toast.error(error.message || 'Failed to create comment');
+    }
   };
 
   const reviewEditActions = ({ exitEditMode }: { exitEditMode: () => void }) => (
@@ -525,51 +546,16 @@ export default function ReviewClient({
           suggestions={suggestions}
           canCreateSuggestions={canCreateSuggestions}
           currentUserId={user.id}
-          onSuggestionClick={handleSuggestionClick}
+          onSuggestionClick={() => {}}
           onApplySuggestion={handleApplySuggestion}
           onDismissSuggestion={handleDismissSuggestion}
           onCreateSuggestion={handleCreateSuggestion}
           documentVersion={targetVersion.version}
           isApplyingSuggestion={isApplyingSuggestion}
           isDismissingSuggestion={isDismissingSuggestion}
+          onReply={handleReply}
+          onCreateGeneralThread={handleCreateGeneralThread}
         />
-
-        {/* Comments Section */}
-        <Card className="mt-6 p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Comments
-          </h3>
-
-          {targetVersion.comments && targetVersion.comments.length > 0 && (
-            <div className="space-y-4 mb-6">
-              {targetVersion.comments.map((c: any) => (
-                <div key={c.id} className="border-l-2 border-gray-300 pl-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">{c.user.name}</span>
-                    <span className="text-xs text-gray-500">{new Date(c.createdAt).toLocaleString()}</span>
-                  </div>
-                  <p className="text-gray-700">{c.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="comment">Add Comment</Label>
-            <Textarea
-              id="comment"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Leave a comment..."
-              rows={3}
-            />
-            <Button onClick={handleAddComment} disabled={loading || !comment.trim()}>
-              <MessageCircle />
-              Add Comment
-            </Button>
-          </div>
-        </Card>
 
         {/* GitHub Deployment Status */}
         <GitHubStatus
