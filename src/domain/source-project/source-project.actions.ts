@@ -30,6 +30,7 @@ export async function createSourceProjectAction(input: unknown) {
   const sourceProject = await createSourceProject({
     name: validated.name,
     description: validated.description,
+    identifier: validated.identifier,
   });
 
   // Auto-create translation projects for all target languages (excluding English)
@@ -68,6 +69,7 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
   return await updateSourceProject(id, {
     name: validated.name,
     description: validated.description,
+    identifier: validated.identifier,
     status: validated.status,
   });
 }

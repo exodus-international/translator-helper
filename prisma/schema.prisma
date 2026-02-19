@@ -50,6 +50,18 @@ enum SuggestionStatus {
   DISMISSED // Odmítnut
 }
 
+enum DocumentType {
+  DAY
+  FIELD_GUIDE
+  DAILY_CONTENT
+}
+
+enum GitHubPRStatus {
+  OPEN
+  MERGED
+  CLOSED
+}
+
 model User {
   id                  String               @id @default(uuid())
   email               String               @unique
@@ -127,6 +139,7 @@ model Language {
   code                    String               @unique // e.g., "en", "cs", "de"
   name                    String // e.g., "English", "Czech", "German"
   translationInstructions String?              @db.Text
+  branchName              String?
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   documentVersions        DocumentVersion[]
@@ -150,6 +163,7 @@ model SourceProject {
   id                  String               @id @default(uuid())
   name                String               @unique
   description         String?              @db.Text
+  identifier          String?
   status              SourceProjectStatus  @default(ACTIVE)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -214,6 +228,7 @@ model Document {
   title            String
   labels           String[] // Array of labels for categorization
   deadline         DateTime? // Optional deadline for translation completion
+  type             DocumentType?
   folderId         String? // Deprecated - kept for migration
   folder           Folder?              @relation(fields: [folderId], references: [id], onDelete: SetNull)
   sourceProjectId  String?
@@ -240,9 +255,10 @@ model DocumentVersion {
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
-  comments     Comment[]
-  activityLogs ActivityLog[]
-  suggestions  Suggestion[]
+  comments      Comment[]
+  activityLogs  ActivityLog[]
+  suggestions   Suggestion[]
+  githubCommits GitHubCommit[]
 
   @@unique([documentId, languageId])
   @@map("document_version")
@@ -317,4 +333,21 @@ model Suggestion {
   updatedAt         DateTime         @updatedAt
 
   @@map("suggestion")
+}
+
+model GitHubCommit {
+  id                String          @id @default(uuid())
+  documentVersionId String
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  commitSha         String
+  branchName        String
+  filePath          String
+  prNumber          Int?
+  prUrl             String?
+  prStatus          GitHubPRStatus?
+  errorMessage      String?         @db.Text
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@map("github_commit")
 }

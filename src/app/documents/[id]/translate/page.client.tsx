@@ -29,9 +29,9 @@ import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@prisma/client';
 import matter from 'gray-matter';
-import { AlertCircle, Calendar, Maximize2, Minimize2, Save, Send, Sparkles, Trash2, User } from 'lucide-react';
+import { AlertCircle, Calendar, Check, Cloud, CloudOff, Loader2, Maximize2, Minimize2, Save, Send, Sparkles, Trash2, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -53,6 +53,43 @@ interface TranslateClientProps {
   translationProject?: any | null;
   assignment?: any | null;
   user: SessionUser;
+}
+
+function SaveStatusIndicator({ status, lastSavedAt }: { status: 'saved' | 'unsaved' | 'saving' | 'error'; lastSavedAt: Date | null }) {
+  const timeStr = lastSavedAt
+    ? lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  switch (status) {
+    case 'saving':
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>Saving...</span>
+        </div>
+      );
+    case 'saved':
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-green-600">
+          <Cloud className="h-3.5 w-3.5" />
+          <span>Saved{timeStr ? ` at ${timeStr}` : ''}</span>
+        </div>
+      );
+    case 'unsaved':
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-amber-600">
+          <CloudOff className="h-3.5 w-3.5" />
+          <span>Unsaved changes</span>
+        </div>
+      );
+    case 'error':
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-red-600">
+          <CloudOff className="h-3.5 w-3.5" />
+          <span>Save failed</span>
+        </div>
+      );
+  }
 }
 
 function getContentWithoutFrontmatter(text: string) {
@@ -81,6 +118,80 @@ export default function TranslateClient({
   const [translating, setTranslating] = useState(false);
   const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
   const [sourceSaving, setSourceSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving' | 'error'>('saved');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const savedContentRef = useRef(initialTargetVersion?.content || '');
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+  const contentRef = useRef(content);
+  const targetVersionRef = useRef(targetVersion);
+  const autoSavingRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => { contentRef.current = content; }, [content]);
+  useEffect(() => { targetVersionRef.current = targetVersion; }, [targetVersion]);
+
+  // Track unsaved changes
+  useEffect(() => {
+    if (content !== savedContentRef.current) {
+      setSaveStatus('unsaved');
+    }
+  }, [content]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Stable auto-save function that reads from refs (no state dependencies)
+  const performAutoSave = useCallback(async () => {
+    const tv = targetVersionRef.current;
+    const currentContent = contentRef.current;
+    if (!tv || tv.status === 'PENDING_TRANSLATION') return;
+    if (currentContent === savedContentRef.current) return;
+    if (autoSavingRef.current) return;
+
+    autoSavingRef.current = true;
+    setSaveStatus('saving');
+    try {
+      await updateDocumentVersionAction(tv.id, { content: currentContent });
+      if (!isMountedRef.current) return;
+      savedContentRef.current = currentContent;
+      setSaveStatus('saved');
+      setLastSavedAt(new Date());
+    } catch (error: any) {
+      if (!isMountedRef.current) return;
+      console.error('Auto-save failed:', error);
+      setSaveStatus('error');
+    } finally {
+      autoSavingRef.current = false;
+    }
+  }, []);
+
+  // Debounced auto-save: triggers 3 seconds after last edit, only depends on content
+  useEffect(() => {
+    if (!targetVersion || targetVersion.status === 'PENDING_TRANSLATION') return;
+    if (content === savedContentRef.current) return;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      performAutoSave();
+    }, 3000);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [content, performAutoSave]); // no targetVersion dependency — read from ref inside performAutoSave
 
   // Check if user can edit source (deployer only)
   const canEditSource = isDeployerClient(user);
@@ -134,7 +245,13 @@ export default function TranslateClient({
   }, [zenMode]);
 
   const handleSave = async () => {
+    // Cancel any pending auto-save
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
     setLoading(true);
+    setSaveStatus('saving');
     try {
       if (targetVersion) {
         // Update existing version
@@ -151,9 +268,13 @@ export default function TranslateClient({
         });
         setTargetVersion(created);
       }
+      savedContentRef.current = content;
+      setSaveStatus('saved');
+      setLastSavedAt(new Date());
       toast.success('Translation saved successfully!');
     } catch (error: any) {
       console.error('Error saving translation:', error);
+      setSaveStatus('error');
       toast.error(error.message || 'Failed to save translation');
     } finally {
       setLoading(false);
@@ -327,9 +448,10 @@ export default function TranslateClient({
                             <Maximize2 className="h-4 w-4 mr-2" />
                             Zen Mode (F11)
                           </Button>
-                          <Button variant="outline" onClick={handleSave} disabled={loading || translating}>
+                          <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+                          <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
                             <Save className="h-4 w-4 mr-2" />
-                            Save Draft
+                            Save
                           </Button>
                         </>
                       )}
@@ -487,10 +609,13 @@ export default function TranslateClient({
                     </Button>
                   )}
                   {targetVersion.status !== 'PENDING_TRANSLATION' && (
-                    <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
+                    <>
+                      <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+                      <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save
+                      </Button>
+                    </>
                   )}
                   {targetVersion.status === 'IN_PROGRESS' && (
                     <Button size="sm" onClick={handleSubmitForReview} disabled={loading || translating}>

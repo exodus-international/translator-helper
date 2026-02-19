@@ -19,7 +19,12 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Plus, Edit, Trash2 } from 'lucide-react';
-import { createLanguageAction, updateLanguageAction, deleteLanguageAction } from '@/domain/language/language.actions';
+import {
+  createLanguageAction,
+  updateLanguageAction,
+  updateLanguageBranchNameAction,
+  deleteLanguageAction,
+} from '@/domain/language/language.actions';
 import { toast } from 'sonner';
 
 interface LanguagesClientProps {
@@ -32,6 +37,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
   const [editingLanguage, setEditingLanguage] = useState<Language | null>(null);
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
+  const [branchName, setBranchName] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,9 +47,17 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
     try {
       if (editingLanguage) {
         const updated = await updateLanguageAction(editingLanguage.id, { name });
-        setLanguages(languages.map((l) => (l.id === updated.id ? updated : l)));
+        // Also update branch name if it changed
+        if (branchName !== (editingLanguage.branchName || '')) {
+          await updateLanguageBranchNameAction(editingLanguage.id, {
+            branchName: branchName || null,
+          });
+        }
+        setLanguages(
+          languages.map((l) => (l.id === updated.id ? { ...updated, branchName: branchName || null } : l)),
+        );
       } else {
-        const created = await createLanguageAction({ code, name });
+        const created = await createLanguageAction({ code, name, branchName: branchName || undefined });
         setLanguages([...languages, created]);
       }
 
@@ -61,6 +75,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
     setEditingLanguage(language);
     setCode(language.code);
     setName(language.name);
+    setBranchName(language.branchName || '');
     setDialogOpen(true);
   };
 
@@ -83,6 +98,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
     setEditingLanguage(null);
     setCode('');
     setName('');
+    setBranchName('');
   };
 
   return (
@@ -133,6 +149,16 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
                       required
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="branchName">GitHub Branch Name</Label>
+                    <Input
+                      id="branchName"
+                      value={branchName}
+                      onChange={(e) => setBranchName(e.target.value)}
+                      placeholder="e.g., hr-croatian-translation"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Branch in the content repo for this language</p>
+                  </div>
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                       Cancel
@@ -156,6 +182,9 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
                 <div>
                   <h3 className="font-semibold text-lg">{language.name}</h3>
                   <p className="text-sm text-gray-600">Code: {language.code}</p>
+                  {language.branchName && (
+                    <p className="text-xs text-gray-500">Branch: {language.branchName}</p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => handleEdit(language)}>

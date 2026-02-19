@@ -46,6 +46,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
   const [editingProject, setEditingProject] = useState<SourceProject | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Sync state with props when they change (e.g., after router.refresh())
@@ -62,6 +63,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
         const updated = await updateSourceProjectAction(editingProject.id, {
           name,
           description: description || null,
+          identifier: identifier || null,
         });
         setSourceProjects(
           sourceProjects.map((p) =>
@@ -81,6 +83,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
         await createSourceProjectAction({
           name,
           description: description || undefined,
+          identifier: identifier || undefined,
         });
         // Refresh the page to get updated counts including translation projects
         router.refresh();
@@ -100,6 +103,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     setEditingProject(project);
     setName(project.name);
     setDescription(project.description || '');
+    setIdentifier((project as any).identifier || '');
     setDialogOpen(true);
   };
 
@@ -153,6 +157,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     setEditingProject(null);
     setName('');
     setDescription('');
+    setIdentifier('');
   };
 
   return (
@@ -202,6 +207,16 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
                       rows={3}
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="identifier">Repository Identifier</Label>
+                    <Input
+                      id="identifier"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      placeholder="e.g., exodus90, lent2026"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Folder name in the content repository</p>
+                  </div>
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                       Cancel
@@ -242,6 +257,9 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
                       </Link>
                     </div>
                     {project.description && <p className="text-sm text-gray-600 mt-1">{project.description}</p>}
+                    {(project as any).identifier && (
+                      <p className="text-xs text-gray-500 mt-1">ID: {(project as any).identifier}</p>
+                    )}
                     <div className="flex gap-4 mt-2 text-sm text-gray-600">
                       <span>{project._count.documents} document(s)</span>
                       <span>{project._count.translationProjects} translation project(s)</span>

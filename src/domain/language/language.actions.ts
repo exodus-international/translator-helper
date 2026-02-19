@@ -8,9 +8,15 @@ import {
   getLanguageById,
   listLanguages,
   updateLanguage,
+  updateLanguageBranchName,
   updateLanguageInstructions,
 } from './language.repository';
-import { createLanguageSchema, updateLanguageInstructionsSchema, updateLanguageSchema } from './language.types';
+import {
+  createLanguageSchema,
+  updateLanguageBranchNameSchema,
+  updateLanguageInstructionsSchema,
+  updateLanguageSchema,
+} from './language.types';
 
 export async function listLanguagesAction() {
   await requireUser();
@@ -30,7 +36,7 @@ export async function createLanguageAction(input: unknown) {
   }
 
   const validated = createLanguageSchema.parse(input);
-  return await createLanguage(validated.code, validated.name);
+  return await createLanguage(validated.code, validated.name, validated.branchName);
 }
 
 export async function updateLanguageAction(id: string, input: unknown) {
@@ -57,6 +63,17 @@ export async function updateLanguageInstructionsAction(id: string, input: unknow
 
   const validated = updateLanguageInstructionsSchema.parse(input);
   return await updateLanguageInstructions(id, validated.translationInstructions ?? null);
+}
+
+export async function updateLanguageBranchNameAction(id: string, input: unknown) {
+  const user = await requireUser();
+
+  if (!canManageLanguages(user)) {
+    throw new Error('Forbidden: Only deployers can manage languages');
+  }
+
+  const validated = updateLanguageBranchNameSchema.parse(input);
+  return await updateLanguageBranchName(id, validated.branchName);
 }
 
 export async function deleteLanguageAction(id: string) {

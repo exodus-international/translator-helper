@@ -1,5 +1,6 @@
 'use client';
 
+import { GitHubStatus } from '@/components/github-status';
 import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
 import { SourceTranslationViewer } from '@/components/source-translation-viewer';
 import { StatusDropdown } from '@/components/status-dropdown';
@@ -219,6 +220,7 @@ export default function ReviewClient({
   const handleDeploy = async () => {
     setLoading(true);
     try {
+      console.log('[Deploy] handleDeploy called with targetVersion.id:', targetVersion.id);
       await deployVersionAction(targetVersion.id);
 
       // Trigger download
@@ -567,6 +569,12 @@ export default function ReviewClient({
             </Button>
           </div>
         </Card>
+
+        {/* GitHub Deployment Status */}
+        <GitHubStatus
+          documentVersionId={targetVersion.id}
+          isDeployed={targetVersion.status === DocumentStatus.DEPLOYED}
+        />
 
         {/* Activity Log */}
         {targetVersion.activityLogs && targetVersion.activityLogs.length > 0 && (

@@ -16,16 +16,24 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
 import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { Document, DocumentStatus, Language } from '@prisma/client';
-import { FileText, Plus, Search, Trash2 } from 'lucide-react';
+import { FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type DocumentWithVersions = Document & {
-  folder: any | null; // Deprecated - kept for backward compatibility
+  folder: any | null;
   sourceProject: any | null;
   versions: Array<{
     id: string;
@@ -63,30 +71,69 @@ export default function DocumentsClient({
 }: DocumentsClientProps) {
   const [selectedSourceProject, setSelectedSourceProject] = useState<string>(initialFilters.sourceProject || 'all');
   const [searchQuery, setSearchQuery] = useState<string>(initialFilters.search || '');
+  const isDeployer = isDeployerClient(user);
 
-  // Filter documents based on source project and search
-  const filteredDocuments = documents.filter((doc) => {
-    if (selectedSourceProject !== 'all' && doc.sourceProjectId !== selectedSourceProject) {
-      return false;
-    }
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return doc.title.toLowerCase().includes(query) || doc.slug.toLowerCase().includes(query);
-    }
-    return true;
-  });
+  // Filter documents
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((doc) => {
+      if (selectedSourceProject !== 'all' && doc.sourceProjectId !== selectedSourceProject) {
+        return false;
+      }
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return doc.title.toLowerCase().includes(query) || doc.slug.toLowerCase().includes(query);
+      }
+      return true;
+    });
+  }, [documents, selectedSourceProject, searchQuery]);
 
-  // Helper to get version status for a specific language
+  // Group documents by source project
+  const groupedDocuments = useMemo(() => {
+    const groups: Array<{ projectName: string; projectId: string | null; docs: DocumentWithVersions[] }> = [];
+    const projectMap = new Map<string | null, DocumentWithVersions[]>();
+
+    // Sort documents by project name then title
+    const sorted = [...filteredDocuments].sort((a, b) => {
+      const projA = a.sourceProject?.name || 'zzz';
+      const projB = b.sourceProject?.name || 'zzz';
+      if (projA !== projB) return projA.localeCompare(projB);
+      return a.title.localeCompare(b.title);
+    });
+
+    for (const doc of sorted) {
+      const key = doc.sourceProjectId;
+      if (!projectMap.has(key)) {
+        projectMap.set(key, []);
+      }
+      projectMap.get(key)!.push(doc);
+    }
+
+    for (const [projectId, docs] of projectMap) {
+      const projectName = docs[0]?.sourceProject?.name || 'Unassigned';
+      groups.push({ projectName, projectId, docs });
+    }
+
+    // Move "Unassigned" to the end
+    groups.sort((a, b) => {
+      if (a.projectId === null) return 1;
+      if (b.projectId === null) return -1;
+      return a.projectName.localeCompare(b.projectName);
+    });
+
+    return groups;
+  }, [filteredDocuments]);
+
   const getLanguageStatus = (doc: DocumentWithVersions, languageId: string) => {
     const version = doc.versions.find((v) => v.languageId === languageId);
     return version?.status || null;
   };
 
-  // Helper to get version ID for a specific language
   const getVersionId = (doc: DocumentWithVersions, languageId: string) => {
     const version = doc.versions.find((v) => v.languageId === languageId);
     return version?.id;
   };
+
+  const totalColumns = 3 + languages.length + (isDeployer ? 1 : 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -143,135 +190,132 @@ export default function DocumentsClient({
             <p className="text-gray-500">No documents found</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* Header Row */}
-            <Card className="p-4 bg-gray-50">
-              <div className="grid grid-cols-12 gap-4 items-center">
-                <div className="col-span-4">
-                  <h3 className="font-semibold text-sm text-gray-700">Document</h3>
-                </div>
-                <div className="col-span-7">
-                  <div className="flex gap-6">
-                    {languages.map((lang) => (
-                      <div key={lang.id} className="flex-1 text-center">
-                        <span className="text-sm font-medium text-gray-700">{lang.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {isDeployerClient(user) && (
-                  <div className="flex justify-end col-span-1 text-sm font-medium text-gray-700"> Options </div>
-                )}
-              </div>
-            </Card>
+          <div className="rounded-md border bg-white">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50/80">
+                  <TableHead className="min-w-[200px]">Title</TableHead>
+                  <TableHead className="min-w-[120px]">Filename</TableHead>
+                  <TableHead className="min-w-[80px]">Type</TableHead>
+                  {languages.map((lang) => (
+                    <TableHead key={lang.id} className="text-center min-w-[60px]">
+                      {lang.name}
+                    </TableHead>
+                  ))}
+                  {isDeployer && <TableHead className="text-right min-w-[100px]">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupedDocuments.map((group) => (
+                  <>
+                    {/* Group header row */}
+                    <TableRow key={`group-${group.projectId || 'unassigned'}`} className="bg-gray-100/60 hover:bg-gray-100/60">
+                      <TableCell colSpan={totalColumns} className="py-2 px-4">
+                        <span className="text-sm font-semibold text-gray-700">
+                          {group.projectName}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          ({group.docs.length} {group.docs.length === 1 ? 'document' : 'documents'})
+                        </span>
+                      </TableCell>
+                    </TableRow>
 
-            {/* Document Rows */}
-            {filteredDocuments.map((doc) => (
-              <Card key={doc.id} className="p-4 hover:shadow-md transition-shadow">
-                <div className="grid grid-cols-12 gap-4 items-center">
-                  {/* Document Info */}
-                  <div className="col-span-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base truncate">{doc.title}</h3>
-                        <p className="text-sm text-gray-600 truncate">
-                          {doc.slug}
-                          {doc.sourceProject && (
-                            <>
-                              {' '}
-                              <span className="text-gray-400">•</span> {doc.sourceProject.name}
-                            </>
-                          )}
-                        </p>
-                        {doc.labels && doc.labels.length > 0 && (
-                          <div className="flex gap-1 mt-1 flex-wrap">
-                            {doc.labels.map((label: string) => (
-                              <Badge key={label} variant="secondary" className="text-xs">
-                                {label}
-                              </Badge>
-                            ))}
+                    {/* Document rows */}
+                    {group.docs.map((doc) => (
+                      <TableRow key={doc.id}>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Link
+                              href={`/documents/${doc.id}/review?version=${doc.versions[0]?.id || ''}`}
+                              className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {doc.title}
+                            </Link>
+                            {doc.labels && doc.labels.length > 0 && (
+                              <div className="flex gap-1 flex-wrap">
+                                {doc.labels.map((label: string) => (
+                                  <Badge key={label} variant="secondary" className="text-xs py-0">
+                                    {label}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                        </TableCell>
+                        <TableCell className="text-gray-600 text-sm">
+                          {doc.originalFilename || '—'}
+                        </TableCell>
+                        <TableCell>
+                          {doc.type ? (
+                            <Badge variant="outline" className="text-xs font-normal">
+                              {doc.type.replace('_', ' ')}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400 text-sm">—</span>
+                          )}
+                        </TableCell>
+                        {languages.map((lang) => {
+                          const status = getLanguageStatus(doc, lang.id);
+                          const versionId = getVersionId(doc, lang.id);
+                          const statusConfig = getDocumentStatusConfig(status);
+                          const IndicatorIcon = statusConfig.icon;
 
-                  {/* Language Status Indicators */}
-                  <div className="col-span-7">
-                    <div className="flex gap-6">
-                      {languages.map((lang) => {
-                        const status = getLanguageStatus(doc, lang.id);
-                        const versionId = getVersionId(doc, lang.id);
-                        const statusConfig = getDocumentStatusConfig(status);
-                        const IndicatorIcon = statusConfig.icon;
+                          const href = versionId
+                            ? status === 'PENDING_TRANSLATION' || status === 'IN_PROGRESS'
+                              ? `/documents/${doc.id}/translate?lang=${lang.id}&version=${versionId}`
+                              : `/documents/${doc.id}/review?version=${versionId}`
+                            : `/documents/${doc.id}/translate?lang=${lang.id}`;
 
-                        return (
-                          <div key={lang.id} className="flex-1 flex justify-center items-center gap-2">
-                            {versionId ? (
-                              <>
-                                <Link
-                                  href={
-                                    status === 'PENDING_TRANSLATION' || status === 'IN_PROGRESS'
-                                      ? `/documents/${doc.id}/translate?lang=${lang.id}&version=${versionId}`
-                                      : `/documents/${doc.id}/review?version=${versionId}`
-                                  }
-                                  className="group"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <div
-                                    className={`${statusConfig.color.textClass} transition-transform group-hover:scale-110 cursor-pointer`}
-                                    title={statusConfig.name}
-                                  >
-                                    <IndicatorIcon className="h-4 w-4" />
-                                  </div>
-                                </Link>
-                              </>
-                            ) : (
-                              <Link
-                                href={`/documents/${doc.id}/translate?lang=${lang.id}`}
-                                className="group"
-                                onClick={(e) => e.stopPropagation()}
-                              >
+                          return (
+                            <TableCell key={lang.id} className="text-center">
+                              <Link href={href} className="group inline-flex justify-center">
                                 <div
-                                  className={`${statusConfig.color.textClass} transition-transform group-hover:scale-110 cursor-pointer`}
-                                  title="Start translation"
+                                  className={`${statusConfig.color.textClass} transition-transform group-hover:scale-125 cursor-pointer`}
+                                  title={versionId ? statusConfig.name : 'Start translation'}
                                 >
                                   <IndicatorIcon className="h-4 w-4" />
                                 </div>
                               </Link>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  {isDeployerClient(user) && (
-                    <div className="flex justify-end col-span-1">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Document</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete "{doc.title}"? This will delete the source version and all
-                              translation versions. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteDocument(doc.id)}>Delete</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            ))}
+                            </TableCell>
+                          );
+                        })}
+                        {isDeployer && (
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Link href={`/documents/${doc.id}/edit`}>
+                                <Button variant="ghost" size="sm">
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Document</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete &ldquo;{doc.title}&rdquo;? This will delete the source version and all
+                                      translation versions. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteDocument(doc.id)}>Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
 

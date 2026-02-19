@@ -229,6 +229,7 @@ export async function createDocument(data: {
   labels: string[];
   deadline?: Date;
   originalFilename?: string;
+  type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT';
 }): Promise<
   Prisma.DocumentGetPayload<{
     include: {
@@ -247,6 +248,7 @@ export async function createDocument(data: {
       labels: data.labels,
       deadline: data.deadline,
       originalFilename: data.originalFilename,
+      type: data.type,
     },
     include: {
       folder: true, // Deprecated
@@ -264,6 +266,8 @@ export async function updateDocument(
     folderId?: string | null; // Deprecated - kept for backward compatibility
     labels?: string[];
     deadline?: Date | null;
+    type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT' | null;
+    originalFilename?: string | null;
   },
 ): Promise<
   Prisma.DocumentGetPayload<{

@@ -44,6 +44,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [labelInput, setLabelInput] = useState('');
   const [deadline, setDeadline] = useState<string>('');
   const [originalFilename, setOriginalFilename] = useState<string>('');
+  const [documentType, setDocumentType] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -81,12 +82,13 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
         const extractedTitle = frontmatter.title || file.name.replace('.md', '');
         setTitle(extractedTitle);
 
-        // Generate slug from title
-        const generatedSlug = extractedTitle
+        // Generate slug from title with random suffix for uniqueness
+        const base = extractedTitle
           .toLowerCase()
           .replace(/\s+/g, '-')
           .replace(/[^a-z0-9-]/g, '');
-        setSlug(generatedSlug);
+        const suffix = Math.random().toString(36).substring(2, 7);
+        setSlug(base ? `${base}-${suffix}` : '');
 
         // Extract labels from frontmatter
         const extractedLabels: string[] = [];
@@ -122,12 +124,13 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
         const extractedTitle = frontmatter.title || file.name.replace('.md', '');
         setTitle(extractedTitle);
 
-        // Generate slug from title
-        const generatedSlug = extractedTitle
+        // Generate slug from title with random suffix for uniqueness
+        const base = extractedTitle
           .toLowerCase()
           .replace(/\s+/g, '-')
           .replace(/[^a-z0-9-]/g, '');
-        setSlug(generatedSlug);
+        const suffix = Math.random().toString(36).substring(2, 7);
+        setSlug(base ? `${base}-${suffix}` : '');
 
         // Extract labels from frontmatter
         const extractedLabels: string[] = [];
@@ -145,15 +148,13 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
-    // Auto-generate slug from title
-    if (!slug) {
-      setSlug(
-        value
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-          .replace(/[^a-z0-9-]/g, ''),
-      );
-    }
+    // Always auto-generate slug from title with random suffix for uniqueness
+    const base = value
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+    const suffix = Math.random().toString(36).substring(2, 7);
+    setSlug(base ? `${base}-${suffix}` : '');
   };
 
   const addLabel = () => {
@@ -213,6 +214,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
         labels,
         deadline: deadline ? new Date(deadline) : undefined,
         originalFilename: originalFilename || undefined,
+        type: documentType || undefined,
       });
 
       router.push('/dashboard');
@@ -290,15 +292,14 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                         />
                       </div>
                       <div>
-                        <Label htmlFor="slug">Slug *</Label>
+                        <Label htmlFor="originalFilename">Original Filename</Label>
                         <Input
-                          id="slug"
-                          value={slug}
-                          onChange={(e) => setSlug(e.target.value)}
-                          required
-                          placeholder="document-slug"
-                          pattern="[a-z0-9\-]+"
+                          id="originalFilename"
+                          value={originalFilename}
+                          onChange={(e) => setOriginalFilename(e.target.value)}
+                          placeholder="e.g., 1.md"
                         />
+                        <p className="text-xs text-gray-500 mt-1">Used for GitHub deploy path</p>
                       </div>
                     </div>
 
@@ -374,6 +375,21 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                           placeholder="Select deadline"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="documentType">Document Type</Label>
+                      <Select value={documentType} onValueChange={setDocumentType}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DAY">Day</SelectItem>
+                          <SelectItem value="FIELD_GUIDE">Field Guide</SelectItem>
+                          <SelectItem value="DAILY_CONTENT">Daily Content</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500 mt-1">Determines the file path in the content repository</p>
                     </div>
 
                     <div>
