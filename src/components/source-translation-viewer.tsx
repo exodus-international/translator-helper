@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
-import { Edit, Eye, FileEdit, Save, X } from 'lucide-react';
+import { Edit, Eye, FileEdit, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -124,6 +124,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
   ) {
     const isZen = layout === 'zen';
     const [mounted, setMounted] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
@@ -278,8 +279,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       }
     };
 
-    const cardClassName = isZen ? 'p-4 h-full flex flex-col' : 'p-6';
-    const bodyClassName = isZen ? 'flex-1 overflow-hidden' : undefined;
+    const cardClassName = isZen ? 'p-3 h-full flex flex-col min-w-0' : 'pt-3 px-0';
+    const bodyClassName = isZen ? 'flex-1 min-h-0 relative' : undefined;
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -464,6 +465,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     };
 
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
+    const sidebarHidden = isZen && sidebarCollapsed;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
@@ -471,14 +473,18 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
 
     return (
       <div className={cn(
-        'grid gap-4',
-        hasSidebar ? 'grid-cols-[1fr_1fr_340px]' : 'grid-cols-2 gap-6',
+        'grid gap-3',
+        hasSidebar
+          ? sidebarHidden
+            ? 'grid-cols-2'
+            : 'grid-cols-[1fr_1fr_340px]'
+          : 'grid-cols-2',
         className,
         isZen && 'h-full',
       )}>
         <Card className={cn(cardClassName)}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Source (English)</h2>
+          <div className="flex items-center justify-between mb-2 px-3">
+            <h2 className="text-sm font-semibold">Source (English)</h2>
             <div className="flex items-center gap-2">
               {!isSourceEditing &&
                 (mounted ? (
@@ -577,7 +583,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 }}
               />
             ) : sourceViewMode === 'formatted' ? (
-              <div className="prose max-w-none">
+              <div className={cn('prose max-w-none', isZen && 'absolute inset-0 overflow-y-auto')}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
               </div>
             ) : (
@@ -601,8 +607,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
         </Card>
 
         <Card className={cn(cardClassName)}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Translation</h2>
+          <div className="flex items-center justify-between mb-2 px-3">
+            <h2 className="text-sm font-semibold">Translation</h2>
             <div className="flex items-center gap-2">
               {variant === 'translate' ? (
                 mounted ? (
@@ -707,6 +713,22 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
               )}
               {translationHeaderExtra}
               {variant === 'review' && reviewConfig?.headerExtra}
+              {isZen && hasSidebar && sidebarCollapsed && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="h-7 text-xs"
+                >
+                  <PanelRightOpen className="h-3.5 w-3.5 mr-1" />
+                  Feedback
+                  {openSuggestionsCount > 0 && (
+                    <Badge variant="primary" className="ml-1 h-4 min-w-4 px-1 text-[10px]">
+                      {openSuggestionsCount}
+                    </Badge>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -757,7 +779,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   )}
                 </div>
               ) : (
-                <div className="prose max-w-none min-h-[500px]">
+                <div className={cn('prose max-w-none', isZen ? 'absolute inset-0 overflow-y-auto' : 'min-h-[500px]')}>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {translationPreview || translationPreviewEmptyText}
                   </ReactMarkdown>
@@ -787,7 +809,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 {translationEditActions}
               </div>
             ) : reviewViewMode === 'formatted' ? (
-              <div className="prose max-w-none">
+              <div className={cn('prose max-w-none', isZen && 'absolute inset-0 overflow-y-auto')}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
               </div>
             ) : (
@@ -850,7 +872,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
           </div>
         </Card>
 
-        {hasSidebar && (
+        {hasSidebar && !sidebarHidden && (
           <ThreadSidebar
             suggestions={suggestions}
             currentUserId={currentUserId || ''}
@@ -862,8 +884,10 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             onSuggestionClick={handleSuggestionClickInternal}
             onCreateGeneralThread={onCreateGeneralThread}
             activeThreadId={activeThreadId}
+            onCollapse={isZen ? () => setSidebarCollapsed(true) : undefined}
           />
         )}
+
       </div>
     );
   },

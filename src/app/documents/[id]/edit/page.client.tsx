@@ -113,8 +113,8 @@ export default function EditDocumentClient({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <Card className="p-8">
+      <div className="container mx-auto px-4 py-4">
+        <Card className="p-4">
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">

@@ -85,7 +85,7 @@ export function ThreadCard({
   return (
     <div
       className={cn(
-        'rounded-md border bg-white px-3 py-2.5 cursor-pointer transition-colors',
+        'rounded border bg-white px-2.5 py-2 cursor-pointer transition-colors',
         'hover:bg-muted/40',
         isActive ? 'border-blue-400 bg-blue-50/50 ring-1 ring-blue-200' : 'border-border',
         suggestion.status !== SuggestionStatus.OPEN && 'opacity-70',

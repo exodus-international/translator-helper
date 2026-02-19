@@ -74,8 +74,8 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
   if (!isDeployed) return null;
 
   return (
-    <Card className="mt-6 p-6">
-      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+    <Card className="mt-4 p-4">
+      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
         <GitBranch className="h-5 w-5" />
         GitHub Deployment
       </h3>
@@ -100,7 +100,7 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
       {!loading && commits.length > 0 && (
         <div className="space-y-4">
           {commits.map((commit) => (
-            <div key={commit.id} className="border rounded-lg p-4 space-y-2">
+            <div key={commit.id} className="border rounded p-3 space-y-1.5">
               {commit.errorMessage ? (
                 <div className="flex items-start gap-2 text-red-600">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />

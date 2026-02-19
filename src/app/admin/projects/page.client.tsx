@@ -232,7 +232,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4">
           {sourceProjects.map((project) => (
             <Card key={project.id} className="p-4">

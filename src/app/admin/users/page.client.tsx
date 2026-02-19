@@ -157,7 +157,7 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4">
           {users.map((user) => (
             <Card key={user.id} className="p-4">

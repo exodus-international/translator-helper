@@ -28,8 +28,6 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
     onChange,
     onCursorChange,
     readOnly = false,
-    placeholder,
-    rows = 20,
     className,
     currentLine,
     highlightLine,
@@ -153,7 +151,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
   });
 
   return (
-    <div className={cn('border rounded-md overflow-hidden h-full', className)}>
+    <div className={cn('border overflow-hidden h-full', className)}>
       <Editor
         height="100%"
         defaultLanguage="markdown"

@@ -358,11 +358,11 @@ export default function TranslationProjectClient({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid gap-8 lg:grid-cols-2">
+      <div className="container mx-auto px-4 py-4">
+        <div className="grid gap-4 lg:grid-cols-2">
           {/* Members Section */}
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <Users className="h-5 w-5" />
                 Project Members
@@ -552,8 +552,8 @@ export default function TranslationProjectClient({
                 );
               })}
               {Object.keys(membersByUser).length === 0 && (
-                <Card className="p-8 text-center">
-                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <Card className="p-6 text-center">
+                  <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-600">No members yet. Add one to get started.</p>
                 </Card>
               )}
@@ -562,7 +562,7 @@ export default function TranslationProjectClient({
 
           {/* Document Assignments Section */}
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Document Assignments
@@ -749,8 +749,8 @@ export default function TranslationProjectClient({
               )}
 
               {assignments.length === 0 && (
-                <Card className="p-8 text-center">
-                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <Card className="p-6 text-center">
+                  <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-600">No document assignments yet. Assign documents to get started.</p>
                 </Card>
               )}

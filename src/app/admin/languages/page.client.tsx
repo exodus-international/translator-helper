@@ -174,7 +174,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4">
           {languages.map((language) => (
             <Card key={language.id} className="p-4">

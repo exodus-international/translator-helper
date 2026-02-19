@@ -158,8 +158,8 @@ export function ActivityLog({ entries }: ActivityLogProps) {
   const collapsed = collapseEntries(entries);
 
   return (
-    <Card className="mt-6 p-6">
-      <h3 className="text-lg font-semibold mb-4">Activity Log</h3>
+    <Card className="mt-4 p-4">
+      <h3 className="text-sm font-semibold mb-2">Activity Log</h3>
       <div className="space-y-2">
         {collapsed.map((group) => {
           const Icon = group.config.icon;

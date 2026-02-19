@@ -183,10 +183,10 @@ export default function DocumentsClient({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4">
         {filteredDocuments.length === 0 ? (
           <div className="text-center py-12">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
             <p className="text-gray-500">No documents found</p>
           </div>
         ) : (
@@ -321,7 +321,7 @@ export default function DocumentsClient({
 
         {/* Legend */}
         {filteredDocuments.length > 0 && (
-          <Card className="mt-6 p-4 bg-gray-50">
+          <Card className="mt-4 p-4 bg-gray-50">
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Legend</h4>
             <div className="flex flex-wrap gap-6 text-sm">
               {[...DOCUMENT_STATUS_SEQUENCE, null].map((status) => {
