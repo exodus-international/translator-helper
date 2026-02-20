@@ -33,10 +33,9 @@ import {
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
 import { canReviewClient, isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { cn } from '@/lib/utils';
 import { DocumentStatus, SuggestionType } from '@prisma/client';
 import matter from 'gray-matter';
-import { Download, FileCheck, FilePlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -131,7 +130,6 @@ export default function ReviewClient({
 
   const canDeploy = targetVersion.status === 'APPROVED';
   const isPendingReview = targetVersion.status === 'PENDING_REVIEW';
-  const currentStatusConfig = getDocumentStatusConfig(targetVersion.status);
   const statusSteps = DOCUMENT_STATUS_SEQUENCE.map((status, index) => ({
     status,
     step: index + 1,
@@ -450,123 +448,127 @@ export default function ReviewClient({
     </div>
   );
 
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold">{document.title}</h1>
-              <div className="flex items-center flex-col gap-2">
-                <div className="flex justify-between w-full">
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary">{sourceVersion.language.name}</Badge>
-                    <span className="text-gray-400">→</span>
-                    <Badge variant="secondary">{targetVersion.language.name}</Badge>
-                    <Badge variant="secondary" className={cn('gap-1', currentStatusConfig.color.badgeClass)}>
-                      <currentStatusConfig.icon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
-                      {currentStatusConfig.name}
-                    </Badge>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    {(targetVersion.status === DocumentStatus.APPROVED ||
-                      targetVersion.status === DocumentStatus.DEPLOYED) && (
-                      <Button variant="default" size="sm" onClick={handleDownload} disabled={loading}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                    )}
-                    {targetVersion.status === DocumentStatus.PENDING_REVIEW && (
-                      <Button
-                        variant={waitingForFinalLabel ? 'outline' : 'default'}
-                        size="sm"
-                        onClick={handleToggleWaitingForFinalLabel}
-                        disabled={labelLoading}
-                        className={
-                          waitingForFinalLabel
-                            ? 'bg-green-700 text-white border-green-200 hover:bg-green-700/80 hover:text-white'
-                            : ''
-                        }
-                      >
-                        {waitingForFinalLabel ? <FileCheck className="h-4 w-4" /> : <FilePlus className="h-4 w-4" />}
-                        {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
-                      </Button>
-                    )}
-                    <StatusDropdown
-                      currentStatus={targetVersion.status}
-                      versionId={targetVersion.id}
-                      user={user}
-                      documentId={document.id}
-                      languageId={targetVersion.languageId}
-                      disabled={loading}
-                      onStatusChange={handleStatusChange}
-                    />
-                  </div>
-                </div>
-                <div className="mt-4 w-full">
-                  <Stepper value={getStatusStep(targetVersion.status)} orientation="horizontal">
-                    <StepperNav>
-                      {statusSteps.map(({ step, status, config }) => (
-                        <StepperItem key={status} step={step} completed={isStepCompleted(step, targetVersion.status)}>
-                          <StepperTrigger disabled>
-                            <StepperStatusIndicator status={status} />
-                            <StepperTitle className={config.color.textClass}>{config.name}</StepperTitle>
-                          </StepperTrigger>
-                          {step < statusSteps.length && <StepperSeparator />}
-                        </StepperItem>
-                      ))}
-                    </StepperNav>
-                  </Stepper>
-                </div>
-              </div>
-            </div>
+        <div className="px-3 py-1.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-sm font-semibold truncate">{document.title}</h1>
+            <span className="text-xs text-gray-500 shrink-0">
+              {sourceVersion.language.name} → {targetVersion.language.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {(targetVersion.status === DocumentStatus.APPROVED ||
+              targetVersion.status === DocumentStatus.DEPLOYED) && (
+              <Button variant="default" size="sm" onClick={handleDownload} disabled={loading}>
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </Button>
+            )}
+            {targetVersion.status === DocumentStatus.PENDING_REVIEW && (
+              <Button
+                variant={waitingForFinalLabel ? 'outline' : 'default'}
+                size="sm"
+                onClick={handleToggleWaitingForFinalLabel}
+                disabled={labelLoading}
+                className={
+                  waitingForFinalLabel
+                    ? 'bg-green-700 text-white border-green-200 hover:bg-green-700/80 hover:text-white'
+                    : ''
+                }
+              >
+                {waitingForFinalLabel ? <FileCheck className="h-4 w-4" /> : <FilePlus className="h-4 w-4" />}
+                {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
+              </Button>
+            )}
+            <StatusDropdown
+              currentStatus={targetVersion.status}
+              versionId={targetVersion.id}
+              user={user}
+              documentId={document.id}
+              languageId={targetVersion.languageId}
+              disabled={loading}
+              onStatusChange={handleStatusChange}
+            />
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-2 py-4">
-        <SourceTranslationViewer
-          variant="review"
-          sourceContent={sourceVersion.content}
-          sourceFormattedContent={sourceFormattedContent}
-          translationContent={content}
-          translationFormattedContent={translationFormattedContent}
-          onTranslationChange={setContent}
-          sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
-          translationBadge={<Badge variant="secondary">{targetVersion.language.name}</Badge>}
-          canEditSource={canEditSource}
-          onSourceChange={handleSourceChange}
-          onSourceSave={handleSourceSave}
-          onSourceDelete={handleSourceDeleteConfirm}
-          sourceEditContent={sourceEditContent}
-          reviewConfig={{
-            canEdit: isPendingReview,
-            renderEditActions: reviewEditActions,
-          }}
-          suggestions={suggestions}
-          canCreateSuggestions={canCreateSuggestions}
-          currentUserId={user.id}
-          onSuggestionClick={() => {}}
-          onApplySuggestion={handleApplySuggestion}
-          onDismissSuggestion={handleDismissSuggestion}
-          onCreateSuggestion={handleCreateSuggestion}
-          documentVersion={targetVersion.version}
-          isApplyingSuggestion={isApplyingSuggestion}
-          isDismissingSuggestion={isDismissingSuggestion}
-          onReply={handleReply}
-          onCreateGeneralThread={handleCreateGeneralThread}
-        />
+      <div className="">
+        <div className="h-[calc(100vh-7.5rem)]">
+          <SourceTranslationViewer
+            variant="review"
+            className="h-full"
+            sourceContent={sourceVersion.content}
+            sourceFormattedContent={sourceFormattedContent}
+            translationContent={content}
+            translationFormattedContent={translationFormattedContent}
+            onTranslationChange={setContent}
+            sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
+            translationBadge={<Badge variant="secondary">{targetVersion.language.name}</Badge>}
+            canEditSource={canEditSource}
+            onSourceChange={handleSourceChange}
+            onSourceSave={handleSourceSave}
+            onSourceDelete={handleSourceDeleteConfirm}
+            sourceEditContent={sourceEditContent}
+            reviewConfig={{
+              canEdit: isPendingReview,
+              renderEditActions: reviewEditActions,
+            }}
+            suggestions={suggestions}
+            canCreateSuggestions={canCreateSuggestions}
+            currentUserId={user.id}
+            onSuggestionClick={() => {}}
+            onApplySuggestion={handleApplySuggestion}
+            onDismissSuggestion={handleDismissSuggestion}
+            onCreateSuggestion={handleCreateSuggestion}
+            documentVersion={targetVersion.version}
+            isApplyingSuggestion={isApplyingSuggestion}
+            isDismissingSuggestion={isDismissingSuggestion}
+            onReply={handleReply}
+            onCreateGeneralThread={handleCreateGeneralThread}
+          />
+        </div>
 
-        {/* GitHub Deployment Status */}
-        <GitHubStatus
-          documentVersionId={targetVersion.id}
-          isDeployed={targetVersion.status === DocumentStatus.DEPLOYED}
-        />
+        {/* Collapsible details section */}
+        <div className="mt-1 p-4">
+          <button
+            onClick={() => setDetailsExpanded(!detailsExpanded)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+          >
+            {detailsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {detailsExpanded ? 'Hide details' : 'Show details'}
+          </button>
+          {detailsExpanded && (
+            <div className="space-y-4 py-2">
+              <Stepper value={getStatusStep(targetVersion.status)} orientation="horizontal">
+                <StepperNav>
+                  {statusSteps.map(({ step, status, config }) => (
+                    <StepperItem key={status} step={step} completed={isStepCompleted(step, targetVersion.status)}>
+                      <StepperTrigger disabled>
+                        <StepperStatusIndicator status={status} />
+                        <StepperTitle className={config.color.textClass}>{config.name}</StepperTitle>
+                      </StepperTrigger>
+                      {step < statusSteps.length && <StepperSeparator />}
+                    </StepperItem>
+                  ))}
+                </StepperNav>
+              </Stepper>
 
-        {/* Activity Log */}
-        {targetVersion.activityLogs && targetVersion.activityLogs.length > 0 && (
-          <ActivityLog entries={targetVersion.activityLogs} />
-        )}
+              <GitHubStatus
+                documentVersionId={targetVersion.id}
+                isDeployed={targetVersion.status === DocumentStatus.DEPLOYED}
+              />
+
+              {targetVersion.activityLogs && targetVersion.activityLogs.length > 0 && (
+                <ActivityLog entries={targetVersion.activityLogs} />
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

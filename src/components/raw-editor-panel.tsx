@@ -48,23 +48,19 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
   ref,
 ) {
   return (
-    <div className={cn(fullHeight ? 'flex h-full flex-col space-y-2' : 'space-y-2', className)}>
+    <div className={cn(fullHeight ? 'flex h-full flex-col space-y-2 ' : 'flex h-full flex-col space-y-2', className)}>
       {lineInfo && (
-        <div className="flex items-center gap-2 text-xs text-gray-500 px-3">
-          <span className="font-semibold">
-            {lineInfo.primaryLabel}: {lineInfo.primaryValue}
-          </span>
+        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 px-2 py-0.5">
+          <span className="font-semibold">L{lineInfo.primaryValue}</span>
           {lineInfo.secondaryLabel !== undefined && lineInfo.secondaryValue !== undefined && (
             <>
-              <span className="text-gray-400">{lineInfo.direction === 'from' ? '←' : '→'}</span>
-              <span>
-                {lineInfo.secondaryLabel}: {lineInfo.secondaryValue}
-              </span>
+              <span>{lineInfo.direction === 'from' ? '←' : '→'}</span>
+              <span>L{lineInfo.secondaryValue}</span>
             </>
           )}
         </div>
       )}
-      <div className={cn(fullHeight ? 'flex-1' : 'h-120', editorContainerClassName)}>
+      <div className={cn(fullHeight ? 'flex-1' : 'flex h-full flex-col', editorContainerClassName)}>
         <TextareaWithLineNumbers
           ref={ref}
           value={value}

@@ -1,15 +1,18 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { DocumentTypeSelect } from '@/components/document-form/document-type-select';
+import { LabelsField } from '@/components/document-form/labels-field';
+import { OriginalFilenameField } from '@/components/document-form/original-filename-field';
+import { validateDailyContentFilename } from '@/components/document-form/validate-daily-content-filename';
 import { updateDocumentAction } from '@/domain/document/document.actions';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -48,20 +51,10 @@ export default function EditDocumentClient({
   const [documentType, setDocumentType] = useState(document.type || '');
   const [sourceProjectId, setSourceProjectId] = useState(document.sourceProjectId || '');
   const [labels, setLabels] = useState<string[]>(document.labels || []);
-  const [labelInput, setLabelInput] = useState('');
   const [content, setContent] = useState(sourceVersion?.content || '');
   const [loading, setLoading] = useState(false);
 
-  const addLabel = () => {
-    if (labelInput && !labels.includes(labelInput)) {
-      setLabels([...labels, labelInput]);
-      setLabelInput('');
-    }
-  };
-
-  const removeLabel = (label: string) => {
-    setLabels(labels.filter((l) => l !== label));
-  };
+  const dailyContentFilenameError = validateDailyContentFilename(documentType, originalFilename);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,16 +121,12 @@ export default function EditDocumentClient({
                     placeholder="Document title"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="originalFilename">Original Filename</Label>
-                  <Input
-                    id="originalFilename"
-                    value={originalFilename}
-                    onChange={(e) => setOriginalFilename(e.target.value)}
-                    placeholder="e.g., 1.md"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Used for GitHub deploy path</p>
-                </div>
+                <OriginalFilenameField
+                  value={originalFilename}
+                  onChange={setOriginalFilename}
+                  documentType={documentType}
+                  error={dailyContentFilenameError}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -156,53 +145,10 @@ export default function EditDocumentClient({
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="documentType">Document Type</Label>
-                  <Select value={documentType} onValueChange={setDocumentType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DAY">Day</SelectItem>
-                      <SelectItem value="FIELD_GUIDE">Field Guide</SelectItem>
-                      <SelectItem value="DAILY_CONTENT">Daily Content</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
               </div>
 
-              <div>
-                <Label htmlFor="labels">Labels</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="labels"
-                    value={labelInput}
-                    onChange={(e) => setLabelInput(e.target.value)}
-                    placeholder="Add label"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addLabel();
-                      }
-                    }}
-                  />
-                  <Button type="button" onClick={addLabel} variant="outline">
-                    Add
-                  </Button>
-                </div>
-                {labels.length > 0 && (
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    {labels.map((label) => (
-                      <Badge key={label} variant="secondary">
-                        {label}
-                        <button type="button" onClick={() => removeLabel(label)} className="ml-2">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <LabelsField labels={labels} onChange={setLabels} />
 
               {sourceVersion && (
                 <div>
@@ -224,7 +170,7 @@ export default function EditDocumentClient({
                     Cancel
                   </Button>
                 </Link>
-                <Button type="submit" disabled={loading || !title}>
+                <Button type="submit" disabled={loading || !title || !!dailyContentFilenameError}>
                   {loading ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>

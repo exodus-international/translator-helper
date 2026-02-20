@@ -279,8 +279,10 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       }
     };
 
-    const cardClassName = isZen ? 'p-3 h-full flex flex-col min-w-0' : 'pt-3 px-0';
-    const bodyClassName = isZen ? 'flex-1 min-h-0 relative' : undefined;
+    const cardClassName = isZen
+      ? 'p-3 h-full flex flex-col min-w-0'
+      : 'p-0 gap-0 shadow-none h-full flex flex-col min-w-0';
+    const bodyClassName = isZen ? 'flex-1 min-h-0 relative' : 'flex-1 min-h-0';
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -473,7 +475,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
 
     return (
       <div className={cn(
-        'grid gap-3',
+        'grid border-0',
         hasSidebar
           ? sidebarHidden
             ? 'grid-cols-2'
@@ -482,8 +484,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
         className,
         isZen && 'h-full',
       )}>
-        <Card className={cn(cardClassName)}>
-          <div className="flex items-center justify-between mb-2 px-3">
+        <Card className={cn(cardClassName, "rounded-none border-t-0 border-r-0")}>
+          <div className="flex items-center justify-between py-1.5 px-2">
             <h2 className="text-sm font-semibold">Source (English)</h2>
             <div className="flex items-center gap-2">
               {!isSourceEditing &&
@@ -573,7 +575,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 currentLine={sourceLine}
                 highlightLine={syncedSourceLine}
                 onCursorChange={handleSourceCursorChange}
-                fullHeight={isZen}
+                fullHeight
                 lineInfo={{
                   primaryLabel: 'Source Line',
                   primaryValue: sourceLine,
@@ -583,7 +585,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 }}
               />
             ) : sourceViewMode === 'formatted' ? (
-              <div className={cn('prose max-w-none', isZen && 'absolute inset-0 overflow-y-auto')}>
+              <div className="prose max-w-none h-full overflow-y-auto">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
               </div>
             ) : (
@@ -593,7 +595,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 currentLine={sourceLine}
                 highlightLine={syncedSourceLine}
                 onCursorChange={handleSourceCursorChange}
-                fullHeight={isZen}
+                fullHeight
                 lineInfo={{
                   primaryLabel: 'Source Line',
                   primaryValue: sourceLine,
@@ -606,8 +608,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
           </div>
         </Card>
 
-        <Card className={cn(cardClassName)}>
-          <div className="flex items-center justify-between mb-2 px-3">
+        <Card className={cn(cardClassName, "rounded-none border-t-0 border-r-0")}>
+          <div className="flex items-center justify-between py-1.5 px-2">
             <h2 className="text-sm font-semibold">Translation</h2>
             <div className="flex items-center gap-2">
               {variant === 'translate' ? (
@@ -744,7 +746,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                     placeholder={translationPlaceholder}
                     currentLine={translationLine}
                     highlightLine={syncedTranslationLine}
-                    fullHeight={isZen}
+                    fullHeight
                     suggestions={showSuggestionDecorations ? suggestions : undefined}
                     onSuggestionClick={showSuggestionDecorations ? handleSuggestionClickInternal : undefined}
                     onSelectionChange={showSelectionToolbar ? handleSelectionChange : undefined}
@@ -779,21 +781,21 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   )}
                 </div>
               ) : (
-                <div className={cn('prose max-w-none', isZen ? 'absolute inset-0 overflow-y-auto' : 'min-h-[500px]')}>
+                <div className="prose max-w-none h-full overflow-y-auto">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {translationPreview || translationPreviewEmptyText}
                   </ReactMarkdown>
                 </div>
               )
             ) : isReviewEditing ? (
-              <div className={cn('space-y-4', isZen && 'h-full flex flex-col')}>
+              <div className="h-full flex flex-col space-y-2">
                 <RawEditorPane
                   value={translationContent}
                   onChange={onTranslationChange}
                   onCursorChange={handleTranslationCursorChange}
                   currentLine={translationLine}
                   highlightLine={syncedTranslationLine}
-                  fullHeight={isZen}
+                  fullHeight
                   lineInfo={
                     sourceViewMode === 'raw'
                       ? {
@@ -809,7 +811,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 {translationEditActions}
               </div>
             ) : reviewViewMode === 'formatted' ? (
-              <div className={cn('prose max-w-none', isZen && 'absolute inset-0 overflow-y-auto')}>
+              <div className="prose max-w-none h-full overflow-y-auto">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
               </div>
             ) : (
