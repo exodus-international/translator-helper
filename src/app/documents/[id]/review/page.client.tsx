@@ -1,12 +1,12 @@
 'use client';
 
+import { ActivityLog } from '@/components/activity-log';
+import { GitHubStatus } from '@/components/github-status';
 import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
 import { SourceTranslationViewer } from '@/components/source-translation-viewer';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import {
   Stepper,
   StepperItem,
@@ -16,9 +16,7 @@ import {
   StepperTitle,
   StepperTrigger,
 } from '@/components/ui/stepper';
-import { Textarea } from '@/components/ui/textarea';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
-import { createCommentAction } from '@/domain/comment/comment.actions';
 import {
   deployVersionAction,
   reviewVersionAction,
@@ -28,16 +26,16 @@ import { deleteDocumentAction, toggleDocumentLabelAction } from '@/domain/docume
 import {
   applySuggestionAction,
   createSuggestionAction,
+  createSuggestionReplyAction,
   dismissSuggestionAction,
   getSuggestionsByDocumentVersionAction,
 } from '@/domain/suggestion/suggestion.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
 import { canReviewClient, isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { cn } from '@/lib/utils';
 import { DocumentStatus, SuggestionType } from '@prisma/client';
 import matter from 'gray-matter';
-import { Download, FileCheck, FilePlus, MessageCircle, MessageSquare } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -78,7 +76,6 @@ export default function ReviewClient({
   const router = useRouter();
   const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
   const [content, setContent] = useState(initialTargetVersion.content);
-  const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
   const [sourceSaving, setSourceSaving] = useState(false);
@@ -90,6 +87,10 @@ export default function ReviewClient({
     initialSuggestions.map((s: any) => ({
       ...s,
       createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+      replies: (s.replies || []).map((r: any) => ({
+        ...r,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      })),
     })) as SuggestionWithUser[],
   );
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
@@ -114,6 +115,10 @@ export default function ReviewClient({
         const formattedSuggestions = updatedSuggestions.map((s: any) => ({
           ...s,
           createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+          replies: (s.replies || []).map((r: any) => ({
+            ...r,
+            createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+          })),
         }));
         setSuggestions(formattedSuggestions as SuggestionWithUser[]);
       } catch (error) {
@@ -125,7 +130,6 @@ export default function ReviewClient({
 
   const canDeploy = targetVersion.status === 'APPROVED';
   const isPendingReview = targetVersion.status === 'PENDING_REVIEW';
-  const currentStatusConfig = getDocumentStatusConfig(targetVersion.status);
   const statusSteps = DOCUMENT_STATUS_SEQUENCE.map((status, index) => ({
     status,
     step: index + 1,
@@ -154,34 +158,12 @@ export default function ReviewClient({
     }
   };
 
-  const handleAddComment = async () => {
-    if (!comment.trim()) return;
-
-    setLoading(true);
-    try {
-      await createCommentAction({
-        documentVersionId: targetVersion.id,
-        content: comment,
-      });
-      setComment('');
-      toast.success('Comment added!');
-      // Reload to show new comment
-      window.location.reload();
-    } catch (error: any) {
-      console.error('Error adding comment:', error);
-      toast.error(error.message || 'Failed to add comment');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleApprove = async () => {
     setLoading(true);
     try {
       await reviewVersionAction({
         versionId: targetVersion.id,
         approved: true,
-        comment: comment || undefined,
       });
       toast.success('Translation approved!');
       router.push('/dashboard');
@@ -194,17 +176,11 @@ export default function ReviewClient({
   };
 
   const handleRequestChanges = async () => {
-    if (!comment.trim()) {
-      toast.warning('Please add a comment explaining the changes needed');
-      return;
-    }
-
     setLoading(true);
     try {
       await reviewVersionAction({
         versionId: targetVersion.id,
         approved: false,
-        comment,
       });
       toast.success('Changes requested!');
       router.push('/dashboard');
@@ -219,6 +195,7 @@ export default function ReviewClient({
   const handleDeploy = async () => {
     setLoading(true);
     try {
+      console.log('[Deploy] handleDeploy called with targetVersion.id:', targetVersion.id);
       await deployVersionAction(targetVersion.id);
 
       // Trigger download
@@ -396,9 +373,54 @@ export default function ReviewClient({
     }
   };
 
-  const handleSuggestionClick = (suggestion: SuggestionWithUser) => {
-    // Scroll to suggestion range - this would be handled by the Monaco editor
-    // The decoration hook should handle this
+  const handleReply = async (suggestionId: string, replyContent: string) => {
+    try {
+      await createSuggestionReplyAction({ suggestionId, content: replyContent });
+      // Reload suggestions
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        replies: (s.replies || []).map((r: any) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        })),
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error replying:', error);
+      toast.error(error.message || 'Failed to post reply');
+    }
+  };
+
+  const handleCreateGeneralThread = async (generalComment: string) => {
+    try {
+      await createSuggestionAction({
+        documentVersionId: targetVersion.id,
+        startLine: null,
+        startColumn: null,
+        endLine: null,
+        endColumn: null,
+        type: 'COMMENT' as SuggestionType,
+        comment: generalComment,
+        version: targetVersion.version ?? 1,
+      });
+      toast.success('Comment added!');
+      // Reload suggestions
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        replies: (s.replies || []).map((r: any) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        })),
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error creating general thread:', error);
+      toast.error(error.message || 'Failed to create comment');
+    }
   };
 
   const reviewEditActions = ({ exitEditMode }: { exitEditMode: () => void }) => (
@@ -426,168 +448,127 @@ export default function ReviewClient({
     </div>
   );
 
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold">{document.title}</h1>
-              <div className="flex items-center flex-col gap-2">
-                <div className="flex justify-between w-full">
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary">{sourceVersion.language.name}</Badge>
-                    <span className="text-gray-400">→</span>
-                    <Badge variant="secondary">{targetVersion.language.name}</Badge>
-                    <Badge variant="secondary" className={cn('gap-1', currentStatusConfig.color.badgeClass)}>
-                      <currentStatusConfig.icon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
-                      {currentStatusConfig.name}
-                    </Badge>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    {(targetVersion.status === DocumentStatus.APPROVED ||
-                      targetVersion.status === DocumentStatus.DEPLOYED) && (
-                      <Button variant="default" size="sm" onClick={handleDownload} disabled={loading}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                    )}
-                    {targetVersion.status === DocumentStatus.PENDING_REVIEW && (
-                      <Button
-                        variant={waitingForFinalLabel ? 'outline' : 'default'}
-                        size="sm"
-                        onClick={handleToggleWaitingForFinalLabel}
-                        disabled={labelLoading}
-                        className={
-                          waitingForFinalLabel
-                            ? 'bg-green-700 text-white border-green-200 hover:bg-green-700/80 hover:text-white'
-                            : ''
-                        }
-                      >
-                        {waitingForFinalLabel ? <FileCheck className="h-4 w-4" /> : <FilePlus className="h-4 w-4" />}
-                        {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
-                      </Button>
-                    )}
-                    <StatusDropdown
-                      currentStatus={targetVersion.status}
-                      versionId={targetVersion.id}
-                      user={user}
-                      documentId={document.id}
-                      languageId={targetVersion.languageId}
-                      disabled={loading}
-                      onStatusChange={handleStatusChange}
-                    />
-                  </div>
-                </div>
-                <div className="mt-4 w-full">
-                  <Stepper value={getStatusStep(targetVersion.status)} orientation="horizontal">
-                    <StepperNav>
-                      {statusSteps.map(({ step, status, config }) => (
-                        <StepperItem key={status} step={step} completed={isStepCompleted(step, targetVersion.status)}>
-                          <StepperTrigger disabled>
-                            <StepperStatusIndicator status={status} />
-                            <StepperTitle className={config.color.textClass}>{config.name}</StepperTitle>
-                          </StepperTrigger>
-                          {step < statusSteps.length && <StepperSeparator />}
-                        </StepperItem>
-                      ))}
-                    </StepperNav>
-                  </Stepper>
-                </div>
-              </div>
-            </div>
+        <div className="px-3 py-1.5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-sm font-semibold truncate">{document.title}</h1>
+            <span className="text-xs text-gray-500 shrink-0">
+              {sourceVersion.language.name} → {targetVersion.language.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {(targetVersion.status === DocumentStatus.APPROVED ||
+              targetVersion.status === DocumentStatus.DEPLOYED) && (
+              <Button variant="default" size="sm" onClick={handleDownload} disabled={loading}>
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </Button>
+            )}
+            {targetVersion.status === DocumentStatus.PENDING_REVIEW && (
+              <Button
+                variant={waitingForFinalLabel ? 'outline' : 'default'}
+                size="sm"
+                onClick={handleToggleWaitingForFinalLabel}
+                disabled={labelLoading}
+                className={
+                  waitingForFinalLabel
+                    ? 'bg-green-700 text-white border-green-200 hover:bg-green-700/80 hover:text-white'
+                    : ''
+                }
+              >
+                {waitingForFinalLabel ? <FileCheck className="h-4 w-4" /> : <FilePlus className="h-4 w-4" />}
+                {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
+              </Button>
+            )}
+            <StatusDropdown
+              currentStatus={targetVersion.status}
+              versionId={targetVersion.id}
+              user={user}
+              documentId={document.id}
+              languageId={targetVersion.languageId}
+              disabled={loading}
+              onStatusChange={handleStatusChange}
+            />
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <SourceTranslationViewer
-          variant="review"
-          sourceContent={sourceVersion.content}
-          sourceFormattedContent={sourceFormattedContent}
-          translationContent={content}
-          translationFormattedContent={translationFormattedContent}
-          onTranslationChange={setContent}
-          sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
-          translationBadge={<Badge variant="secondary">{targetVersion.language.name}</Badge>}
-          canEditSource={canEditSource}
-          onSourceChange={handleSourceChange}
-          onSourceSave={handleSourceSave}
-          onSourceDelete={handleSourceDeleteConfirm}
-          sourceEditContent={sourceEditContent}
-          reviewConfig={{
-            canEdit: isPendingReview,
-            renderEditActions: reviewEditActions,
-          }}
-          suggestions={suggestions}
-          canCreateSuggestions={canCreateSuggestions}
-          currentUserId={user.id}
-          onSuggestionClick={handleSuggestionClick}
-          onApplySuggestion={handleApplySuggestion}
-          onDismissSuggestion={handleDismissSuggestion}
-          onCreateSuggestion={handleCreateSuggestion}
-          documentVersion={targetVersion.version}
-          isApplyingSuggestion={isApplyingSuggestion}
-          isDismissingSuggestion={isDismissingSuggestion}
-        />
+      <div className="">
+        <div className="h-[calc(100vh-7.5rem)]">
+          <SourceTranslationViewer
+            variant="review"
+            className="h-full"
+            sourceContent={sourceVersion.content}
+            sourceFormattedContent={sourceFormattedContent}
+            translationContent={content}
+            translationFormattedContent={translationFormattedContent}
+            onTranslationChange={setContent}
+            sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
+            translationBadge={<Badge variant="secondary">{targetVersion.language.name}</Badge>}
+            canEditSource={canEditSource}
+            onSourceChange={handleSourceChange}
+            onSourceSave={handleSourceSave}
+            onSourceDelete={handleSourceDeleteConfirm}
+            sourceEditContent={sourceEditContent}
+            reviewConfig={{
+              canEdit: isPendingReview,
+              renderEditActions: reviewEditActions,
+            }}
+            suggestions={suggestions}
+            canCreateSuggestions={canCreateSuggestions}
+            currentUserId={user.id}
+            onSuggestionClick={() => {}}
+            onApplySuggestion={handleApplySuggestion}
+            onDismissSuggestion={handleDismissSuggestion}
+            onCreateSuggestion={handleCreateSuggestion}
+            documentVersion={targetVersion.version}
+            isApplyingSuggestion={isApplyingSuggestion}
+            isDismissingSuggestion={isDismissingSuggestion}
+            onReply={handleReply}
+            onCreateGeneralThread={handleCreateGeneralThread}
+          />
+        </div>
 
-        {/* Comments Section */}
-        <Card className="mt-6 p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Comments
-          </h3>
+        {/* Collapsible details section */}
+        <div className="mt-1 p-4">
+          <button
+            onClick={() => setDetailsExpanded(!detailsExpanded)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+          >
+            {detailsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            {detailsExpanded ? 'Hide details' : 'Show details'}
+          </button>
+          {detailsExpanded && (
+            <div className="space-y-4 py-2">
+              <Stepper value={getStatusStep(targetVersion.status)} orientation="horizontal">
+                <StepperNav>
+                  {statusSteps.map(({ step, status, config }) => (
+                    <StepperItem key={status} step={step} completed={isStepCompleted(step, targetVersion.status)}>
+                      <StepperTrigger disabled>
+                        <StepperStatusIndicator status={status} />
+                        <StepperTitle className={config.color.textClass}>{config.name}</StepperTitle>
+                      </StepperTrigger>
+                      {step < statusSteps.length && <StepperSeparator />}
+                    </StepperItem>
+                  ))}
+                </StepperNav>
+              </Stepper>
 
-          {targetVersion.comments && targetVersion.comments.length > 0 && (
-            <div className="space-y-4 mb-6">
-              {targetVersion.comments.map((c: any) => (
-                <div key={c.id} className="border-l-2 border-gray-300 pl-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">{c.user.name}</span>
-                    <span className="text-xs text-gray-500">{new Date(c.createdAt).toLocaleString()}</span>
-                  </div>
-                  <p className="text-gray-700">{c.content}</p>
-                </div>
-              ))}
+              <GitHubStatus
+                documentVersionId={targetVersion.id}
+                isDeployed={targetVersion.status === DocumentStatus.DEPLOYED}
+              />
+
+              {targetVersion.activityLogs && targetVersion.activityLogs.length > 0 && (
+                <ActivityLog entries={targetVersion.activityLogs} />
+              )}
             </div>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="comment">Add Comment</Label>
-            <Textarea
-              id="comment"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Leave a comment..."
-              rows={3}
-            />
-            <Button onClick={handleAddComment} disabled={loading || !comment.trim()}>
-              <MessageCircle />
-              Add Comment
-            </Button>
-          </div>
-        </Card>
-
-        {/* Activity Log */}
-        {targetVersion.activityLogs && targetVersion.activityLogs.length > 0 && (
-          <Card className="mt-6 p-6">
-            <h3 className="text-lg font-semibold mb-4">Activity Log</h3>
-            <div className="space-y-3">
-              {targetVersion.activityLogs.map((log: any) => (
-                <div key={log.id} className="flex items-start gap-3 text-sm">
-                  <div className="flex-1">
-                    <span className="font-medium">{log.user.name}</span>
-                    <span className="text-gray-600 ml-2">{log.action}</span>
-                    {log.details && Object.keys(log.details).length > 0 && (
-                      <span className="text-gray-500 ml-2">{JSON.stringify(log.details)}</span>
-                    )}
-                  </div>
-                  <span className="text-gray-500">{new Date(log.createdAt).toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+        </div>
       </div>
     </div>
   );

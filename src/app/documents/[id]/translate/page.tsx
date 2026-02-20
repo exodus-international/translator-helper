@@ -5,6 +5,7 @@ import {
 } from '@/domain/document-version/document-version.repository';
 import { getDocumentById } from '@/domain/document/document.repository';
 import { getLanguageByCode } from '@/domain/language/language.repository';
+import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.repository';
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
 import { getCurrentUser } from '@/lib/session';
 import { notFound, redirect } from 'next/navigation';
@@ -63,6 +64,11 @@ export default async function TranslatePage({
     }
   }
 
+  // Fetch suggestions for the target version
+  const initialSuggestions = targetVersion
+    ? await getSuggestionsByDocumentVersion(targetVersion.id)
+    : [];
+
   return (
     <TranslateClient
       document={document}
@@ -72,6 +78,7 @@ export default async function TranslatePage({
       translationProject={translationProject}
       assignment={assignment}
       user={user}
+      initialSuggestions={initialSuggestions}
     />
   );
 }

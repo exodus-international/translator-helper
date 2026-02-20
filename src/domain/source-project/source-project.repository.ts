@@ -44,7 +44,7 @@ export async function getSourceProjectById(id: string) {
   });
 }
 
-export async function createSourceProject(data: { name: string; description?: string | null }) {
+export async function createSourceProject(data: { name: string; description?: string | null; identifier?: string }) {
   return prisma.sourceProject.create({
     data,
   });
@@ -52,7 +52,7 @@ export async function createSourceProject(data: { name: string; description?: st
 
 export async function updateSourceProject(
   id: string,
-  data: { name?: string; description?: string | null; status?: 'ACTIVE' | 'COMPLETE' },
+  data: { name?: string; description?: string | null; identifier?: string | null; status?: 'ACTIVE' | 'COMPLETE' },
 ) {
   return prisma.sourceProject.update({
     where: { id },

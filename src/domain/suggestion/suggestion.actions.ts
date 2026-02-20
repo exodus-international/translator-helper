@@ -9,6 +9,7 @@ import { getDocumentVersionById, updateDocumentVersion } from '../document-versi
 import { getTranslationProjectBySourceAndLanguage } from '../translation-project/translation-project.repository';
 import {
   applySuggestionSchema,
+  createSuggestionReplySchema,
   createSuggestionSchema,
   dismissSuggestionSchema,
   updateSuggestionStatusSchema,
@@ -16,8 +17,11 @@ import {
 import {
   checkSuggestionConflict,
   createSuggestion,
+  createSuggestionReply,
   deleteSuggestion,
+  deleteSuggestionReply,
   getSuggestionById,
+  getSuggestionReplyById,
   getSuggestionsByDocumentVersion,
   updateSuggestionStatus,
 } from './suggestion.repository';
@@ -81,6 +85,10 @@ export async function createSuggestionAction(input: unknown) {
     ...validated,
     comment: validated.comment ?? '',
     userId: user.id,
+    startLine: validated.startLine ?? null,
+    startColumn: validated.startColumn ?? null,
+    endLine: validated.endLine ?? null,
+    endColumn: validated.endColumn ?? null,
     proposedText: validated.proposedText || null,
   });
 }
@@ -105,6 +113,10 @@ export async function applySuggestionAction(input: unknown) {
 
   if (!suggestion.proposedText) {
     throw new Error('Suggestion does not have proposed text');
+  }
+
+  if (suggestion.startLine == null || suggestion.endLine == null || suggestion.startColumn == null || suggestion.endColumn == null) {
+    throw new Error('Cannot apply a suggestion without a text range');
   }
 
   // Get document version
@@ -258,6 +270,39 @@ export async function deleteSuggestionAction(id: string) {
   }
 
   return await deleteSuggestion(id);
+}
+
+export async function createSuggestionReplyAction(input: unknown) {
+  const user = await requireUser();
+  const validated = createSuggestionReplySchema.parse(input);
+
+  // Verify suggestion exists
+  const suggestion = await getSuggestionById(validated.suggestionId);
+  if (!suggestion) {
+    throw new Error('Suggestion not found');
+  }
+
+  return await createSuggestionReply({
+    suggestionId: validated.suggestionId,
+    userId: user.id,
+    content: validated.content,
+  });
+}
+
+export async function deleteSuggestionReplyAction(replyId: string) {
+  const user = await requireUser();
+
+  const reply = await getSuggestionReplyById(replyId);
+  if (!reply) {
+    throw new Error('Reply not found');
+  }
+
+  // Only the reply author can delete
+  if (reply.userId !== user.id) {
+    throw new Error('Forbidden: You can only delete your own replies');
+  }
+
+  return await deleteSuggestionReply(replyId);
 }
 
 export async function updateSuggestionAction(id: string, input: unknown) {

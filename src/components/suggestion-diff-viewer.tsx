@@ -37,10 +37,13 @@ export function SuggestionDiffViewer({
       return;
     }
 
-    // Sort suggestions by line number (top to bottom)
-    const sortedSuggestions = [...filteredSuggestions].sort((a, b) => {
-      if (a.startLine !== b.startLine) return a.startLine - b.startLine;
-      return a.startColumn - b.startColumn;
+    // Filter to only anchored suggestions and sort by line number
+    const anchoredSuggestions = filteredSuggestions.filter(
+      (s) => s.startLine != null && s.startColumn != null && s.endLine != null && s.endColumn != null,
+    );
+    const sortedSuggestions = [...anchoredSuggestions].sort((a, b) => {
+      if (a.startLine! !== b.startLine!) return a.startLine! - b.startLine!;
+      return a.startColumn! - b.startColumn!;
     });
 
     // Apply suggestions in reverse order (bottom to top) to maintain line numbers
@@ -50,10 +53,10 @@ export function SuggestionDiffViewer({
     // Apply each suggestion
     sortedSuggestions.forEach((suggestion) => {
       if (suggestion.type === 'CHANGE' && suggestion.proposedText) {
-        const startLine = suggestion.startLine - 1; // Convert to 0-based
-        const endLine = suggestion.endLine - 1;
-        const startColumn = suggestion.startColumn - 1;
-        const endColumn = suggestion.endColumn - 1;
+        const startLine = suggestion.startLine! - 1; // Convert to 0-based
+        const endLine = suggestion.endLine! - 1;
+        const startColumn = suggestion.startColumn! - 1;
+        const endColumn = suggestion.endColumn! - 1;
 
         if (startLine >= 0 && endLine < lines.length) {
           if (startLine === endLine) {

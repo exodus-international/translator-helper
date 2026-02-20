@@ -48,8 +48,8 @@ export default function OnboardingLanguagesClient({ languages }: OnboardingLangu
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl p-6">
-        <div className="mb-6">
+      <Card className="w-full max-w-2xl p-4">
+        <div className="mb-4">
           <h1 className="text-2xl font-bold mb-2">Welcome! Select Your Languages</h1>
           <p className="text-gray-600">
             Please select the languages you work with. This helps us filter and show you relevant people and tasks in

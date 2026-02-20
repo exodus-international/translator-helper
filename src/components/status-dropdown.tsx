@@ -97,8 +97,33 @@ export function StatusDropdown({
     }
 
     setLoading(true);
+
+    // Show a loading toast for deploy (GitHub takes a few seconds)
+    let deployToastId: string | number | undefined;
+    if (newStatus === DocumentStatus.DEPLOYED) {
+      deployToastId = toast.loading('Deploying to GitHub...');
+    }
+
     try {
-      await updateDocumentVersionStatusAction(versionId, newStatus);
+      const result = await updateDocumentVersionStatusAction(versionId, newStatus);
+
+      // Show GitHub deploy feedback
+      if (result.github) {
+        if (deployToastId) toast.dismiss(deployToastId);
+        if (result.github.status === 'success') {
+          toast.success(result.github.prUrl ? `GitHub PR created successfully` : 'Deployed to GitHub successfully', {
+            action: result.github.prUrl
+              ? { label: 'Open PR', onClick: () => window.open(result.github!.prUrl, '_blank') }
+              : undefined,
+            duration: 8000,
+          });
+        } else if (result.github.status === 'failed') {
+          toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
+        }
+      } else if (deployToastId) {
+        toast.dismiss(deployToastId);
+      }
+
       // Update displayed status immediately for optimistic UI update
       setDisplayedStatus(newStatus);
       // Update parent state first so stepper and other components update immediately
@@ -134,6 +159,7 @@ export function StatusDropdown({
         }
       }
     } catch (error: any) {
+      if (deployToastId) toast.dismiss(deployToastId);
       console.error('Error updating status:', error);
       toast.error(error.message || 'Failed to update status');
     } finally {

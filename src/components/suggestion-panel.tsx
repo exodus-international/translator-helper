@@ -117,6 +117,7 @@ export function SuggestionPanel({
   };
 
   const getContextPreview = (suggestion: SuggestionWithUser, content: string) => {
+    if (suggestion.startLine == null || suggestion.endLine == null) return '...';
     const lines = content.split('\n');
     const startLine = Math.max(0, suggestion.startLine - 2);
     const endLine = Math.min(lines.length - 1, suggestion.endLine);
@@ -129,7 +130,7 @@ export function SuggestionPanel({
   };
 
   const getTextFromRange = (suggestion: SuggestionWithUser, docContent: string): string => {
-    if (!docContent) return '';
+    if (!docContent || suggestion.startLine == null || suggestion.endLine == null || suggestion.startColumn == null || suggestion.endColumn == null) return '';
     const lines = docContent.split('\n');
     const startLine = suggestion.startLine - 1; // Convert to 0-based
     const endLine = suggestion.endLine - 1;
@@ -296,7 +297,7 @@ export function SuggestionPanel({
                     <div className="flex items-baseline gap-2 min-w-0">
                       <span className="text-sm font-medium truncate">{suggestion.user.name}</span>
                       <span className="text-[11px] text-muted-foreground shrink-0">
-                        v{suggestion.version} • L{suggestion.startLine}
+                        v{suggestion.version}{suggestion.startLine != null ? ` • L${suggestion.startLine}` : ' • General'}
                       </span>
                     </div>
                   </div>

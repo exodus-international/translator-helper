@@ -1,10 +1,11 @@
 'use client';
 
+import { ActivityLog } from '@/components/activity-log';
+import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
 import { SourceTranslationViewer, SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
   Stepper,
   StepperItem,
@@ -23,15 +24,22 @@ import {
   updateDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
 import { deleteDocumentAction } from '@/domain/document/document.actions';
+import {
+  applySuggestionAction,
+  createSuggestionAction,
+  createSuggestionReplyAction,
+  dismissSuggestionAction,
+  getSuggestionsByDocumentVersionAction,
+} from '@/domain/suggestion/suggestion.actions';
 import { translateDocumentAction } from '@/domain/translation/translation.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
 import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus, SuggestionType } from '@prisma/client';
 import matter from 'gray-matter';
-import { AlertCircle, Calendar, Maximize2, Minimize2, Save, Send, Sparkles, Trash2, User } from 'lucide-react';
+import { AlertCircle, Calendar, Check, ChevronDown, ChevronRight, Cloud, CloudOff, Loader2, Maximize2, Minimize2, Save, Send, Sparkles, Trash2, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -53,6 +61,44 @@ interface TranslateClientProps {
   translationProject?: any | null;
   assignment?: any | null;
   user: SessionUser;
+  initialSuggestions?: any[];
+}
+
+function SaveStatusIndicator({ status, lastSavedAt }: { status: 'saved' | 'unsaved' | 'saving' | 'error'; lastSavedAt: Date | null }) {
+  const timeStr = lastSavedAt
+    ? lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  switch (status) {
+    case 'saving':
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>Saving...</span>
+        </div>
+      );
+    case 'saved':
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-green-600">
+          <Cloud className="h-3.5 w-3.5" />
+          <span>Saved{timeStr ? ` at ${timeStr}` : ''}</span>
+        </div>
+      );
+    case 'unsaved':
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-amber-600">
+          <CloudOff className="h-3.5 w-3.5" />
+          <span>Unsaved changes</span>
+        </div>
+      );
+    case 'error':
+      return (
+        <div className="flex items-center gap-1.5 text-xs text-red-600">
+          <CloudOff className="h-3.5 w-3.5" />
+          <span>Save failed</span>
+        </div>
+      );
+  }
 }
 
 function getContentWithoutFrontmatter(text: string) {
@@ -72,15 +118,101 @@ export default function TranslateClient({
   translationProject,
   assignment,
   user,
+  initialSuggestions = [],
 }: TranslateClientProps) {
   const router = useRouter();
   const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
   const [content, setContent] = useState(initialTargetVersion?.content || '');
   const [loading, setLoading] = useState(false);
   const [zenMode, setZenMode] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestionWithUser[]>(
+    initialSuggestions.map((s: any) => ({
+      ...s,
+      createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+      replies: (s.replies || []).map((r: any) => ({
+        ...r,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      })),
+    })) as SuggestionWithUser[],
+  );
   const [translating, setTranslating] = useState(false);
   const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
   const [sourceSaving, setSourceSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving' | 'error'>('saved');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const savedContentRef = useRef(initialTargetVersion?.content || '');
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+  const contentRef = useRef(content);
+  const targetVersionRef = useRef(targetVersion);
+  const autoSavingRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => { contentRef.current = content; }, [content]);
+  useEffect(() => { targetVersionRef.current = targetVersion; }, [targetVersion]);
+
+  // Track unsaved changes
+  useEffect(() => {
+    if (content !== savedContentRef.current) {
+      setSaveStatus('unsaved');
+    }
+  }, [content]);
+
+  // Track mount state for auto-save
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Stable auto-save function that reads from refs (no state dependencies)
+  const performAutoSave = useCallback(async () => {
+    const tv = targetVersionRef.current;
+    const currentContent = contentRef.current;
+    if (!tv || tv.status === 'PENDING_TRANSLATION') return;
+    if (currentContent === savedContentRef.current) return;
+    if (autoSavingRef.current) return;
+
+    autoSavingRef.current = true;
+    setSaveStatus('saving');
+    try {
+      await updateDocumentVersionAction(tv.id, { content: currentContent });
+      if (!isMountedRef.current) return;
+      savedContentRef.current = currentContent;
+      setSaveStatus('saved');
+      setLastSavedAt(new Date());
+    } catch (error: any) {
+      if (!isMountedRef.current) return;
+      console.error('Auto-save failed:', error);
+      setSaveStatus('error');
+    } finally {
+      autoSavingRef.current = false;
+    }
+  }, []);
+
+  // Debounced auto-save: triggers 3 seconds after last edit, only depends on content
+  useEffect(() => {
+    if (!targetVersion || targetVersion.status === 'PENDING_TRANSLATION') return;
+    if (content === savedContentRef.current) return;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      performAutoSave();
+    }, 3000);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [content, performAutoSave]); // no targetVersion dependency — read from ref inside performAutoSave
 
   // Check if user can edit source (deployer only)
   const canEditSource = isDeployerClient(user);
@@ -134,7 +266,13 @@ export default function TranslateClient({
   }, [zenMode]);
 
   const handleSave = async () => {
+    // Cancel any pending auto-save
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
     setLoading(true);
+    setSaveStatus('saving');
     try {
       if (targetVersion) {
         // Update existing version
@@ -151,9 +289,13 @@ export default function TranslateClient({
         });
         setTargetVersion(created);
       }
+      savedContentRef.current = content;
+      setSaveStatus('saved');
+      setLastSavedAt(new Date());
       toast.success('Translation saved successfully!');
     } catch (error: any) {
       console.error('Error saving translation:', error);
+      setSaveStatus('error');
       toast.error(error.message || 'Failed to save translation');
     } finally {
       setLoading(false);
@@ -293,145 +435,170 @@ export default function TranslateClient({
     }
   };
 
+  const reloadSuggestions = async () => {
+    if (!targetVersion) return;
+    try {
+      const updated = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formatted = updated.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        replies: (s.replies || []).map((r: any) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        })),
+      }));
+      setSuggestions(formatted as SuggestionWithUser[]);
+    } catch (error) {
+      console.error('Error loading suggestions:', error);
+    }
+  };
+
+  const handleApplySuggestion = async (suggestionId: string) => {
+    try {
+      const updatedVersion = await applySuggestionAction({ suggestionId });
+      setTargetVersion(updatedVersion);
+      setContent(updatedVersion.content);
+      savedContentRef.current = updatedVersion.content;
+      setSaveStatus('saved');
+      toast.success('Suggestion applied!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error applying suggestion:', error);
+      toast.error(error.message || 'Failed to apply suggestion');
+    }
+  };
+
+  const handleDismissSuggestion = async (suggestionId: string, reason?: string) => {
+    try {
+      await dismissSuggestionAction({ suggestionId, dismissedReason: reason });
+      toast.success('Suggestion dismissed!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error dismissing suggestion:', error);
+      toast.error(error.message || 'Failed to dismiss suggestion');
+    }
+  };
+
+  const handleCreateSuggestion = async (data: {
+    comment: string;
+    proposedText?: string;
+    type: SuggestionType;
+    range: { startLine: number; startColumn: number; endLine: number; endColumn: number };
+    version: number;
+  }) => {
+    if (!targetVersion) return;
+    try {
+      await createSuggestionAction({
+        documentVersionId: targetVersion.id,
+        startLine: data.range.startLine,
+        startColumn: data.range.startColumn,
+        endLine: data.range.endLine,
+        endColumn: data.range.endColumn,
+        type: data.type,
+        comment: data.comment,
+        proposedText: data.proposedText,
+        version: data.version,
+      });
+      toast.success('Suggestion created!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error creating suggestion:', error);
+      toast.error(error.message || 'Failed to create suggestion');
+    }
+  };
+
+  const handleReply = async (suggestionId: string, content: string) => {
+    try {
+      await createSuggestionReplyAction({ suggestionId, content });
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error replying:', error);
+      toast.error(error.message || 'Failed to post reply');
+    }
+  };
+
+  const handleCreateGeneralThread = async (comment: string) => {
+    if (!targetVersion) return;
+    try {
+      await createSuggestionAction({
+        documentVersionId: targetVersion.id,
+        startLine: null,
+        startColumn: null,
+        endLine: null,
+        endColumn: null,
+        type: 'COMMENT' as SuggestionType,
+        comment,
+        version: targetVersion.version ?? 1,
+      });
+      toast.success('Comment added!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error creating general thread:', error);
+      toast.error(error.message || 'Failed to create comment');
+    }
+  };
+
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+
   return (
     <div className={zenMode ? 'fixed inset-0 bg-white z-50' : 'min-h-screen bg-gray-50'}>
       {!zenMode && (
         <div className="border-b bg-white">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex flex-col gap-4">
-              {/* Row 1: Title */}
-              <h1 className="text-2xl font-bold">{document.title}</h1>
-
-              {/* Row 2: Translation badges and buttons */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{sourceVersion.language.name}</Badge>
-                  <span className="text-gray-400">→</span>
-                  <Badge variant="secondary">{targetVersion?.language.name || 'New Translation'}</Badge>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {targetVersion ? (
+          <div className="px-3 py-1.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-sm font-semibold truncate">{document.title}</h1>
+              <span className="text-xs text-gray-500 shrink-0">
+                {sourceVersion.language.name} → {targetVersion?.language.name || 'New Translation'}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {targetVersion ? (
+                <>
+                  {targetVersion.status !== 'PENDING_TRANSLATION' && (
                     <>
-                      {targetVersion.status !== 'PENDING_TRANSLATION' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAutoTranslate}
-                            disabled={loading || translating || !targetLanguageId}
-                          >
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            {translating ? 'Translating...' : 'Translate with AI'}
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => setZenMode(true)}>
-                            <Maximize2 className="h-4 w-4 mr-2" />
-                            Zen Mode (F11)
-                          </Button>
-                          <Button variant="outline" onClick={handleSave} disabled={loading || translating}>
-                            <Save className="h-4 w-4 mr-2" />
-                            Save Draft
-                          </Button>
-                        </>
-                      )}
-                      <StatusDropdown
-                        currentStatus={targetVersion.status}
-                        versionId={targetVersion.id}
-                        user={user}
-                        documentId={document.id}
-                        languageId={targetLanguageId}
-                        disabled={loading || translating}
-                        onStatusChange={handleStatusChange}
-                      />
-                      {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
-                        <Button variant="outline" size="sm" onClick={handleDeleteTranslation} disabled={loading}>
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      )}
-                    </>
-                  ) : targetLanguageId ? (
-                    <Button onClick={handleStartTranslation} disabled={loading}>
-                      Start Translation
-                    </Button>
-                  ) : (
-                    <span className="text-sm text-gray-500">
-                      Please select a target language from the documents page to start translating.
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 3: Stepper */}
-              <div className="w-full">
-                <Stepper value={getStatusStep(targetVersion?.status || null)} orientation="horizontal">
-                  <StepperNav>
-                    {statusSteps.map(({ step, status, config }) => (
-                      <StepperItem
-                        key={status}
-                        step={step}
-                        completed={isStepCompleted(step, targetVersion?.status || null)}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAutoTranslate}
+                        disabled={loading || translating || !targetLanguageId}
                       >
-                        <StepperTrigger disabled>
-                          <StepperStatusIndicator status={status} />
-                          <StepperTitle className={config.color.textClass}>{config.name}</StepperTitle>
-                        </StepperTrigger>
-                        {step < statusSteps.length && <StepperSeparator />}
-                      </StepperItem>
-                    ))}
-                  </StepperNav>
-                </Stepper>
-              </div>
-
-              {/* Assignment Information */}
-              {assignment && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <div className="flex items-center gap-2 text-sm">
-                    {assignment.user ? (
-                      <>
-                        <User className="h-4 w-4 text-blue-600" />
-                        <span className="text-gray-700">
-                          Assigned to: <span className="font-medium">{assignment.user.name}</span>
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="h-4 w-4 text-blue-600" />
-                        <span className="text-blue-700 font-medium">Unassigned (visible to all project members)</span>
-                      </>
-                    )}
-                    {assignment.deadline && (
-                      <>
-                        <span className="text-gray-400">•</span>
-                        <Calendar className="h-4 w-4 text-blue-600" />
-                        <span className="text-gray-700">
-                          Deadline:{' '}
-                          <span className="font-medium">{new Date(assignment.deadline).toLocaleDateString()}</span>
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Version Information */}
-              {targetVersion && (
-                <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                  {targetVersion.user && (
-                    <span>
-                      Translator: <span className="font-medium">{targetVersion.user.name}</span>
-                    </span>
+                        <Sparkles className="h-4 w-4 mr-1" />
+                        {translating ? 'Translating...' : 'AI Translate'}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setZenMode(true)}>
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                      <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+                      <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
+                        <Save className="h-4 w-4 mr-1" />
+                        Save
+                      </Button>
+                    </>
                   )}
-                  {reviewer && (
-                    <span>
-                      Reviewer: <span className="font-medium">{reviewer.name}</span>
-                    </span>
+                  <StatusDropdown
+                    currentStatus={targetVersion.status}
+                    versionId={targetVersion.id}
+                    user={user}
+                    documentId={document.id}
+                    languageId={targetLanguageId}
+                    disabled={loading || translating}
+                    onStatusChange={handleStatusChange}
+                  />
+                  {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
+                    <Button variant="outline" size="sm" onClick={handleDeleteTranslation} disabled={loading}>
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
                   )}
-                  {deployer && (
-                    <span>
-                      Deployed by: <span className="font-medium">{deployer.name}</span>
-                    </span>
-                  )}
-                </div>
+                </>
+              ) : targetLanguageId ? (
+                <Button onClick={handleStartTranslation} disabled={loading} size="sm">
+                  Start Translation
+                </Button>
+              ) : (
+                <span className="text-sm text-gray-500">
+                  Please select a target language from the documents page to start translating.
+                </span>
               )}
             </div>
           </div>
@@ -487,10 +654,13 @@ export default function TranslateClient({
                     </Button>
                   )}
                   {targetVersion.status !== 'PENDING_TRANSLATION' && (
-                    <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
+                    <>
+                      <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+                      <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save
+                      </Button>
+                    </>
                   )}
                   {targetVersion.status === 'IN_PROGRESS' && (
                     <Button size="sm" onClick={handleSubmitForReview} disabled={loading || translating}>
@@ -539,46 +709,124 @@ export default function TranslateClient({
         </div>
       )}
 
-      <div className={zenMode ? 'h-[calc(100vh-3.5rem)] p-4' : 'container mx-auto px-4 py-8'}>
-        <SourceTranslationViewer
-          ref={viewerRef}
-          variant="translate"
-          layout={zenMode ? 'zen' : 'default'}
-          className={zenMode ? 'h-full' : undefined}
-          sourceContent={sourceVersion.content}
-          sourceFormattedContent={sourceFormattedContent}
-          translationContent={content}
-          translationFormattedContent={translationFormattedContent}
-          translationPlaceholder="Enter your translation here..."
-          translationPreviewEmptyText="*No content yet...*"
-          onTranslationChange={setContent}
-          sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
-          translationBadge={<Badge variant="secondary">{targetVersion?.language.name || 'New Translation'}</Badge>}
-          canEditSource={canEditSource}
-          onSourceChange={handleSourceChange}
-          onSourceSave={handleSourceSave}
-          onSourceDelete={handleSourceDelete}
-          sourceEditContent={sourceEditContent}
-        />
-        {/* Activity Log */}
-        {!zenMode && targetVersion && targetVersion.activityLogs && (
-          <Card className="mt-6 p-6">
-            <h3 className="text-lg font-semibold mb-4">Activity Log</h3>
-            <div className="space-y-3">
-              {targetVersion.activityLogs.map((log: any) => (
-                <div key={log.id} className="flex items-start gap-3 text-sm">
-                  <div className="flex-1">
-                    <span className="font-medium">{log.user.name}</span>
-                    <span className="text-gray-600 ml-2">{log.action}</span>
-                    {log.details && Object.keys(log.details).length > 0 && (
-                      <span className="text-gray-500 ml-2">{JSON.stringify(log.details)}</span>
+      <div className={zenMode ? 'h-[calc(100vh-3.5rem)] p-4' : 'border-0'}>
+        <div className={zenMode ? 'h-full' : 'h-[calc(100vh-7.5rem)]'}>
+          <SourceTranslationViewer
+            ref={viewerRef}
+            variant="translate"
+            layout={zenMode ? 'zen' : 'default'}
+            className="h-full"
+            sourceContent={sourceVersion.content}
+            sourceFormattedContent={sourceFormattedContent}
+            translationContent={content}
+            translationFormattedContent={translationFormattedContent}
+            translationPlaceholder="Enter your translation here..."
+            translationPreviewEmptyText="*No content yet...*"
+            onTranslationChange={setContent}
+            sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
+            translationBadge={<Badge variant="secondary">{targetVersion?.language.name || 'New Translation'}</Badge>}
+            canEditSource={canEditSource}
+            onSourceChange={handleSourceChange}
+            onSourceSave={handleSourceSave}
+            onSourceDelete={handleSourceDelete}
+            sourceEditContent={sourceEditContent}
+            suggestions={suggestions}
+            currentUserId={user.id}
+            onApplySuggestion={handleApplySuggestion}
+            onDismissSuggestion={handleDismissSuggestion}
+            onCreateSuggestion={handleCreateSuggestion}
+            onReply={handleReply}
+            onCreateGeneralThread={handleCreateGeneralThread}
+            documentVersion={targetVersion?.version ?? 1}
+          />
+        </div>
+
+        {/* Collapsible details section */}
+        {!zenMode && (
+          <div className="mt-1 p-4">
+            <button
+              onClick={() => setDetailsExpanded(!detailsExpanded)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+            >
+              {detailsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              {detailsExpanded ? 'Hide details' : 'Show details'}
+            </button>
+            {detailsExpanded && (
+              <div className="space-y-4 py-2">
+                <Stepper value={getStatusStep(targetVersion?.status || null)} orientation="horizontal">
+                  <StepperNav>
+                    {statusSteps.map(({ step, status, config }) => (
+                      <StepperItem
+                        key={status}
+                        step={step}
+                        completed={isStepCompleted(step, targetVersion?.status || null)}
+                      >
+                        <StepperTrigger disabled>
+                          <StepperStatusIndicator status={status} />
+                          <StepperTitle className={config.color.textClass}>{config.name}</StepperTitle>
+                        </StepperTrigger>
+                        {step < statusSteps.length && <StepperSeparator />}
+                      </StepperItem>
+                    ))}
+                  </StepperNav>
+                </Stepper>
+
+                {assignment && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex items-center gap-2 text-sm">
+                      {assignment.user ? (
+                        <>
+                          <User className="h-4 w-4 text-blue-600" />
+                          <span className="text-gray-700">
+                            Assigned to: <span className="font-medium">{assignment.user.name}</span>
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-4 w-4 text-blue-600" />
+                          <span className="text-blue-700 font-medium">Unassigned (visible to all project members)</span>
+                        </>
+                      )}
+                      {assignment.deadline && (
+                        <>
+                          <span className="text-gray-400">•</span>
+                          <Calendar className="h-4 w-4 text-blue-600" />
+                          <span className="text-gray-700">
+                            Deadline:{' '}
+                            <span className="font-medium">{new Date(assignment.deadline).toLocaleDateString()}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {targetVersion && (
+                  <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+                    {targetVersion.user && (
+                      <span>
+                        Translator: <span className="font-medium">{targetVersion.user.name}</span>
+                      </span>
+                    )}
+                    {reviewer && (
+                      <span>
+                        Reviewer: <span className="font-medium">{reviewer.name}</span>
+                      </span>
+                    )}
+                    {deployer && (
+                      <span>
+                        Deployed by: <span className="font-medium">{deployer.name}</span>
+                      </span>
                     )}
                   </div>
-                  <span className="text-gray-500">{new Date(log.createdAt).toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
+                )}
+
+                {targetVersion && targetVersion.activityLogs && (
+                  <ActivityLog entries={targetVersion.activityLogs} />
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

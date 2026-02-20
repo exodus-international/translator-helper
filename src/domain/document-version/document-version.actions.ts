@@ -4,7 +4,7 @@ import prisma from '@/lib/db';
 import { canDeploy, canReviewInProject, canTranslateInProject, isDeployer, isProjectMember } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 import { DocumentStatus, ProjectRole } from '@prisma/client';
-import { createActivityLog } from '../activity-log/activity-log.repository';
+import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { createComment } from '../comment/comment.repository';
 import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
@@ -121,11 +121,10 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
 
   const version = await updateDocumentVersion(id, validated.content, user.id);
 
-  // Log the activity
-  await createActivityLog({
+  // Log the activity (coalesce rapid edits within 5 minutes)
+  await coalesceEditLog({
     documentVersionId: version.id,
     userId: user.id,
-    action: 'edited',
     details: { version: version.version },
   });
 
@@ -240,13 +239,16 @@ export async function reviewVersionAction(input: unknown) {
 }
 
 export async function deployVersionAction(versionId: string) {
+  console.log('[Deploy] deployVersionAction called with versionId:', versionId);
   const user = await requireUser();
+  console.log('[Deploy] User:', user.id, user.name);
 
   if (!canDeploy(user)) {
     throw new Error('Forbidden: Only deployers can deploy documents');
   }
 
   const version = await updateDocumentVersionStatus(versionId, DocumentStatus.DEPLOYED);
+  console.log('[Deploy] Version status updated to DEPLOYED');
 
   // Log the activity
   await createActivityLog({
@@ -255,6 +257,36 @@ export async function deployVersionAction(versionId: string) {
     action: 'deployed',
     details: {},
   });
+
+  // Attempt GitHub deploy (non-blocking — deploy succeeds regardless of GitHub outcome)
+  try {
+    console.log('[GitHub] Checking if GitHub is configured...');
+    const { isGitHubConfigured } = await import('@/lib/github-config');
+    if (isGitHubConfigured()) {
+      console.log('[GitHub] GitHub is configured, starting deploy for version:', versionId);
+      const { deployToGitHub } = await import('../github/github.service');
+      await deployToGitHub(versionId);
+
+      console.log('[GitHub] Deploy succeeded, logging activity');
+      await createActivityLog({
+        documentVersionId: version.id,
+        userId: user.id,
+        action: 'github_deployed',
+        details: {},
+      });
+    } else {
+      console.log('[GitHub] GitHub is not configured, skipping deploy');
+    }
+  } catch (error: any) {
+    console.error('[GitHub] Deploy failed:', error.message);
+    console.error('[GitHub] Full error:', error);
+    await createActivityLog({
+      documentVersionId: version.id,
+      userId: user.id,
+      action: 'github_deploy_failed',
+      details: { error: error.message },
+    });
+  }
 
   return version;
 }
@@ -285,8 +317,15 @@ export async function deleteDocumentVersionAction(id: string) {
   return await deleteDocumentVersion(id);
 }
 
-export async function updateDocumentVersionStatusAction(versionId: string, status: DocumentStatus) {
+export async function updateDocumentVersionStatusAction(
+  versionId: string,
+  status: DocumentStatus,
+): Promise<{
+  version: Awaited<ReturnType<typeof updateDocumentVersionStatus>>;
+  github?: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string };
+}> {
   const user = await requireUser();
+  console.log('[StatusUpdate] updateDocumentVersionStatusAction called:', versionId, '→', status);
 
   // Check permission for DEPLOYED status
   if (status === DocumentStatus.DEPLOYED && !canDeploy(user)) {
@@ -309,7 +348,43 @@ export async function updateDocumentVersionStatusAction(versionId: string, statu
     details: { status: status },
   });
 
-  return version;
+  // If transitioning to DEPLOYED, attempt GitHub deploy
+  let github: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string } | undefined;
+  if (status === DocumentStatus.DEPLOYED) {
+    try {
+      console.log('[GitHub] Checking if GitHub is configured...');
+      const { isGitHubConfigured } = await import('@/lib/github-config');
+      if (isGitHubConfigured()) {
+        console.log('[GitHub] GitHub is configured, starting deploy for version:', versionId);
+        const { deployToGitHub } = await import('../github/github.service');
+        const result = await deployToGitHub(versionId);
+
+        console.log('[GitHub] Deploy succeeded, logging activity');
+        await createActivityLog({
+          documentVersionId: version.id,
+          userId: user.id,
+          action: 'github_deployed',
+          details: {},
+        });
+        github = { status: 'success', prUrl: result?.prUrl };
+      } else {
+        console.log('[GitHub] GitHub is not configured, skipping deploy');
+        github = { status: 'skipped' };
+      }
+    } catch (error: any) {
+      console.error('[GitHub] Deploy failed:', error.message);
+      console.error('[GitHub] Full error:', error);
+      await createActivityLog({
+        documentVersionId: version.id,
+        userId: user.id,
+        action: 'github_deploy_failed',
+        details: { error: error.message },
+      });
+      github = { status: 'failed', error: error.message };
+    }
+  }
+
+  return { version, github };
 }
 
 export async function assignDocumentVersionAction(input: unknown) {

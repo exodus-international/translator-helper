@@ -3,10 +3,10 @@ import { SuggestionStatus, SuggestionType } from '@prisma/client';
 
 export const createSuggestionSchema = z.object({
   documentVersionId: z.string(),
-  startLine: z.number().int().min(1),
-  startColumn: z.number().int().min(1),
-  endLine: z.number().int().min(1),
-  endColumn: z.number().int().min(1),
+  startLine: z.number().int().min(1).nullable().optional(),
+  startColumn: z.number().int().min(1).nullable().optional(),
+  endLine: z.number().int().min(1).nullable().optional(),
+  endColumn: z.number().int().min(1).nullable().optional(),
   type: z.nativeEnum(SuggestionType),
   comment: z
     .string()
@@ -34,6 +34,13 @@ export type CreateSuggestionInput = z.infer<typeof createSuggestionSchema>;
 export type UpdateSuggestionStatusInput = z.infer<typeof updateSuggestionStatusSchema>;
 export type ApplySuggestionInput = z.infer<typeof applySuggestionSchema>;
 export type DismissSuggestionInput = z.infer<typeof dismissSuggestionSchema>;
+
+export const createSuggestionReplySchema = z.object({
+  suggestionId: z.string(),
+  content: z.string().min(1),
+});
+
+export type CreateSuggestionReplyInput = z.infer<typeof createSuggestionReplySchema>;
 
 export interface SuggestionFilters {
   status?: SuggestionStatus | 'ALL';

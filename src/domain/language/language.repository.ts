@@ -33,12 +33,20 @@ export async function getLanguageByCode(code: string) {
   });
 }
 
-export async function createLanguage(code: string, name: string) {
+export async function createLanguage(code: string, name: string, branchName?: string) {
   return prisma.language.create({
     data: {
       code,
       name,
+      branchName,
     },
+  });
+}
+
+export async function updateLanguageBranchName(id: string, branchName: string | null) {
+  return prisma.language.update({
+    where: { id },
+    data: { branchName },
   });
 }
 

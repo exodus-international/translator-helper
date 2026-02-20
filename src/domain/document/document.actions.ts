@@ -59,6 +59,7 @@ export async function createDocumentAction(input: unknown) {
     labels: validated.labels,
     deadline: validated.deadline,
     originalFilename: validated.originalFilename,
+    type: validated.type,
   });
 
   // Create the English (source) version with APPROVED status

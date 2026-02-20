@@ -61,13 +61,13 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4">
           {languages.map((language) => (
             <Card key={language.id} className="p-5">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h2 className="text-lg font-semibold">{language.name}</h2>
+                  <h2 className="text-sm font-semibold">{language.name}</h2>
                   <p className="text-sm text-gray-500 flex items-center gap-2">
                     <Badge variant="secondary">{language.code}</Badge>
                     <span>Applied when translating from English to {language.name}</span>

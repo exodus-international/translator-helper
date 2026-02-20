@@ -186,7 +186,7 @@ export default function TranslationsClient({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4">
           {translationProjects.map((tp) => (
             <Card key={tp.id} className="p-4">
@@ -217,8 +217,8 @@ export default function TranslationsClient({
             </Card>
           ))}
           {translationProjects.length === 0 && (
-            <Card className="p-8 text-center">
-              <Languages className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <Card className="p-6 text-center">
+              <Languages className="h-8 w-8 text-gray-400 mx-auto mb-2" />
               <p className="text-gray-600">No translation projects yet. Create one to get started.</p>
             </Card>
           )}
