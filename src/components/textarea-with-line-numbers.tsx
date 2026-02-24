@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import Editor from '@monaco-editor/react';
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { SuggestionWithUser, useMonacoSuggestions } from './monaco-suggestion-decorations';
 
 interface TextareaWithLineNumbersProps {
@@ -40,6 +40,9 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const ignoreNextCursorEventRef = useRef(false);
+  const [editorMounted, setEditorMounted] = useState(false);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
 
   // Expose editor and monaco refs to parent
   useImperativeHandle(
@@ -48,7 +51,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
       editor: editorRef.current,
       monaco: monacoRef.current,
     }),
-    [],
+    [editorMounted],
   );
 
   // Sync cursor position to show blue highlight on the specified line
@@ -124,22 +127,24 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
       editor.revealLineInCenter(currentLine);
     }
 
-    // Listen for selection changes
-    if (onSelectionChange) {
-      editor.onDidChangeCursorSelection((e: any) => {
-        const selection = e.selection;
-        if (selection && !selection.isEmpty()) {
-          onSelectionChange({
-            startLine: selection.startLineNumber,
-            startColumn: selection.startColumn,
-            endLine: selection.endLineNumber,
-            endColumn: selection.endColumn,
-          });
-        } else {
-          onSelectionChange(null);
-        }
-      });
-    }
+    // Signal that editor is ready so useImperativeHandle re-evaluates
+    setEditorMounted(true);
+
+    // Listen for selection changes (use ref to always call latest callback)
+    editor.onDidChangeCursorSelection((e: any) => {
+      if (!onSelectionChangeRef.current) return;
+      const selection = e.selection;
+      if (selection && !selection.isEmpty()) {
+        onSelectionChangeRef.current({
+          startLine: selection.startLineNumber,
+          startColumn: selection.startColumn,
+          endLine: selection.endLineNumber,
+          endColumn: selection.endColumn,
+        });
+      } else {
+        onSelectionChangeRef.current(null);
+      }
+    });
   };
 
   // Apply suggestion decorations

@@ -12,6 +12,7 @@ import {
   createSuggestionReplySchema,
   createSuggestionSchema,
   dismissSuggestionSchema,
+  reopenSuggestionSchema,
   updateSuggestionStatusSchema,
 } from './suggestion.types';
 import {
@@ -253,6 +254,53 @@ export async function dismissSuggestionAction(input: unknown) {
 
   // Update suggestion status
   return await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.DISMISSED, validated.dismissedReason);
+}
+
+export async function reopenSuggestionAction(input: unknown) {
+  const user = await requireUser();
+  const validated = reopenSuggestionSchema.parse(input);
+
+  const suggestion = await getSuggestionById(validated.suggestionId);
+  if (!suggestion) {
+    throw new Error('Suggestion not found');
+  }
+
+  if (suggestion.status === SuggestionStatus.OPEN) {
+    throw new Error('Suggestion is already open');
+  }
+
+  // Get document version to check permissions
+  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
+  if (!documentVersion) {
+    throw new Error('Document version not found');
+  }
+
+  const document = await getDocumentById(documentVersion.documentId);
+  if (!document || !document.sourceProjectId) {
+    throw new Error('Document not found or not associated with a source project');
+  }
+
+  const translationProject = await getTranslationProjectBySourceAndLanguage(
+    document.sourceProjectId,
+    documentVersion.languageId,
+  );
+
+  if (translationProject) {
+    const canReview = await canReviewInProject(user, translationProject.id, validated.suggestionId);
+    if (!canReview) {
+      // Also allow translators to reopen
+      const canTranslate = await canTranslateInProject(user, translationProject.id);
+      if (!canTranslate) {
+        throw new Error('You do not have permission to reopen suggestions in this project');
+      }
+    }
+  } else {
+    if (!isDeployer(user)) {
+      throw new Error('You do not have permission to reopen suggestions');
+    }
+  }
+
+  return await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.OPEN);
 }
 
 export async function deleteSuggestionAction(id: string) {

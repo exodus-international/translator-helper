@@ -29,6 +29,7 @@ import {
   createSuggestionReplyAction,
   dismissSuggestionAction,
   getSuggestionsByDocumentVersionAction,
+  reopenSuggestionAction,
 } from '@/domain/suggestion/suggestion.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
 import { canReviewClient, isDeployerClient } from '@/lib/permissions-client';
@@ -158,40 +159,6 @@ export default function ReviewClient({
     }
   };
 
-  const handleApprove = async () => {
-    setLoading(true);
-    try {
-      await reviewVersionAction({
-        versionId: targetVersion.id,
-        approved: true,
-      });
-      toast.success('Translation approved!');
-      router.push('/dashboard');
-    } catch (error: any) {
-      console.error('Error approving:', error);
-      toast.error(error.message || 'Failed to approve');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestChanges = async () => {
-    setLoading(true);
-    try {
-      await reviewVersionAction({
-        versionId: targetVersion.id,
-        approved: false,
-      });
-      toast.success('Changes requested!');
-      router.push('/dashboard');
-    } catch (error: any) {
-      console.error('Error requesting changes:', error);
-      toast.error(error.message || 'Failed to request changes');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeploy = async () => {
     setLoading(true);
     try {
@@ -217,9 +184,6 @@ export default function ReviewClient({
     }
   };
 
-  const handleDeployConfirm = async () => {
-    await handleDeploy();
-  };
 
   const handleDownload = () => {
     try {
@@ -370,6 +334,27 @@ export default function ReviewClient({
       toast.error(error.message || 'Failed to dismiss suggestion');
     } finally {
       setIsDismissingSuggestion(false);
+    }
+  };
+
+  const handleReopenSuggestion = async (suggestionId: string) => {
+    try {
+      await reopenSuggestionAction({ suggestionId });
+      toast.success('Suggestion reopened!');
+      // Reload suggestions
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        replies: (s.replies || []).map((r: any) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        })),
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error reopening suggestion:', error);
+      toast.error(error.message || 'Failed to reopen suggestion');
     }
   };
 
@@ -524,6 +509,7 @@ export default function ReviewClient({
             onSuggestionClick={() => {}}
             onApplySuggestion={handleApplySuggestion}
             onDismissSuggestion={handleDismissSuggestion}
+            onReopenSuggestion={handleReopenSuggestion}
             onCreateSuggestion={handleCreateSuggestion}
             documentVersion={targetVersion.version}
             isApplyingSuggestion={isApplyingSuggestion}

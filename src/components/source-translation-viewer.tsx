@@ -64,6 +64,7 @@ interface SourceTranslationViewerProps {
   onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
   onApplySuggestion?: (suggestionId: string) => void;
   onDismissSuggestion?: (suggestionId: string, reason?: string) => void;
+  onReopenSuggestion?: (suggestionId: string) => void;
   onCreateSuggestion?: (data: {
     comment: string;
     proposedText?: string;
@@ -112,6 +113,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       onSuggestionClick,
       onApplySuggestion,
       onDismissSuggestion,
+      onReopenSuggestion,
       onCreateSuggestion,
       documentVersion = 1,
       isApplyingSuggestion = false,
@@ -161,9 +163,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
 
     const translationPreview = translationFormattedContent ?? translationContent;
     const translationRawVisible =
-      variant === 'translate'
-        ? translateTab === 'edit'
-        : isReviewEditing || reviewViewMode === 'review';
+      variant === 'translate' ? translateTab === 'edit' : isReviewEditing || reviewViewMode === 'review';
     const isReviewMode = variant === 'review' && reviewViewMode === 'review';
 
     // Update source edit value when sourceEditContent prop changes
@@ -242,7 +242,12 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       setActiveThreadId(suggestion.id);
       try {
         // Only scroll editor for anchored suggestions
-        if (suggestion.startLine != null && suggestion.startColumn != null && suggestion.endLine != null && suggestion.endColumn != null) {
+        if (
+          suggestion.startLine != null &&
+          suggestion.startColumn != null &&
+          suggestion.endLine != null &&
+          suggestion.endColumn != null
+        ) {
           const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
           const editor = editorWrapper?.editor;
           const monaco = editorWrapper?.monaco;
@@ -280,9 +285,9 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     };
 
     const cardClassName = isZen
-      ? 'p-3 h-full flex flex-col min-w-0'
-      : 'p-0 gap-0 shadow-none h-full flex flex-col min-w-0';
-    const bodyClassName = isZen ? 'flex-1 min-h-0 relative' : 'flex-1 min-h-0';
+      ? 'p-3 h-full flex flex-col min-w-0 min-h-0'
+      : 'p-0 gap-0 shadow-none h-full flex flex-col min-w-0 min-h-0';
+    const bodyClassName = isZen ? 'flex-1 min-h-0 overflow-hidden relative' : 'flex-1 min-h-0 overflow-hidden';
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -330,8 +335,12 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
         endColumn: number;
       } | null,
     ) => {
+      // Close suggestion form if open when selection changes
+      if (showSuggestionForm) {
+        setShowSuggestionForm(false);
+      }
+
       setSelectedRange(range);
-      console.log('range', range);
       // Get selected text from editor
       if (range) {
         const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
@@ -474,17 +483,15 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     const showSelectionToolbar = canCreateSuggestions && (isReviewMode || showSuggestionDecorations);
 
     return (
-      <div className={cn(
-        'grid border-0',
-        hasSidebar
-          ? sidebarHidden
-            ? 'grid-cols-2'
-            : 'grid-cols-[1fr_1fr_340px]'
-          : 'grid-cols-2',
-        className,
-        isZen && 'h-full',
-      )}>
-        <Card className={cn(cardClassName, "rounded-none border-t-0 border-r-0")}>
+      <div
+        className={cn(
+          'grid border-0',
+          hasSidebar ? (sidebarHidden ? 'grid-cols-2' : 'grid-cols-[1fr_1fr_340px]') : 'grid-cols-2',
+          className,
+          isZen && 'h-full',
+        )}
+      >
+        <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
           <div className="flex items-center justify-between py-1.5 px-2">
             <h2 className="text-sm font-semibold">Source (English)</h2>
             <div className="flex items-center gap-2">
@@ -580,12 +587,12 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   primaryLabel: 'Source Line',
                   primaryValue: sourceLine,
                   secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                  secondaryValue: translationRawVisible ? syncedTranslationLine ?? translationLine : undefined,
+                  secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
                   direction: 'to',
                 }}
               />
             ) : sourceViewMode === 'formatted' ? (
-              <div className="prose max-w-none h-full overflow-y-auto">
+              <div className="prose max-w-none h-full overflow-y-auto p-3">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
               </div>
             ) : (
@@ -600,7 +607,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   primaryLabel: 'Source Line',
                   primaryValue: sourceLine,
                   secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                  secondaryValue: translationRawVisible ? syncedTranslationLine ?? translationLine : undefined,
+                  secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
                   direction: 'to',
                 }}
               />
@@ -608,7 +615,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
           </div>
         </Card>
 
-        <Card className={cn(cardClassName, "rounded-none border-t-0 border-r-0")}>
+        <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
           <div className="flex items-center justify-between py-1.5 px-2">
             <h2 className="text-sm font-semibold">Translation</h2>
             <div className="flex items-center gap-2">
@@ -707,21 +714,10 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 )
               ) : null}
               {translationBadge}
-              {variant === 'review' && !isReviewEditing && reviewConfig?.canEdit && (
-                <Button variant="outline" size="sm" onClick={enterReviewEditMode}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  {reviewConfig?.editButtonLabel || 'Edit'}
-                </Button>
-              )}
               {translationHeaderExtra}
               {variant === 'review' && reviewConfig?.headerExtra}
               {isZen && hasSidebar && sidebarCollapsed && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSidebarCollapsed(false)}
-                  className="h-7 text-xs"
-                >
+                <Button variant="outline" size="sm" onClick={() => setSidebarCollapsed(false)} className="h-7 text-xs">
                   <PanelRightOpen className="h-3.5 w-3.5 mr-1" />
                   Feedback
                   {openSuggestionsCount > 0 && (
@@ -754,7 +750,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                       primaryLabel: 'Translation Line',
                       primaryValue: translationLine,
                       secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                      secondaryValue: sourceViewMode === 'raw' ? syncedSourceLine ?? sourceLine : undefined,
+                      secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
                       direction: 'from',
                     }}
                   />
@@ -766,7 +762,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                     />
                   )}
                   {showSuggestionForm && selectedRange && (
-                    <div className="absolute top-4 right-4 w-96 bg-white border rounded-lg shadow-lg p-4 z-50">
+                    <div className="absolute right-4 w-96 bg-green-400 border rounded-lg shadow-lg p-4 z-50">
                       <SuggestionForm
                         type={suggestionFormType}
                         initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
@@ -781,7 +777,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   )}
                 </div>
               ) : (
-                <div className="prose max-w-none h-full overflow-y-auto">
+                <div className="prose max-w-none h-full overflow-y-auto p-3">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {translationPreview || translationPreviewEmptyText}
                   </ReactMarkdown>
@@ -811,7 +807,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 {translationEditActions}
               </div>
             ) : reviewViewMode === 'formatted' ? (
-              <div className="prose max-w-none h-full overflow-y-auto">
+              <div className="prose max-w-none h-full overflow-y-auto p-3">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
               </div>
             ) : (
@@ -842,7 +838,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                         primaryLabel: 'Translation Line',
                         primaryValue: translationLine,
                         secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                        secondaryValue: sourceViewMode === 'raw' ? syncedSourceLine ?? sourceLine : undefined,
+                        secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
                         direction: 'from',
                       }}
                     />
@@ -854,7 +850,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                       />
                     )}
                     {showSuggestionForm && selectedRange && (
-                      <div className="absolute top-4 right-4 w-96 bg-white border rounded-lg shadow-lg p-4 z-50">
+                      <div className="absolute top-4 right-4 w-[75%] bg-white border rounded-lg shadow-lg p-4 z-50">
                         <SuggestionForm
                           type={suggestionFormType}
                           initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
@@ -883,13 +879,13 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             onReply={onReply}
             onApply={onApplySuggestion}
             onDismiss={(id) => onDismissSuggestion?.(id)}
+            onReopen={(id) => onReopenSuggestion?.(id)}
             onSuggestionClick={handleSuggestionClickInternal}
             onCreateGeneralThread={onCreateGeneralThread}
             activeThreadId={activeThreadId}
             onCollapse={isZen ? () => setSidebarCollapsed(true) : undefined}
           />
         )}
-
       </div>
     );
   },

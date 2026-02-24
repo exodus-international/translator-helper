@@ -1,7 +1,7 @@
 'use client';
 
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
-import { Check, MessageSquare, Pencil, X } from 'lucide-react';
+import { Check, MessageSquare, Pencil, RotateCcw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
@@ -17,6 +17,7 @@ interface ThreadCardProps {
   onReply?: (suggestionId: string, content: string) => void;
   onApply?: (suggestionId: string) => void;
   onDismiss?: (suggestionId: string) => void;
+  onReopen?: (suggestionId: string) => void;
   onClick?: () => void;
 }
 
@@ -63,6 +64,7 @@ export function ThreadCard({
   onReply,
   onApply,
   onDismiss,
+  onReopen,
   onClick,
 }: ThreadCardProps) {
   const isAnchored = suggestion.startLine != null;
@@ -185,6 +187,24 @@ export function ThreadCard({
               Dismiss
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Reopen action for resolved suggestions */}
+      {suggestion.status !== SuggestionStatus.OPEN && onReopen && (
+        <div className="flex gap-1.5 mt-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReopen(suggestion.id);
+            }}
+            className="h-6 text-xs px-2"
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Reopen
+          </Button>
         </div>
       )}
     </div>

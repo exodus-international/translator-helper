@@ -16,6 +16,7 @@ interface ThreadSidebarProps {
   onReply?: (suggestionId: string, content: string) => void;
   onApply?: (suggestionId: string) => void;
   onDismiss?: (suggestionId: string) => void;
+  onReopen?: (suggestionId: string) => void;
   onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
   onCreateGeneralThread?: (comment: string) => void;
   activeThreadId?: string | null;
@@ -30,6 +31,7 @@ export function ThreadSidebar({
   onReply,
   onApply,
   onDismiss,
+  onReopen,
   onSuggestionClick,
   onCreateGeneralThread,
   activeThreadId,
@@ -45,7 +47,7 @@ export function ThreadSidebar({
     () =>
       suggestions
         .filter((s) => s.status === SuggestionStatus.OPEN)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        .sort((a, b) => (a.startLine ?? -Infinity) - (b.startLine ?? -Infinity)),
     [suggestions],
   );
 
@@ -53,7 +55,7 @@ export function ThreadSidebar({
     () =>
       suggestions
         .filter((s) => s.status !== SuggestionStatus.OPEN)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        .sort((a, b) => (a.startLine ?? -Infinity) - (b.startLine ?? -Infinity)),
     [suggestions],
   );
 
@@ -94,6 +96,7 @@ export function ThreadSidebar({
         onReply={onReply}
         onApply={onApply}
         onDismiss={onDismiss}
+        onReopen={onReopen}
         onClick={() => onSuggestionClick?.(suggestion)}
       />
     </div>

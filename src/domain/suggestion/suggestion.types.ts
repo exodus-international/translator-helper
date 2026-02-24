@@ -30,10 +30,15 @@ export const dismissSuggestionSchema = z.object({
   dismissedReason: z.string().optional(),
 });
 
+export const reopenSuggestionSchema = z.object({
+  suggestionId: z.string(),
+});
+
 export type CreateSuggestionInput = z.infer<typeof createSuggestionSchema>;
 export type UpdateSuggestionStatusInput = z.infer<typeof updateSuggestionStatusSchema>;
 export type ApplySuggestionInput = z.infer<typeof applySuggestionSchema>;
 export type DismissSuggestionInput = z.infer<typeof dismissSuggestionSchema>;
+export type ReopenSuggestionInput = z.infer<typeof reopenSuggestionSchema>;
 
 export const createSuggestionReplySchema = z.object({
   suggestionId: z.string(),

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { SuggestionType } from '@prisma/client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface SuggestionFormProps {
   type: SuggestionType;
@@ -25,13 +25,21 @@ export function SuggestionForm({
 }: SuggestionFormProps) {
   const [comment, setComment] = useState(initialComment);
   const [proposedText, setProposedText] = useState(initialProposedText);
+  const proposedTextRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
 
   // Update proposedText when initialProposedText changes (e.g., when selection changes)
   useEffect(() => {
     if (type === SuggestionType.CHANGE && initialProposedText) {
       setProposedText(initialProposedText);
+      requestAnimationFrame(() => autoResize(proposedTextRef.current));
     }
-  }, [initialProposedText, type]);
+  }, [initialProposedText, type, autoResize]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,13 +71,17 @@ export function SuggestionForm({
         <div>
           <Label htmlFor="proposedText">Proposed replacement</Label>
           <Textarea
+            ref={proposedTextRef}
             id="proposedText"
             value={proposedText}
-            onChange={(e) => setProposedText(e.target.value)}
+            onChange={(e) => {
+              setProposedText(e.target.value);
+              autoResize(e.target);
+            }}
             placeholder="Enter the suggested text..."
-            rows={3}
+            rows={1}
             required
-            className="mt-1 font-mono"
+            className="mt-1 font-mono overflow-hidden"
           />
         </div>
       )}

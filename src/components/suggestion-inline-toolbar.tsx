@@ -13,6 +13,19 @@ interface SuggestionInlineToolbarProps {
 export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position }: SuggestionInlineToolbarProps) {
   const [isVisible, setIsVisible] = useState(true);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [adjustedLeft, setAdjustedLeft] = useState(position.x);
+
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const toolbarWidth = el.offsetWidth;
+    // Measure the nearest positioned ancestor (the "relative" container)
+    const parent = el.offsetParent as HTMLElement | null;
+    const parentWidth = parent?.clientWidth ?? Infinity;
+    const maxLeft = parentWidth - toolbarWidth - 8;
+    setAdjustedLeft(Math.max(8, Math.min(position.x, maxLeft)));
+  }, [position.x]);
 
   useEffect(() => {
     return () => {
@@ -23,14 +36,12 @@ export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position }: 
   }, []);
 
   const handleMouseLeave = () => {
-    // Set timeout to hide after 1 second
     hideTimeoutRef.current = setTimeout(() => {
       setIsVisible(false);
     }, 1000);
   };
 
   const handleMouseEnter = () => {
-    // Cancel hide timeout if user moves mouse back
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
@@ -39,12 +50,17 @@ export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position }: 
 
   if (!isVisible) return null;
 
+  console.log('adjustedLeft', adjustedLeft);
+  console.log('position.x', position.x);
+  // console.log('containerWidth', containerWidth);
+
   return (
     <div
+      ref={toolbarRef}
       className="absolute z-50 flex gap-1 bg-white border border-gray-300 rounded-md shadow-lg p-1"
       style={{
-        left: `${position.x}px`,
-        top: `${position.y - 40}px`,
+        left: `${adjustedLeft}px`,
+        top: `${position.y - 70}px`,
       }}
       onMouseLeave={handleMouseLeave}
       onMouseEnter={handleMouseEnter}
