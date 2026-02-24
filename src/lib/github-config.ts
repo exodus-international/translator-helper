@@ -16,7 +16,9 @@ let cachedConfig: GitHubConfig | null = null;
 export function getGitHubConfig(): GitHubConfig {
   if (cachedConfig) return cachedConfig;
 
-  let privateKey = process.env.GITHUB_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  let privateKey = process.env.GITHUB_PRIVATE_KEY_BASE64
+    ? Buffer.from(process.env.GITHUB_PRIVATE_KEY_BASE64, 'base64').toString('utf-8')
+    : process.env.GITHUB_PRIVATE_KEY;
 
   if (!privateKey && process.env.GITHUB_PRIVATE_KEY_PATH) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
