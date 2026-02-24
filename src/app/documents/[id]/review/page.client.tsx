@@ -339,7 +339,11 @@ export default function ReviewClient({
 
   const handleReopenSuggestion = async (suggestionId: string) => {
     try {
-      await reopenSuggestionAction({ suggestionId });
+      const result = await reopenSuggestionAction({ suggestionId });
+      if (result.updatedVersion) {
+        setContent(result.updatedVersion.content);
+        setTargetVersion(result.updatedVersion);
+      }
       toast.success('Suggestion reopened!');
       // Reload suggestions
       const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);

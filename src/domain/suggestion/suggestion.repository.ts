@@ -90,12 +90,14 @@ export async function updateSuggestionStatus(
   id: string,
   status: SuggestionStatus,
   dismissedReason?: string | null,
+  originalText?: string | null,
 ) {
   return prisma.suggestion.update({
     where: { id },
     data: {
       status,
       dismissedReason: dismissedReason ?? null,
+      ...(originalText !== undefined ? { originalText } : {}),
     },
     include: {
       user: { select: userSelect },

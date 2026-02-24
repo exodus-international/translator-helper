@@ -323,7 +323,8 @@ model Suggestion {
   // Obsah
   comment           String           @db.Text
   proposedText      String?          @db.Text // null pro COMMENT, vyplněno pro CHANGE
-  
+  originalText      String?          @db.Text // Original text before CHANGE was applied, used for revert on reopen
+
   // Stav
   status            SuggestionStatus @default(OPEN)
   dismissedReason  String?          @db.Text

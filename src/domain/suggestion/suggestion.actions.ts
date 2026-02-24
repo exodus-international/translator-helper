@@ -162,6 +162,18 @@ export async function applySuggestionAction(input: unknown) {
     throw new Error('Suggestion range is out of bounds');
   }
 
+  // Extract the original text at the range before replacing
+  let originalText: string;
+  if (startLine === endLine) {
+    const line = lines[startLine];
+    originalText = line.substring(startColumn, endColumn);
+  } else {
+    const firstLine = lines[startLine].substring(startColumn);
+    const lastLine = lines[endLine].substring(0, endColumn);
+    const middleLines = lines.slice(startLine + 1, endLine);
+    originalText = [firstLine, ...middleLines, lastLine].join('\n');
+  }
+
   // Replace the text
   if (startLine === endLine) {
     // Single line replacement
@@ -184,8 +196,8 @@ export async function applySuggestionAction(input: unknown) {
   // Update document version
   const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, newContent, user.id);
 
-  // Update suggestion status
-  await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.APPLIED);
+  // Update suggestion status and store original text for potential revert
+  await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.APPLIED, null, originalText);
 
   // Log the activity
   await createActivityLog({
@@ -300,7 +312,39 @@ export async function reopenSuggestionAction(input: unknown) {
     }
   }
 
-  return await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.OPEN);
+  // If this was an APPLIED CHANGE suggestion with stored originalText, revert the content
+  if (
+    suggestion.status === SuggestionStatus.APPLIED &&
+    suggestion.type === SuggestionType.CHANGE &&
+    suggestion.originalText != null &&
+    suggestion.proposedText != null
+  ) {
+    const currentContent = documentVersion.content;
+    const revertedContent = currentContent.replace(suggestion.proposedText, suggestion.originalText);
+
+    if (revertedContent !== currentContent) {
+      const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, revertedContent, user.id);
+
+      // Clear originalText and set status to OPEN
+      await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.OPEN, null, null);
+
+      await createActivityLog({
+        documentVersionId: suggestion.documentVersionId,
+        userId: user.id,
+        action: 'reopened_suggestion',
+        details: {
+          suggestionId: suggestion.id,
+          type: suggestion.type,
+          reverted: true,
+        },
+      });
+
+      return { suggestion: await getSuggestionById(validated.suggestionId), updatedVersion };
+    }
+  }
+
+  await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.OPEN, null, null);
+  return { suggestion: await getSuggestionById(validated.suggestionId) };
 }
 
 export async function deleteSuggestionAction(id: string) {

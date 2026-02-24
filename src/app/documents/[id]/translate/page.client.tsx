@@ -30,6 +30,7 @@ import {
   createSuggestionReplyAction,
   dismissSuggestionAction,
   getSuggestionsByDocumentVersionAction,
+  reopenSuggestionAction,
 } from '@/domain/suggestion/suggestion.actions';
 import { translateDocumentAction } from '@/domain/translation/translation.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
@@ -479,6 +480,23 @@ export default function TranslateClient({
     }
   };
 
+  const handleReopenSuggestion = async (suggestionId: string) => {
+    try {
+      const result = await reopenSuggestionAction({ suggestionId });
+      if (result.updatedVersion) {
+        setContent(result.updatedVersion.content);
+        setTargetVersion(result.updatedVersion);
+        savedContentRef.current = result.updatedVersion.content;
+        setSaveStatus('saved');
+      }
+      toast.success('Suggestion reopened!');
+      await reloadSuggestions();
+    } catch (error: any) {
+      console.error('Error reopening suggestion:', error);
+      toast.error(error.message || 'Failed to reopen suggestion');
+    }
+  };
+
   const handleCreateSuggestion = async (data: {
     comment: string;
     proposedText?: string;
@@ -734,6 +752,7 @@ export default function TranslateClient({
             currentUserId={user.id}
             onApplySuggestion={handleApplySuggestion}
             onDismissSuggestion={handleDismissSuggestion}
+            onReopenSuggestion={handleReopenSuggestion}
             onCreateSuggestion={handleCreateSuggestion}
             onReply={handleReply}
             onCreateGeneralThread={handleCreateGeneralThread}
