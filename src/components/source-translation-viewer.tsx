@@ -1,4 +1,14 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -6,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
 import { Edit, Eye, FileEdit, PanelRightOpen, Save, X } from 'lucide-react';
-import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
@@ -141,6 +151,9 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       endColumn: number;
     } | null>(null);
     const [selectedText, setSelectedText] = useState<string>(''); // Store selected text for pre-filling
+    const suggestionFormDirtyRef = useRef(false);
+    const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+    const pendingDiscardActionRef = useRef<(() => void) | null>(null);
     const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
     const translationEditorRef = useRef<any>(null);
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null); // Filter by user for diff view
@@ -327,6 +340,35 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       [variant, enterReviewEditMode, exitReviewEditMode],
     );
 
+    const doCloseSuggestionForm = useCallback(() => {
+      setShowSuggestionForm(false);
+      setSelectedRange(null);
+      setSelectedText('');
+      suggestionFormDirtyRef.current = false;
+    }, []);
+
+    const requestCloseSuggestionForm = useCallback((onConfirmed?: () => void) => {
+      if (!suggestionFormDirtyRef.current) {
+        doCloseSuggestionForm();
+        onConfirmed?.();
+        return;
+      }
+      pendingDiscardActionRef.current = onConfirmed ?? null;
+      setShowDiscardDialog(true);
+    }, [doCloseSuggestionForm]);
+
+    const handleDiscardConfirm = useCallback(() => {
+      doCloseSuggestionForm();
+      setShowDiscardDialog(false);
+      pendingDiscardActionRef.current?.();
+      pendingDiscardActionRef.current = null;
+    }, [doCloseSuggestionForm]);
+
+    const handleDiscardCancel = useCallback(() => {
+      setShowDiscardDialog(false);
+      pendingDiscardActionRef.current = null;
+    }, []);
+
     const handleSelectionChange = (
       range: {
         startLine: number;
@@ -337,7 +379,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     ) => {
       // Close suggestion form if open when selection changes
       if (showSuggestionForm) {
-        setShowSuggestionForm(false);
+        requestCloseSuggestionForm();
+        return;
       }
 
       setSelectedRange(range);
@@ -429,6 +472,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
         range: selectedRange,
         version: documentVersion,
       });
+      suggestionFormDirtyRef.current = false;
       setShowSuggestionForm(false);
       setSelectedRange(null);
       setSelectedText('');
@@ -767,11 +811,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                         type={suggestionFormType}
                         initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
                         onSubmit={handleSuggestionFormSubmit}
-                        onCancel={() => {
-                          setShowSuggestionForm(false);
-                          setSelectedRange(null);
-                          setSelectedText('');
-                        }}
+                        onCancel={() => requestCloseSuggestionForm()}
+                        onDirtyChange={(dirty) => { suggestionFormDirtyRef.current = dirty; }}
                       />
                     </div>
                   )}
@@ -855,11 +896,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                           type={suggestionFormType}
                           initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
                           onSubmit={handleSuggestionFormSubmit}
-                          onCancel={() => {
-                            setShowSuggestionForm(false);
-                            setSelectedRange(null);
-                            setSelectedText('');
-                          }}
+                          onCancel={() => requestCloseSuggestionForm()}
+                          onDirtyChange={(dirty) => { suggestionFormDirtyRef.current = dirty; }}
                         />
                       </div>
                     )}
@@ -886,6 +924,21 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             onCollapse={isZen ? () => setSidebarCollapsed(true) : undefined}
           />
         )}
+
+        <AlertDialog open={showDiscardDialog} onOpenChange={(open) => { if (!open) handleDiscardCancel(); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Discard unsaved suggestion?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes in your suggestion. Are you sure you want to discard them?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleDiscardCancel}>Keep editing</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDiscardConfirm}>Discard</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   },

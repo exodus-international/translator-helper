@@ -13,6 +13,7 @@ interface SuggestionFormProps {
   onSubmit: (data: { comment: string; proposedText?: string }) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
 export function SuggestionForm({
@@ -22,10 +23,21 @@ export function SuggestionForm({
   onSubmit,
   onCancel,
   isSubmitting = false,
+  onDirtyChange,
 }: SuggestionFormProps) {
   const [comment, setComment] = useState(initialComment);
   const [proposedText, setProposedText] = useState(initialProposedText);
   const proposedTextRef = useRef<HTMLTextAreaElement>(null);
+
+  // Track dirty state
+  const isDirty = comment !== initialComment || proposedText !== initialProposedText;
+  const prevDirtyRef = useRef(false);
+  useEffect(() => {
+    if (isDirty !== prevDirtyRef.current) {
+      prevDirtyRef.current = isDirty;
+      onDirtyChange?.(isDirty);
+    }
+  }, [isDirty, onDirtyChange]);
 
   const autoResize = useCallback((el: HTMLTextAreaElement | null) => {
     if (!el) return;
