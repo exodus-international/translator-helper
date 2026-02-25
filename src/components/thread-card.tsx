@@ -1,10 +1,12 @@
 'use client';
 
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
-import { Check, MessageSquare, Pencil, RotateCcw, X } from 'lucide-react';
+import { Check, MessageSquare, Pencil, PencilLine, RotateCcw, X } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
+import { SuggestionForm } from './suggestion-form';
 import { ThreadReplyInput } from './thread-reply-input';
 
 const MONO_FONT = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
@@ -18,6 +20,7 @@ interface ThreadCardProps {
   onApply?: (suggestionId: string) => void;
   onDismiss?: (suggestionId: string) => void;
   onReopen?: (suggestionId: string) => void;
+  onEdit?: (suggestionId: string, data: { comment: string; proposedText?: string }) => Promise<void> | void;
   onClick?: () => void;
 }
 
@@ -65,9 +68,13 @@ export function ThreadCard({
   onApply,
   onDismiss,
   onReopen,
+  onEdit,
   onClick,
 }: ThreadCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const isAnchored = suggestion.startLine != null;
+  const canEdit = onEdit && suggestion.status === SuggestionStatus.OPEN && suggestion.user.id === currentUserId;
   const lineLabel = isAnchored ? `L${suggestion.startLine}` : 'General';
   const replies = suggestion.replies || [];
 
@@ -114,26 +121,48 @@ export function ThreadCard({
         <span className="ml-auto">{statusBadge}</span>
       </div>
 
-      {/* Comment text */}
-      {suggestion.comment?.trim() && (
-        <p className="mt-1.5 text-sm text-gray-700 whitespace-pre-wrap break-words">
-          {suggestion.comment}
-        </p>
-      )}
-
-      {/* Diff preview for CHANGE suggestions */}
-      {suggestion.type === SuggestionType.CHANGE && suggestion.proposedText && isAnchored && (
-        <div
-          className="mt-2 text-[11px] leading-5 rounded bg-muted/40 px-2 py-1.5 space-y-0.5"
-          style={{ fontFamily: MONO_FONT }}
-        >
-          <div className="text-red-700/80 line-through whitespace-pre-wrap break-words">
-            {getTextFromRange(suggestion, translationContent) || '(text not available)'}
-          </div>
-          <div className="text-green-800 whitespace-pre-wrap break-words">
-            {suggestion.proposedText}
-          </div>
+      {/* Edit form or Comment text + diff */}
+      {isEditing ? (
+        <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+          <SuggestionForm
+            type={suggestion.type}
+            initialComment={suggestion.comment ?? ''}
+            initialProposedText={suggestion.proposedText ?? ''}
+            isSubmitting={isEditSubmitting}
+            onSubmit={async (data) => {
+              setIsEditSubmitting(true);
+              try {
+                await onEdit!(suggestion.id, data);
+                setIsEditing(false);
+              } finally {
+                setIsEditSubmitting(false);
+              }
+            }}
+            onCancel={() => setIsEditing(false)}
+          />
         </div>
+      ) : (
+        <>
+          {suggestion.comment?.trim() && (
+            <p className="mt-1.5 text-sm text-gray-700 whitespace-pre-wrap break-words">
+              {suggestion.comment}
+            </p>
+          )}
+
+          {suggestion.type === SuggestionType.CHANGE && suggestion.proposedText && isAnchored && (
+            <div
+              className="mt-2 text-[11px] leading-5 rounded bg-muted/40 px-2 py-1.5 space-y-0.5"
+              style={{ fontFamily: MONO_FONT }}
+            >
+              <div className="text-red-700/80 line-through whitespace-pre-wrap break-words">
+                {(suggestion.status === SuggestionStatus.APPLIED && suggestion.originalText) || getTextFromRange(suggestion, translationContent) || '(text not available)'}
+              </div>
+              <div className="text-green-800 whitespace-pre-wrap break-words">
+                {suggestion.proposedText}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Replies */}
@@ -157,7 +186,7 @@ export function ThreadCard({
       )}
 
       {/* Actions */}
-      {suggestion.status === SuggestionStatus.OPEN && (onApply || onDismiss) && (
+      {suggestion.status === SuggestionStatus.OPEN && (onApply || onDismiss || canEdit) && !isEditing && (
         <div className="flex gap-1.5 mt-2">
           {suggestion.type === SuggestionType.CHANGE && isAnchored && onApply && (
             <Button
@@ -176,7 +205,7 @@ export function ThreadCard({
           {onDismiss && (
             <Button
               size="sm"
-              variant="outline"
+              variant="destructiveOutline"
               onClick={(e) => {
                 e.stopPropagation();
                 onDismiss(suggestion.id);
@@ -185,6 +214,19 @@ export function ThreadCard({
             >
               <X className="h-3 w-3 mr-1" />
               Dismiss
+            </Button>
+          )}
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+              }}
+              className="h-6 text-xs px-2 ml-auto"
+            >
+              <PencilLine className="h-3 w-3 mr-1" />
             </Button>
           )}
         </div>

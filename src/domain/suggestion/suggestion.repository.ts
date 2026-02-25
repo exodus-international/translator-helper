@@ -106,6 +106,23 @@ export async function updateSuggestionStatus(
   });
 }
 
+export async function updateSuggestionContent(
+  id: string,
+  data: { comment: string; proposedText?: string | null },
+) {
+  return prisma.suggestion.update({
+    where: { id },
+    data: {
+      comment: data.comment,
+      ...(data.proposedText !== undefined ? { proposedText: data.proposedText } : {}),
+    },
+    include: {
+      user: { select: userSelect },
+      ...repliesInclude,
+    },
+  });
+}
+
 export async function deleteSuggestion(id: string) {
   return prisma.suggestion.delete({
     where: { id },

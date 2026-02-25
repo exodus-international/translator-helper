@@ -26,6 +26,7 @@ export interface SuggestionWithUser {
   status: SuggestionStatus;
   comment: string;
   proposedText: string | null;
+  originalText: string | null;
   user: {
     id: string;
     name: string;
@@ -98,11 +99,31 @@ export function useMonacoSuggestions({ editor, monaco, suggestions, onSuggestion
       }
 
       // Create range decoration
+      // For APPLIED CHANGE suggestions, compute the range from proposedText length
+      // since the original range no longer matches the replacement text
+      let rangeEndLine = suggestion.endLine!;
+      let rangeEndColumn = suggestion.endColumn!;
+
+      if (
+        suggestion.status === SuggestionStatus.APPLIED &&
+        suggestion.type === SuggestionType.CHANGE &&
+        suggestion.proposedText != null
+      ) {
+        const proposedLines = suggestion.proposedText.split('\n');
+        if (proposedLines.length === 1) {
+          rangeEndLine = suggestion.startLine!;
+          rangeEndColumn = suggestion.startColumn! + proposedLines[0].length;
+        } else {
+          rangeEndLine = suggestion.startLine! + proposedLines.length - 1;
+          rangeEndColumn = proposedLines[proposedLines.length - 1].length + 1;
+        }
+      }
+
       const range = new monaco.Range(
         suggestion.startLine!,
         suggestion.startColumn!,
-        suggestion.endLine!,
-        suggestion.endColumn!,
+        rangeEndLine,
+        rangeEndColumn,
       );
 
       decorations.push({

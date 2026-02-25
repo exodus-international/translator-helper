@@ -34,11 +34,21 @@ export const reopenSuggestionSchema = z.object({
   suggestionId: z.string(),
 });
 
+export const editSuggestionSchema = z.object({
+  suggestionId: z.string(),
+  comment: z
+    .string()
+    .optional()
+    .transform((value) => (value ?? '').trim()),
+  proposedText: z.string().optional(),
+});
+
 export type CreateSuggestionInput = z.infer<typeof createSuggestionSchema>;
 export type UpdateSuggestionStatusInput = z.infer<typeof updateSuggestionStatusSchema>;
 export type ApplySuggestionInput = z.infer<typeof applySuggestionSchema>;
 export type DismissSuggestionInput = z.infer<typeof dismissSuggestionSchema>;
 export type ReopenSuggestionInput = z.infer<typeof reopenSuggestionSchema>;
+export type EditSuggestionInput = z.infer<typeof editSuggestionSchema>;
 
 export const createSuggestionReplySchema = z.object({
   suggestionId: z.string(),

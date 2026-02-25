@@ -326,7 +326,7 @@ export function SuggestionPanel({
                 >
                   <div className="text-red-700/80 line-through whitespace-pre-wrap wrap-break-word">
                     {(() => {
-                      const beforeText = getTextFromRange(suggestion, content);
+                      const beforeText = (suggestion.status === SuggestionStatus.APPLIED && suggestion.originalText) || getTextFromRange(suggestion, content);
                       if (!beforeText) return '(text not available)';
                       return beforeText.length > 160 ? beforeText.substring(0, 160) + '…' : beforeText;
                     })()}

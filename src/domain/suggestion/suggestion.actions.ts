@@ -12,6 +12,7 @@ import {
   createSuggestionReplySchema,
   createSuggestionSchema,
   dismissSuggestionSchema,
+  editSuggestionSchema,
   reopenSuggestionSchema,
   updateSuggestionStatusSchema,
 } from './suggestion.types';
@@ -24,6 +25,7 @@ import {
   getSuggestionById,
   getSuggestionReplyById,
   getSuggestionsByDocumentVersion,
+  updateSuggestionContent,
   updateSuggestionStatus,
 } from './suggestion.repository';
 
@@ -345,6 +347,29 @@ export async function reopenSuggestionAction(input: unknown) {
 
   await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.OPEN, null, null);
   return { suggestion: await getSuggestionById(validated.suggestionId) };
+}
+
+export async function editSuggestionAction(input: unknown) {
+  const user = await requireUser();
+  const validated = editSuggestionSchema.parse(input);
+
+  const suggestion = await getSuggestionById(validated.suggestionId);
+  if (!suggestion) {
+    throw new Error('Suggestion not found');
+  }
+
+  if (suggestion.userId !== user.id) {
+    throw new Error('Forbidden: You can only edit your own suggestions');
+  }
+
+  if (suggestion.status !== SuggestionStatus.OPEN) {
+    throw new Error('Only open suggestions can be edited');
+  }
+
+  return await updateSuggestionContent(validated.suggestionId, {
+    comment: validated.comment ?? '',
+    proposedText: validated.proposedText ?? null,
+  });
 }
 
 export async function deleteSuggestionAction(id: string) {

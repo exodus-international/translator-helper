@@ -75,6 +75,7 @@ interface SourceTranslationViewerProps {
   onApplySuggestion?: (suggestionId: string) => void;
   onDismissSuggestion?: (suggestionId: string, reason?: string) => void;
   onReopenSuggestion?: (suggestionId: string) => void;
+  onEditSuggestion?: (suggestionId: string, data: { comment: string; proposedText?: string }) => Promise<void> | void;
   onCreateSuggestion?: (data: {
     comment: string;
     proposedText?: string;
@@ -124,6 +125,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       onApplySuggestion,
       onDismissSuggestion,
       onReopenSuggestion,
+      onEditSuggestion,
       onCreateSuggestion,
       documentVersion = 1,
       isApplyingSuggestion = false,
@@ -918,6 +920,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             onApply={onApplySuggestion}
             onDismiss={(id) => onDismissSuggestion?.(id)}
             onReopen={(id) => onReopenSuggestion?.(id)}
+            onEdit={onEditSuggestion}
             onSuggestionClick={handleSuggestionClickInternal}
             onCreateGeneralThread={onCreateGeneralThread}
             activeThreadId={activeThreadId}

@@ -28,6 +28,7 @@ import {
   createSuggestionAction,
   createSuggestionReplyAction,
   dismissSuggestionAction,
+  editSuggestionAction,
   getSuggestionsByDocumentVersionAction,
   reopenSuggestionAction,
 } from '@/domain/suggestion/suggestion.actions';
@@ -362,6 +363,26 @@ export default function ReviewClient({
     }
   };
 
+  const handleEditSuggestion = async (suggestionId: string, data: { comment: string; proposedText?: string }) => {
+    try {
+      await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
+      toast.success('Suggestion updated!');
+      const updatedSuggestions = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+      const formattedSuggestions = updatedSuggestions.map((s: any) => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+        replies: (s.replies || []).map((r: any) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+        })),
+      }));
+      setSuggestions(formattedSuggestions as SuggestionWithUser[]);
+    } catch (error: any) {
+      console.error('Error editing suggestion:', error);
+      toast.error(error.message || 'Failed to edit suggestion');
+    }
+  };
+
   const handleReply = async (suggestionId: string, replyContent: string) => {
     try {
       await createSuggestionReplyAction({ suggestionId, content: replyContent });
@@ -514,6 +535,7 @@ export default function ReviewClient({
             onApplySuggestion={handleApplySuggestion}
             onDismissSuggestion={handleDismissSuggestion}
             onReopenSuggestion={handleReopenSuggestion}
+            onEditSuggestion={handleEditSuggestion}
             onCreateSuggestion={handleCreateSuggestion}
             documentVersion={targetVersion.version}
             isApplyingSuggestion={isApplyingSuggestion}
