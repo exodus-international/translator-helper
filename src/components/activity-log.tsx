@@ -1,20 +1,27 @@
 'use client';
 
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import {
   AlertTriangle,
   ArrowRightLeft,
   CheckCheck,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   FilePlus,
   Github,
   Languages,
+  MessageSquarePlus,
   MessageSquareWarning,
   PenLine,
   Play,
   Rocket,
+  RotateCcw,
   Send,
+  Trash2,
   UserPlus,
+  XCircle,
 } from 'lucide-react';
 import { type LucideIcon } from 'lucide-react';
 
@@ -55,6 +62,11 @@ const ACTION_MAP: Record<string, ActionConfig> = {
   github_deployed: { label: 'Deployed to GitHub', icon: Github, colorClass: 'text-violet-500' },
   github_deploy_failed: { label: 'GitHub deploy failed', icon: AlertTriangle, colorClass: 'text-red-500' },
   applied_suggestion: { label: 'Applied suggestion', icon: CheckCheck, colorClass: 'text-green-500' },
+  reopened_suggestion: { label: 'Reopened suggestion', icon: RotateCcw, colorClass: 'text-orange-500' },
+  dismissed_suggestion: { label: 'Dismissed suggestion', icon: XCircle, colorClass: 'text-gray-500' },
+  created_suggestion: { label: 'Created suggestion', icon: MessageSquarePlus, colorClass: 'text-blue-500' },
+  edited_suggestion: { label: 'Edited suggestion', icon: PenLine, colorClass: 'text-gray-500' },
+  deleted_suggestion: { label: 'Deleted suggestion', icon: Trash2, colorClass: 'text-red-500' },
 };
 
 const DEFAULT_CONFIG: ActionConfig = {
@@ -109,6 +121,36 @@ function getDetailText(action: string, details: Record<string, any> | null): str
       return details.language || null;
     case 'github_deploy_failed':
       return details.error ? (details.error.length > 60 ? details.error.slice(0, 60) + '...' : details.error) : null;
+    case 'created_suggestion':
+    case 'deleted_suggestion':
+    case 'dismissed_suggestion': {
+      const type = details.type === 'CHANGE' ? 'Change' : 'Comment';
+      const line = details.startLine
+        ? details.startLine === details.endLine
+          ? `L${details.startLine}`
+          : `L${details.startLine}-${details.endLine}`
+        : 'General';
+      const comment = details.comment ? `'${details.comment}'` : null;
+      return [type, line, comment].filter(Boolean).join(' · ');
+    }
+    case 'applied_suggestion': {
+      const type = details.type === 'CHANGE' ? 'Change' : 'Comment';
+      const range = details.range;
+      const line = range?.startLine
+        ? range.startLine === range.endLine
+          ? `L${range.startLine}`
+          : `L${range.startLine}-${range.endLine}`
+        : null;
+      return [type, line].filter(Boolean).join(' · ');
+    }
+    case 'reopened_suggestion': {
+      const type = details.type === 'CHANGE' ? 'Change' : 'Comment';
+      const reverted = details.reverted ? 'reverted' : null;
+      return [type, reverted].filter(Boolean).join(' · ');
+    }
+    case 'edited_suggestion': {
+      return details.comment ? `'${details.comment}'` : null;
+    }
     default:
       return null;
   }
@@ -152,6 +194,69 @@ function collapseEntries(entries: ActivityLogEntry[]): CollapsedEntry[] {
   return result;
 }
 
+function CollapsedGroupRow({ group }: { group: CollapsedEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const Icon = group.config.icon;
+  const representative = group.entries[0];
+  const detailText = getDetailText(group.action, representative.details);
+  const fullDate = group.lastTime.toLocaleString();
+  const isCollapsible = group.count > 1;
+
+  return (
+    <div>
+      <div className="flex items-start gap-3 text-sm py-1">
+        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${group.config.colorClass}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="font-medium">{group.config.label}</span>
+            {isCollapsible ? (
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="inline-flex items-center gap-0.5 text-gray-400 text-xs hover:text-gray-600 transition-colors"
+              >
+                {expanded ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+                &times;{group.count}
+              </button>
+            ) : (
+              detailText && <span className="text-gray-500">{detailText}</span>
+            )}
+            <span
+              className="text-gray-400 text-xs ml-auto shrink-0"
+              title={fullDate}
+            >
+              {formatRelativeTime(group.lastTime)}
+            </span>
+          </div>
+          <div className="text-xs text-gray-400">
+            by {representative.user.name || representative.user.email}
+          </div>
+        </div>
+      </div>
+      {isCollapsible && expanded && (
+        <div className="ml-7 mt-1 mb-1 space-y-1 border-l-2 border-gray-100 pl-3">
+          {group.entries.map((entry) => {
+            const entryDetail = getDetailText(group.action, entry.details);
+            const entryTime = new Date(entry.createdAt);
+            return (
+              <div key={entry.id} className="flex items-baseline gap-2 text-xs text-gray-500">
+                {entryDetail && <span>{entryDetail}</span>}
+                <span className="text-gray-400 ml-auto shrink-0" title={entryTime.toLocaleString()}>
+                  {formatRelativeTime(entryTime)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ActivityLog({ entries }: ActivityLogProps) {
   if (!entries || entries.length === 0) return null;
 
@@ -161,38 +266,9 @@ export function ActivityLog({ entries }: ActivityLogProps) {
     <Card className="mt-4 p-4">
       <h3 className="text-sm font-semibold mb-2">Activity Log</h3>
       <div className="space-y-2">
-        {collapsed.map((group) => {
-          const Icon = group.config.icon;
-          const representative = group.entries[0];
-          const detailText = getDetailText(group.action, representative.details);
-          const fullDate = group.lastTime.toLocaleString();
-
-          return (
-            <div key={representative.id} className="flex items-start gap-3 text-sm py-1">
-              <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${group.config.colorClass}`} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="font-medium">{group.config.label}</span>
-                  {group.count > 1 && (
-                    <span className="text-gray-400 text-xs">(&times;{group.count})</span>
-                  )}
-                  {detailText && (
-                    <span className="text-gray-500">{detailText}</span>
-                  )}
-                  <span
-                    className="text-gray-400 text-xs ml-auto shrink-0"
-                    title={fullDate}
-                  >
-                    {formatRelativeTime(group.lastTime)}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-400">
-                  by {representative.user.name || representative.user.email}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {collapsed.map((group) => (
+          <CollapsedGroupRow key={group.entries[0].id} group={group} />
+        ))}
       </div>
     </Card>
   );

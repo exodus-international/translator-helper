@@ -3,6 +3,7 @@
 import { canReviewInProject, canTranslateInProject, isDeployer } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
+import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentById } from '../document/document.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
@@ -28,6 +29,10 @@ import {
   updateSuggestionContent,
   updateSuggestionStatus,
 } from './suggestion.repository';
+
+function truncate(text: string, max = 80) {
+  return text.length > max ? text.slice(0, max) + '…' : text;
+}
 
 export async function getSuggestionsByDocumentVersionAction(documentVersionId: string, filters?: any) {
   await requireUser();
@@ -84,7 +89,7 @@ export async function createSuggestionAction(input: unknown) {
     throw new Error('Proposed text should not be provided for COMMENT type suggestions');
   }
 
-  return await createSuggestion({
+  const suggestion = await createSuggestion({
     ...validated,
     comment: validated.comment ?? '',
     userId: user.id,
@@ -94,6 +99,23 @@ export async function createSuggestionAction(input: unknown) {
     endColumn: validated.endColumn ?? null,
     proposedText: validated.proposedText || null,
   });
+
+  await createActivityLog({
+    documentVersionId: validated.documentVersionId,
+    userId: user.id,
+    action: 'created_suggestion',
+    details: {
+      suggestionId: suggestion.id,
+      type: validated.type,
+      startLine: validated.startLine ?? null,
+      endLine: validated.endLine ?? null,
+      comment: validated.comment ? truncate(validated.comment) : null,
+    },
+  });
+
+  revalidatePath(`/documents/${documentVersion.documentId}/review`);
+
+  return suggestion;
 }
 
 export async function applySuggestionAction(input: unknown) {
@@ -218,6 +240,8 @@ export async function applySuggestionAction(input: unknown) {
     },
   });
 
+  revalidatePath(`/documents/${documentVersion.documentId}/review`);
+
   return updatedVersion;
 }
 
@@ -267,7 +291,24 @@ export async function dismissSuggestionAction(input: unknown) {
   }
 
   // Update suggestion status
-  return await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.DISMISSED, validated.dismissedReason);
+  const updated = await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.DISMISSED, validated.dismissedReason);
+
+  await createActivityLog({
+    documentVersionId: suggestion.documentVersionId,
+    userId: user.id,
+    action: 'dismissed_suggestion',
+    details: {
+      suggestionId: suggestion.id,
+      type: suggestion.type,
+      startLine: suggestion.startLine ?? null,
+      endLine: suggestion.endLine ?? null,
+      comment: suggestion.comment ? truncate(suggestion.comment) : null,
+    },
+  });
+
+  revalidatePath(`/documents/${documentVersion.documentId}/review`);
+
+  return updated;
 }
 
 export async function reopenSuggestionAction(input: unknown) {
@@ -341,11 +382,27 @@ export async function reopenSuggestionAction(input: unknown) {
         },
       });
 
+      revalidatePath(`/documents/${documentVersion.documentId}/review`);
+
       return { suggestion: await getSuggestionById(validated.suggestionId), updatedVersion };
     }
   }
 
   await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.OPEN, null, null);
+
+  await createActivityLog({
+    documentVersionId: suggestion.documentVersionId,
+    userId: user.id,
+    action: 'reopened_suggestion',
+    details: {
+      suggestionId: suggestion.id,
+      type: suggestion.type,
+      reverted: false,
+    },
+  });
+
+  revalidatePath(`/documents/${documentVersion.documentId}/review`);
+
   return { suggestion: await getSuggestionById(validated.suggestionId) };
 }
 
@@ -366,10 +423,28 @@ export async function editSuggestionAction(input: unknown) {
     throw new Error('Only open suggestions can be edited');
   }
 
-  return await updateSuggestionContent(validated.suggestionId, {
+  const updated = await updateSuggestionContent(validated.suggestionId, {
     comment: validated.comment ?? '',
     proposedText: validated.proposedText ?? null,
   });
+
+  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
+
+  await createActivityLog({
+    documentVersionId: suggestion.documentVersionId,
+    userId: user.id,
+    action: 'edited_suggestion',
+    details: {
+      suggestionId: suggestion.id,
+      comment: validated.comment ? truncate(validated.comment) : null,
+    },
+  });
+
+  if (documentVersion) {
+    revalidatePath(`/documents/${documentVersion.documentId}/review`);
+  }
+
+  return updated;
 }
 
 export async function deleteSuggestionAction(id: string) {
@@ -386,7 +461,28 @@ export async function deleteSuggestionAction(id: string) {
     throw new Error('Forbidden: You can only delete your own suggestions');
   }
 
-  return await deleteSuggestion(id);
+  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
+
+  const result = await deleteSuggestion(id);
+
+  await createActivityLog({
+    documentVersionId: suggestion.documentVersionId,
+    userId: user.id,
+    action: 'deleted_suggestion',
+    details: {
+      suggestionId: id,
+      type: suggestion.type,
+      startLine: suggestion.startLine ?? null,
+      endLine: suggestion.endLine ?? null,
+      comment: suggestion.comment ? truncate(suggestion.comment) : null,
+    },
+  });
+
+  if (documentVersion) {
+    revalidatePath(`/documents/${documentVersion.documentId}/review`);
+  }
+
+  return result;
 }
 
 export async function createSuggestionReplyAction(input: unknown) {

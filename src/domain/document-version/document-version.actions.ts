@@ -4,6 +4,7 @@ import prisma from '@/lib/db';
 import { canDeploy, canReviewInProject, canTranslateInProject, isDeployer, isProjectMember } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 import { DocumentStatus, ProjectRole } from '@prisma/client';
+import { revalidatePath } from 'next/cache';
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { createComment } from '../comment/comment.repository';
 import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
@@ -274,6 +275,7 @@ export async function deployVersionAction(versionId: string) {
         action: 'github_deployed',
         details: {},
       });
+      revalidatePath(`/documents/${version.documentId}/review`);
     } else {
       console.log('[GitHub] GitHub is not configured, skipping deploy');
     }
@@ -286,6 +288,7 @@ export async function deployVersionAction(versionId: string) {
       action: 'github_deploy_failed',
       details: { error: error.message },
     });
+    revalidatePath(`/documents/${version.documentId}/review`);
   }
 
   return version;
@@ -366,6 +369,7 @@ export async function updateDocumentVersionStatusAction(
           action: 'github_deployed',
           details: {},
         });
+        revalidatePath(`/documents/${version.documentId}/review`);
         github = { status: 'success', prUrl: result?.prUrl };
       } else {
         console.log('[GitHub] GitHub is not configured, skipping deploy');
@@ -380,6 +384,7 @@ export async function updateDocumentVersionStatusAction(
         action: 'github_deploy_failed',
         details: { error: error.message },
       });
+      revalidatePath(`/documents/${version.documentId}/review`);
       github = { status: 'failed', error: error.message };
     }
   }

@@ -78,6 +78,7 @@ export default function ReviewClient({
   const router = useRouter();
   const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
   const [content, setContent] = useState(initialTargetVersion.content);
+  const [activityLogs, setActivityLogs] = useState(initialTargetVersion.activityLogs ?? []);
   const [loading, setLoading] = useState(false);
   const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
   const [sourceSaving, setSourceSaving] = useState(false);
@@ -107,6 +108,13 @@ export default function ReviewClient({
     [sourceVersion.content],
   );
   const translationFormattedContent = useMemo(() => getContentWithoutFrontmatter(content), [content]);
+
+  // Sync activity logs when server re-renders with new data
+  useEffect(() => {
+    if (initialTargetVersion.activityLogs) {
+      setActivityLogs(initialTargetVersion.activityLogs);
+    }
+  }, [initialTargetVersion.activityLogs]);
 
   // Refresh suggestions when content changes
   useEffect(() => {
@@ -575,8 +583,8 @@ export default function ReviewClient({
                 isDeployed={targetVersion.status === DocumentStatus.DEPLOYED}
               />
 
-              {targetVersion.activityLogs && targetVersion.activityLogs.length > 0 && (
-                <ActivityLog entries={targetVersion.activityLogs} />
+              {activityLogs && activityLogs.length > 0 && (
+                <ActivityLog entries={activityLogs} />
               )}
             </div>
           )}
