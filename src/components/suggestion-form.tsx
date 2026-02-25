@@ -61,7 +61,7 @@ export function SuggestionForm({
 
     onSubmit({
       comment: comment.trim(),
-      proposedText: type === SuggestionType.CHANGE ? proposedText.trim() : undefined,
+      proposedText: type === SuggestionType.CHANGE ? proposedText : undefined,
     });
   };
 
@@ -95,6 +95,7 @@ export function SuggestionForm({
             required
             className="mt-1 font-mono overflow-hidden"
           />
+          <p className="text-[11px] text-muted-foreground mt-1">Whitespace and spaces are preserved as-is.</p>
         </div>
       )}
 
