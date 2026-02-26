@@ -9,7 +9,7 @@ import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { DocumentStatus } from '@prisma/client';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { ArrowRight, ChevronDown } from 'lucide-react';
+import { AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useState } from 'react';
@@ -70,8 +70,19 @@ export function StatusDropdown({
       statuses = statuses.filter((status) => status !== DocumentStatus.DEPLOYED);
     }
 
+    // Restrict to adjacent statuses only (previous and next in sequence)
+    if (currentStatus) {
+      const currentIndex = DOCUMENT_STATUS_SEQUENCE.indexOf(currentStatus);
+      if (currentIndex !== -1) {
+        const adjacentStatuses = new Set<DocumentStatus>();
+        if (currentIndex > 0) adjacentStatuses.add(DOCUMENT_STATUS_SEQUENCE[currentIndex - 1]);
+        if (currentIndex < DOCUMENT_STATUS_SEQUENCE.length - 1) adjacentStatuses.add(DOCUMENT_STATUS_SEQUENCE[currentIndex + 1]);
+        statuses = statuses.filter((s) => adjacentStatuses.has(s));
+      }
+    }
+
     return statuses;
-  }, [allowedStatuses, user]);
+  }, [allowedStatuses, user, currentStatus]);
 
   const transitionLabels: Partial<Record<DocumentStatus, string>> = {
     [DocumentStatus.IN_PROGRESS]: 'Start translation',
@@ -225,7 +236,7 @@ export function StatusDropdown({
             const isCurrentStatus = status === displayedStatus;
 
             const isBlockedByOpenSuggestions =
-              status === DocumentStatus.APPROVED && openSuggestionsCount > 0;
+              (status === DocumentStatus.APPROVED || status === DocumentStatus.DEPLOYED) && openSuggestionsCount > 0;
 
             const isDisabled =
               isCurrentStatus || loading || (user.role === 'TRANSLATOR' && status === DocumentStatus.DEPLOYED) || isBlockedByOpenSuggestions;
@@ -261,9 +272,9 @@ export function StatusDropdown({
                       {getTransitionLabel(displayedStatus, status)}
                     </span>
                     {isBlockedByOpenSuggestions && (
-                      <span className="text-[10px] text-amber-600">
-                        {openSuggestionsCount} open suggestion{openSuggestionsCount !== 1 ? 's' : ''} remaining
-                      </span>
+                      <div className="text-[12px] text-red-600 flex items-center">
+                        <AlertCircle className="h-3.5 w-3.5 mr-1" /> {openSuggestionsCount} open suggestion{openSuggestionsCount !== 1 ? 's' : ''} remaining
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
