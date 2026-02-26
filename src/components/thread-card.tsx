@@ -22,6 +22,7 @@ interface ThreadCardProps {
   onReopen?: (suggestionId: string) => void;
   onEdit?: (suggestionId: string, data: { comment: string; proposedText?: string }) => Promise<void> | void;
   onClick?: () => void;
+  disableReopen?: boolean;
 }
 
 function formatTimeAgo(date: string) {
@@ -70,6 +71,7 @@ export function ThreadCard({
   onReopen,
   onEdit,
   onClick,
+  disableReopen = false,
 }: ThreadCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
@@ -233,7 +235,7 @@ export function ThreadCard({
       )}
 
       {/* Reopen action for resolved suggestions */}
-      {suggestion.status !== SuggestionStatus.OPEN && onReopen && (
+      {suggestion.status !== SuggestionStatus.OPEN && onReopen && !disableReopen && (
         <div className="flex gap-1.5 mt-2">
           <Button
             size="sm"

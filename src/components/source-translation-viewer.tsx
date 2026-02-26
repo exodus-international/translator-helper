@@ -89,6 +89,7 @@ interface SourceTranslationViewerProps {
   editorRef?: React.RefObject<any>; // Ref to the Monaco editor to get cursor position
   onReply?: (suggestionId: string, content: string) => void;
   onCreateGeneralThread?: (comment: string) => void;
+  disableReopen?: boolean;
 }
 
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
@@ -133,6 +134,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       editorRef: externalEditorRef,
       onReply,
       onCreateGeneralThread,
+      disableReopen = false,
     },
     ref,
   ) {
@@ -925,6 +927,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             onCreateGeneralThread={onCreateGeneralThread}
             activeThreadId={activeThreadId}
             onCollapse={isZen ? () => setSidebarCollapsed(true) : undefined}
+            disableReopen={disableReopen}
           />
         )}
 

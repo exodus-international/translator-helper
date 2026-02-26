@@ -24,6 +24,7 @@ interface StatusDropdownProps {
   onStatusChange?: (newStatus: DocumentStatus) => void;
   allowedStatuses?: DocumentStatus[]; // For future permission filtering
   disabled?: boolean;
+  openSuggestionsCount?: number;
 }
 
 export function StatusDropdown({
@@ -35,6 +36,7 @@ export function StatusDropdown({
   onStatusChange,
   allowedStatuses,
   disabled = false,
+  openSuggestionsCount = 0,
 }: StatusDropdownProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -222,21 +224,29 @@ export function StatusDropdown({
             const StatusIcon = statusConfig.icon;
             const isCurrentStatus = status === displayedStatus;
 
+            const isBlockedByOpenSuggestions =
+              status === DocumentStatus.APPROVED && openSuggestionsCount > 0;
+
             const isDisabled =
-              isCurrentStatus || loading || (user.role === 'TRANSLATOR' && status === DocumentStatus.DEPLOYED);
+              isCurrentStatus || loading || (user.role === 'TRANSLATOR' && status === DocumentStatus.DEPLOYED) || isBlockedByOpenSuggestions;
 
             return (
               <DropdownMenuPrimitive.Item
                 key={status}
                 disabled={isDisabled}
                 className={cn(
-                  'relative flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm cursor-pointer outline-none',
-                  'hover:bg-gray-100 focus:bg-gray-100',
-                  isDisabled && 'opacity-50 cursor-not-allowed',
-                  isCurrentStatus && 'bg-blue-50',
+                  'relative flex items-center gap-2 px-2 py-2 text-sm rounded-sm outline-none',
+                  isDisabled
+                    ? 'opacity-40 cursor-not-allowed'
+                    : 'cursor-pointer hover:bg-gray-100 focus:bg-gray-100',
+                  isCurrentStatus && 'bg-blue-50 opacity-60',
                 )}
                 onSelect={(e) => {
                   e.preventDefault();
+                  if (isBlockedByOpenSuggestions) {
+                    toast.warning(`Resolve all open suggestions before approving (${openSuggestionsCount} remaining)`);
+                    return;
+                  }
                   if (!isDisabled) {
                     handleStatusChange(status);
                   }
@@ -244,9 +254,20 @@ export function StatusDropdown({
               >
                 {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
                 <div className="flex w-full justify-between items-center gap-2">
-                  <span className="text-gray-500">{getTransitionLabel(displayedStatus, status)}</span>
+                  <div className="flex flex-col">
+                    <span className={cn(
+                      isDisabled ? 'text-gray-400' : 'text-gray-900 font-medium',
+                    )}>
+                      {getTransitionLabel(displayedStatus, status)}
+                    </span>
+                    {isBlockedByOpenSuggestions && (
+                      <span className="text-[10px] text-amber-600">
+                        {openSuggestionsCount} open suggestion{openSuggestionsCount !== 1 ? 's' : ''} remaining
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
-                    <ArrowRight className="h-3.5 w-3.5 text-gray-400" />
+                    <ArrowRight className={cn('h-3.5 w-3.5', isDisabled ? 'text-gray-300' : 'text-gray-400')} />
                     <Badge variant="secondary" className={cn('gap-1', statusConfig.color.badgeClass, 'justify-start')}>
                       <StatusIcon className={cn('h-3.5 w-3.5', statusConfig.color.textClass)} />
                       <span className={cn('font-medium', statusConfig.color.textClass)}>{statusConfig.name}</span>

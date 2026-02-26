@@ -35,7 +35,7 @@ import {
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
 import { canReviewClient, isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus, SuggestionType } from '@prisma/client';
+import { DocumentStatus, SuggestionStatus, SuggestionType } from '@prisma/client';
 import matter from 'gray-matter';
 import { ChevronDown, ChevronRight, Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -140,6 +140,12 @@ export default function ReviewClient({
 
   const canDeploy = targetVersion.status === 'APPROVED';
   const isPendingReview = targetVersion.status === 'PENDING_REVIEW';
+  const isApprovedOrLater =
+    targetVersion.status === DocumentStatus.APPROVED || targetVersion.status === DocumentStatus.DEPLOYED;
+  const openSuggestionsCount = useMemo(
+    () => suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length,
+    [suggestions],
+  );
   const statusSteps = DOCUMENT_STATUS_SEQUENCE.map((status, index) => ({
     status,
     step: index + 1,
@@ -510,6 +516,7 @@ export default function ReviewClient({
               languageId={targetVersion.languageId}
               disabled={loading}
               onStatusChange={handleStatusChange}
+              openSuggestionsCount={openSuggestionsCount}
             />
           </div>
         </div>
@@ -550,6 +557,7 @@ export default function ReviewClient({
             isDismissingSuggestion={isDismissingSuggestion}
             onReply={handleReply}
             onCreateGeneralThread={handleCreateGeneralThread}
+            disableReopen={isApprovedOrLater}
           />
         </div>
 

@@ -22,6 +22,7 @@ interface ThreadSidebarProps {
   onCreateGeneralThread?: (comment: string) => void;
   activeThreadId?: string | null;
   onCollapse?: () => void;
+  disableReopen?: boolean;
 }
 
 export function ThreadSidebar({
@@ -38,6 +39,7 @@ export function ThreadSidebar({
   onCreateGeneralThread,
   activeThreadId,
   onCollapse,
+  disableReopen = false,
 }: ThreadSidebarProps) {
   const [showGeneralInput, setShowGeneralInput] = useState(false);
   const [generalComment, setGeneralComment] = useState('');
@@ -101,6 +103,7 @@ export function ThreadSidebar({
         onReopen={onReopen}
         onEdit={onEdit}
         onClick={() => onSuggestionClick?.(suggestion)}
+        disableReopen={disableReopen}
       />
     </div>
   );
