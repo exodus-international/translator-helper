@@ -84,15 +84,29 @@ export function StatusDropdown({
     return statuses;
   }, [allowedStatuses, user, currentStatus]);
 
-  const transitionLabels: Partial<Record<DocumentStatus, string>> = {
+  const forwardLabels: Partial<Record<DocumentStatus, string>> = {
     [DocumentStatus.IN_PROGRESS]: 'Start translation',
     [DocumentStatus.PENDING_REVIEW]: 'Give me feedback',
     [DocumentStatus.APPROVED]: 'Approve',
     [DocumentStatus.DEPLOYED]: 'Deploy',
   };
 
-  const getTransitionLabel = (_from: DocumentStatus | null | undefined, to: DocumentStatus) => {
-    return transitionLabels[to] ?? 'Transition to';
+  const backwardLabels: Partial<Record<DocumentStatus, string>> = {
+    [DocumentStatus.PENDING_TRANSLATION]: 'Back to pending',
+    [DocumentStatus.IN_PROGRESS]: 'Return to translation',
+    [DocumentStatus.PENDING_REVIEW]: 'Request new review',
+    [DocumentStatus.APPROVED]: 'Revoke deployment',
+  };
+
+  const getTransitionLabel = (from: DocumentStatus | null | undefined, to: DocumentStatus) => {
+    if (from) {
+      const fromIndex = DOCUMENT_STATUS_SEQUENCE.indexOf(from);
+      const toIndex = DOCUMENT_STATUS_SEQUENCE.indexOf(to);
+      if (fromIndex !== -1 && toIndex !== -1 && toIndex < fromIndex) {
+        return backwardLabels[to] ?? 'Move back';
+      }
+    }
+    return forwardLabels[to] ?? 'Transition to';
   };
 
   const handleStatusChange = async (newStatus: DocumentStatus) => {
