@@ -5,7 +5,7 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
   fallback?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   name?: string; // Name used to generate color
 }
 
@@ -40,6 +40,7 @@ function getColorFromString(str: string): { bg: string; text: string } {
 const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
   ({ className, src, alt, fallback, size = 'md', name, children, ...props }, ref) => {
     const sizeClasses = {
+      xs: 'h-5 w-5 text-[10px]',
       sm: 'h-6 w-6 text-xs',
       md: 'h-8 w-8 text-xs',
       lg: 'h-10 w-10 text-sm',

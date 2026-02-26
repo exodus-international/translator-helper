@@ -8,6 +8,7 @@ import {
   deleteProjectMembersByUser,
   getProjectMemberById,
   getProjectMembersByUserAndProject,
+  getProjectReviewers,
   getUserRoleInProject,
   listProjectMembers,
   updateProjectMember,
@@ -71,6 +72,18 @@ export async function deleteProjectMembersByUserAction(userId: string, translati
   // TODO: Add permission check - only PROJECT_MANAGER or DEPLOYER can remove members
 
   return await deleteProjectMembersByUser(userId, translationProjectId);
+}
+
+export async function getProjectReviewersAction(translationProjectId: string) {
+  await requireUser();
+  const members = await getProjectReviewers(translationProjectId);
+  // Deduplicate by user ID (a user might have multiple reviewer-eligible roles)
+  const seen = new Set<string>();
+  return members.filter((m) => {
+    if (seen.has(m.user.id)) return false;
+    seen.add(m.user.id);
+    return true;
+  });
 }
 
 export async function getUserRoleInProjectAction(translationProjectId: string) {

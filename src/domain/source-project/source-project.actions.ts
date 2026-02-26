@@ -8,6 +8,7 @@ import { createSourceProjectSchema, updateSourceProjectSchema } from './source-p
 import {
   listSourceProjects,
   getSourceProjectById,
+  getSourceProjectsForUser,
   createSourceProject,
   updateSourceProject,
   deleteSourceProject,
@@ -16,6 +17,12 @@ import {
 export async function listSourceProjectsAction(options?: { includeComplete?: boolean }) {
   await requireUser();
   return await listSourceProjects(options);
+}
+
+export async function getSourceProjectsForUserAction() {
+  const user = await requireUser();
+  const isDeployerUser = user.role === 'DEPLOYER';
+  return await getSourceProjectsForUser(user.id, isDeployerUser);
 }
 
 export async function getSourceProjectAction(id: string) {

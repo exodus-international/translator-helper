@@ -18,6 +18,13 @@ export async function getDocumentVersionById(id: string) {
           email: true,
         },
       },
+      reviewer: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
       comments: {
         include: {
           user: {
@@ -66,6 +73,13 @@ export async function getDocumentVersionByDocumentAndLanguage(documentId: string
       },
       language: true,
       user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      reviewer: {
         select: {
           id: true,
           name: true,
@@ -139,6 +153,13 @@ export async function createDocumentVersion(data: {
           email: true,
         },
       },
+      reviewer: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
   });
 }
@@ -179,18 +200,35 @@ export async function updateDocumentVersion(id: string, content: string, userId:
           email: true,
         },
       },
+      reviewer: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
   });
 }
 
-export async function updateDocumentVersionStatus(id: string, status: DocumentStatus) {
+export async function updateDocumentVersionStatus(id: string, status: DocumentStatus, reviewerId?: string) {
   return prisma.documentVersion.update({
     where: { id },
-    data: { status },
+    data: {
+      status,
+      ...(reviewerId !== undefined ? { reviewerId } : {}),
+    },
     include: {
       document: true,
       language: true,
       user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      reviewer: {
         select: {
           id: true,
           name: true,

@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth-client';
 import { SessionUser } from '@/lib/session';
-import { LogOut } from 'lucide-react';
+import { FilePlus, LogOut, PlusIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -39,9 +39,7 @@ export function Navigation({ user }: NavigationProps) {
               <Link href="/documents" className="text-sm text-gray-600 hover:text-gray-900">
                 Documents
               </Link>
-              <Link href="/documents/new" className="text-sm text-gray-600 hover:text-gray-900">
-                New Document
-              </Link>
+
               {user.role === 'DEPLOYER' && (
                 <>
                   <Link href="/admin/languages" className="text-sm text-gray-600 hover:text-gray-900">
@@ -61,6 +59,13 @@ export function Navigation({ user }: NavigationProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {user.role === 'DEPLOYER' && (
+              <Button variant="outline" size="sm">
+                <Link href="/documents/new" className="flex items-center gap-2">
+                  <FilePlus className="h-4 w-4" /> New
+                </Link>
+              </Button>
+            )}
             <Avatar size="sm" name={user.name || undefined}>
               <AvatarFallback name={user.name || undefined}>
                 {user.name

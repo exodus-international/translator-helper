@@ -90,6 +90,7 @@ interface SourceTranslationViewerProps {
   onReply?: (suggestionId: string, content: string) => void;
   onCreateGeneralThread?: (comment: string) => void;
   disableReopen?: boolean;
+  sidebarHeader?: ReactNode;
 }
 
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
@@ -135,6 +136,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       onReply,
       onCreateGeneralThread,
       disableReopen = false,
+      sidebarHeader,
     },
     ref,
   ) {
@@ -534,7 +536,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       <div
         className={cn(
           'grid border-0',
-          hasSidebar ? (sidebarHidden ? 'grid-cols-2' : 'grid-cols-[1fr_1fr_340px]') : 'grid-cols-2',
+          (hasSidebar || sidebarHeader) ? (sidebarHidden ? 'grid-cols-2' : 'grid-cols-[1fr_1fr_340px]') : 'grid-cols-2',
           className,
           isZen && 'h-full',
         )}
@@ -912,23 +914,28 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
           </div>
         </Card>
 
-        {hasSidebar && !sidebarHidden && (
-          <ThreadSidebar
-            suggestions={suggestions}
-            currentUserId={currentUserId || ''}
-            translationContent={translationContent}
-            canCreateSuggestions={canCreateSuggestions}
-            onReply={onReply}
-            onApply={onApplySuggestion}
-            onDismiss={(id) => onDismissSuggestion?.(id)}
-            onReopen={(id) => onReopenSuggestion?.(id)}
-            onEdit={onEditSuggestion}
-            onSuggestionClick={handleSuggestionClickInternal}
-            onCreateGeneralThread={onCreateGeneralThread}
-            activeThreadId={activeThreadId}
-            onCollapse={isZen ? () => setSidebarCollapsed(true) : undefined}
-            disableReopen={disableReopen}
-          />
+        {(hasSidebar || sidebarHeader) && !sidebarHidden && (
+          <div className="flex flex-col overflow-hidden">
+            {sidebarHeader}
+            {hasSidebar && (
+              <ThreadSidebar
+                suggestions={suggestions}
+                currentUserId={currentUserId || ''}
+                translationContent={translationContent}
+                canCreateSuggestions={canCreateSuggestions}
+                onReply={onReply}
+                onApply={onApplySuggestion}
+                onDismiss={(id) => onDismissSuggestion?.(id)}
+                onReopen={(id) => onReopenSuggestion?.(id)}
+                onEdit={onEditSuggestion}
+                onSuggestionClick={handleSuggestionClickInternal}
+                onCreateGeneralThread={onCreateGeneralThread}
+                activeThreadId={activeThreadId}
+                onCollapse={isZen ? () => setSidebarCollapsed(true) : undefined}
+                disableReopen={disableReopen}
+              />
+            )}
+          </div>
         )}
 
         <AlertDialog open={showDiscardDialog} onOpenChange={(open) => { if (!open) handleDiscardCancel(); }}>

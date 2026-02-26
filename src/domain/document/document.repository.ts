@@ -1054,6 +1054,13 @@ export async function getDashboardDocuments(
               },
             },
           },
+          reviewer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
           activityLogs: {
             orderBy: {
               createdAt: 'desc',

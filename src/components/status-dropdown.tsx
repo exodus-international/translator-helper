@@ -22,6 +22,7 @@ interface StatusDropdownProps {
   documentId?: string; // For navigation after status change
   languageId?: string; // For navigation after status change
   onStatusChange?: (newStatus: DocumentStatus) => void;
+  onReviewRequested?: () => void; // Called instead of direct transition when moving to PENDING_REVIEW
   allowedStatuses?: DocumentStatus[]; // For future permission filtering
   disabled?: boolean;
   openSuggestionsCount?: number;
@@ -34,6 +35,7 @@ export function StatusDropdown({
   documentId,
   languageId,
   onStatusChange,
+  onReviewRequested,
   allowedStatuses,
   disabled = false,
   openSuggestionsCount = 0,
@@ -120,6 +122,14 @@ export function StatusDropdown({
 
     if (displayedStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
       toast.warning('Only deployers can change the status of a deployed document');
+      return;
+    }
+
+    // Intercept PENDING_REVIEW transition to let parent show reviewer picker
+    // Only when moving forward (from IN_PROGRESS), not when going back (from APPROVED)
+    if (newStatus === DocumentStatus.PENDING_REVIEW && onReviewRequested && currentStatus !== DocumentStatus.APPROVED) {
+      setOpen(false);
+      onReviewRequested();
       return;
     }
 

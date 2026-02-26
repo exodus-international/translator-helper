@@ -1,383 +1,298 @@
 'use client';
 
+import ProjectCard from '@/components/project-card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
-import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
-import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
+import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus, Language } from '@prisma/client';
-import { FileCheck, FileText, Plus, Search } from 'lucide-react';
+import { DocumentStatus } from '@prisma/client';
+import { ArrowRight, ClipboardList, Eye, FolderOpen, Rocket, Search } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+
+type VersionWithDetails = {
+  id: string;
+  status: DocumentStatus;
+  updatedAt: string | Date;
+  document: {
+    id: string;
+    title: string;
+    slug: string;
+    sourceProject: {
+      id: string;
+      name: string;
+    } | null;
+  };
+  language: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+  reviewer: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+};
 
 interface DashboardClientProps {
   user: SessionUser;
-  languages: Language[];
-  translationProjects: any[];
-  initialFilters: {
-    language?: string;
-    status?: string;
-    sourceProject?: string;
-    search?: string;
-  };
+  projects: {
+    id: string;
+    name: string;
+    description: string | null;
+    status: string;
+    _count: {
+      documents: number;
+      translationProjects: number;
+    };
+    translationProjects: {
+      id: string;
+      languageId: string;
+      language: {
+        id: string;
+        name: string;
+        code: string;
+      };
+      _count: {
+        members: number;
+      };
+    }[];
+  }[];
+  assignments: {
+    id: string;
+    documentId: string;
+    deadline: string | Date | null;
+    document: {
+      id: string;
+      title: string;
+      slug: string;
+      sourceProject: {
+        id: string;
+        name: string;
+      } | null;
+      versions: {
+        id: string;
+        status: DocumentStatus;
+        languageId: string;
+        language: {
+          id: string;
+          name: string;
+          code: string;
+        };
+      }[];
+    };
+    translationProject: {
+      id: string;
+      language: {
+        id: string;
+        name: string;
+        code: string;
+      };
+      sourceProject: {
+        id: string;
+        name: string;
+      };
+    };
+  }[];
+  approvedVersions: VersionWithDetails[];
+  reviewAssignments: VersionWithDetails[];
+  translatingVersions: VersionWithDetails[];
 }
 
-type KanbanCardData = {
-  id: string;
-  name: string;
-  column: string;
-  document: any;
-  versionId?: string;
-};
+function getDocumentUrl(assignment: DashboardClientProps['assignments'][number]): string {
+  const doc = assignment.document;
+  const langId = assignment.translationProject.language.id;
+  const version = doc.versions.find((v) => v.languageId === langId);
 
-type KanbanColumn = {
-  id: string;
-  name: string;
-  color: string;
-  status?: DocumentStatus | null;
-};
-
-// Map statuses to columns
-const getColumnForStatus = (status: DocumentStatus | null | undefined, hasVersion: boolean): string => {
-  if (!hasVersion || !status) return 'pending';
-
-  switch (status) {
-    case DocumentStatus.PENDING_TRANSLATION:
-      return 'pending';
-    case DocumentStatus.IN_PROGRESS:
-      return 'in-progress';
-    case DocumentStatus.PENDING_REVIEW:
-      return 'review';
-    case DocumentStatus.APPROVED:
-      return 'approved';
-    case DocumentStatus.DEPLOYED:
-      return 'deployed';
-    default:
-      return 'pending';
+  if (!version) {
+    return `/documents/${doc.id}/translate?lang=${langId}`;
   }
+
+  if (version.status === DocumentStatus.PENDING_TRANSLATION || version.status === DocumentStatus.IN_PROGRESS) {
+    return `/documents/${doc.id}/translate?lang=${langId}&version=${version.id}`;
+  }
+
+  return `/documents/${doc.id}/review?version=${version.id}`;
+}
+
+function getVersionStatus(assignment: DashboardClientProps['assignments'][number]): DocumentStatus | null {
+  const langId = assignment.translationProject.language.id;
+  const version = assignment.document.versions.find((v) => v.languageId === langId);
+  return version?.status || null;
+}
+
+const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+});
+
+function getVersionUrl(version: VersionWithDetails): string {
+  if (version.status === DocumentStatus.PENDING_TRANSLATION || version.status === DocumentStatus.IN_PROGRESS) {
+    return `/documents/${version.document.id}/translate?lang=${version.language.id}&version=${version.id}`;
+  }
+  return `/documents/${version.document.id}/review?version=${version.id}`;
+}
+
+type WorkItem = {
+  key: string;
+  documentId: string;
+  documentTitle: string;
+  projectName: string | null;
+  languageName: string;
+  role: 'Translator' | 'Reviewer';
+  status: DocumentStatus | null;
+  deadline: Date | string | null;
+  url: string;
+  translatorName: string | null;
+  reviewerName: string | null;
 };
 
-const getStatusForColumn = (columnId: string): DocumentStatus | null => {
-  switch (columnId) {
-    case 'pending':
-      return DocumentStatus.PENDING_TRANSLATION;
-    case 'in-progress':
-      return DocumentStatus.IN_PROGRESS;
-    case 'review':
-      return DocumentStatus.PENDING_REVIEW;
-    case 'approved':
-      return DocumentStatus.APPROVED;
-    case 'deployed':
-      return DocumentStatus.DEPLOYED;
-    default:
-      return null;
+function buildWorkItems(
+  translatingVersions: VersionWithDetails[],
+  reviewAssignments: VersionWithDetails[],
+  assignments: DashboardClientProps['assignments'],
+): WorkItem[] {
+  const itemMap = new Map<string, WorkItem>();
+
+  // 1. Add translating versions as Translator entries
+  for (const v of translatingVersions) {
+    const key = `${v.document.id}:${v.language.id}`;
+    itemMap.set(key, {
+      key,
+      documentId: v.document.id,
+      documentTitle: v.document.title,
+      projectName: v.document.sourceProject?.name ?? null,
+      languageName: v.language.name,
+      role: 'Translator',
+      status: v.status,
+      deadline: null,
+      url: getVersionUrl(v),
+      translatorName: v.user?.name ?? null,
+      reviewerName: v.reviewer?.name ?? null,
+    });
   }
-};
+
+  // 2. Add review assignments as Reviewer entries
+  for (const v of reviewAssignments) {
+    const key = `${v.document.id}:${v.language.id}:reviewer`;
+    itemMap.set(key, {
+      key,
+      documentId: v.document.id,
+      documentTitle: v.document.title,
+      projectName: v.document.sourceProject?.name ?? null,
+      languageName: v.language.name,
+      role: 'Reviewer',
+      status: v.status,
+      deadline: null,
+      url: `/documents/${v.document.id}/review?version=${v.id}`,
+      translatorName: v.user?.name ?? null,
+      reviewerName: v.reviewer?.name ?? null,
+    });
+  }
+
+  // 3. Merge assignments — enrich existing or add new
+  for (const a of assignments) {
+    const langId = a.translationProject.language.id;
+    const key = `${a.document.id}:${langId}`;
+    const existing = itemMap.get(key);
+
+    if (existing) {
+      // Enrich with deadline from assignment
+      existing.deadline = a.deadline;
+    } else {
+      // Not yet present — add as new translator entry
+      const version = a.document.versions.find((v) => v.languageId === langId);
+      const status = version?.status ?? null;
+      const url = getDocumentUrl(a);
+
+      itemMap.set(key, {
+        key,
+        documentId: a.document.id,
+        documentTitle: a.document.title,
+        projectName: a.translationProject.sourceProject?.name ?? null,
+        languageName: a.translationProject.language.name,
+        role: 'Translator',
+        status,
+        deadline: a.deadline,
+        url,
+        translatorName: null,
+        reviewerName: null,
+      });
+    }
+  }
+
+  // Sort: deadline first (earliest), then nulls last
+  return Array.from(itemMap.values()).sort((a, b) => {
+    if (a.deadline && b.deadline) {
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    }
+    if (a.deadline) return -1;
+    if (b.deadline) return 1;
+    return 0;
+  });
+}
+
+const headClass = 'text-[11px] uppercase tracking-wider text-muted-foreground font-medium';
 
 export default function DashboardClient({
   user,
-  languages,
-  translationProjects,
-  initialFilters,
+  projects,
+  assignments,
+  approvedVersions,
+  reviewAssignments,
+  translatingVersions,
 }: DashboardClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const LANGUAGE_STORAGE_KEY = 'dashboard:selectedLanguage';
-
-  // Initialize from URL searchParams as fallback if initialFilters doesn't have it
-  const urlSourceProject = searchParams.get('sourceProject');
-  const initialSourceProject = initialFilters.sourceProject || urlSourceProject || 'all';
-
-  const [selectedLanguage, setSelectedLanguage] = useState<string>(initialFilters.language || languages[0]?.id || '');
-  const [selectedSourceProject, setSelectedSourceProject] = useState<string>(initialSourceProject);
-  const isInitialMount = useRef(true);
-
-  const [searchQuery, setSearchQuery] = useState<string>(initialFilters.search || '');
-  const [selectedUser, setSelectedUser] = useState<string>('all');
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Get source project ID from selected project
-  const selectedSourceProjectId = selectedSourceProject !== 'all' ? selectedSourceProject : undefined;
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (storedLanguage && languages.some((lang) => lang.id === storedLanguage)) {
-      setSelectedLanguage(storedLanguage);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [deployLanguageFilter, setDeployLanguageFilter] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('dashboard:deployLanguageFilter') || 'all';
     }
-  }, [languages]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (selectedLanguage) {
-      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, selectedLanguage);
-    }
-  }, [selectedLanguage]);
-
-  // Sync source project selection to URL (skip on initial mount)
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const params = new URLSearchParams(searchParams.toString());
-    const currentUrlValue = params.get('sourceProject');
-
-    // Only update if the value actually changed
-    if (selectedSourceProject && selectedSourceProject !== 'all') {
-      if (currentUrlValue !== selectedSourceProject) {
-        params.set('sourceProject', selectedSourceProject);
-        const newUrl = `/dashboard?${params.toString()}`;
-        router.replace(newUrl, { scroll: false });
-      }
-    } else {
-      if (currentUrlValue) {
-        params.delete('sourceProject');
-        const newUrl = `/dashboard?${params.toString()}`;
-        router.replace(newUrl, { scroll: false });
-      }
-    }
-  }, [selectedSourceProject, router, searchParams]);
-
-  // Get unique source projects that the user has access to (through any translation project)
-  // This shows all source projects the user can access, regardless of the selected language
-  const languageSourceProjects = useMemo(() => {
-    const sourceProjectsMap = new Map();
-    translationProjects.forEach((tp) => {
-      if (tp.sourceProject && !sourceProjectsMap.has(tp.sourceProject.id)) {
-        sourceProjectsMap.set(tp.sourceProject.id, tp.sourceProject);
-      }
-    });
-    return Array.from(sourceProjectsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [translationProjects, selectedLanguage]);
-
-  useEffect(() => {
-    loadDocuments();
-  }, [selectedLanguage, selectedSourceProjectId]);
-
-  async function loadDocuments() {
-    setLoading(true);
-    try {
-      const docs = await getDashboardDocumentsAction(selectedLanguage, selectedSourceProjectId);
-      setDocuments(docs);
-    } catch (error) {
-      console.error('Error loading documents:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Extract unique users from documents (from assignments and versions)
-  const availableUsers = useMemo(() => {
-    const userMap = new Map<string, { id: string; name: string; email: string }>();
-
-    documents.forEach((doc) => {
-      // Add users from assignments
-      doc.assignments?.forEach((assignment: any) => {
-        if (assignment?.user) {
-          userMap.set(assignment.user.id, {
-            id: assignment.user.id,
-            name: assignment.user.name,
-            email: assignment.user.email,
-          });
-        }
-      });
-
-      // Add users from versions
-      doc.versions?.forEach((version: any) => {
-        if (version?.user) {
-          userMap.set(version.user.id, {
-            id: version.user.id,
-            name: version.user.name,
-            email: version.user.email,
-          });
-        }
-      });
-    });
-
-    return Array.from(userMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [documents]);
-
-  const filteredDocuments = documents.filter((doc) => {
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      if (!doc.title.toLowerCase().includes(query) && !doc.slug.toLowerCase().includes(query)) {
-        return false;
-      }
-    }
-
-    // User filter
-    if (selectedUser === 'all') {
-      return true;
-    }
-
-    if (selectedUser === 'me') {
-      // Check if current user is in assignments or versions
-      const hasAssignment = doc.assignments?.some((assignment: any) => assignment?.user?.id === user.id);
-      const hasVersion = doc.versions?.some((version: any) => version?.user?.id === user.id);
-      return hasAssignment || hasVersion;
-    }
-
-    // Filter by specific user
-    const hasAssignment = doc.assignments?.some((assignment: any) => assignment?.user?.id === selectedUser);
-    const hasVersion = doc.versions?.some((version: any) => version?.user?.id === selectedUser);
-    return hasAssignment || hasVersion;
+    return 'all';
   });
 
-  // Define Kanban columns based on active tab
-  const columns: KanbanColumn[] = [
-    {
-      id: 'pending',
-      name: 'To Do',
-      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.PENDING_TRANSLATION].color.hex,
-      status: DocumentStatus.PENDING_TRANSLATION,
-    },
-    {
-      id: 'in-progress',
-      name: 'In Progress',
-      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.IN_PROGRESS].color.hex,
-      status: DocumentStatus.IN_PROGRESS,
-    },
-    {
-      id: 'review',
-      name: 'Texts in review',
-      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.PENDING_REVIEW].color.hex,
-      status: DocumentStatus.PENDING_REVIEW,
-    },
-    {
-      id: 'approved',
-      name: 'Texts approved',
-      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.APPROVED].color.hex,
-      status: DocumentStatus.APPROVED,
-    },
-    {
-      id: 'deployed',
-      name: 'Texts deployed',
-      color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.DEPLOYED].color.hex,
-      status: DocumentStatus.DEPLOYED,
-    },
-  ];
-
-  const activeColumnIds = new Set(columns.map((column) => column.id));
-
-  // Helper function to get deployed timestamp from activity logs
-  const getDeployedTimestamp = (version: any): Date | null => {
-    if (!version?.activityLogs || version.activityLogs.length === 0) {
-      return null;
-    }
-
-    // Find the first activity log entry where:
-    // 1. action is "deployed", OR
-    // 2. action is "status_updated" and details.status is "DEPLOYED"
-    for (const log of version.activityLogs) {
-      if (log.action === 'deployed') {
-        return new Date(log.createdAt);
-      }
-      if (log.action === 'status_updated' && log.details) {
-        const details = log.details as { status?: string };
-        if (details.status === 'DEPLOYED') {
-          return new Date(log.createdAt);
-        }
-      }
-    }
-
-    return null;
+  const handleDeployLanguageFilterChange = (value: string) => {
+    setDeployLanguageFilter(value);
+    localStorage.setItem('dashboard:deployLanguageFilter', value);
   };
+  const workItems = useMemo(
+    () => buildWorkItems(translatingVersions, reviewAssignments, assignments),
+    [translatingVersions, reviewAssignments, assignments],
+  );
 
-  // Transform documents to Kanban card format
-  const allCards: KanbanCardData[] = filteredDocuments
-    .map((doc) => {
-      const hasVersion = doc.versions && doc.versions.length > 0;
-      const version = hasVersion ? doc.versions[0] : null;
-      const status = version?.status || null;
-      const column = getColumnForStatus(status, hasVersion);
-
-      return {
-        id: doc.id,
-        name: doc.title,
-        column,
-        document: doc,
-        versionId: version?.id,
-      };
-    })
-    .filter((card) => activeColumnIds.has(card.column));
-
-  // Separate cards by column
-  const deployedCards = allCards.filter((card) => card.column === 'deployed');
-  const otherCards = allCards.filter((card) => card.column !== 'deployed');
-
-  // Sort deployed cards by deployed timestamp (newest first)
-  const sortedDeployedCards = deployedCards.sort((a, b) => {
-    const aVersion = a.document.versions?.[0];
-    const bVersion = b.document.versions?.[0];
-    const aTimestamp = aVersion ? getDeployedTimestamp(aVersion) : null;
-    const bTimestamp = bVersion ? getDeployedTimestamp(bVersion) : null;
-
-    // If both have timestamps, sort by timestamp (newest first)
-    if (aTimestamp && bTimestamp) {
-      return bTimestamp.getTime() - aTimestamp.getTime();
+  const deployLanguages = useMemo(() => {
+    const langMap = new Map<string, string>();
+    for (const v of approvedVersions) {
+      langMap.set(v.language.id, v.language.name);
     }
-    // If only one has timestamp, prioritize it
-    if (aTimestamp && !bTimestamp) {
-      return -1;
-    }
-    if (!aTimestamp && bTimestamp) {
-      return 1;
-    }
-    // If neither has timestamp, maintain original order
-    return 0;
-  });
+    return Array.from(langMap.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [approvedVersions]);
 
-  // Sort other cards alphabetically Z-A by name
-  const sortedOtherCards = otherCards.sort((a, b) => {
-    const aName = a.name || a.document.title || '';
-    const bName = b.name || b.document.title || '';
-    return bName.localeCompare(aName, undefined, { sensitivity: 'base' });
-  });
+  const filteredApprovedVersions = useMemo(() => {
+    if (deployLanguageFilter === 'all') return approvedVersions;
+    return approvedVersions.filter((v) => v.language.id === deployLanguageFilter);
+  }, [approvedVersions, deployLanguageFilter]);
 
-  // Combine: deployed cards (sorted by timestamp) + other cards (sorted Z-A)
-  const kanbanData: KanbanCardData[] = [...sortedDeployedCards, ...sortedOtherCards];
-
-  // Handle drag and drop
-  async function handleDataChange(newData: KanbanCardData[]) {
-    // Find cards that changed columns
-    for (const newCard of newData) {
-      const oldCard = kanbanData.find((c) => c.id === newCard.id);
-      if (oldCard && oldCard.column !== newCard.column) {
-        const newStatus = getStatusForColumn(newCard.column);
-        // Get version ID from the document
-        const doc = newCard.document || oldCard.document;
-        const hasVersion = doc.versions && doc.versions.length > 0;
-        const versionId = hasVersion ? doc.versions[0].id : null;
-
-        if (newStatus && versionId) {
-          try {
-            // Update document version status
-            await updateDocumentVersionStatusAction(versionId, newStatus);
-            // Reload documents to reflect changes
-            await loadDocuments();
-          } catch (error) {
-            console.error('Error updating document status:', error);
-            // Reload anyway to revert UI changes if update failed
-            await loadDocuments();
-          }
-        }
-      }
-    }
-  }
-
-  const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
+  const filteredProjects = projects.filter((project) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      project.name.toLowerCase().includes(query) ||
+      (project.description && project.description.toLowerCase().includes(query))
+    );
   });
 
   return (
@@ -387,7 +302,7 @@ export default function DashboardClient({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div>
-                <h1 className="text-2xl font-bold">Translation Dashboard</h1>
+                <h1 className="text-2xl font-bold">Dashboard</h1>
                 <div className="flex items-center gap-2 mt-1">
                   <Avatar size="sm" name={user.name || undefined}>
                     <AvatarFallback name={user.name || undefined}>
@@ -401,298 +316,231 @@ export default function DashboardClient({
                 </div>
               </div>
             </div>
-            <Link href="/documents/new">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Document
-              </Button>
-            </Link>
           </div>
 
-          <div className="mt-4 flex gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search documents..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            <div className="flex gap-4 items-center justify-end text-sm text-gray-600 ml-32">
-              <div className="flex gap-4 items-center justify-end">Filters:</div>
-              <div className="justify-end flex">
-                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {languages.map((lang) => (
-                      <SelectItem key={lang.id} value={lang.id}>
-                        {lang.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="justify-end flex">
-                <Select value={selectedSourceProject} onValueChange={setSelectedSourceProject}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All projects" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All source projects</SelectItem>
-                    {languageSourceProjects.map((sp) => (
-                      <SelectItem key={sp.id} value={sp.id}>
-                        {sp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="justify-end flex">
-                <Select value={selectedUser} onValueChange={setSelectedUser}>
-                  <SelectTrigger className="min-w-[200px]">
-                    <div className="flex items-center gap-2">
-                      <SelectValue placeholder="All users" className="[&_div]:hidden! [&_span:last-child]:inline!" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All users</SelectItem>
-                    <SelectItem value="me">
-                      <div className="flex items-center gap-2">
-                        <Avatar size="sm" name={user.name || undefined} className="pointer-events-none">
-                          <AvatarFallback name={user.name || undefined}>
-                            {user.name
-                              .split(' ')
-                              .map((name) => name.charAt(0))
-                              .join('')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>Me</span>
-                      </div>
-                    </SelectItem>
-                    {availableUsers
-                      .filter((u) => u.id !== user.id)
-                      .map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          <div className="flex items-center gap-2">
-                            <Avatar size="sm" name={u.name || undefined} className="pointer-events-none">
-                              <AvatarFallback name={u.name || undefined}>
-                                {u.name
-                                  .split(' ')
-                                  .map((name) => name.charAt(0))
-                                  .join('')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span>{u.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="mt-4">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-4">
-        <div className="mt-4">
-          {loading ? (
+      <div className="container mx-auto px-4 py-6 space-y-8">
+        {/* Projects section */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">My Projects</h2>
+          {filteredProjects.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-500">Loading documents...</p>
-            </div>
-          ) : filteredDocuments.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">No documents found</p>
+              <FolderOpen className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-500">{searchQuery ? 'No projects match your search' : 'No projects available'}</p>
             </div>
           ) : (
-            <div className="h-[calc(100vh-300px)]">
-              <KanbanProvider columns={columns} data={kanbanData} onDataChange={handleDataChange}>
-                {(column) => (
-                  <KanbanBoard id={column.id} key={column.id}>
-                    <KanbanHeader>
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: column.color }} />
-                        <span>{column.name}</span>
-                      </div>
-                    </KanbanHeader>
-                    <KanbanCards id={column.id}>
-                      {(card: KanbanCardData) => {
-                        const doc = card.document;
-                        const hasVersion = doc.versions && doc.versions.length > 0;
-                        const version = hasVersion ? doc.versions[0] : null;
-                        const assignment = doc.assignments?.[0];
-                        const language = version?.language || languages.find((l) => l.id === selectedLanguage);
-                        const deadline = assignment?.deadline || doc.deadline;
-                        const hasWaitingForFinalLabel =
-                          version?.status === DocumentStatus.PENDING_REVIEW &&
-                          doc.labels?.includes('Waiting for final label');
-
-                        const getDocumentUrl = () => {
-                          if (
-                            hasVersion &&
-                            (version?.status === 'PENDING_TRANSLATION' || version?.status === 'IN_PROGRESS')
-                          ) {
-                            return `/documents/${doc.id}/translate?lang=${selectedLanguage}&version=${version.id}`;
-                          }
-                          if (hasVersion && version?.status === 'PENDING_REVIEW') {
-                            return `/documents/${doc.id}/review?version=${version.id}`;
-                          }
-                          if (hasVersion) {
-                            return `/documents/${doc.id}/review?version=${version.id}`;
-                          }
-                          return `/documents/${doc.id}/translate?lang=${selectedLanguage}`;
-                        };
-
-                        // Get all cards in this column to check previous card
-                        const cardsInColumn = kanbanData.filter((c) => c.column === column.id);
-                        const cardIndexInColumn = cardsInColumn.findIndex((c) => c.id === card.id);
-                        const prevCardInColumn = cardIndexInColumn > 0 ? cardsInColumn[cardIndexInColumn - 1] : null;
-                        const prevCardHasLabel =
-                          prevCardInColumn &&
-                          prevCardInColumn.document.versions?.[0]?.status === DocumentStatus.PENDING_REVIEW &&
-                          prevCardInColumn.document.labels?.includes('Waiting for final label');
-                        const shouldShowSeparator = hasWaitingForFinalLabel && !prevCardHasLabel && prevCardInColumn;
-
-                        // Get open suggestions count for this document
-                        const openSuggestionsCount = version ? (version as any).openSuggestionsCount ?? 0 : 0;
-
-                        return (
-                          <Fragment key={card.id}>
-                            {shouldShowSeparator && (
-                              <div key={`${card.id}__separator`} className="border-t-2 border-gray-300 my-2" />
-                            )}
-                            <KanbanCard
-                              column={column.id}
-                              id={card.id}
-                              name={card.name}
-                              className={hasWaitingForFinalLabel ? 'bg-green-50/50 border-green-800/40' : ''}
-                            >
-                              <Link
-                                href={getDocumentUrl()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                                className="hover:text-muted-foreground transition-colors"
-                                title="Open document"
-                              >
-                                <div className="flex flex-col gap-2">
-                                  <div className="flex items-center gap-2">
-                                    {hasWaitingForFinalLabel && <FileCheck className="h-4 w-4" />}
-                                    <p className="m-0 flex-1 font-medium text-sm">{doc.title}</p>
-                                    {openSuggestionsCount > 0 && (
-                                      <Badge variant="primary" size="xs" className="shrink-0">
-                                        {openSuggestionsCount}
-                                      </Badge>
-                                    )}
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      {(() => {
-                                        // Helper function to check if user has the selected language
-                                        const userHasLanguage = (user: any) => {
-                                          if (!user?.languages) return false;
-                                          return user.languages.some((ul: any) => ul.languageId === selectedLanguage);
-                                        };
-
-                                        // Filter users based on language preference
-                                        const assignmentUser =
-                                          assignment?.user && userHasLanguage(assignment.user) ? assignment.user : null;
-                                        const versionUser =
-                                          version?.user && userHasLanguage(version.user) ? version.user : null;
-                                        const shouldShowVersionUser =
-                                          versionUser && (!assignmentUser || versionUser.id !== assignmentUser.id);
-
-                                        if (!assignmentUser && !shouldShowVersionUser) {
-                                          return null;
-                                        }
-
-                                        return (
-                                          <div className="flex items-center gap-1 -space-x-1">
-                                            {assignmentUser && (
-                                              <Avatar
-                                                size="sm"
-                                                name={assignmentUser.name || undefined}
-                                                className="border-2 border-background"
-                                                title={assignmentUser.name || undefined}
-                                              >
-                                                <AvatarFallback name={assignmentUser.name || undefined}>
-                                                  {assignmentUser.name
-                                                    .split(' ')
-                                                    .map((name: string) => name.charAt(0))
-                                                    .join('')}
-                                                </AvatarFallback>
-                                              </Avatar>
-                                            )}
-                                            {shouldShowVersionUser && (
-                                              <Avatar
-                                                size="sm"
-                                                name={versionUser.name || undefined}
-                                                className="border-2 border-background"
-                                                title={versionUser.name || undefined}
-                                              >
-                                                <AvatarFallback name={versionUser.name || undefined}>
-                                                  {versionUser.name
-                                                    .split(' ')
-                                                    .map((name: string) => name.charAt(0))
-                                                    .join('')}
-                                                </AvatarFallback>
-                                              </Avatar>
-                                            )}
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-wrap gap-1 items-center">
-                                    {doc.sourceProject && (
-                                      <Badge variant="secondary" size="xs">
-                                        {doc.sourceProject.name}
-                                      </Badge>
-                                    )}
-                                    {language && (
-                                      <Badge variant="secondary" size="xs">
-                                        {language.name}
-                                      </Badge>
-                                    )}
-                                    {deadline && (
-                                      <Badge variant="outline" size="xs">
-                                        {shortDateFormatter.format(new Date(deadline))}
-                                      </Badge>
-                                    )}
-                                    {version && (
-                                      <div
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                        }}
-                                        className="ml-auto"
-                                      >
-                                        {/* <StatusDropdown
-                                      currentStatus={version.status}
-                                      versionId={version.id}
-                                      user={user}
-                                      documentId={doc.id}
-                                      languageId={selectedLanguage}
-                                    /> */}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </Link>
-                            </KanbanCard>
-                          </Fragment>
-                        );
-                      }}
-                    </KanbanCards>
-                  </KanbanBoard>
-                )}
-              </KanbanProvider>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredProjects.map((project) => (
+                <ProjectCard key={project.id} project={project} />
+              ))}
             </div>
           )}
-        </div>
+        </section>
+
+        {/* Waiting for Deploy section - deployers only */}
+        {isDeployerClient(user) && approvedVersions.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">
+                Waiting for Deploy
+                <Badge variant="secondary" size="sm" className="ml-2">
+                  {filteredApprovedVersions.length}
+                </Badge>
+              </h2>
+              {deployLanguages.length > 1 && (
+                <Select value={deployLanguageFilter} onValueChange={handleDeployLanguageFilterChange}>
+                  <SelectTrigger className="w-[180px] h-8 text-sm">
+                    <SelectValue placeholder="All languages" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All languages</SelectItem>
+                    {deployLanguages.map((lang) => (
+                      <SelectItem key={lang.id} value={lang.id}>{lang.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <Card>
+              <Table>
+                <TableHeader>
+                  {/* <TableRow> */}
+                  <TableHead className={headClass}>Document</TableHead>
+                  <TableHead className={headClass}>Project</TableHead>
+                  <TableHead className={headClass}>Language</TableHead>
+                  <TableHead className={headClass}>Translator</TableHead>
+                  <TableHead className={headClass}>Reviewer</TableHead>
+                  <TableHead className={headClass}>Status</TableHead>
+                  <TableHead className="w-[60px]" />
+                  {/* </TableRow> */}
+                </TableHeader>
+                <TableBody>
+                  {filteredApprovedVersions.map((version) => {
+                    const url = `/documents/${version.document.id}/review?version=${version.id}`;
+                    const statusConfig = DOCUMENT_STATUS_CONFIGS[version.status];
+                    return (
+                      <TableRow key={version.id} className="group cursor-pointer" onClick={() => router.push(url)}>
+                        <TableCell>
+                          <span className="font-medium text-sm">{version.document.title}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {version.document.sourceProject?.name ?? '\u2014'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium">{version.language.name}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{version.user?.name ?? '\u2014'}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{version.reviewer?.name ?? '\u2014'}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
+                          >
+                            <span
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: statusConfig.color.hex }}
+                            />
+                            {statusConfig.name}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Link href={url} onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Card>
+          </section>
+        )}
+
+        {/* My Work section - unified view of translations, reviews, and assignments */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">
+            My Work
+            {workItems.length > 0 && (
+              <Badge variant="secondary" size="sm" className="ml-2">
+                {workItems.length}
+              </Badge>
+            )}
+          </h2>
+          {workItems.length === 0 ? (
+            <div className="text-center py-12">
+              <ClipboardList className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-500">No active work assigned to you</p>
+            </div>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  {/* <TableRow> */}
+                  <TableHead className={headClass}>Document</TableHead>
+                  <TableHead className={headClass}>Project</TableHead>
+                  <TableHead className={headClass}>Language</TableHead>
+                  <TableHead className={headClass}>Translator</TableHead>
+                  <TableHead className={headClass}>Reviewer</TableHead>
+                  <TableHead className={headClass}>Status</TableHead>
+                  <TableHead className={headClass}>Deadline</TableHead>
+                  <TableHead className="w-[60px]" />
+                  {/* </TableRow> */}
+                </TableHeader>
+                <TableBody>
+                  {workItems.map((item) => {
+                    const statusConfig = item.status ? DOCUMENT_STATUS_CONFIGS[item.status] : null;
+
+                    return (
+                      <TableRow key={item.key} className="group cursor-pointer" onClick={() => router.push(item.url)}>
+                        <TableCell>
+                          <span className="font-medium text-sm">{item.documentTitle}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{item.projectName ?? '\u2014'}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium">{item.languageName}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{item.translatorName ?? '\u2014'}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">{item.reviewerName ?? '\u2014'}</span>
+                        </TableCell>
+                        <TableCell>
+                          {statusConfig ? (
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
+                            >
+                              <span
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{ backgroundColor: statusConfig.color.hex }}
+                              />
+                              {statusConfig.name}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border border-gray-200 bg-gray-50 text-gray-500">
+                              Not started
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.deadline ? (
+                            <span className="text-sm text-muted-foreground">
+                              {shortDateFormatter.format(new Date(item.deadline))}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">{'\u2014'}</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Link href={item.url} onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              {item.role === 'Reviewer' ? (
+                                <Eye className="h-4 w-4" />
+                              ) : (
+                                <ArrowRight className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </section>
       </div>
     </div>
   );

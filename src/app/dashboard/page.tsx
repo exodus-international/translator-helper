@@ -1,53 +1,45 @@
 'use server';
-import { listTargetLanguages } from '@/domain/language/language.repository';
-import { getTranslationProjectsByUserAction } from '@/domain/translation-project/translation-project.actions';
+
+import { getAssignedDocumentsForUserAction } from '@/domain/document-assignment/document-assignment.actions';
+import {
+  getApprovedVersionsAction,
+  getVersionsForReviewByUserAction,
+  getVersionsTranslatingByUserAction,
+} from '@/domain/document-version/document-version.actions';
+import { getSourceProjectsForUserAction } from '@/domain/source-project/source-project.actions';
 import { getUserLanguagesCountAction } from '@/domain/user-language/user-language.actions';
 import { getCurrentUser } from '@/lib/session';
 import { redirect } from 'next/navigation';
 import DashboardClient from './page.client';
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    language?: string;
-    status?: string;
-    sourceProject?: string;
-    search?: string;
-  }>;
-}) {
+export default async function DashboardPage() {
   const user = await getCurrentUser();
 
   if (!user) {
     redirect('/login');
   }
 
-  // Check if user has selected languages, redirect to onboarding if not
   const languagesCount = await getUserLanguagesCountAction();
   if (languagesCount === 0) {
     redirect('/onboarding/languages');
   }
 
-  const params = await searchParams;
-
-  // Fetch target languages (excluding English) and user's translation projects for filters
-  const languages = await listTargetLanguages();
-  const translationProjects = await getTranslationProjectsByUserAction();
-
-  // Set default language to first non-English language if not specified
-  const defaultLanguage = params.language || languages[0]?.id || '';
+  const [projects, assignments, approvedVersions, reviewAssignments, translatingVersions] = await Promise.all([
+    getSourceProjectsForUserAction(),
+    getAssignedDocumentsForUserAction(),
+    getApprovedVersionsAction(),
+    getVersionsForReviewByUserAction(),
+    getVersionsTranslatingByUserAction(),
+  ]);
 
   return (
     <DashboardClient
       user={user}
-      languages={languages}
-      translationProjects={translationProjects}
-      initialFilters={{
-        language: defaultLanguage,
-        status: params.status || 'needs-translation',
-        sourceProject: params.sourceProject,
-        search: params.search,
-      }}
+      projects={projects}
+      assignments={assignments}
+      approvedVersions={approvedVersions}
+      reviewAssignments={reviewAssignments}
+      translatingVersions={translatingVersions}
     />
   );
 }

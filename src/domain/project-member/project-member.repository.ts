@@ -252,3 +252,42 @@ export async function isUserProjectManagerForSourceProject(userId: string, sourc
 
   return !!projectMember;
 }
+
+export async function getProjectReviewers(translationProjectId: string) {
+  return prisma.projectMember.findMany({
+    where: {
+      translationProjectId,
+      role: {
+        in: [ProjectRole.REVIEWER, ProjectRole.EDITOR, ProjectRole.PROJECT_MANAGER],
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+    distinct: ['userId'],
+    orderBy: {
+      user: {
+        name: 'asc',
+      },
+    },
+  });
+}
+
+export async function isUserMemberOfSourceProject(userId: string, sourceProjectId: string): Promise<boolean> {
+  const projectMember = await prisma.projectMember.findFirst({
+    where: {
+      userId,
+      translationProject: {
+        sourceProjectId,
+      },
+    },
+  });
+
+  return !!projectMember;
+}

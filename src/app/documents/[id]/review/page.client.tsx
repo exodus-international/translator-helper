@@ -37,6 +37,18 @@ import { canReviewClient, isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus, SuggestionStatus, SuggestionType } from '@prisma/client';
 import matter from 'gray-matter';
+import { DocumentInfoCard } from '@/components/document-info-card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import {
+  createDocumentAssignmentAction,
+  updateDocumentAssignmentAction,
+} from '@/domain/document-assignment/document-assignment.actions';
+import { assignReviewerToVersionAction } from '@/domain/document-version/document-version.actions';
+import { getProjectReviewersAction, listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import { submitForReviewAction } from '@/domain/document-version/document-version.actions';
 import { ChevronDown, ChevronRight, Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -98,11 +110,186 @@ export default function ReviewClient({
   );
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const [isDismissingSuggestion, setIsDismissingSuggestion] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewers, setReviewers] = useState<{ id: string; user: { id: string; name: string; email: string } }[]>([]);
+  const [selectedReviewerId, setSelectedReviewerId] = useState('');
+  const [loadingReviewers, setLoadingReviewers] = useState(false);
+
+  // Assign translator dialog state
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignMembers, setAssignMembers] = useState<{ id: string; userId: string; user: { id: string; name: string | null; email: string } }[]>([]);
+  const [assignUserId, setAssignUserId] = useState('');
+  const [assignDeadline, setAssignDeadline] = useState('');
+  const [assignSaving, setAssignSaving] = useState(false);
+
+  // Assign reviewer dialog state
+  const [reviewerAssignDialogOpen, setReviewerAssignDialogOpen] = useState(false);
+  const [reviewerCandidates, setReviewerCandidates] = useState<{ id: string; user: { id: string; name: string; email: string } }[]>([]);
+  const [selectedReviewerForAssign, setSelectedReviewerForAssign] = useState('');
+  const [reviewerAssignSaving, setReviewerAssignSaving] = useState(false);
+
+  // Find translation project ID from document assignments
+  const translationProjectId = useMemo(() => {
+    const assignment = document.assignments?.find(
+      (a: any) => a.translationProject?.language?.id === targetVersion.languageId,
+    );
+    return assignment?.translationProject?.id || null;
+  }, [document.assignments, targetVersion.languageId]);
+
+  const handleOpenReviewDialog = async () => {
+    if (translationProjectId) {
+      setLoadingReviewers(true);
+      try {
+        const members = await getProjectReviewersAction(translationProjectId);
+        setReviewers(members);
+      } catch (error) {
+        console.error('Error loading reviewers:', error);
+        toast.error('Failed to load reviewers');
+        return;
+      } finally {
+        setLoadingReviewers(false);
+      }
+    }
+    setReviewDialogOpen(true);
+  };
+
+  const handleSubmitForReview = async () => {
+    if (!selectedReviewerId) return;
+    setLoading(true);
+    try {
+      await submitForReviewAction({ versionId: targetVersion.id, reviewerId: selectedReviewerId });
+      toast.success('Submitted for review!');
+      setReviewDialogOpen(false);
+      setTargetVersion((prev: any) => ({ ...prev, status: DocumentStatus.PENDING_REVIEW }));
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error submitting for review:', error);
+      toast.error(error.message || 'Failed to submit for review');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenAssignDialog = async () => {
+    if (!translationProjectId) return;
+    try {
+      const members = await listProjectMembersAction(translationProjectId);
+      const seen = new Map<string, typeof members[number]>();
+      for (const m of members) {
+        if (!seen.has(m.user.id)) seen.set(m.user.id, m);
+      }
+      setAssignMembers(Array.from(seen.values()));
+    } catch (error) {
+      console.error('Error loading members:', error);
+      toast.error('Failed to load team members');
+      return;
+    }
+    setAssignUserId('');
+    setAssignDeadline('');
+    setAssignDialogOpen(true);
+  };
+
+  const handleAssignTranslator = async () => {
+    if (!assignUserId || !translationProjectId) return;
+    setAssignSaving(true);
+    try {
+      const existingAssignment = document.assignments?.find(
+        (a: any) => a.translationProject?.language?.id === targetVersion.languageId,
+      );
+      if (existingAssignment?.id) {
+        await updateDocumentAssignmentAction(existingAssignment.id, {
+          userId: assignUserId,
+          deadline: assignDeadline ? new Date(assignDeadline) : null,
+        });
+      } else {
+        await createDocumentAssignmentAction({
+          documentId: document.id,
+          translationProjectId,
+          userId: assignUserId,
+          deadline: assignDeadline ? new Date(assignDeadline) : null,
+        });
+      }
+      const assignedUser = assignMembers.find((m) => m.user.id === assignUserId)?.user ?? null;
+      if (assignedUser) {
+        setTargetVersion((prev: any) => prev ? { ...prev, user: assignedUser } : prev);
+      }
+      toast.success('Translator assigned!');
+      setAssignDialogOpen(false);
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error assigning translator:', error);
+      toast.error(error.message || 'Failed to assign translator');
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const handleOpenReviewerAssignDialog = async () => {
+    if (!translationProjectId) return;
+    try {
+      const members = await getProjectReviewersAction(translationProjectId);
+      setReviewerCandidates(members);
+    } catch (error) {
+      console.error('Error loading reviewers:', error);
+      toast.error('Failed to load reviewers');
+      return;
+    }
+    setSelectedReviewerForAssign('');
+    setReviewerAssignDialogOpen(true);
+  };
+
+  const handleAssignReviewer = async () => {
+    if (!selectedReviewerForAssign) return;
+    setReviewerAssignSaving(true);
+    try {
+      await assignReviewerToVersionAction(targetVersion.id, selectedReviewerForAssign);
+      const assignedReviewer = reviewerCandidates.find((m) => m.user.id === selectedReviewerForAssign)?.user ?? null;
+      if (assignedReviewer) {
+        setTargetVersion((prev: any) => prev ? { ...prev, reviewer: assignedReviewer } : prev);
+      }
+      toast.success('Reviewer assigned!');
+      setReviewerAssignDialogOpen(false);
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error assigning reviewer:', error);
+      toast.error(error.message || 'Failed to assign reviewer');
+    } finally {
+      setReviewerAssignSaving(false);
+    }
+  };
+
+  const handleUnassignTranslator = async () => {
+    const existingAssignment = document.assignments?.find(
+      (a: any) => a.translationProject?.language?.id === targetVersion.languageId,
+    );
+    if (!existingAssignment?.id) return;
+    try {
+      await updateDocumentAssignmentAction(existingAssignment.id, { userId: null });
+      setTargetVersion((prev: any) => prev ? { ...prev, user: null } : prev);
+      toast.success('Translator unassigned');
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error unassigning translator:', error);
+      toast.error(error.message || 'Failed to unassign translator');
+    }
+  };
+
+  const handleUnassignReviewer = async () => {
+    try {
+      await assignReviewerToVersionAction(targetVersion.id, null);
+      setTargetVersion((prev: any) => prev ? { ...prev, reviewer: null } : prev);
+      toast.success('Reviewer unassigned');
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error unassigning reviewer:', error);
+      toast.error(error.message || 'Failed to unassign reviewer');
+    }
+  };
 
   // Check if user can edit source (deployer only)
-  const canEditSource = isDeployerClient(user);
+  const canEditSourceBase = isDeployerClient(user);
   // Check if user can create suggestions (reviewers)
-  const canCreateSuggestions = canReviewClient(user);
+  const canCreateSuggestionsBase = canReviewClient(user);
   const sourceFormattedContent = useMemo(
     () => getContentWithoutFrontmatter(sourceVersion.content),
     [sourceVersion.content],
@@ -142,6 +329,8 @@ export default function ReviewClient({
   const isPendingReview = targetVersion.status === 'PENDING_REVIEW';
   const isApprovedOrLater =
     targetVersion.status === DocumentStatus.APPROVED || targetVersion.status === DocumentStatus.DEPLOYED;
+  const canEditSource = canEditSourceBase && !isApprovedOrLater;
+  const canCreateSuggestions = canCreateSuggestionsBase && !isApprovedOrLater;
   const openSuggestionsCount = useMemo(
     () => suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length,
     [suggestions],
@@ -516,6 +705,7 @@ export default function ReviewClient({
               languageId={targetVersion.languageId}
               disabled={loading}
               onStatusChange={handleStatusChange}
+              onReviewRequested={handleOpenReviewDialog}
               openSuggestionsCount={openSuggestionsCount}
             />
           </div>
@@ -558,6 +748,38 @@ export default function ReviewClient({
             onReply={handleReply}
             onCreateGeneralThread={handleCreateGeneralThread}
             disableReopen={isApprovedOrLater}
+            sidebarHeader={
+              <DocumentInfoCard
+                status={targetVersion.status}
+                translator={targetVersion.user}
+                reviewer={targetVersion.reviewer}
+                language={targetVersion.language?.name}
+                onAssignTranslator={
+                  isDeployerClient(user) && translationProjectId &&
+                  (targetVersion.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion.user)
+                    ? handleOpenAssignDialog
+                    : undefined
+                }
+                onUnassignTranslator={
+                  isDeployerClient(user) && targetVersion.user &&
+                  targetVersion.status === DocumentStatus.PENDING_TRANSLATION
+                    ? handleUnassignTranslator
+                    : undefined
+                }
+                onAssignReviewer={
+                  isDeployerClient(user) && translationProjectId &&
+                  (targetVersion.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion.reviewer)
+                    ? handleOpenReviewerAssignDialog
+                    : undefined
+                }
+                onUnassignReviewer={
+                  isDeployerClient(user) && targetVersion.reviewer &&
+                  targetVersion.status === DocumentStatus.PENDING_TRANSLATION
+                    ? handleUnassignReviewer
+                    : undefined
+                }
+              />
+            }
           />
         </div>
 
@@ -598,6 +820,114 @@ export default function ReviewClient({
           )}
         </div>
       </div>
+
+      {/* Reviewer picker dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit for Review</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label>Select a reviewer</Label>
+              <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder={loadingReviewers ? 'Loading...' : 'Choose reviewer'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {reviewers.map((member) => (
+                    <SelectItem key={member.user.id} value={member.user.id}>
+                      {member.user.name} ({member.user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleSubmitForReview}
+              disabled={!selectedReviewerId || loading}
+              className="w-full"
+            >
+              {loading ? 'Submitting...' : 'Submit for Review'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign translator dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Translator</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label>Translator</Label>
+              <Select value={assignUserId} onValueChange={setAssignUserId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select translator..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignMembers.map((m) => (
+                    <SelectItem key={m.user.id} value={m.user.id}>
+                      {m.user.name || m.user.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Deadline (optional)</Label>
+              <Input
+                type="date"
+                value={assignDeadline}
+                onChange={(e) => setAssignDeadline(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <Button
+              onClick={handleAssignTranslator}
+              disabled={!assignUserId || assignSaving}
+              className="w-full"
+            >
+              {assignSaving ? 'Assigning...' : 'Assign'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Reviewer Dialog */}
+      <Dialog open={reviewerAssignDialogOpen} onOpenChange={setReviewerAssignDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Reviewer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Reviewer</Label>
+              <Select value={selectedReviewerForAssign} onValueChange={setSelectedReviewerForAssign}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a reviewer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {reviewerCandidates.map((m) => (
+                    <SelectItem key={m.user.id} value={m.user.id}>
+                      {m.user.name || m.user.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleAssignReviewer}
+              disabled={!selectedReviewerForAssign || reviewerAssignSaving}
+              className="w-full"
+            >
+              {reviewerAssignSaving ? 'Assigning...' : 'Assign'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

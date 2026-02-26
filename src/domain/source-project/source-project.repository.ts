@@ -21,6 +21,56 @@ export async function listSourceProjects(options?: { includeComplete?: boolean }
   });
 }
 
+export async function getSourceProjectsForUser(userId: string, isDeployer: boolean) {
+  return prisma.sourceProject.findMany({
+    where: {
+      status: 'ACTIVE',
+      ...(!isDeployer
+        ? {
+            translationProjects: {
+              some: {
+                members: {
+                  some: {
+                    userId,
+                  },
+                },
+              },
+            },
+          }
+        : {}),
+    },
+    orderBy: {
+      name: 'asc',
+    },
+    include: {
+      _count: {
+        select: {
+          documents: true,
+          translationProjects: true,
+        },
+      },
+      translationProjects: {
+        select: {
+          id: true,
+          languageId: true,
+          language: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+          _count: {
+            select: {
+              members: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function getSourceProjectById(id: string) {
   return prisma.sourceProject.findUnique({
     where: { id },

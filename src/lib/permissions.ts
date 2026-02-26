@@ -4,6 +4,7 @@ import {
   getUserRoleInProject as getUserRoleInProjectRepo,
   getUserRolesInProject as getUserRolesInProjectRepo,
   isUserProjectManagerForSourceProject as isUserProjectManagerForSourceProjectRepo,
+  isUserMemberOfSourceProject as isUserMemberOfSourceProjectRepo,
 } from '@/domain/project-member/project-member.repository';
 
 export function isTranslator(user: SessionUser): boolean {
@@ -156,6 +157,14 @@ export async function getUserRoleInProject(
 
   const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
   return roles.length > 0 ? roles[0] : null;
+}
+
+export async function canAccessSourceProject(user: SessionUser, sourceProjectId: string): Promise<boolean> {
+  if (user.role === Role.DEPLOYER) {
+    return true;
+  }
+
+  return await isUserMemberOfSourceProjectRepo(user.id, sourceProjectId);
 }
 
 export async function canManageSourceProject(user: SessionUser, sourceProjectId: string): Promise<boolean> {

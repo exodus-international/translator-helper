@@ -13,6 +13,7 @@ export const updateDocumentVersionSchema = z.object({
 
 export const submitForReviewSchema = z.object({
   versionId: z.string(),
+  reviewerId: z.string().optional(),
 });
 
 export const reviewVersionSchema = z.object({

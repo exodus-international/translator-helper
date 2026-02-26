@@ -36,6 +36,26 @@ export async function getDocumentVersionAction(id: string) {
   return await getDocumentVersionById(id);
 }
 
+export async function assignReviewerToVersionAction(versionId: string, reviewerId: string | null) {
+  const user = await requireUser();
+  if (!isDeployer(user)) {
+    throw new Error('Forbidden: Only deployers can pre-assign reviewers');
+  }
+
+  const version = await prisma.documentVersion.update({
+    where: { id: versionId },
+    data: { reviewerId },
+    include: {
+      language: true,
+      user: { select: { id: true, name: true, email: true } },
+      reviewer: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  revalidatePath(`/documents/${version.documentId}`, 'layout');
+  return version;
+}
+
 export async function getDocumentVersionByDocumentAndLanguageAction(documentId: string, languageId: string) {
   await requireUser();
   return await getDocumentVersionByDocumentAndLanguage(documentId, languageId);
@@ -167,14 +187,14 @@ export async function submitForReviewAction(input: unknown) {
     }
   }
 
-  const version = await updateDocumentVersionStatus(validated.versionId, DocumentStatus.PENDING_REVIEW);
+  const version = await updateDocumentVersionStatus(validated.versionId, DocumentStatus.PENDING_REVIEW, validated.reviewerId);
 
   // Log the activity
   await createActivityLog({
     documentVersionId: version.id,
     userId: user.id,
     action: 'submitted_for_review',
-    details: {},
+    details: { reviewerId: validated.reviewerId },
   });
 
   return version;
@@ -549,4 +569,93 @@ export async function assignDocumentVersionAction(input: unknown) {
   });
 
   return version;
+}
+
+export async function getApprovedVersionsAction() {
+  const user = await requireUser();
+  if (!isDeployer(user)) {
+    return [];
+  }
+
+  return prisma.documentVersion.findMany({
+    where: {
+      status: DocumentStatus.APPROVED,
+      language: { code: { not: 'en' } },
+    },
+    include: {
+      document: {
+        include: {
+          sourceProject: true,
+        },
+      },
+      language: true,
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+      reviewer: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
+  });
+}
+
+export async function getVersionsTranslatingByUserAction() {
+  const user = await requireUser();
+
+  return prisma.documentVersion.findMany({
+    where: {
+      userId: user.id,
+      status: {
+        in: [DocumentStatus.PENDING_TRANSLATION, DocumentStatus.IN_PROGRESS],
+      },
+    },
+    include: {
+      document: {
+        include: {
+          sourceProject: true,
+        },
+      },
+      language: true,
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+      reviewer: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
+  });
+}
+
+export async function getVersionsForReviewByUserAction() {
+  const user = await requireUser();
+
+  return prisma.documentVersion.findMany({
+    where: {
+      reviewerId: user.id,
+      status: DocumentStatus.PENDING_REVIEW,
+    },
+    include: {
+      document: {
+        include: {
+          sourceProject: true,
+        },
+      },
+      language: true,
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+      reviewer: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
+  });
 }
