@@ -50,6 +50,7 @@ import { assignReviewerToVersionAction } from '@/domain/document-version/documen
 import { getProjectReviewersAction, listProjectMembersAction } from '@/domain/project-member/project-member.actions';
 import { submitForReviewAction } from '@/domain/document-version/document-version.actions';
 import { ChevronDown, ChevronRight, Download, FileCheck, FilePlus } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -668,6 +669,17 @@ export default function ReviewClient({
       <div className="border-b bg-white">
         <div className="px-3 py-1.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
+            {document.sourceProject && (
+              <>
+                <Link
+                  href={`/projects/${document.sourceProject.id}`}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors truncate shrink-0"
+                >
+                  {document.sourceProject.name}
+                </Link>
+                <span className="text-muted-foreground">/</span>
+              </>
+            )}
             <h1 className="text-sm font-semibold truncate">{document.title}</h1>
             <span className="text-xs text-gray-500 shrink-0">
               {sourceVersion.language.name} → {targetVersion.language.name}

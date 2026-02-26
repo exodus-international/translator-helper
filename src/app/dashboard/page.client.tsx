@@ -5,17 +5,22 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
+import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@prisma/client';
-import { ArrowRight, ClipboardList, Eye, FolderOpen, Rocket, Search } from 'lucide-react';
+import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Rocket, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 type VersionWithDetails = {
   id: string;
@@ -286,6 +291,36 @@ export default function DashboardClient({
     return approvedVersions.filter((v) => v.language.id === deployLanguageFilter);
   }, [approvedVersions, deployLanguageFilter]);
 
+  // Create project dialog state
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [newProjectIdentifier, setNewProjectIdentifier] = useState('');
+  const [createLoading, setCreateLoading] = useState(false);
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    try {
+      await createSourceProjectAction({
+        name: newProjectName,
+        description: newProjectDescription || null,
+        identifier: newProjectIdentifier || null,
+      });
+      toast.success('Project created');
+      setCreateDialogOpen(false);
+      setNewProjectName('');
+      setNewProjectDescription('');
+      setNewProjectIdentifier('');
+      router.refresh();
+    } catch (error: any) {
+      console.error('Error creating project:', error);
+      toast.error(error.message || 'Failed to create project');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   const filteredProjects = projects.filter((project) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -335,7 +370,74 @@ export default function DashboardClient({
       <div className="container mx-auto px-4 py-6 space-y-8">
         {/* Projects section */}
         <section>
-          <h2 className="text-lg font-semibold mb-4">My Projects</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">My Projects</h2>
+            {isDeployerClient(user) && (
+              <Dialog open={createDialogOpen} onOpenChange={(open) => {
+                setCreateDialogOpen(open);
+                if (!open) {
+                  setNewProjectName('');
+                  setNewProjectDescription('');
+                  setNewProjectIdentifier('');
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    New Project
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Project</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleCreateProject} className="space-y-4">
+                    <div>
+                      <Label htmlFor="new-project-name">Project Name *</Label>
+                      <Input
+                        id="new-project-name"
+                        value={newProjectName}
+                        onChange={(e) => setNewProjectName(e.target.value)}
+                        placeholder="e.g., Exodus90, Daily Readings"
+                        required
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="new-project-description">Description</Label>
+                      <Textarea
+                        id="new-project-description"
+                        value={newProjectDescription}
+                        onChange={(e) => setNewProjectDescription(e.target.value)}
+                        placeholder="Optional description of the project"
+                        rows={3}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="new-project-identifier">Repository Identifier</Label>
+                      <Input
+                        id="new-project-identifier"
+                        value={newProjectIdentifier}
+                        onChange={(e) => setNewProjectIdentifier(e.target.value)}
+                        placeholder="e.g., exodus90, lent2026"
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Folder name in the content repository</p>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={createLoading || !newProjectName.trim()}>
+                        {createLoading ? 'Creating...' : 'Create Project'}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
           {filteredProjects.length === 0 ? (
             <div className="text-center py-12">
               <FolderOpen className="h-8 w-8 text-gray-400 mx-auto mb-2" />

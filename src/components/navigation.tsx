@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/auth-client';
 import { SessionUser } from '@/lib/session';
-import { FilePlus, LogOut, PlusIcon } from 'lucide-react';
+import { FilePlus, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -36,12 +36,12 @@ export function Navigation({ user }: NavigationProps) {
               <Link href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900">
                 Dashboard
               </Link>
-              <Link href="/documents" className="text-sm text-gray-600 hover:text-gray-900">
-                Documents
-              </Link>
 
               {user.role === 'DEPLOYER' && (
                 <>
+                  <Link href="/documents" className="text-sm text-gray-600 hover:text-gray-900">
+                    Documents
+                  </Link>
                   <Link href="/admin/languages" className="text-sm text-gray-600 hover:text-gray-900">
                     Languages
                   </Link>
