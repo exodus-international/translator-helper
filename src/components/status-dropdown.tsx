@@ -269,7 +269,7 @@ export function StatusDropdown({
                 onSelect={(e) => {
                   e.preventDefault();
                   if (isBlockedByOpenSuggestions) {
-                    toast.warning(`Resolve all open suggestions before approving (${openSuggestionsCount} remaining)`);
+                    toast.warning(`Resolve all open comments before approving (${openSuggestionsCount} remaining)`);
                     return;
                   }
                   if (!isDisabled) {
@@ -287,7 +287,7 @@ export function StatusDropdown({
                     </span>
                     {isBlockedByOpenSuggestions && (
                       <div className="text-[12px] text-red-600 flex items-center">
-                        <AlertCircle className="h-3.5 w-3.5 mr-1" /> {openSuggestionsCount} open suggestion{openSuggestionsCount !== 1 ? 's' : ''} remaining
+                        <AlertCircle className="h-3.5 w-3.5 mr-1" /> {openSuggestionsCount} open comment{openSuggestionsCount !== 1 ? 's' : ''} remaining
                       </div>
                     )}
                   </div>
