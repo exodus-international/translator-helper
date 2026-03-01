@@ -94,6 +94,7 @@ The application manages the complete lifecycle of document translations:
 - **Review actions**:
   - **Edit**: Can edit translation directly
   - **Add Comment**: Leave feedback for translator
+  - **Request Final Approval**: Toggle "Waiting for final label" on documents in PENDING_REVIEW status; visible on Kanban board for workflow tracking
   - **Approve**: Mark as approved (status: APPROVED)
   - **Request Changes**: Revert to PENDING_TRANSLATION status
   - **Deploy** (Deployers only): Change status to DEPLOYED and download file
