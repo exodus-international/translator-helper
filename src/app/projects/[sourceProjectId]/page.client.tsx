@@ -93,13 +93,10 @@ export default function ProjectDetailClient({
   }, [selectedLanguage, LANGUAGE_STORAGE_KEY]);
 
   // Find the translation project for the selected language
-  const selectedTranslationProject = translationProjects.find(
-    (tp) => tp.languageId === selectedLanguage,
-  );
+  const selectedTranslationProject = translationProjects.find((tp) => tp.languageId === selectedLanguage);
 
   const canManageTeam =
-    isDeployerClient(user) ||
-    selectedTranslationProject?.members?.some((m) => m.userId === user.id);
+    isDeployerClient(user) || selectedTranslationProject?.members?.some((m) => m.userId === user.id);
 
   const handleSaveSettings = async () => {
     setSettingsSaving(true);
@@ -141,9 +138,7 @@ export default function ProjectDetailClient({
             </Link>
             <div className="flex-1">
               <h1 className="text-2xl font-bold">{sourceProject.name}</h1>
-              {sourceProject.description && (
-                <p className="text-sm text-gray-500 mt-0.5">{sourceProject.description}</p>
-              )}
+              {sourceProject.description && <p className="text-sm text-gray-500 mt-0.5">{sourceProject.description}</p>}
             </div>
             <div>
               <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
@@ -251,7 +246,9 @@ export default function ProjectDetailClient({
                         placeholder="e.g., exodus90, lent2026"
                         className="mt-1"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Folder name in the content repository</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        GITHUB: Folder name in the content repository
+                      </p>
                     </div>
                     <div className="flex justify-end">
                       <Button onClick={handleSaveSettings} disabled={settingsSaving || !settingsName.trim()}>

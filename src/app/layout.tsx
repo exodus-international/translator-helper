@@ -4,6 +4,7 @@ import './globals.css';
 import { getCurrentUser } from '@/lib/session';
 import { Navigation } from '@/components/navigation';
 import { Toaster } from '@/components/ui/sonner';
+import { FeedbackButton } from '@/components/feedback-button';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -32,6 +33,7 @@ export default async function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Navigation user={user} />
         {children}
+        <FeedbackButton />
         <Toaster />
       </body>
     </html>

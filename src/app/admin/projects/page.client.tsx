@@ -1,14 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { SourceProject } from '@prisma/client';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,14 +11,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, FolderOpen, Languages, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   createSourceProjectAction,
-  updateSourceProjectAction,
   deleteSourceProjectAction,
+  updateSourceProjectAction,
 } from '@/domain/source-project/source-project.actions';
+import { SourceProject } from '@prisma/client';
+import { CheckCircle2, Edit, FolderOpen, Languages, Plus, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface ProjectsClientProps {
@@ -215,7 +215,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
                       onChange={(e) => setIdentifier(e.target.value)}
                       placeholder="e.g., exodus90, lent2026"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Folder name in the content repository</p>
+                    <p className="text-xs text-gray-500 mt-1">GITHUB: Folder name in the content repository</p>
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

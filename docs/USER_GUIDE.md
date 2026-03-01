@@ -29,6 +29,7 @@ This guide covers how translators and deployers work with the Translation Helper
   - [Managing Users](#managing-users)
 - [Document Lifecycle](#document-lifecycle)
 - [Roles and Permissions](#roles-and-permissions)
+- [Support & Bug Reporting](#support--bug-reporting)
 
 ---
 
@@ -412,3 +413,16 @@ Within each Translation Project, members can be assigned roles. These roles prim
 | **Reviewer** | Designated reviewer for assigned translations |
 | **Editor** | Edit translations directly |
 | **Translator** | Translate assigned documents |
+
+---
+
+## Support & Bug Reporting
+
+Two floating buttons are available in the bottom-right corner of every page:
+
+| Button | Icon | Purpose |
+|--------|------|---------|
+| **Support** | Life buoy | Opens the general support portal for questions, help requests, and feature suggestions |
+| **Report a bug** | Bug | Opens a pre-filled bug report form that automatically includes the URL of the page you were on |
+
+Both links open the Jira Service Desk in a new tab. Use **Report a bug** when something is broken or behaving unexpectedly, and **Support** for general questions or requests.

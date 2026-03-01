@@ -423,7 +423,7 @@ export default function DashboardClient({
                         placeholder="e.g., exodus90, lent2026"
                         className="mt-1"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Folder name in the content repository</p>
+                      <p className="text-xs text-muted-foreground mt-1">GITHUB: Folder name in the content repository</p>
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
