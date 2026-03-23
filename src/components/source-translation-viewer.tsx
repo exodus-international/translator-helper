@@ -162,6 +162,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     const pendingDiscardActionRef = useRef<(() => void) | null>(null);
     const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
     const translationEditorRef = useRef<any>(null);
+    const translationContainerRef = useRef<HTMLDivElement>(null);
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null); // Filter by user for diff view
     const [isSourceEditing, setIsSourceEditing] = useState(false);
     const [sourceEditValue, setSourceEditValue] = useState(sourceEditContent ?? sourceContent);
@@ -786,7 +787,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
           <div className={bodyClassName}>
             {variant === 'translate' ? (
               translateTab === 'edit' ? (
-                <div className="relative h-full">
+                <div ref={translationContainerRef} className="relative h-full">
                   <RawEditorPane
                     ref={translationEditorRef}
                     value={translationContent}
@@ -810,6 +811,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                   {toolbarPosition && canCreateSuggestions && (
                     <SuggestionInlineToolbar
                       position={toolbarPosition}
+                      containerRef={translationContainerRef}
                       onComment={() => handleCreateSuggestion(SuggestionType.COMMENT)}
                       onSuggestEdit={() => handleCreateSuggestion(SuggestionType.CHANGE)}
                     />
@@ -863,7 +865,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
               </div>
             ) : (
-              <div className="relative h-full">
+              <div ref={translationContainerRef} className="relative h-full">
                 {selectedUserId ? (
                   // Show diff view when user filter is active
                   <SuggestionDiffViewer
@@ -897,6 +899,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                     {toolbarPosition && canCreateSuggestions && (
                       <SuggestionInlineToolbar
                         position={toolbarPosition}
+                        containerRef={translationContainerRef}
                         onComment={() => handleCreateSuggestion(SuggestionType.COMMENT)}
                         onSuggestEdit={() => handleCreateSuggestion(SuggestionType.CHANGE)}
                       />
