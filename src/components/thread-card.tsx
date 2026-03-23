@@ -215,7 +215,7 @@ export function ThreadCard({
           {onDismiss && (
             <Button
               size="sm"
-              variant="destructiveOutline"
+              variant="outline"
               onClick={(e) => {
                 e.stopPropagation();
                 onDismiss(suggestion.id);
