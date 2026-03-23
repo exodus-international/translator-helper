@@ -10,7 +10,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/domain/translation/translation.service.test.ts",
+    "test": "tsx --test src/domain/translation/translation.service.test.ts src/lib/authorize.test.ts",
     "db:seed": "tsx prisma/seed.ts",
     "format": "prettier --write ."
   },
