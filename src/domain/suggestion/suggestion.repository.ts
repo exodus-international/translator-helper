@@ -147,6 +147,15 @@ export async function getSuggestionReplyById(id: string) {
   });
 }
 
+export async function countOpenSuggestions(documentVersionId: string): Promise<number> {
+  return prisma.suggestion.count({
+    where: {
+      documentVersionId,
+      status: SuggestionStatus.OPEN,
+    },
+  });
+}
+
 export async function checkSuggestionConflict(suggestionId: string, currentContent: string) {
   const suggestion = await getSuggestionById(suggestionId);
   if (!suggestion) {

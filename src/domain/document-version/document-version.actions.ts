@@ -6,6 +6,8 @@ import { DocumentStatus, ProjectRole, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { createComment } from '../comment/comment.repository';
+import { countOpenSuggestions } from '../suggestion/suggestion.repository';
+import { validateTransition } from './document-version.transitions';
 import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
@@ -172,6 +174,8 @@ export async function submitForReviewAction(input: unknown) {
     await authorize('admin');
   }
 
+  validateTransition(existingVersion.status, DocumentStatus.PENDING_REVIEW);
+
   const version = await updateDocumentVersionStatus(
     validated.versionId,
     DocumentStatus.PENDING_REVIEW,
@@ -222,8 +226,10 @@ export async function reviewVersionAction(input: unknown) {
   // Determine new status based on approval decision
   const newStatus = validated.approved
     ? DocumentStatus.APPROVED
-    : // If changes are requested, always go back to IN_PROGRESS (since it was being reviewed, it must have content)
-      DocumentStatus.IN_PROGRESS;
+    : DocumentStatus.IN_PROGRESS;
+
+  const openCount = await countOpenSuggestions(validated.versionId);
+  validateTransition(currentVersion.status, newStatus, { openSuggestionsCount: openCount });
 
   const version = await updateDocumentVersionStatus(validated.versionId, newStatus);
 
@@ -248,12 +254,17 @@ export async function reviewVersionAction(input: unknown) {
 }
 
 export async function deployVersionAction(versionId: string) {
-  console.log('[Deploy] deployVersionAction called with versionId:', versionId);
   const { user } = await authorize('can:deploy');
-  console.log('[Deploy] User:', user.id, user.name);
+
+  const currentVersion = await getDocumentVersionById(versionId);
+  if (!currentVersion) {
+    throw new Error('Document version not found');
+  }
+
+  const openCount = await countOpenSuggestions(versionId);
+  validateTransition(currentVersion.status, DocumentStatus.DEPLOYED, { openSuggestionsCount: openCount });
 
   const version = await updateDocumentVersionStatus(versionId, DocumentStatus.DEPLOYED);
-  console.log('[Deploy] Version status updated to DEPLOYED');
 
   // Log the activity
   await createActivityLog({
@@ -332,18 +343,20 @@ export async function updateDocumentVersionStatusAction(
   github?: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string };
 }> {
   const { user } = await authorize('authenticated');
-  console.log('[StatusUpdate] updateDocumentVersionStatusAction called:', versionId, '→', status);
 
   // Check permission for DEPLOYED status
   if (status === DocumentStatus.DEPLOYED && user.role !== Role.ADMIN) {
     throw new Error('Forbidden: Only deployers can deploy documents');
   }
 
-  // Get existing version to check permissions
+  // Get existing version to validate transition
   const existingVersion = await getDocumentVersionById(versionId);
   if (!existingVersion) {
     throw new Error('Document version not found');
   }
+
+  const openCount = await countOpenSuggestions(versionId);
+  validateTransition(existingVersion.status, status, { openSuggestionsCount: openCount });
 
   const version = await updateDocumentVersionStatus(versionId, status);
 
