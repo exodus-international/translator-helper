@@ -2,7 +2,7 @@ import { DocumentStatus } from '@prisma/client';
 
 // ─── Valid transitions map ───────────────────────────────────
 
-const VALID_TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
+export const VALID_TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
   [DocumentStatus.PENDING_TRANSLATION]: [DocumentStatus.IN_PROGRESS],
   [DocumentStatus.IN_PROGRESS]: [DocumentStatus.PENDING_TRANSLATION, DocumentStatus.PENDING_REVIEW],
   [DocumentStatus.PENDING_REVIEW]: [DocumentStatus.IN_PROGRESS, DocumentStatus.APPROVED],

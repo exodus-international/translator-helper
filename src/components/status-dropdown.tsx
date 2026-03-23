@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
+import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { canDeployClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -72,16 +73,10 @@ export function StatusDropdown({
       statuses = statuses.filter((status) => status !== DocumentStatus.DEPLOYED);
     }
 
-    // Restrict to adjacent statuses only (previous and next in sequence)
+    // Restrict to valid transitions from the current status
     if (currentStatus) {
-      const currentIndex = DOCUMENT_STATUS_SEQUENCE.indexOf(currentStatus);
-      if (currentIndex !== -1) {
-        const adjacentStatuses = new Set<DocumentStatus>();
-        if (currentIndex > 0) adjacentStatuses.add(DOCUMENT_STATUS_SEQUENCE[currentIndex - 1]);
-        if (currentIndex < DOCUMENT_STATUS_SEQUENCE.length - 1)
-          adjacentStatuses.add(DOCUMENT_STATUS_SEQUENCE[currentIndex + 1]);
-        statuses = statuses.filter((s) => adjacentStatuses.has(s));
-      }
+      const validTargets = VALID_TRANSITIONS[currentStatus] || [];
+      statuses = statuses.filter((s) => validTargets.includes(s));
     }
 
     return statuses;
