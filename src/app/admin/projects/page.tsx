@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
-import { canManageFolders } from '@/lib/permissions';
 import { listSourceProjectsAction } from '@/domain/source-project/source-project.actions';
 import ProjectsClient from './page.client';
 
@@ -11,7 +10,7 @@ export default async function ProjectsPage() {
     redirect('/login');
   }
 
-  if (!canManageFolders(user)) {
+  if (user.role !== 'ADMIN') {
     redirect('/dashboard');
   }
 

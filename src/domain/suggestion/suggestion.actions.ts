@@ -1,7 +1,6 @@
 'use server';
 
-import { canReviewInProject, canTranslateInProject, isAdmin } from '@/lib/permissions';
-import { requireUser } from '@/lib/session';
+import { authorize } from '@/lib/authorize';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
@@ -35,17 +34,17 @@ function truncate(text: string, max = 80) {
 }
 
 export async function getSuggestionsByDocumentVersionAction(documentVersionId: string, filters?: any) {
-  await requireUser();
+  await authorize('authenticated');
   return await getSuggestionsByDocumentVersion(documentVersionId, filters);
 }
 
 export async function getSuggestionByIdAction(id: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getSuggestionById(id);
 }
 
 export async function createSuggestionAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = createSuggestionSchema.parse(input);
 
   // Get document version to check permissions
@@ -67,16 +66,9 @@ export async function createSuggestionAction(input: unknown) {
   );
 
   if (translationProject) {
-    // Check if user can review in this project (only reviewers can create suggestions)
-    const canReview = await canReviewInProject(user, translationProject.id, validated.documentVersionId);
-    if (!canReview) {
-      throw new Error('You do not have permission to create suggestions in this project');
-    }
+    await authorize({ project: translationProject.id, role: 'reviewer' });
   } else {
-    // Fallback: check basic review permission
-    if (!isAdmin(user)) {
-      throw new Error('You do not have permission to create suggestions');
-    }
+    await authorize('admin');
   }
 
   // Validate that proposedText is provided for CHANGE type
@@ -119,7 +111,7 @@ export async function createSuggestionAction(input: unknown) {
 }
 
 export async function applySuggestionAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = applySuggestionSchema.parse(input);
 
   // Get suggestion
@@ -168,16 +160,9 @@ export async function applySuggestionAction(input: unknown) {
   );
 
   if (translationProject) {
-    // Check if user can translate/edit in this project
-    const canTranslate = await canTranslateInProject(user, translationProject.id);
-    if (!canTranslate) {
-      throw new Error('You do not have permission to apply suggestions in this project');
-    }
+    await authorize({ project: translationProject.id, role: 'translator' });
   } else {
-    // Fallback: check basic permissions
-    if (!isAdmin(user)) {
-      throw new Error('You do not have permission to apply suggestions');
-    }
+    await authorize('admin');
   }
 
   // Apply the suggestion by replacing the text at the range
@@ -251,7 +236,7 @@ export async function applySuggestionAction(input: unknown) {
 }
 
 export async function dismissSuggestionAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = dismissSuggestionSchema.parse(input);
 
   // Get suggestion
@@ -283,16 +268,9 @@ export async function dismissSuggestionAction(input: unknown) {
   );
 
   if (translationProject) {
-    // Check if user can translate/edit in this project
-    const canTranslate = await canTranslateInProject(user, translationProject.id);
-    if (!canTranslate) {
-      throw new Error('You do not have permission to dismiss suggestions in this project');
-    }
+    await authorize({ project: translationProject.id, role: 'translator' });
   } else {
-    // Fallback: check basic permissions
-    if (!isAdmin(user)) {
-      throw new Error('You do not have permission to dismiss suggestions');
-    }
+    await authorize('admin');
   }
 
   // Update suggestion status
@@ -321,7 +299,7 @@ export async function dismissSuggestionAction(input: unknown) {
 }
 
 export async function reopenSuggestionAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = reopenSuggestionSchema.parse(input);
 
   const suggestion = await getSuggestionById(validated.suggestionId);
@@ -350,18 +328,9 @@ export async function reopenSuggestionAction(input: unknown) {
   );
 
   if (translationProject) {
-    const canReview = await canReviewInProject(user, translationProject.id, validated.suggestionId);
-    if (!canReview) {
-      // Also allow translators to reopen
-      const canTranslate = await canTranslateInProject(user, translationProject.id);
-      if (!canTranslate) {
-        throw new Error('You do not have permission to reopen suggestions in this project');
-      }
-    }
+    await authorize({ project: translationProject.id, roles: ['reviewer', 'translator'] });
   } else {
-    if (!isAdmin(user)) {
-      throw new Error('You do not have permission to reopen suggestions');
-    }
+    await authorize('admin');
   }
 
   // If this was an APPLIED CHANGE suggestion with stored originalText, revert the content
@@ -416,7 +385,7 @@ export async function reopenSuggestionAction(input: unknown) {
 }
 
 export async function editSuggestionAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = editSuggestionSchema.parse(input);
 
   const suggestion = await getSuggestionById(validated.suggestionId);
@@ -457,7 +426,7 @@ export async function editSuggestionAction(input: unknown) {
 }
 
 export async function deleteSuggestionAction(id: string) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
 
   // Get suggestion
   const suggestion = await getSuggestionById(id);
@@ -495,7 +464,7 @@ export async function deleteSuggestionAction(id: string) {
 }
 
 export async function createSuggestionReplyAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = createSuggestionReplySchema.parse(input);
 
   // Verify suggestion exists
@@ -512,7 +481,7 @@ export async function createSuggestionReplyAction(input: unknown) {
 }
 
 export async function deleteSuggestionReplyAction(replyId: string) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
 
   const reply = await getSuggestionReplyById(replyId);
   if (!reply) {
@@ -528,7 +497,7 @@ export async function deleteSuggestionReplyAction(replyId: string) {
 }
 
 export async function updateSuggestionAction(id: string, input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = updateSuggestionStatusSchema.parse(input);
 
   // Get suggestion

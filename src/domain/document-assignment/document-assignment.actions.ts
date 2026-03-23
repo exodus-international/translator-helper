@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { requireUser } from '@/lib/session';
+import { authorize } from '@/lib/authorize';
 import { revalidatePath } from 'next/cache';
 import { createDocumentAssignmentSchema, updateDocumentAssignmentSchema } from './document-assignment.types';
 import {
@@ -44,12 +44,12 @@ export async function listDocumentAssignmentsAction(filters?: {
   userId?: string;
   documentId?: string;
 }) {
-  await requireUser();
+  await authorize('authenticated');
   return await listDocumentAssignments(filters);
 }
 
 export async function getDocumentAssignmentAction(id: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentAssignmentById(id);
 }
 
@@ -57,16 +57,15 @@ export async function getDocumentAssignmentByDocumentAndProjectAction(
   documentId: string,
   translationProjectId: string,
 ) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentAssignmentByDocumentAndProject(documentId, translationProjectId);
 }
 
 export async function createDocumentAssignmentAction(input: unknown) {
-  const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER can assign documents
-  // This will be implemented after permissions system is updated
-
   const validated = createDocumentAssignmentSchema.parse(input);
+
+  const { user } = await authorize({ project: validated.translationProjectId, role: 'manager' });
+
   const result = await createDocumentAssignment({
     documentId: validated.documentId,
     translationProjectId: validated.translationProjectId,
@@ -83,8 +82,12 @@ export async function createDocumentAssignmentAction(input: unknown) {
 }
 
 export async function updateDocumentAssignmentAction(id: string, input: unknown) {
-  const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER can update assignments
+  const assignment = await getDocumentAssignmentById(id);
+  if (!assignment) {
+    throw new Error('Document assignment not found');
+  }
+
+  await authorize({ project: assignment.translationProjectId, role: 'manager' });
 
   const validated = updateDocumentAssignmentSchema.parse(input);
   const updateData: { userId?: string | null; deadline?: Date | null } = {};
@@ -108,8 +111,12 @@ export async function updateDocumentAssignmentAction(id: string, input: unknown)
 }
 
 export async function deleteDocumentAssignmentAction(id: string) {
-  const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER can delete assignments
+  const assignment = await getDocumentAssignmentById(id);
+  if (!assignment) {
+    throw new Error('Document assignment not found');
+  }
+
+  await authorize({ project: assignment.translationProjectId, role: 'manager' });
 
   const result = await deleteDocumentAssignment(id);
   revalidatePath('/dashboard');
@@ -118,11 +125,11 @@ export async function deleteDocumentAssignmentAction(id: string) {
 }
 
 export async function getUnassignedDocumentsAction(translationProjectId: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getUnassignedDocuments(translationProjectId);
 }
 
 export async function getAssignedDocumentsForUserAction(translationProjectId?: string) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   return await getAssignedDocumentsForUser(user.id, translationProjectId);
 }

@@ -1,7 +1,6 @@
 'use server';
 
-import { canManageLanguages } from '@/lib/permissions';
-import { requireUser } from '@/lib/session';
+import { authorize } from '@/lib/authorize';
 import {
   createLanguage,
   deleteLanguage,
@@ -19,32 +18,24 @@ import {
 } from './language.types';
 
 export async function listLanguagesAction() {
-  await requireUser();
+  await authorize('authenticated');
   return await listLanguages();
 }
 
 export async function getLanguageAction(id: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getLanguageById(id);
 }
 
 export async function createLanguageAction(input: unknown) {
-  const user = await requireUser();
-
-  if (!canManageLanguages(user)) {
-    throw new Error('Forbidden: Only deployers can manage languages');
-  }
+  await authorize('can:manage-languages');
 
   const validated = createLanguageSchema.parse(input);
   return await createLanguage(validated.code, validated.name, validated.branchName);
 }
 
 export async function updateLanguageAction(id: string, input: unknown) {
-  const user = await requireUser();
-
-  if (!canManageLanguages(user)) {
-    throw new Error('Forbidden: Only deployers can manage languages');
-  }
+  await authorize('can:manage-languages');
 
   const validated = updateLanguageSchema.parse(input);
   if (!validated.name) {
@@ -55,33 +46,21 @@ export async function updateLanguageAction(id: string, input: unknown) {
 }
 
 export async function updateLanguageInstructionsAction(id: string, input: unknown) {
-  const user = await requireUser();
-
-  if (!canManageLanguages(user)) {
-    throw new Error('Forbidden: Only deployers can manage languages');
-  }
+  await authorize('can:manage-languages');
 
   const validated = updateLanguageInstructionsSchema.parse(input);
   return await updateLanguageInstructions(id, validated.translationInstructions ?? null);
 }
 
 export async function updateLanguageBranchNameAction(id: string, input: unknown) {
-  const user = await requireUser();
-
-  if (!canManageLanguages(user)) {
-    throw new Error('Forbidden: Only deployers can manage languages');
-  }
+  await authorize('can:manage-languages');
 
   const validated = updateLanguageBranchNameSchema.parse(input);
   return await updateLanguageBranchName(id, validated.branchName);
 }
 
 export async function deleteLanguageAction(id: string) {
-  const user = await requireUser();
-
-  if (!canManageLanguages(user)) {
-    throw new Error('Forbidden: Only deployers can manage languages');
-  }
+  await authorize('can:manage-languages');
 
   return await deleteLanguage(id);
 }

@@ -1,7 +1,6 @@
 'use server';
 
-import { requireUser } from '@/lib/session';
-import { canManageFolders } from '@/lib/permissions';
+import { authorize } from '@/lib/authorize';
 import { createTranslationProjectSchema, updateTranslationProjectSchema } from './translation-project.types';
 import {
   listTranslationProjects,
@@ -14,26 +13,22 @@ import {
 } from './translation-project.repository';
 
 export async function listTranslationProjectsAction(filters?: { sourceProjectId?: string; languageId?: string }) {
-  await requireUser();
+  await authorize('authenticated');
   return await listTranslationProjects(filters);
 }
 
 export async function getTranslationProjectAction(id: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getTranslationProjectById(id);
 }
 
 export async function getTranslationProjectBySourceAndLanguageAction(sourceProjectId: string, languageId: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getTranslationProjectBySourceAndLanguage(sourceProjectId, languageId);
 }
 
 export async function createTranslationProjectAction(input: unknown) {
-  const user = await requireUser();
-
-  if (!canManageFolders(user)) {
-    throw new Error('Forbidden: Only deployers can create translation projects');
-  }
+  await authorize('can:manage-folders');
 
   const validated = createTranslationProjectSchema.parse(input);
   return await createTranslationProject({
@@ -44,11 +39,7 @@ export async function createTranslationProjectAction(input: unknown) {
 }
 
 export async function updateTranslationProjectAction(id: string, input: unknown) {
-  const user = await requireUser();
-
-  if (!canManageFolders(user)) {
-    throw new Error('Forbidden: Only deployers can update translation projects');
-  }
+  await authorize('can:manage-folders');
 
   const validated = updateTranslationProjectSchema.parse(input);
   return await updateTranslationProject(id, {
@@ -57,16 +48,12 @@ export async function updateTranslationProjectAction(id: string, input: unknown)
 }
 
 export async function deleteTranslationProjectAction(id: string) {
-  const user = await requireUser();
-
-  if (!canManageFolders(user)) {
-    throw new Error('Forbidden: Only deployers can delete translation projects');
-  }
+  await authorize('can:manage-folders');
 
   return await deleteTranslationProject(id);
 }
 
 export async function getTranslationProjectsByUserAction() {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   return await getTranslationProjectsByUser(user.id);
 }

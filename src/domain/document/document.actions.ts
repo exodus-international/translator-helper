@@ -1,8 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { isAdmin } from '@/lib/permissions';
-import { requireUser } from '@/lib/session';
+import { authorize } from '@/lib/authorize';
 import { DocumentStatus } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
@@ -32,22 +31,22 @@ export async function listDocumentsAction(filters?: {
   labels?: string[];
   search?: string;
 }) {
-  await requireUser();
+  await authorize('authenticated');
   return await listDocuments(filters);
 }
 
 export async function getDocumentAction(id: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentById(id);
 }
 
 export async function getDocumentBySlugAction(slug: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentBySlug(slug);
 }
 
 export async function createDocumentAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = createDocumentSchema.parse(input);
 
   // Create the document
@@ -92,12 +91,7 @@ export async function createDocumentAction(input: unknown) {
 }
 
 export async function updateDocumentAction(id: string, input: unknown) {
-  const user = await requireUser();
-
-  // Only deployers can update documents (since documents contain source versions)
-  if (!isAdmin(user)) {
-    throw new Error('Forbidden: Only deployers can edit documents');
-  }
+  await authorize('admin');
 
   const validated = updateDocumentSchema.parse(input);
 
@@ -107,24 +101,14 @@ export async function updateDocumentAction(id: string, input: unknown) {
 }
 
 export async function deleteDocumentAction(id: string) {
-  const user = await requireUser();
-
-  // Only deployers can delete documents
-  if (!isAdmin(user)) {
-    throw new Error('Forbidden: Only deployers can delete documents');
-  }
+  await authorize('admin');
 
   return await deleteDocument(id);
 }
 
 // Wrapper that returns void for client component compatibility
 export async function deleteDocumentActionVoid(id: string): Promise<void> {
-  const user = await requireUser();
-
-  // Only deployers can delete documents
-  if (!isAdmin(user)) {
-    throw new Error('Forbidden: Only deployers can delete documents');
-  }
+  await authorize('admin');
 
   await deleteDocumentAction(id);
   await deleteDocumentVersionsByDocumentId(id);
@@ -132,37 +116,37 @@ export async function deleteDocumentActionVoid(id: string): Promise<void> {
 }
 
 export async function getDocumentsNeedingTranslationAction(languageId: string, translationProjectId?: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentsNeedingTranslation(languageId, translationProjectId);
 }
 
 export async function getDocumentsPendingReviewAction(languageId?: string, translationProjectId?: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentsPendingReview(languageId, translationProjectId);
 }
 
 export async function getDocumentsReadyToDeployAction(languageId?: string, translationProjectId?: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentsReadyToDeploy(languageId, translationProjectId);
 }
 
 export async function getDocumentsByUserAction(languageId?: string, translationProjectId?: string) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   return await getDocumentsByUser(user.id, languageId, translationProjectId);
 }
 
 export async function getDocumentsWithAllVersionsAction() {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentsWithAllVersions();
 }
 
 export async function getDashboardDocumentsAction(languageId: string, sourceProjectId?: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDashboardDocuments(languageId, sourceProjectId);
 }
 
 export async function toggleDocumentLabelAction(documentId: string, label: string) {
-  const user = await requireUser();
+  await authorize('authenticated');
 
   // Get the document to check its current labels
   const document = await getDocumentById(documentId);

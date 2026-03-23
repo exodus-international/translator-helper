@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
-import { canManageLanguages } from '@/lib/permissions';
 import { listLanguages } from '@/domain/language/language.repository';
 import LanguagesClient from './page.client';
 
@@ -11,7 +10,7 @@ export default async function LanguagesPage() {
     redirect('/login');
   }
 
-  if (!canManageLanguages(user)) {
+  if (user.role !== 'ADMIN') {
     redirect('/dashboard');
   }
 
