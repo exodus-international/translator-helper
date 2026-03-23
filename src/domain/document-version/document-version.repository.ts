@@ -125,14 +125,7 @@ export async function createDocumentVersion(data: {
   status?: DocumentStatus;
   userId: string;
 }) {
-  // If status is explicitly provided, use it. Otherwise, determine it based on content
-  // If content is provided and not empty, set to IN_PROGRESS, otherwise PENDING_TRANSLATION
-  const finalStatus =
-    data.status !== undefined
-      ? data.status
-      : data.content.trim()
-        ? DocumentStatus.IN_PROGRESS
-        : DocumentStatus.PENDING_TRANSLATION;
+  const finalStatus = data.status ?? DocumentStatus.PENDING_TRANSLATION;
 
   return prisma.documentVersion.create({
     data: {
@@ -174,19 +167,12 @@ export async function updateDocumentVersion(id: string, content: string, userId:
     throw new Error('Document version not found');
   }
 
-  // If status is PENDING_TRANSLATION and content is provided, change to IN_PROGRESS
-  const newStatus =
-    current.status === DocumentStatus.PENDING_TRANSLATION && content.trim()
-      ? DocumentStatus.IN_PROGRESS
-      : current.status;
-
-  // Update with incremented version
+  // Update with incremented version (status unchanged — transitions are explicit)
   return prisma.documentVersion.update({
     where: { id },
     data: {
       content,
       userId,
-      status: newStatus,
       version: current.version + 1,
       updatedAt: new Date(),
     },
