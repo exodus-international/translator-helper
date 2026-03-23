@@ -119,12 +119,7 @@ export function useMonacoSuggestions({ editor, monaco, suggestions, onSuggestion
         }
       }
 
-      const range = new monaco.Range(
-        suggestion.startLine!,
-        suggestion.startColumn!,
-        rangeEndLine,
-        rangeEndColumn,
-      );
+      const range = new monaco.Range(suggestion.startLine!, suggestion.startColumn!, rangeEndLine, rangeEndColumn);
 
       decorations.push({
         range,
@@ -178,7 +173,9 @@ export function useMonacoSuggestions({ editor, monaco, suggestions, onSuggestion
       const disposable = editor.onMouseDown((e: any) => {
         if (e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
           const lineNumber = e.target.position.lineNumber;
-          const suggestion = anchoredSuggestions.find((s) => s.startLine === lineNumber && s.status === SuggestionStatus.OPEN);
+          const suggestion = anchoredSuggestions.find(
+            (s) => s.startLine === lineNumber && s.status === SuggestionStatus.OPEN,
+          );
           if (suggestion) {
             onSuggestionClick(suggestion);
             // Scroll to the suggestion

@@ -18,10 +18,7 @@ const repliesInclude = {
   },
 };
 
-export async function getSuggestionsByDocumentVersion(
-  documentVersionId: string,
-  filters?: SuggestionFilters,
-) {
+export async function getSuggestionsByDocumentVersion(documentVersionId: string, filters?: SuggestionFilters) {
   const where: any = { documentVersionId };
 
   if (filters) {
@@ -106,10 +103,7 @@ export async function updateSuggestionStatus(
   });
 }
 
-export async function updateSuggestionContent(
-  id: string,
-  data: { comment: string; proposedText?: string | null },
-) {
+export async function updateSuggestionContent(id: string, data: { comment: string; proposedText?: string | null }) {
   return prisma.suggestion.update({
     where: { id },
     data: {
@@ -129,11 +123,7 @@ export async function deleteSuggestion(id: string) {
   });
 }
 
-export async function createSuggestionReply(data: {
-  suggestionId: string;
-  userId: string;
-  content: string;
-}) {
+export async function createSuggestionReply(data: { suggestionId: string; userId: string; content: string }) {
   return prisma.suggestionReply.create({
     data,
     include: {
@@ -163,7 +153,12 @@ export async function checkSuggestionConflict(suggestionId: string, currentConte
     return { hasConflict: false };
   }
 
-  if (suggestion.startLine == null || suggestion.endLine == null || suggestion.startColumn == null || suggestion.endColumn == null) {
+  if (
+    suggestion.startLine == null ||
+    suggestion.endLine == null ||
+    suggestion.startColumn == null ||
+    suggestion.endColumn == null
+  ) {
     return { hasConflict: false };
   }
 

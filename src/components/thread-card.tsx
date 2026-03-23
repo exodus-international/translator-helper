@@ -41,7 +41,14 @@ function formatTimeAgo(date: string) {
 }
 
 function getTextFromRange(suggestion: SuggestionWithUser, content: string): string {
-  if (!content || suggestion.startLine == null || suggestion.endLine == null || suggestion.startColumn == null || suggestion.endColumn == null) return '';
+  if (
+    !content ||
+    suggestion.startLine == null ||
+    suggestion.endLine == null ||
+    suggestion.startColumn == null ||
+    suggestion.endColumn == null
+  )
+    return '';
   const lines = content.split('\n');
   const startLine = suggestion.startLine - 1;
   const endLine = suggestion.endLine - 1;
@@ -80,18 +87,19 @@ export function ThreadCard({
   const lineLabel = isAnchored ? `L${suggestion.startLine}` : 'General';
   const replies = suggestion.replies || [];
 
-  const statusBadge = suggestion.status !== SuggestionStatus.OPEN ? (
-    <span
-      className={cn(
-        'text-[10px] px-1.5 py-0.5 rounded border',
-        suggestion.status === SuggestionStatus.APPLIED
-          ? 'border-green-200 text-green-700 bg-green-50'
-          : 'border-gray-200 text-gray-500 bg-gray-50',
-      )}
-    >
-      {suggestion.status === SuggestionStatus.APPLIED ? 'Applied' : 'Dismissed'}
-    </span>
-  ) : null;
+  const statusBadge =
+    suggestion.status !== SuggestionStatus.OPEN ? (
+      <span
+        className={cn(
+          'text-[10px] px-1.5 py-0.5 rounded border',
+          suggestion.status === SuggestionStatus.APPLIED
+            ? 'border-green-200 text-green-700 bg-green-50'
+            : 'border-gray-200 text-gray-500 bg-gray-50',
+        )}
+      >
+        {suggestion.status === SuggestionStatus.APPLIED ? 'Applied' : 'Dismissed'}
+      </span>
+    ) : null;
 
   return (
     <div
@@ -112,10 +120,12 @@ export function ThreadCard({
         )}
         <span className="font-medium truncate">{suggestion.user.name}</span>
         <span className="text-muted-foreground">·</span>
-        <span className={cn(
-          'text-[10px] px-1 py-0.5 rounded',
-          isAnchored ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600',
-        )}>
+        <span
+          className={cn(
+            'text-[10px] px-1 py-0.5 rounded',
+            isAnchored ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600',
+          )}
+        >
           {lineLabel}
         </span>
         <span className="text-muted-foreground">·</span>
@@ -146,9 +156,7 @@ export function ThreadCard({
       ) : (
         <>
           {suggestion.comment?.trim() && (
-            <p className="mt-1.5 text-sm text-gray-700 whitespace-pre-wrap break-words">
-              {suggestion.comment}
-            </p>
+            <p className="mt-1.5 text-sm text-gray-700 whitespace-pre-wrap break-words">{suggestion.comment}</p>
           )}
 
           {suggestion.type === SuggestionType.CHANGE && suggestion.proposedText && isAnchored && (
@@ -157,11 +165,11 @@ export function ThreadCard({
               style={{ fontFamily: MONO_FONT }}
             >
               <div className="text-red-700/80 line-through whitespace-pre-wrap break-words">
-                {(suggestion.status === SuggestionStatus.APPLIED && suggestion.originalText) || getTextFromRange(suggestion, translationContent) || '(text not available)'}
+                {(suggestion.status === SuggestionStatus.APPLIED && suggestion.originalText) ||
+                  getTextFromRange(suggestion, translationContent) ||
+                  '(text not available)'}
               </div>
-              <div className="text-green-800 whitespace-pre-wrap break-words">
-                {suggestion.proposedText}
-              </div>
+              <div className="text-green-800 whitespace-pre-wrap break-words">{suggestion.proposedText}</div>
             </div>
           )}
         </>

@@ -25,7 +25,9 @@ interface RawEditorPaneProps {
   editorContainerClassName?: string;
   suggestions?: SuggestionWithUser[];
   onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
-  onSelectionChange?: (range: { startLine: number; startColumn: number; endLine: number; endColumn: number } | null) => void;
+  onSelectionChange?: (
+    range: { startLine: number; startColumn: number; endLine: number; endColumn: number } | null,
+  ) => void;
 }
 
 export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEditorPane(

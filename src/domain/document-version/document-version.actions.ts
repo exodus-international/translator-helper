@@ -187,7 +187,11 @@ export async function submitForReviewAction(input: unknown) {
     }
   }
 
-  const version = await updateDocumentVersionStatus(validated.versionId, DocumentStatus.PENDING_REVIEW, validated.reviewerId);
+  const version = await updateDocumentVersionStatus(
+    validated.versionId,
+    DocumentStatus.PENDING_REVIEW,
+    validated.reviewerId,
+  );
 
   // Log the activity
   await createActivityLog({

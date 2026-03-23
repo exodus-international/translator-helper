@@ -130,7 +130,14 @@ export function SuggestionPanel({
   };
 
   const getTextFromRange = (suggestion: SuggestionWithUser, docContent: string): string => {
-    if (!docContent || suggestion.startLine == null || suggestion.endLine == null || suggestion.startColumn == null || suggestion.endColumn == null) return '';
+    if (
+      !docContent ||
+      suggestion.startLine == null ||
+      suggestion.endLine == null ||
+      suggestion.startColumn == null ||
+      suggestion.endColumn == null
+    )
+      return '';
     const lines = docContent.split('\n');
     const startLine = suggestion.startLine - 1; // Convert to 0-based
     const endLine = suggestion.endLine - 1;
@@ -297,7 +304,8 @@ export function SuggestionPanel({
                     <div className="flex items-baseline gap-2 min-w-0">
                       <span className="text-sm font-medium truncate">{suggestion.user.name}</span>
                       <span className="text-[11px] text-muted-foreground shrink-0">
-                        v{suggestion.version}{suggestion.startLine != null ? ` • L${suggestion.startLine}` : ' • General'}
+                        v{suggestion.version}
+                        {suggestion.startLine != null ? ` • L${suggestion.startLine}` : ' • General'}
                       </span>
                     </div>
                   </div>
@@ -326,13 +334,17 @@ export function SuggestionPanel({
                 >
                   <div className="text-red-700/80 line-through whitespace-pre-wrap wrap-break-word">
                     {(() => {
-                      const beforeText = (suggestion.status === SuggestionStatus.APPLIED && suggestion.originalText) || getTextFromRange(suggestion, content);
+                      const beforeText =
+                        (suggestion.status === SuggestionStatus.APPLIED && suggestion.originalText) ||
+                        getTextFromRange(suggestion, content);
                       if (!beforeText) return '(text not available)';
                       return beforeText.length > 160 ? beforeText.substring(0, 160) + '…' : beforeText;
                     })()}
                   </div>
                   <div className="text-green-800 whitespace-pre-wrap wrap-break-word">
-                    {suggestion.proposedText.length > 160 ? suggestion.proposedText.substring(0, 160) + '…' : suggestion.proposedText}
+                    {suggestion.proposedText.length > 160
+                      ? suggestion.proposedText.substring(0, 160) + '…'
+                      : suggestion.proposedText}
                   </div>
                 </div>
               )}

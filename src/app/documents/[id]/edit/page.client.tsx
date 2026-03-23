@@ -40,11 +40,7 @@ interface EditDocumentClientProps {
   }>;
 }
 
-export default function EditDocumentClient({
-  document,
-  sourceVersion,
-  sourceProjects,
-}: EditDocumentClientProps) {
+export default function EditDocumentClient({ document, sourceVersion, sourceProjects }: EditDocumentClientProps) {
   const router = useRouter();
   const [title, setTitle] = useState(document.title);
   const [originalFilename, setOriginalFilename] = useState(document.originalFilename || '');

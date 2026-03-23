@@ -143,7 +143,9 @@ export default function ProjectKanbanBoard({
   const [assignUserId, setAssignUserId] = useState('');
   const [assignDeadline, setAssignDeadline] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
-  const [projectMembers, setProjectMembers] = useState<{ id: string; userId: string; user: { id: string; name: string | null; email: string } }[]>([]);
+  const [projectMembers, setProjectMembers] = useState<
+    { id: string; userId: string; user: { id: string; name: string | null; email: string } }[]
+  >([]);
 
   const isDeployer = isDeployerClient(user);
 
@@ -165,13 +167,15 @@ export default function ProjectKanbanBoard({
 
   useEffect(() => {
     if (translationProjectId && isDeployer) {
-      listProjectMembersAction(translationProjectId).then((members) => {
-        const seen = new Map<string, typeof members[number]>();
-        for (const m of members) {
-          if (!seen.has(m.user.id)) seen.set(m.user.id, m);
-        }
-        setProjectMembers(Array.from(seen.values()));
-      }).catch(console.error);
+      listProjectMembersAction(translationProjectId)
+        .then((members) => {
+          const seen = new Map<string, (typeof members)[number]>();
+          for (const m of members) {
+            if (!seen.has(m.user.id)) seen.set(m.user.id, m);
+          }
+          setProjectMembers(Array.from(seen.values()));
+        })
+        .catch(console.error);
     }
   }, [translationProjectId, isDeployer]);
 
@@ -465,7 +469,7 @@ export default function ProjectKanbanBoard({
                       prevCardInColumn.document.labels?.includes('Waiting for final label');
                     const shouldShowSeparator = hasWaitingForFinalLabel && !prevCardHasLabel && prevCardInColumn;
 
-                    const openSuggestionsCount = version ? (version as any).openSuggestionsCount ?? 0 : 0;
+                    const openSuggestionsCount = version ? ((version as any).openSuggestionsCount ?? 0) : 0;
 
                     return (
                       <Fragment key={card.id}>
@@ -516,7 +520,9 @@ export default function ProjectKanbanBoard({
                                       if (reviewer && reviewer.id !== translator?.id) usersToShow.push(reviewer);
                                     }
 
-                                    const canReassign = isDeployer && translationProjectId &&
+                                    const canReassign =
+                                      isDeployer &&
+                                      translationProjectId &&
                                       (!version?.status || version?.status === DocumentStatus.PENDING_TRANSLATION);
 
                                     if (isUnassigned && canReassign) {
@@ -645,11 +651,7 @@ export default function ProjectKanbanBoard({
             </div>
             <div className="space-y-2">
               <Label>Deadline (optional)</Label>
-              <Input
-                type="date"
-                value={assignDeadline}
-                onChange={(e) => setAssignDeadline(e.target.value)}
-              />
+              <Input type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} />
             </div>
           </div>
           <DialogFooter>

@@ -140,7 +140,12 @@ export async function applySuggestionAction(input: unknown) {
     throw new Error('Suggestion does not have proposed text');
   }
 
-  if (suggestion.startLine == null || suggestion.endLine == null || suggestion.startColumn == null || suggestion.endColumn == null) {
+  if (
+    suggestion.startLine == null ||
+    suggestion.endLine == null ||
+    suggestion.startColumn == null ||
+    suggestion.endColumn == null
+  ) {
     throw new Error('Cannot apply a suggestion without a text range');
   }
 
@@ -291,7 +296,11 @@ export async function dismissSuggestionAction(input: unknown) {
   }
 
   // Update suggestion status
-  const updated = await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.DISMISSED, validated.dismissedReason);
+  const updated = await updateSuggestionStatus(
+    validated.suggestionId,
+    SuggestionStatus.DISMISSED,
+    validated.dismissedReason,
+  );
 
   await createActivityLog({
     documentVersionId: suggestion.documentVersionId,

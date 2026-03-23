@@ -78,7 +78,8 @@ export function StatusDropdown({
       if (currentIndex !== -1) {
         const adjacentStatuses = new Set<DocumentStatus>();
         if (currentIndex > 0) adjacentStatuses.add(DOCUMENT_STATUS_SEQUENCE[currentIndex - 1]);
-        if (currentIndex < DOCUMENT_STATUS_SEQUENCE.length - 1) adjacentStatuses.add(DOCUMENT_STATUS_SEQUENCE[currentIndex + 1]);
+        if (currentIndex < DOCUMENT_STATUS_SEQUENCE.length - 1)
+          adjacentStatuses.add(DOCUMENT_STATUS_SEQUENCE[currentIndex + 1]);
         statuses = statuses.filter((s) => adjacentStatuses.has(s));
       }
     }
@@ -263,7 +264,10 @@ export function StatusDropdown({
               (status === DocumentStatus.APPROVED || status === DocumentStatus.DEPLOYED) && openSuggestionsCount > 0;
 
             const isDisabled =
-              isCurrentStatus || loading || (user.role === 'TRANSLATOR' && status === DocumentStatus.DEPLOYED) || isBlockedByOpenSuggestions;
+              isCurrentStatus ||
+              loading ||
+              (user.role === 'TRANSLATOR' && status === DocumentStatus.DEPLOYED) ||
+              isBlockedByOpenSuggestions;
 
             return (
               <DropdownMenuPrimitive.Item
@@ -271,9 +275,7 @@ export function StatusDropdown({
                 disabled={isDisabled}
                 className={cn(
                   'relative flex items-center gap-2 px-2 py-2 text-sm rounded-sm outline-none',
-                  isDisabled
-                    ? 'opacity-40 cursor-not-allowed'
-                    : 'cursor-pointer hover:bg-gray-100 focus:bg-gray-100',
+                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100 focus:bg-gray-100',
                   isCurrentStatus && 'bg-blue-50 opacity-60',
                 )}
                 onSelect={(e) => {
@@ -290,14 +292,13 @@ export function StatusDropdown({
                 {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
                 <div className="flex w-full justify-between items-center gap-2">
                   <div className="flex flex-col">
-                    <span className={cn(
-                      isDisabled ? 'text-gray-400' : 'text-gray-900 font-medium',
-                    )}>
+                    <span className={cn(isDisabled ? 'text-gray-400' : 'text-gray-900 font-medium')}>
                       {getTransitionLabel(displayedStatus, status)}
                     </span>
                     {isBlockedByOpenSuggestions && (
                       <div className="text-[12px] text-red-600 flex items-center">
-                        <AlertCircle className="h-3.5 w-3.5 mr-1" /> {openSuggestionsCount} open comment{openSuggestionsCount !== 1 ? 's' : ''} remaining
+                        <AlertCircle className="h-3.5 w-3.5 mr-1" /> {openSuggestionsCount} open comment
+                        {openSuggestionsCount !== 1 ? 's' : ''} remaining
                       </div>
                     )}
                   </div>

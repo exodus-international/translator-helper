@@ -88,10 +88,7 @@ export function ThreadSidebar({
   };
 
   const renderCard = (suggestion: SuggestionWithUser) => (
-    <div
-      key={suggestion.id}
-      ref={activeThreadId === suggestion.id ? activeCardRef : undefined}
-    >
+    <div key={suggestion.id} ref={activeThreadId === suggestion.id ? activeCardRef : undefined}>
       <ThreadCard
         suggestion={suggestion}
         currentUserId={currentUserId}
@@ -160,10 +157,23 @@ export function ThreadSidebar({
             }}
           />
           <div className="flex gap-1.5 mt-1.5">
-            <Button size="sm" onClick={handleSubmitGeneralThread} disabled={!generalComment.trim()} className="h-6 text-xs">
+            <Button
+              size="sm"
+              onClick={handleSubmitGeneralThread}
+              disabled={!generalComment.trim()}
+              className="h-6 text-xs"
+            >
               Submit
             </Button>
-            <Button size="sm" variant="outline" onClick={() => { setShowGeneralInput(false); setGeneralComment(''); }} className="h-6 text-xs">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setShowGeneralInput(false);
+                setGeneralComment('');
+              }}
+              className="h-6 text-xs"
+            >
               Cancel
             </Button>
           </div>
@@ -173,22 +183,14 @@ export function ThreadSidebar({
       {/* Thread list */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2">
         {suggestions.length === 0 ? (
-          <div className="text-center text-muted-foreground text-xs py-8">
-            No feedback yet
-          </div>
+          <div className="text-center text-muted-foreground text-xs py-8">No feedback yet</div>
         ) : (
           <>
             {/* Open threads */}
-            {openThreads.length > 0 && (
-              <div className="space-y-2">
-                {openThreads.map(renderCard)}
-              </div>
-            )}
+            {openThreads.length > 0 && <div className="space-y-2">{openThreads.map(renderCard)}</div>}
 
             {openThreads.length === 0 && (
-              <div className="text-center text-muted-foreground text-xs py-4">
-                No open threads
-              </div>
+              <div className="text-center text-muted-foreground text-xs py-4">No open threads</div>
             )}
 
             {/* Resolved threads — collapsible */}
@@ -206,11 +208,7 @@ export function ThreadSidebar({
                   <span>Resolved ({resolvedThreads.length})</span>
                 </button>
 
-                {!resolvedCollapsed && (
-                  <div className="space-y-2 mt-1">
-                    {resolvedThreads.map(renderCard)}
-                  </div>
-                )}
+                {!resolvedCollapsed && <div className="space-y-2 mt-1">{resolvedThreads.map(renderCard)}</div>}
               </div>
             )}
           </>

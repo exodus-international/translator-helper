@@ -154,9 +154,7 @@ export default function ProjectTeamTab({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">
-          Team Members ({groupedMembers.length})
-        </h2>
+        <h2 className="text-lg font-semibold">Team Members ({groupedMembers.length})</h2>
         {canManage && (
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>

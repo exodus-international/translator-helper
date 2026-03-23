@@ -178,7 +178,7 @@ flowchart LR
     C -->|Reviewer reviews text| D{Reviewer requests<br/>final check}
     D -->|Approving final version| E[APPROVED<br/>Texts Approved]
     E -->|Deployer deploys| F[DEPLOYED<br/>Texts Deployed]
-    
+
     style A fill:#BABABA,color:#000
     style B fill:#0063ed,color:#fff
     style C fill:#FACC15,color:#000
@@ -194,7 +194,9 @@ flowchart LR
 3. **PENDING_REVIEW (Texts in Review)**: After translation, the translator submits it for review
 4. **Communication Step**: Reviewer reviews the text and requests a final check from the translator (or another team member) via messages in the Dashboard
 5. **APPROVED (Texts Approved)**: Translator performs the final check and approves the translation
+
 - Also AUDIO file is generated and added to the document
+
 6. **DEPLOYED (Texts Deployed)**: Deployer (e.g., Pavel) moves the approved text to deployed status
 
 ## Database Schema

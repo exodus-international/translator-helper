@@ -44,10 +44,10 @@ Translation Helper is a web application for managing the translation workflow of
 
 There are two global roles:
 
-| Role | Description |
-|------|-------------|
-| **Translator** | Can create, translate, and review documents |
-| **Deployer** | All translator permissions + admin features (deploy, manage languages/projects/users) |
+| Role           | Description                                                                           |
+| -------------- | ------------------------------------------------------------------------------------- |
+| **Translator** | Can create, translate, and review documents                                           |
+| **Deployer**   | All translator permissions + admin features (deploy, manage languages/projects/users) |
 
 ---
 
@@ -105,12 +105,12 @@ The system automatically creates a **Translation Project** for each existing lan
 2. Click **Add Member**
 3. Select a user and assign a project role:
 
-| Project Role | Capabilities |
-|-------------|-------------|
+| Project Role        | Capabilities                                       |
+| ------------------- | -------------------------------------------------- |
 | **Project Manager** | Assign documents, manage team, review translations |
-| **Reviewer** | Review and approve translations, request changes |
-| **Editor** | Translate and edit translations, review |
-| **Translator** | Translate documents |
+| **Reviewer**        | Review and approve translations, request changes   |
+| **Editor**          | Translate and edit translations, review            |
+| **Translator**      | Translate documents                                |
 
 #### Assigning Documents
 
@@ -210,13 +210,14 @@ If no translation exists yet, you will be prompted to start one. The document st
 
 The translation interface has two panels:
 
-| Left Panel (Source) | Right Panel (Translation) |
-|---|---|
-| English source document | Your translation |
-| Read-only | Editable |
+| Left Panel (Source)                                        | Right Panel (Translation)                        |
+| ---------------------------------------------------------- | ------------------------------------------------ |
+| English source document                                    | Your translation                                 |
+| Read-only                                                  | Editable                                         |
 | Toggle: **Raw** (code) / **Formatted** (rendered Markdown) | Toggle: **Edit** (code) / **Preview** (rendered) |
 
 **Tips:**
+
 - Use **Raw** view on the source to see exact Markdown formatting (frontmatter, headings, links)
 - Copy the source structure into your translation, then translate the text
 - Preserve Markdown syntax: `**bold**`, `*italic*`, `> blockquotes`, `# headings`
@@ -225,10 +226,10 @@ The translation interface has two panels:
 
 ### Saving and Submitting
 
-| Action | What It Does | Status After |
-|--------|-------------|-------------|
-| **Save Draft** | Saves your work, you can continue later | `In Progress` |
-| **Submit for Review** | Sends the translation for review | `Pending Review` |
+| Action                | What It Does                            | Status After     |
+| --------------------- | --------------------------------------- | ---------------- |
+| **Save Draft**        | Saves your work, you can continue later | `In Progress`    |
+| **Submit for Review** | Sends the translation for review        | `Pending Review` |
 
 Drafts are auto-saved every 5 seconds while you type.
 
@@ -280,9 +281,9 @@ This adds a "Waiting for final label" to the document, which is visible on the *
 
 ### Approving or Requesting Changes
 
-| Action | What It Does | Status After |
-|--------|-------------|-------------|
-| **Approve** | Translation is ready for deployment | `Approved` |
+| Action              | What It Does                           | Status After  |
+| ------------------- | -------------------------------------- | ------------- |
+| **Approve**         | Translation is ready for deployment    | `Approved`    |
 | **Request Changes** | Sends back to translator with feedback | `In Progress` |
 
 When requesting changes, always leave comments or suggestions explaining what needs to be fixed.
@@ -390,29 +391,29 @@ The complete lifecycle of a document from creation to deployment:
 
 Both translators and deployers can create, translate, review, and approve documents. The key difference is that only deployers can deploy and access admin features.
 
-| Permission | Translator | Deployer |
-|-----------|:----------:|:--------:|
-| Create documents | Yes | Yes |
-| Translate documents | Yes | Yes |
-| Review & approve translations | Yes | Yes |
-| Add comments & suggestions | Yes | Yes |
-| Deploy translations | No | Yes |
-| Manage languages | No | Yes |
-| Manage projects | No | Yes |
-| Manage users | No | Yes |
+| Permission                    | Translator | Deployer |
+| ----------------------------- | :--------: | :------: |
+| Create documents              |    Yes     |   Yes    |
+| Translate documents           |    Yes     |   Yes    |
+| Review & approve translations |    Yes     |   Yes    |
+| Add comments & suggestions    |    Yes     |   Yes    |
+| Deploy translations           |     No     |   Yes    |
+| Manage languages              |     No     |   Yes    |
+| Manage projects               |     No     |   Yes    |
+| Manage users                  |     No     |   Yes    |
 
 ### Project Roles
 
 Within each Translation Project, members can be assigned roles. These roles primarily control **document assignment** and **project management** capabilities. Note that review and approval permissions are currently open to all users at the global level.
 
-*Note: This is still in progress and it will be changed. We will move from "language" permissions to project permissions.*
+_Note: This is still in progress and it will be changed. We will move from "language" permissions to project permissions._
 
-| Project Role | Primary Purpose |
-|-------------|----------------|
+| Project Role        | Primary Purpose                                                            |
+| ------------------- | -------------------------------------------------------------------------- |
 | **Project Manager** | Assign documents to team members, manage project membership, set deadlines |
-| **Reviewer** | Designated reviewer for assigned translations |
-| **Editor** | Edit translations directly |
-| **Translator** | Translate assigned documents |
+| **Reviewer**        | Designated reviewer for assigned translations                              |
+| **Editor**          | Edit translations directly                                                 |
+| **Translator**      | Translate assigned documents                                               |
 
 ---
 
@@ -420,9 +421,9 @@ Within each Translation Project, members can be assigned roles. These roles prim
 
 Two floating buttons are available in the bottom-right corner of every page:
 
-| Button | Icon | Purpose |
-|--------|------|---------|
-| **Support** | Life buoy | Opens the general support portal for questions, help requests, and feature suggestions |
-| **Report a bug** | Bug | Opens a pre-filled bug report form that automatically includes the URL of the page you were on |
+| Button           | Icon      | Purpose                                                                                        |
+| ---------------- | --------- | ---------------------------------------------------------------------------------------------- |
+| **Support**      | Life buoy | Opens the general support portal for questions, help requests, and feature suggestions         |
+| **Report a bug** | Bug       | Opens a pre-filled bug report form that automatically includes the URL of the page you were on |
 
 Both links open the Jira Service Desk in a new tab. Use **Report a bug** when something is broken or behaving unexpectedly, and **Support** for general questions or requests.

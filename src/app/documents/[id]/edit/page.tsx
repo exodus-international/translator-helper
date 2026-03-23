@@ -5,11 +5,7 @@ import { isDeployer } from '@/lib/permissions';
 import { notFound, redirect } from 'next/navigation';
 import EditDocumentClient from './page.client';
 
-export default async function EditDocumentPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function EditDocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -33,10 +29,6 @@ export default async function EditDocumentPage({
   const sourceProjects = await listSourceProjectsAction();
 
   return (
-    <EditDocumentClient
-      document={document}
-      sourceVersion={sourceVersion || null}
-      sourceProjects={sourceProjects}
-    />
+    <EditDocumentClient document={document} sourceVersion={sourceVersion || null} sourceProjects={sourceProjects} />
   );
 }

@@ -65,9 +65,7 @@ export default async function TranslatePage({
   }
 
   // Fetch suggestions for the target version
-  const initialSuggestions = targetVersion
-    ? await getSuggestionsByDocumentVersion(targetVersion.id)
-    : [];
+  const initialSuggestions = targetVersion ? await getSuggestionsByDocumentVersion(targetVersion.id) : [];
 
   return (
     <TranslateClient

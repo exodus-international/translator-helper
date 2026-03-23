@@ -163,7 +163,7 @@ export async function getDashboardDocumentsAction(languageId: string, sourceProj
 
 export async function toggleDocumentLabelAction(documentId: string, label: string) {
   const user = await requireUser();
-  
+
   // Get the document to check its current labels
   const document = await getDocumentById(documentId);
   if (!document) {
@@ -173,11 +173,9 @@ export async function toggleDocumentLabelAction(documentId: string, label: strin
   // Check if label exists
   const currentLabels = document.labels || [];
   const hasLabel = currentLabels.includes(label);
-  
+
   // Toggle the label
-  const newLabels = hasLabel
-    ? currentLabels.filter((l) => l !== label)
-    : [...currentLabels, label];
+  const newLabels = hasLabel ? currentLabels.filter((l) => l !== label) : [...currentLabels, label];
 
   // Update the document directly (bypassing deployer check for label toggling)
   // This allows reviewers to toggle labels when documents are in PENDING_REVIEW

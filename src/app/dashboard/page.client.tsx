@@ -283,7 +283,9 @@ export default function DashboardClient({
     for (const v of approvedVersions) {
       langMap.set(v.language.id, v.language.name);
     }
-    return Array.from(langMap.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(langMap.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [approvedVersions]);
 
   const filteredApprovedVersions = useMemo(() => {
@@ -373,14 +375,17 @@ export default function DashboardClient({
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">My Projects</h2>
             {isDeployerClient(user) && (
-              <Dialog open={createDialogOpen} onOpenChange={(open) => {
-                setCreateDialogOpen(open);
-                if (!open) {
-                  setNewProjectName('');
-                  setNewProjectDescription('');
-                  setNewProjectIdentifier('');
-                }
-              }}>
+              <Dialog
+                open={createDialogOpen}
+                onOpenChange={(open) => {
+                  setCreateDialogOpen(open);
+                  if (!open) {
+                    setNewProjectName('');
+                    setNewProjectDescription('');
+                    setNewProjectIdentifier('');
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button size="sm">
                     <Plus className="h-4 w-4 mr-1.5" />
@@ -423,7 +428,9 @@ export default function DashboardClient({
                         placeholder="e.g., exodus90, lent2026"
                         className="mt-1"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">GITHUB: Folder name in the content repository</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        GITHUB: Folder name in the content repository
+                      </p>
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -470,7 +477,9 @@ export default function DashboardClient({
                   <SelectContent>
                     <SelectItem value="all">All languages</SelectItem>
                     {deployLanguages.map((lang) => (
-                      <SelectItem key={lang.id} value={lang.id}>{lang.name}</SelectItem>
+                      <SelectItem key={lang.id} value={lang.id}>
+                        {lang.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

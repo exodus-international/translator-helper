@@ -8,11 +8,7 @@ import { getCurrentUser } from '@/lib/session';
 import { notFound, redirect } from 'next/navigation';
 import ProjectDetailClient from './page.client';
 
-export default async function ProjectDetailPage({
-  params,
-}: {
-  params: Promise<{ sourceProjectId: string }>;
-}) {
+export default async function ProjectDetailPage({ params }: { params: Promise<{ sourceProjectId: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
 

@@ -16,14 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
 import { isDeployerClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -209,11 +202,12 @@ export default function DocumentsClient({
                 {groupedDocuments.map((group) => (
                   <>
                     {/* Group header row */}
-                    <TableRow key={`group-${group.projectId || 'unassigned'}`} className="bg-gray-100/60 hover:bg-gray-100/60">
+                    <TableRow
+                      key={`group-${group.projectId || 'unassigned'}`}
+                      className="bg-gray-100/60 hover:bg-gray-100/60"
+                    >
                       <TableCell colSpan={totalColumns} className="py-2 px-4">
-                        <span className="text-sm font-semibold text-gray-700">
-                          {group.projectName}
-                        </span>
+                        <span className="text-sm font-semibold text-gray-700">{group.projectName}</span>
                         <span className="text-xs text-gray-500 ml-2">
                           ({group.docs.length} {group.docs.length === 1 ? 'document' : 'documents'})
                         </span>
@@ -242,9 +236,7 @@ export default function DocumentsClient({
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-gray-600 text-sm">
-                          {doc.originalFilename || '—'}
-                        </TableCell>
+                        <TableCell className="text-gray-600 text-sm">{doc.originalFilename || '—'}</TableCell>
                         <TableCell>
                           {doc.type ? (
                             <Badge variant="outline" className="text-xs font-normal">
@@ -289,7 +281,11 @@ export default function DocumentsClient({
                               </Link>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </AlertDialogTrigger>
@@ -297,13 +293,15 @@ export default function DocumentsClient({
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Delete Document</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Are you sure you want to delete &ldquo;{doc.title}&rdquo;? This will delete the source version and all
-                                      translation versions. This action cannot be undone.
+                                      Are you sure you want to delete &ldquo;{doc.title}&rdquo;? This will delete the
+                                      source version and all translation versions. This action cannot be undone.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteDocument(doc.id)}>Delete</AlertDialogAction>
+                                    <AlertDialogAction onClick={() => handleDeleteDocument(doc.id)}>
+                                      Delete
+                                    </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>

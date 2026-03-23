@@ -1,7 +1,4 @@
-export function validateDailyContentFilename(
-  documentType: string,
-  originalFilename: string,
-): string | null {
+export function validateDailyContentFilename(documentType: string, originalFilename: string): string | null {
   if (documentType !== 'DAILY_CONTENT') return null;
 
   if (!originalFilename) {

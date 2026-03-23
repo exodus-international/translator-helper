@@ -353,15 +353,18 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       suggestionFormDirtyRef.current = false;
     }, []);
 
-    const requestCloseSuggestionForm = useCallback((onConfirmed?: () => void) => {
-      if (!suggestionFormDirtyRef.current) {
-        doCloseSuggestionForm();
-        onConfirmed?.();
-        return;
-      }
-      pendingDiscardActionRef.current = onConfirmed ?? null;
-      setShowDiscardDialog(true);
-    }, [doCloseSuggestionForm]);
+    const requestCloseSuggestionForm = useCallback(
+      (onConfirmed?: () => void) => {
+        if (!suggestionFormDirtyRef.current) {
+          doCloseSuggestionForm();
+          onConfirmed?.();
+          return;
+        }
+        pendingDiscardActionRef.current = onConfirmed ?? null;
+        setShowDiscardDialog(true);
+      },
+      [doCloseSuggestionForm],
+    );
 
     const handleDiscardConfirm = useCallback(() => {
       doCloseSuggestionForm();
@@ -536,7 +539,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       <div
         className={cn(
           'grid border-0',
-          (hasSidebar || sidebarHeader) ? (sidebarHidden ? 'grid-cols-2' : 'grid-cols-[1fr_1fr_340px]') : 'grid-cols-2',
+          hasSidebar || sidebarHeader ? (sidebarHidden ? 'grid-cols-2' : 'grid-cols-[1fr_1fr_340px]') : 'grid-cols-2',
           className,
           isZen && 'h-full',
         )}
@@ -818,7 +821,9 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                         initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
                         onSubmit={handleSuggestionFormSubmit}
                         onCancel={() => requestCloseSuggestionForm()}
-                        onDirtyChange={(dirty) => { suggestionFormDirtyRef.current = dirty; }}
+                        onDirtyChange={(dirty) => {
+                          suggestionFormDirtyRef.current = dirty;
+                        }}
                       />
                     </div>
                   )}
@@ -903,7 +908,9 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                           initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
                           onSubmit={handleSuggestionFormSubmit}
                           onCancel={() => requestCloseSuggestionForm()}
-                          onDirtyChange={(dirty) => { suggestionFormDirtyRef.current = dirty; }}
+                          onDirtyChange={(dirty) => {
+                            suggestionFormDirtyRef.current = dirty;
+                          }}
                         />
                       </div>
                     )}
@@ -938,7 +945,12 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
           </div>
         )}
 
-        <AlertDialog open={showDiscardDialog} onOpenChange={(open) => { if (!open) handleDiscardCancel(); }}>
+        <AlertDialog
+          open={showDiscardDialog}
+          onOpenChange={(open) => {
+            if (!open) handleDiscardCancel();
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Discard unsaved suggestion?</AlertDialogTitle>

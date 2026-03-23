@@ -354,7 +354,9 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                     </Button>
                     <Button
                       type="submit"
-                      disabled={loading || !sourceProjectId || sourceProjects.length === 0 || !!dailyContentFilenameError}
+                      disabled={
+                        loading || !sourceProjectId || sourceProjects.length === 0 || !!dailyContentFilenameError
+                      }
                     >
                       {loading ? 'Creating...' : 'Create Document'}
                     </Button>

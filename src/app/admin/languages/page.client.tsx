@@ -53,9 +53,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
             branchName: branchName || null,
           });
         }
-        setLanguages(
-          languages.map((l) => (l.id === updated.id ? { ...updated, branchName: branchName || null } : l)),
-        );
+        setLanguages(languages.map((l) => (l.id === updated.id ? { ...updated, branchName: branchName || null } : l)));
       } else {
         const created = await createLanguageAction({ code, name, branchName: branchName || undefined });
         setLanguages([...languages, created]);
@@ -182,9 +180,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
                 <div>
                   <h3 className="font-semibold text-lg">{language.name}</h3>
                   <p className="text-sm text-gray-600">Code: {language.code}</p>
-                  {language.branchName && (
-                    <p className="text-xs text-gray-500">Branch: {language.branchName}</p>
-                  )}
+                  {language.branchName && <p className="text-xs text-gray-500">Branch: {language.branchName}</p>}
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => handleEdit(language)}>

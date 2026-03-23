@@ -107,13 +107,7 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
                   <div>
                     <p className="font-medium">Deploy failed</p>
                     <p className="text-sm">{commit.errorMessage}</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={handleRetry}
-                      disabled={retrying}
-                    >
+                    <Button variant="outline" size="sm" className="mt-2" onClick={handleRetry} disabled={retrying}>
                       <RefreshCw className={`h-3 w-3 mr-1 ${retrying ? 'animate-spin' : ''}`} />
                       {retrying ? 'Retrying...' : 'Retry Deploy'}
                     </Button>
@@ -123,9 +117,7 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
                 <>
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-gray-500">Commit:</span>
-                    <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">
-                      {commit.commitSha.substring(0, 7)}
-                    </code>
+                    <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">{commit.commitSha.substring(0, 7)}</code>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm">
@@ -155,9 +147,7 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
                         <span>#{commit.prNumber}</span>
                       )}
                       {commit.prStatus && (
-                        <Badge className={PR_STATUS_COLORS[commit.prStatus] || ''}>
-                          {commit.prStatus}
-                        </Badge>
+                        <Badge className={PR_STATUS_COLORS[commit.prStatus] || ''}>{commit.prStatus}</Badge>
                       )}
                     </div>
                   )}

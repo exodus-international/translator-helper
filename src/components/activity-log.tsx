@@ -215,26 +215,17 @@ function CollapsedGroupRow({ group }: { group: CollapsedEntry }) {
                 onClick={() => setExpanded(!expanded)}
                 className="inline-flex items-center gap-0.5 text-gray-400 text-xs hover:text-gray-600 transition-colors"
               >
-                {expanded ? (
-                  <ChevronDown className="h-3 w-3" />
-                ) : (
-                  <ChevronRight className="h-3 w-3" />
-                )}
+                {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 &times;{group.count}
               </button>
             ) : (
               detailText && <span className="text-gray-500">{detailText}</span>
             )}
-            <span
-              className="text-gray-400 text-xs ml-auto shrink-0"
-              title={fullDate}
-            >
+            <span className="text-gray-400 text-xs ml-auto shrink-0" title={fullDate}>
               {formatRelativeTime(group.lastTime)}
             </span>
           </div>
-          <div className="text-xs text-gray-400">
-            by {representative.user.name || representative.user.email}
-          </div>
+          <div className="text-xs text-gray-400">by {representative.user.name || representative.user.email}</div>
         </div>
       </div>
       {isCollapsible && expanded && (

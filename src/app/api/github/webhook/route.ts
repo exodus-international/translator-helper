@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
 
-  console.log(`${LOG_PREFIX} PR #${payload.pull_request.number} — action: ${payload.action}, merged: ${payload.pull_request.merged}`);
+  console.log(
+    `${LOG_PREFIX} PR #${payload.pull_request.number} — action: ${payload.action}, merged: ${payload.pull_request.merged}`,
+  );
 
   if (payload.action !== 'closed') {
     console.log(`${LOG_PREFIX} Ignoring action: ${payload.action} (only handling "closed")`);
@@ -65,8 +67,5 @@ export async function POST(request: NextRequest) {
   }
 
   console.log(`${LOG_PREFIX} Done — updated ${commits.length} commit(s) to ${newStatus}`);
-  return NextResponse.json(
-    { message: `Updated ${commits.length} commit(s) to ${newStatus}` },
-    { status: 200 },
-  );
+  return NextResponse.json({ message: `Updated ${commits.length} commit(s) to ${newStatus}` }, { status: 200 });
 }
