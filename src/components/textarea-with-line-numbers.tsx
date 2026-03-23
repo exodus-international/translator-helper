@@ -68,6 +68,10 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
       return;
     }
 
+    // Only move cursor if the editor currently has focus — otherwise
+    // setPosition steals focus from other inputs (e.g. reply input)
+    if (!editor.hasTextFocus()) return;
+
     // Set cursor position to the highlighted line
     // This will trigger Monaco's native blue line highlight
     ignoreNextCursorEventRef.current = true;

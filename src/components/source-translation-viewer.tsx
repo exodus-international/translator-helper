@@ -280,7 +280,6 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
             );
             editor.revealRangeInCenter(range);
             editor.setSelection(range);
-            editor.focus();
           }
 
           // Always sync both panes for context

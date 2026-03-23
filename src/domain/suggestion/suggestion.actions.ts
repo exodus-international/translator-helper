@@ -4,9 +4,8 @@ import { authorize } from '@/lib/authorize';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
-import { getDocumentById } from '../document/document.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
-import { getTranslationProjectBySourceAndLanguage } from '../translation-project/translation-project.repository';
+import { resolveTranslationProject } from '../document-version/resolve-translation-project';
 import {
   applySuggestionSchema,
   createSuggestionReplySchema,
@@ -47,23 +46,7 @@ export async function createSuggestionAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = createSuggestionSchema.parse(input);
 
-  // Get document version to check permissions
-  const documentVersion = await getDocumentVersionById(validated.documentVersionId);
-  if (!documentVersion) {
-    throw new Error('Document version not found');
-  }
-
-  // Get document to find source project
-  const document = await getDocumentById(documentVersion.documentId);
-  if (!document || !document.sourceProjectId) {
-    throw new Error('Document not found or not associated with a source project');
-  }
-
-  // Get translation project
-  const translationProject = await getTranslationProjectBySourceAndLanguage(
-    document.sourceProjectId,
-    documentVersion.languageId,
-  );
+  const { version: documentVersion, translationProject } = await resolveTranslationProject(validated.documentVersionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'reviewer' });
@@ -141,23 +124,7 @@ export async function applySuggestionAction(input: unknown) {
     throw new Error('Cannot apply a suggestion without a text range');
   }
 
-  // Get document version
-  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
-  if (!documentVersion) {
-    throw new Error('Document version not found');
-  }
-
-  // Get document to find source project
-  const document = await getDocumentById(documentVersion.documentId);
-  if (!document || !document.sourceProjectId) {
-    throw new Error('Document not found or not associated with a source project');
-  }
-
-  // Get translation project
-  const translationProject = await getTranslationProjectBySourceAndLanguage(
-    document.sourceProjectId,
-    documentVersion.languageId,
-  );
+  const { version: documentVersion, translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'translator' });
@@ -249,23 +216,7 @@ export async function dismissSuggestionAction(input: unknown) {
     throw new Error('Only open suggestions can be dismissed');
   }
 
-  // Get document version
-  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
-  if (!documentVersion) {
-    throw new Error('Document version not found');
-  }
-
-  // Get document to find source project
-  const document = await getDocumentById(documentVersion.documentId);
-  if (!document || !document.sourceProjectId) {
-    throw new Error('Document not found or not associated with a source project');
-  }
-
-  // Get translation project
-  const translationProject = await getTranslationProjectBySourceAndLanguage(
-    document.sourceProjectId,
-    documentVersion.languageId,
-  );
+  const { version: documentVersion, translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'translator' });
@@ -311,21 +262,7 @@ export async function reopenSuggestionAction(input: unknown) {
     throw new Error('Suggestion is already open');
   }
 
-  // Get document version to check permissions
-  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
-  if (!documentVersion) {
-    throw new Error('Document version not found');
-  }
-
-  const document = await getDocumentById(documentVersion.documentId);
-  if (!document || !document.sourceProjectId) {
-    throw new Error('Document not found or not associated with a source project');
-  }
-
-  const translationProject = await getTranslationProjectBySourceAndLanguage(
-    document.sourceProjectId,
-    documentVersion.languageId,
-  );
+  const { version: documentVersion, translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, roles: ['reviewer', 'translator'] });

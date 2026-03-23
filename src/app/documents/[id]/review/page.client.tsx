@@ -147,10 +147,11 @@ function ReviewInner({
     }
   }, [initialActivityLogs]);
 
-  // Refresh suggestions when content changes
+  // Refresh suggestions when the version changes (not on every content change,
+  // which would cause focus loss in reply inputs due to list re-rendering)
   useEffect(() => {
     reloadSuggestions();
-  }, [targetVersion?.id, content, reloadSuggestions]);
+  }, [targetVersion?.id, reloadSuggestions]);
 
   // ─── Derived values ─────────────────────────────────────
   const canEditSourceBase = isAdminClient(user);
