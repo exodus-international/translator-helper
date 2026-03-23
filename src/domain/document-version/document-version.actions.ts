@@ -8,6 +8,7 @@ import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log
 import { createComment } from '../comment/comment.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
 import { validateTransition } from './document-version.transitions';
+import { resolveTranslationProject } from './resolve-translation-project';
 import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
@@ -197,24 +198,7 @@ export async function reviewVersionAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = reviewVersionSchema.parse(input);
 
-  // Get current version to check if it has content
-  const currentVersion = await getDocumentVersionById(validated.versionId);
-
-  if (!currentVersion) {
-    throw new Error('Document version not found');
-  }
-
-  // Get document to find source project
-  const document = await getDocumentById(currentVersion.documentId);
-  if (!document || !document.sourceProjectId) {
-    throw new Error('Document not found or not associated with a source project');
-  }
-
-  // Get translation project
-  const translationProject = await getTranslationProjectBySourceAndLanguage(
-    document.sourceProjectId,
-    currentVersion.languageId,
-  );
+  const { version: currentVersion, translationProject } = await resolveTranslationProject(validated.versionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'reviewer' });
