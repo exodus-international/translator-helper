@@ -49,7 +49,7 @@ describe('validateTransition', () => {
       );
     });
 
-    it('DEPLOYED → APPROVED', () => {
+    it('DEPLOYED → APPROVED (no guard on backward transition)', () => {
       assert.doesNotThrow(() =>
         validateTransition(DocumentStatus.DEPLOYED, DocumentStatus.APPROVED),
       );
@@ -114,9 +114,10 @@ describe('validateTransition', () => {
       );
     });
 
-    it('approve without context defaults to no guard check', () => {
-      assert.doesNotThrow(() =>
-        validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED),
+    it('approve without context throws (guard is mandatory)', () => {
+      assert.throws(
+        () => validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED),
+        { message: /requires context/ },
       );
     });
   });
