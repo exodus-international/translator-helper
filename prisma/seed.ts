@@ -64,7 +64,7 @@ async function main() {
   ];
 
   for (const user of users) {
-    auth.api.createUser({
+    const result = await auth.api.createUser({
       body: {
         email: user.email,
         name: user.name,
@@ -72,6 +72,7 @@ async function main() {
         role: user.role as Role,
       },
     });
+    console.log(`✓ User ${user.name} (${user.email}) created/updated: ${result.user.id}`);
   }
 
   console.log('Database seeding completed!');
