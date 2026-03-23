@@ -90,7 +90,7 @@ export function createAuthorize(deps: AuthorizeDeps = defaultDeps) {
       return { user, projectRoles };
     }
 
-    return { user };
+    throw new Error(`Unknown permission type`);
   };
 }
 

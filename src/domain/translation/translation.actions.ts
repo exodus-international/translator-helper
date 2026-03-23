@@ -1,12 +1,12 @@
 'use server';
 
 import { getLanguageById } from '@/domain/language/language.repository';
-import { requireUser } from '@/lib/session';
+import { authorize } from '@/lib/authorize';
 import { translateWithChatGPT } from './translation.service';
 import { translateDocumentSchema } from './translation.types';
 
 export async function translateDocumentAction(input: unknown) {
-  await requireUser();
+  await authorize('authenticated');
 
   const validated = translateDocumentSchema.parse(input);
   const targetLanguage = await getLanguageById(validated.targetLanguageId);
