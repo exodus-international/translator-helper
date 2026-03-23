@@ -3,29 +3,44 @@
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface SuggestionInlineToolbarProps {
   onComment: () => void;
   onSuggestEdit: () => void;
   position: { x: number; y: number };
+  /** Ref to the container element for computing viewport-relative position */
+  containerRef?: React.RefObject<HTMLElement | null>;
 }
 
-export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position }: SuggestionInlineToolbarProps) {
+export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position, containerRef }: SuggestionInlineToolbarProps) {
   const [isVisible, setIsVisible] = useState(true);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [adjustedLeft, setAdjustedLeft] = useState(position.x);
+  const [coords, setCoords] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
 
   useEffect(() => {
+    const container = containerRef?.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const viewportX = rect.left + position.x;
+    const viewportY = rect.top + position.y;
+
+    // Position above the selection by default
+    let top = viewportY - 46;
+    // If that would go off-screen, position below instead
+    if (top < 8) {
+      top = viewportY + 28;
+    }
+
+    // Clamp left to stay within viewport
     const el = toolbarRef.current;
-    if (!el) return;
-    const toolbarWidth = el.offsetWidth;
-    // Measure the nearest positioned ancestor (the "relative" container)
-    const parent = el.offsetParent as HTMLElement | null;
-    const parentWidth = parent?.clientWidth ?? Infinity;
-    const maxLeft = parentWidth - toolbarWidth - 8;
-    setAdjustedLeft(Math.max(8, Math.min(position.x, maxLeft)));
-  }, [position.x]);
+    const toolbarWidth = el?.offsetWidth ?? 200;
+    const left = Math.max(8, Math.min(viewportX, window.innerWidth - toolbarWidth - 8));
+
+    setCoords({ left, top });
+  }, [position.x, position.y, containerRef]);
 
   useEffect(() => {
     return () => {
@@ -50,17 +65,13 @@ export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position }: 
 
   if (!isVisible) return null;
 
-  console.log('adjustedLeft', adjustedLeft);
-  console.log('position.x', position.x);
-  // console.log('containerWidth', containerWidth);
-
-  return (
+  const toolbar = (
     <div
       ref={toolbarRef}
-      className="absolute z-50 flex gap-1 bg-white border border-gray-300 rounded-md shadow-lg p-1"
+      className="fixed z-[100] flex gap-1 bg-white border border-gray-300 rounded-md shadow-lg p-1"
       style={{
-        left: `${adjustedLeft}px`,
-        top: `${position.y - 70}px`,
+        left: `${coords.left}px`,
+        top: `${coords.top}px`,
       }}
       onMouseLeave={handleMouseLeave}
       onMouseEnter={handleMouseEnter}
@@ -91,4 +102,6 @@ export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position }: 
       </Button>
     </div>
   );
+
+  return createPortal(toolbar, document.body);
 }
