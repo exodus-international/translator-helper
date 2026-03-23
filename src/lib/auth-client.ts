@@ -12,8 +12,8 @@ const statement = {
 
 const ac = createAccessControl(statement);
 
-// Define DEPLOYER role with all admin permissions
-const deployer = ac.newRole({
+// Define ADMIN role with all admin permissions
+const adminRole = ac.newRole({
   user: ['create', 'read', 'update', 'delete', 'ban', 'unban'],
   session: ['read', 'delete', 'revoke'],
 });
@@ -24,7 +24,7 @@ export const authClient = createAuthClient({
     adminClient({
       ac,
       roles: {
-        DEPLOYER: deployer,
+        ADMIN: adminRole,
       },
     }),
   ],

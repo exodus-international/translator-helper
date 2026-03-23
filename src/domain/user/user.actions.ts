@@ -9,7 +9,7 @@ export async function updateUserRoleAction(userId: string, role: Role) {
   const currentUser = await requireUser();
 
   // Only deployers can update roles
-  if (currentUser.role !== Role.DEPLOYER) {
+  if (currentUser.role !== Role.ADMIN) {
     throw new Error('Forbidden: Only deployers can update user roles');
   }
 
@@ -25,7 +25,7 @@ export async function listUsersAction() {
   const currentUser = await requireUser();
 
   // Only deployers can list all users
-  if (currentUser.role !== Role.DEPLOYER) {
+  if (currentUser.role !== Role.ADMIN) {
     throw new Error('Forbidden: Only deployers can list users');
   }
 

@@ -1,6 +1,6 @@
 'use server';
 
-import { canReviewInProject, canTranslateInProject, isDeployer } from '@/lib/permissions';
+import { canReviewInProject, canTranslateInProject, isAdmin } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
@@ -74,7 +74,7 @@ export async function createSuggestionAction(input: unknown) {
     }
   } else {
     // Fallback: check basic review permission
-    if (!isDeployer(user)) {
+    if (!isAdmin(user)) {
       throw new Error('You do not have permission to create suggestions');
     }
   }
@@ -175,7 +175,7 @@ export async function applySuggestionAction(input: unknown) {
     }
   } else {
     // Fallback: check basic permissions
-    if (!isDeployer(user)) {
+    if (!isAdmin(user)) {
       throw new Error('You do not have permission to apply suggestions');
     }
   }
@@ -290,7 +290,7 @@ export async function dismissSuggestionAction(input: unknown) {
     }
   } else {
     // Fallback: check basic permissions
-    if (!isDeployer(user)) {
+    if (!isAdmin(user)) {
       throw new Error('You do not have permission to dismiss suggestions');
     }
   }
@@ -359,7 +359,7 @@ export async function reopenSuggestionAction(input: unknown) {
       }
     }
   } else {
-    if (!isDeployer(user)) {
+    if (!isAdmin(user)) {
       throw new Error('You do not have permission to reopen suggestions');
     }
   }

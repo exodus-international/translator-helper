@@ -53,13 +53,13 @@ async function main() {
       email: 'admin@example.org',
       name: 'Admin',
       password: 'Hello123456',
-      role: Role.DEPLOYER,
+      role: Role.ADMIN,
     },
     {
       email: 'user@example.org',
       name: 'User',
       password: 'Hello123456',
-      role: Role.TRANSLATOR,
+      role: Role.USER,
     },
   ];
 

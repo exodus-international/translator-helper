@@ -206,7 +206,7 @@ export function StatusDropdown({
   };
 
   const translatorCannotChangeDeployedDocumentStatus =
-    user.role === 'TRANSLATOR' && displayedStatus === DocumentStatus.DEPLOYED;
+    user.role === 'USER' && displayedStatus === DocumentStatus.DEPLOYED;
 
   // Prevent hydration mismatch by only rendering after mount
   if (!mounted) {
@@ -266,7 +266,7 @@ export function StatusDropdown({
             const isDisabled =
               isCurrentStatus ||
               loading ||
-              (user.role === 'TRANSLATOR' && status === DocumentStatus.DEPLOYED) ||
+              (user.role === 'USER' && status === DocumentStatus.DEPLOYED) ||
               isBlockedByOpenSuggestions;
 
             return (

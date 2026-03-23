@@ -35,7 +35,7 @@ import {
 } from '@/domain/document-version/document-version.actions';
 import { translateDocumentAction } from '@/domain/translation/translation.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
-import { isDeployerClient } from '@/lib/permissions-client';
+import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import { useAutoSave } from '@/lib/stores/hooks';
@@ -204,7 +204,7 @@ function TranslateInner({
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const viewerRef = useRef<SourceTranslationViewerHandle>(null);
 
-  const canEditSource = isDeployerClient(user);
+  const canEditSource = isAdminClient(user);
   const statusSteps = DOCUMENT_STATUS_SEQUENCE.map((status, index) => ({
     status,
     step: index + 1,
@@ -409,7 +409,7 @@ function TranslateInner({
                     onStatusChange={handleStatusChange}
                     onReviewRequested={handleOpenReviewDialog}
                   />
-                  {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
+                  {targetVersion.status === 'PENDING_TRANSLATION' && isAdminClient(user) && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -512,7 +512,7 @@ function TranslateInner({
                       Submit
                     </Button>
                   )}
-                  {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
+                  {targetVersion.status === 'PENDING_TRANSLATION' && isAdminClient(user) && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="outline" size="sm" disabled={loading || isAnyLoading}>
@@ -591,14 +591,14 @@ function TranslateInner({
                   reviewer={targetVersion.reviewer || reviewer}
                   language={targetVersion.language?.name}
                   onAssignTranslator={
-                    isDeployerClient(user) &&
+                    isAdminClient(user) &&
                     translationProject &&
                     (targetVersion.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion.user)
                       ? openAssignTranslatorDialog
                       : undefined
                   }
                   onUnassignTranslator={
-                    isDeployerClient(user) &&
+                    isAdminClient(user) &&
                     assignment?.id &&
                     targetVersion.user &&
                     targetVersion.status === DocumentStatus.PENDING_TRANSLATION
@@ -606,14 +606,14 @@ function TranslateInner({
                       : undefined
                   }
                   onAssignReviewer={
-                    isDeployerClient(user) &&
+                    isAdminClient(user) &&
                     translationProject &&
                     targetVersion.status === DocumentStatus.PENDING_TRANSLATION
                       ? openAssignReviewerDialog
                       : undefined
                   }
                   onUnassignReviewer={
-                    isDeployerClient(user) &&
+                    isAdminClient(user) &&
                     targetVersion.reviewer &&
                     targetVersion.status === DocumentStatus.PENDING_TRANSLATION
                       ? unassignReviewer

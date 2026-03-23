@@ -21,11 +21,11 @@ export async function listSourceProjects(options?: { includeComplete?: boolean }
   });
 }
 
-export async function getSourceProjectsForUser(userId: string, isDeployer: boolean) {
+export async function getSourceProjectsForUser(userId: string, isAdmin: boolean) {
   return prisma.sourceProject.findMany({
     where: {
       status: 'ACTIVE',
-      ...(!isDeployer
+      ...(!isAdmin
         ? {
             translationProjects: {
               some: {

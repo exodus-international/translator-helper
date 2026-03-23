@@ -25,7 +25,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       id: session.user.id,
       email: session.user.email,
       name: session.user.name,
-      role: (session.user.role as Role) || Role.TRANSLATOR,
+      role: (session.user.role as Role) || Role.USER,
       image: session.user.image,
       banned: (session.user as any).banned || false,
     };

@@ -22,7 +22,7 @@ import { deployVersionAction, updateDocumentVersionAction } from '@/domain/docum
 import { toggleDocumentLabelAction } from '@/domain/document/document.actions';
 import { editSuggestionAction } from '@/domain/suggestion/suggestion.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
-import { canReviewClient, isDeployerClient } from '@/lib/permissions-client';
+import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import { DocumentStatus, SuggestionStatus } from '@prisma/client';
@@ -153,7 +153,7 @@ function ReviewInner({
   }, [targetVersion?.id, content, reloadSuggestions]);
 
   // ─── Derived values ─────────────────────────────────────
-  const canEditSourceBase = isDeployerClient(user);
+  const canEditSourceBase = isAdminClient(user);
   const canCreateSuggestionsBase = canReviewClient(user);
   const isApprovedOrLater =
     targetVersion?.status === DocumentStatus.APPROVED || targetVersion?.status === DocumentStatus.DEPLOYED;
@@ -401,28 +401,28 @@ function ReviewInner({
                 reviewer={targetVersion?.reviewer}
                 language={targetVersion?.language?.name}
                 onAssignTranslator={
-                  isDeployerClient(user) &&
+                  isAdminClient(user) &&
                   translationProjectId &&
                   (targetVersion?.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion?.user)
                     ? openAssignTranslatorDialog
                     : undefined
                 }
                 onUnassignTranslator={
-                  isDeployerClient(user) &&
+                  isAdminClient(user) &&
                   targetVersion?.user &&
                   targetVersion?.status === DocumentStatus.PENDING_TRANSLATION
                     ? unassignTranslator
                     : undefined
                 }
                 onAssignReviewer={
-                  isDeployerClient(user) &&
+                  isAdminClient(user) &&
                   translationProjectId &&
                   (targetVersion?.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion?.reviewer)
                     ? openAssignReviewerDialog
                     : undefined
                 }
                 onUnassignReviewer={
-                  isDeployerClient(user) &&
+                  isAdminClient(user) &&
                   targetVersion?.reviewer &&
                   targetVersion?.status === DocumentStatus.PENDING_TRANSLATION
                     ? unassignReviewer

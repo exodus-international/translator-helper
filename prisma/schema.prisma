@@ -15,8 +15,8 @@ datasource db {
 }
 
 enum Role {
-  TRANSLATOR
-  DEPLOYER
+  USER
+  ADMIN
 }
 
 enum ProjectRole {
@@ -70,7 +70,7 @@ model User {
   name                String
   emailVerified       Boolean              @default(false)
   image               String?
-  role                Role                 @default(TRANSLATOR)
+  role                Role                 @default(USER)
   banned              Boolean              @default(false)
   banReason           String?
   banExpires          DateTime?
