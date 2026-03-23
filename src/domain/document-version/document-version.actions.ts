@@ -168,6 +168,8 @@ export async function submitForReviewAction(input: unknown) {
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'member' });
+  } else {
+    await authorize('admin');
   }
 
   const version = await updateDocumentVersionStatus(

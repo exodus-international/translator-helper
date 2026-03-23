@@ -3,8 +3,7 @@ import { listDocumentsAction } from '@/domain/document/document.actions';
 import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
 import { getTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
 import { listUsersAction } from '@/domain/user/user.actions';
-import { canAssignDocuments } from '@/lib/permissions';
-import { getCurrentUser } from '@/lib/session';
+import { authorize } from '@/lib/authorize';
 import { notFound, redirect } from 'next/navigation';
 import TranslationProjectClient from './page.client';
 
@@ -13,12 +12,6 @@ export default async function TranslationProjectPage({
 }: {
   params: Promise<{ sourceProjectId: string; translationProjectId: string }>;
 }) {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
   const { sourceProjectId, translationProjectId } = await params;
   const translationProject = await getTranslationProjectAction(translationProjectId);
 
@@ -27,8 +20,9 @@ export default async function TranslationProjectPage({
   }
 
   // Check if user can manage this project (must be PM or ADMIN)
-  const canManage = await canAssignDocuments(user, translationProjectId);
-  if (!canManage) {
+  try {
+    await authorize({ project: translationProjectId, role: 'manager' });
+  } catch {
     redirect('/dashboard');
   }
 

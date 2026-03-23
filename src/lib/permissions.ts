@@ -26,13 +26,3 @@ export async function canManageSourceProject(user: SessionUser, sourceProjectId:
 
   return await isUserProjectManagerForSourceProjectRepo(user.id, sourceProjectId);
 }
-
-export async function canAssignDocuments(user: SessionUser, translationProjectId: string): Promise<boolean> {
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const { getUserRolesInProject } = await import('@/domain/project-member/project-member.repository');
-  const roles = await getUserRolesInProject(user.id, translationProjectId);
-  return roles.includes('PROJECT_MANAGER');
-}
