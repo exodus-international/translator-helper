@@ -21,8 +21,8 @@ export async function listSourceProjectsAction(options?: { includeComplete?: boo
 
 export async function getSourceProjectsForUserAction() {
   const user = await requireUser();
-  const isDeployerUser = user.role === 'DEPLOYER';
-  return await getSourceProjectsForUser(user.id, isDeployerUser);
+  const isAdminUser = user.role === 'ADMIN';
+  return await getSourceProjectsForUser(user.id, isAdminUser);
 }
 
 export async function getSourceProjectAction(id: string) {

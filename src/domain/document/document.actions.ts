@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { isDeployer } from '@/lib/permissions';
+import { isAdmin } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 import { DocumentStatus } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
@@ -95,7 +95,7 @@ export async function updateDocumentAction(id: string, input: unknown) {
   const user = await requireUser();
 
   // Only deployers can update documents (since documents contain source versions)
-  if (!isDeployer(user)) {
+  if (!isAdmin(user)) {
     throw new Error('Forbidden: Only deployers can edit documents');
   }
 
@@ -110,7 +110,7 @@ export async function deleteDocumentAction(id: string) {
   const user = await requireUser();
 
   // Only deployers can delete documents
-  if (!isDeployer(user)) {
+  if (!isAdmin(user)) {
     throw new Error('Forbidden: Only deployers can delete documents');
   }
 
@@ -122,7 +122,7 @@ export async function deleteDocumentActionVoid(id: string): Promise<void> {
   const user = await requireUser();
 
   // Only deployers can delete documents
-  if (!isDeployer(user)) {
+  if (!isAdmin(user)) {
     throw new Error('Forbidden: Only deployers can delete documents');
   }
 

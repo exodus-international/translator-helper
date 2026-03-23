@@ -1,7 +1,7 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { canDeploy, canReviewInProject, canTranslateInProject, isDeployer, isProjectMember } from '@/lib/permissions';
+import { canDeploy, canReviewInProject, canTranslateInProject, isAdmin, isProjectMember } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 import { DocumentStatus, ProjectRole } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
@@ -38,7 +38,7 @@ export async function getDocumentVersionAction(id: string) {
 
 export async function assignReviewerToVersionAction(versionId: string, reviewerId: string | null) {
   const user = await requireUser();
-  if (!isDeployer(user)) {
+  if (!isAdmin(user)) {
     throw new Error('Forbidden: Only deployers can pre-assign reviewers');
   }
 
@@ -101,7 +101,7 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
 
   // If this is a source (English) version, only deployers can edit it
   if (language.code === 'en') {
-    if (!isDeployer(user)) {
+    if (!isAdmin(user)) {
       throw new Error('Forbidden: Only deployers can edit source (English) document versions');
     }
   } else {
@@ -335,7 +335,7 @@ export async function deleteDocumentVersionAction(id: string) {
 
   // If this is a source (English) version, only deployers can delete it
   if (language.code === 'en') {
-    if (!isDeployer(user)) {
+    if (!isAdmin(user)) {
       throw new Error('Forbidden: Only deployers can delete source (English) document versions');
     }
   }
@@ -456,7 +456,7 @@ export async function assignDocumentVersionAction(input: unknown) {
       languageId: validated.languageId,
     });
 
-    // If user is not a deployer, add them as a member with TRANSLATOR role
+    // If user is not an admin, add them as a member with TRANSLATOR role
     // (Deployers have access to all projects automatically)
     if (!canDeploy(user)) {
       // Fetch the created project to get its ID
@@ -577,7 +577,7 @@ export async function assignDocumentVersionAction(input: unknown) {
 
 export async function getApprovedVersionsAction() {
   const user = await requireUser();
-  if (!isDeployer(user)) {
+  if (!isAdmin(user)) {
     return [];
   }
 

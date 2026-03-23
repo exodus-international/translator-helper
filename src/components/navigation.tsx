@@ -37,7 +37,7 @@ export function Navigation({ user }: NavigationProps) {
                 Dashboard
               </Link>
 
-              {user.role === 'DEPLOYER' && (
+              {user.role === 'ADMIN' && (
                 <>
                   <Link href="/documents" className="text-sm text-gray-600 hover:text-gray-900">
                     Documents
@@ -59,7 +59,7 @@ export function Navigation({ user }: NavigationProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {user.role === 'DEPLOYER' && (
+            {user.role === 'ADMIN' && (
               <Button variant="outline" size="sm">
                 <Link href="/documents/new" className="flex items-center gap-2">
                   <FilePlus className="h-4 w-4" /> New

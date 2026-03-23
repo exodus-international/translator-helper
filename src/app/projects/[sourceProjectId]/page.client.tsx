@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { updateSourceProjectAction } from '@/domain/source-project/source-project.actions';
-import { isDeployerClient } from '@/lib/permissions-client';
+import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { Language } from '@prisma/client';
 import { ArrowLeft, BarChart3, CheckCircle2, LayoutDashboard, Settings, Users } from 'lucide-react';
@@ -96,7 +96,7 @@ export default function ProjectDetailClient({
   const selectedTranslationProject = translationProjects.find((tp) => tp.languageId === selectedLanguage);
 
   const canManageTeam =
-    isDeployerClient(user) || selectedTranslationProject?.members?.some((m) => m.userId === user.id);
+    isAdminClient(user) || selectedTranslationProject?.members?.some((m) => m.userId === user.id);
 
   const handleSaveSettings = async () => {
     setSettingsSaving(true);
@@ -173,7 +173,7 @@ export default function ProjectDetailClient({
               <BarChart3 className="h-4 w-4" />
               Statistics
             </TabsTrigger>
-            {isDeployerClient(user) && (
+            {isAdminClient(user) && (
               <TabsTrigger value="settings" className="flex items-center gap-1.5">
                 <Settings className="h-4 w-4" />
                 Settings
@@ -195,7 +195,7 @@ export default function ProjectDetailClient({
             <ProjectTeamTab
               translationProjectId={selectedTranslationProject?.id || null}
               user={user}
-              canManage={isDeployerClient(user)}
+              canManage={isAdminClient(user)}
               selectedLanguageName={languages.find((l) => l.id === selectedLanguage)?.name || ''}
             />
           </TabsContent>
@@ -208,7 +208,7 @@ export default function ProjectDetailClient({
             />
           </TabsContent>
 
-          {isDeployerClient(user) && (
+          {isAdminClient(user) && (
             <TabsContent value="settings" className="mt-4">
               <div className="max-w-2xl space-y-6">
                 <Card>

@@ -8,21 +8,21 @@ import { SessionUser } from './session';
  * These functions only check user roles and don't access the database.
  */
 export function canDeployClient(user: SessionUser): boolean {
-  return user.role === Role.DEPLOYER;
+  return user.role === Role.ADMIN;
 }
 
-export function isDeployerClient(user: SessionUser): boolean {
-  return user.role === Role.DEPLOYER;
+export function isAdminClient(user: SessionUser): boolean {
+  return user.role === Role.ADMIN;
 }
 
-export function isTranslatorClient(user: SessionUser): boolean {
-  return user.role === Role.TRANSLATOR;
+export function isUserClient(user: SessionUser): boolean {
+  return user.role === Role.USER;
 }
 
 export function canTranslateClient(user: SessionUser): boolean {
-  return user.role === Role.TRANSLATOR || user.role === Role.DEPLOYER;
+  return user.role === Role.USER || user.role === Role.ADMIN;
 }
 
 export function canReviewClient(user: SessionUser): boolean {
-  return user.role === Role.TRANSLATOR || user.role === Role.DEPLOYER;
+  return user.role === Role.USER || user.role === Role.ADMIN;
 }

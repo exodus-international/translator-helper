@@ -1,7 +1,7 @@
 import { getDocumentById } from '@/domain/document/document.repository';
 import { listSourceProjectsAction } from '@/domain/source-project/source-project.actions';
 import { getCurrentUser } from '@/lib/session';
-import { isDeployer } from '@/lib/permissions';
+import { isAdmin } from '@/lib/permissions';
 import { notFound, redirect } from 'next/navigation';
 import EditDocumentClient from './page.client';
 
@@ -12,7 +12,7 @@ export default async function EditDocumentPage({ params }: { params: Promise<{ i
     redirect('/login');
   }
 
-  if (!isDeployer(user)) {
+  if (!isAdmin(user)) {
     redirect('/documents');
   }
 

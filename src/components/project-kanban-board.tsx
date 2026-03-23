@@ -23,7 +23,7 @@ import {
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
-import { isDeployerClient } from '@/lib/permissions-client';
+import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus, Language } from '@prisma/client';
 import { FileCheck, FileText, Search, UserPlus } from 'lucide-react';
@@ -147,7 +147,7 @@ export default function ProjectKanbanBoard({
     { id: string; userId: string; user: { id: string; name: string | null; email: string } }[]
   >([]);
 
-  const isDeployer = isDeployerClient(user);
+  const isAdmin = isAdminClient(user);
 
   useEffect(() => {
     loadDocuments();
@@ -166,7 +166,7 @@ export default function ProjectKanbanBoard({
   }
 
   useEffect(() => {
-    if (translationProjectId && isDeployer) {
+    if (translationProjectId && isAdmin) {
       listProjectMembersAction(translationProjectId)
         .then((members) => {
           const seen = new Map<string, (typeof members)[number]>();
@@ -177,7 +177,7 @@ export default function ProjectKanbanBoard({
         })
         .catch(console.error);
     }
-  }, [translationProjectId, isDeployer]);
+  }, [translationProjectId, isAdmin]);
 
   function openAssignDialog(docId: string, existingAssignmentId: string | null) {
     setAssignDocId(docId);
@@ -521,7 +521,7 @@ export default function ProjectKanbanBoard({
                                     }
 
                                     const canReassign =
-                                      isDeployer &&
+                                      isAdmin &&
                                       translationProjectId &&
                                       (!version?.status || version?.status === DocumentStatus.PENDING_TRANSLATION);
 

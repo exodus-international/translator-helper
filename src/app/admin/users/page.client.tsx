@@ -165,8 +165,8 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold text-lg">{user.name}</h3>
-                    <Badge variant={user.role === Role.DEPLOYER ? 'primary' : 'secondary'}>
-                      {user.role === Role.DEPLOYER ? <Shield className="h-3 w-3 mr-1" /> : null}
+                    <Badge variant={user.role === Role.ADMIN ? 'primary' : 'secondary'}>
+                      {user.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
                       {user.role}
                     </Badge>
                     {user.banned && (
@@ -263,8 +263,8 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={Role.TRANSLATOR}>TRANSLATOR</SelectItem>
-                  <SelectItem value={Role.DEPLOYER}>DEPLOYER</SelectItem>
+                  <SelectItem value={Role.USER}>User</SelectItem>
+                  <SelectItem value={Role.ADMIN}>Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>

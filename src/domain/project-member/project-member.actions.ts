@@ -32,7 +32,7 @@ export async function getProjectMembersByUserAndProjectAction(translationProject
 
 export async function createProjectMemberAction(input: unknown) {
   const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER or DEPLOYER can add members
+  // TODO: Add permission check - only PROJECT_MANAGER or ADMIN can add members
   // This will be implemented after permissions system is updated
 
   const validated = createProjectMemberSchema.parse(input);
@@ -52,7 +52,7 @@ export async function createProjectMemberAction(input: unknown) {
 
 export async function updateProjectMemberAction(id: string, input: unknown) {
   const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER or DEPLOYER can update members
+  // TODO: Add permission check - only PROJECT_MANAGER or ADMIN can update members
 
   const validated = updateProjectMemberSchema.parse(input);
   return await updateProjectMember(id, {
@@ -62,14 +62,14 @@ export async function updateProjectMemberAction(id: string, input: unknown) {
 
 export async function deleteProjectMemberAction(id: string) {
   const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER or DEPLOYER can remove members
+  // TODO: Add permission check - only PROJECT_MANAGER or ADMIN can remove members
 
   return await deleteProjectMember(id);
 }
 
 export async function deleteProjectMembersByUserAction(userId: string, translationProjectId: string) {
   const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER or DEPLOYER can remove members
+  // TODO: Add permission check - only PROJECT_MANAGER or ADMIN can remove members
 
   return await deleteProjectMembersByUser(userId, translationProjectId);
 }

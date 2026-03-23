@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
-import { isDeployerClient } from '@/lib/permissions-client';
+import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@prisma/client';
 import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Rocket, Search } from 'lucide-react';
@@ -374,7 +374,7 @@ export default function DashboardClient({
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">My Projects</h2>
-            {isDeployerClient(user) && (
+            {isAdminClient(user) && (
               <Dialog
                 open={createDialogOpen}
                 onOpenChange={(open) => {
@@ -460,7 +460,7 @@ export default function DashboardClient({
         </section>
 
         {/* Waiting for Deploy section - deployers only */}
-        {isDeployerClient(user) && approvedVersions.length > 0 && (
+        {isAdminClient(user) && approvedVersions.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">

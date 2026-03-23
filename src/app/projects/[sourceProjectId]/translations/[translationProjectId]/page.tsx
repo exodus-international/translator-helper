@@ -26,7 +26,7 @@ export default async function TranslationProjectPage({
     notFound();
   }
 
-  // Check if user can manage this project (must be PM or DEPLOYER)
+  // Check if user can manage this project (must be PM or ADMIN)
   const canManage = await canAssignDocuments(user, translationProjectId);
   if (!canManage) {
     redirect('/dashboard');

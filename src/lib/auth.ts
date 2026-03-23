@@ -13,13 +13,13 @@ const statement = {
 
 const ac = createAccessControl(statement);
 
-// Define DEPLOYER role with all admin permissions
-const deployer = ac.newRole({
+// Define ADMIN role with all admin permissions
+const adminRole = ac.newRole({
   user: ['create', 'read', 'update', 'delete', 'ban', 'unban'],
   session: ['read', 'delete', 'revoke'],
 });
 
-const translator = ac.newRole({
+const userRole = ac.newRole({
   user: ['create', 'read'],
   session: ['read', 'delete', 'revoke'],
 });
@@ -36,7 +36,7 @@ export const auth = betterAuth({
       role: {
         type: 'string',
         enum: Object.values(Role),
-        defaultValue: 'TRANSLATOR',
+        defaultValue: 'USER',
         required: true,
       },
     },
@@ -45,8 +45,8 @@ export const auth = betterAuth({
     admin({
       ac,
       roles: {
-        DEPLOYER: deployer,
-        TRANSLATOR: translator,
+        ADMIN: adminRole,
+        USER: userRole,
       },
     }),
   ],

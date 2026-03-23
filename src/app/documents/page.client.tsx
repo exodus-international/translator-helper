@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
-import { isDeployerClient } from '@/lib/permissions-client';
+import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { Document, DocumentStatus, Language } from '@prisma/client';
 import { FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
@@ -64,7 +64,7 @@ export default function DocumentsClient({
 }: DocumentsClientProps) {
   const [selectedSourceProject, setSelectedSourceProject] = useState<string>(initialFilters.sourceProject || 'all');
   const [searchQuery, setSearchQuery] = useState<string>(initialFilters.search || '');
-  const isDeployer = isDeployerClient(user);
+  const isAdmin = isAdminClient(user);
 
   // Filter documents
   const filteredDocuments = useMemo(() => {
@@ -126,7 +126,7 @@ export default function DocumentsClient({
     return version?.id;
   };
 
-  const totalColumns = 3 + languages.length + (isDeployer ? 1 : 0);
+  const totalColumns = 3 + languages.length + (isAdmin ? 1 : 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -195,7 +195,7 @@ export default function DocumentsClient({
                       {lang.name}
                     </TableHead>
                   ))}
-                  {isDeployer && <TableHead className="text-right min-w-[100px]">Actions</TableHead>}
+                  {isAdmin && <TableHead className="text-right min-w-[100px]">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -271,7 +271,7 @@ export default function DocumentsClient({
                             </TableCell>
                           );
                         })}
-                        {isDeployer && (
+                        {isAdmin && (
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               <Link href={`/documents/${doc.id}/edit`}>
