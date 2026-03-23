@@ -228,8 +228,12 @@ export async function reviewVersionAction(input: unknown) {
     ? DocumentStatus.APPROVED
     : DocumentStatus.IN_PROGRESS;
 
-  const openCount = await countOpenSuggestions(validated.versionId);
-  validateTransition(currentVersion.status, newStatus, { openSuggestionsCount: openCount });
+  if (validated.approved) {
+    const openCount = await countOpenSuggestions(validated.versionId);
+    validateTransition(currentVersion.status, newStatus, { openSuggestionsCount: openCount });
+  } else {
+    validateTransition(currentVersion.status, newStatus);
+  }
 
   const version = await updateDocumentVersionStatus(validated.versionId, newStatus);
 
@@ -355,8 +359,12 @@ export async function updateDocumentVersionStatusAction(
     throw new Error('Document version not found');
   }
 
-  const openCount = await countOpenSuggestions(versionId);
-  validateTransition(existingVersion.status, status, { openSuggestionsCount: openCount });
+  if (status === DocumentStatus.APPROVED || status === DocumentStatus.DEPLOYED) {
+    const openCount = await countOpenSuggestions(versionId);
+    validateTransition(existingVersion.status, status, { openSuggestionsCount: openCount });
+  } else {
+    validateTransition(existingVersion.status, status);
+  }
 
   const version = await updateDocumentVersionStatus(versionId, status);
 
@@ -505,9 +513,9 @@ export async function assignDocumentVersionAction(input: unknown) {
       throw new Error('This translation is already assigned to another user');
     }
 
-    // For any other status (PENDING_TRANSLATION, PENDING_REVIEW, etc.), assign to current user and set to IN_PROGRESS
-    // This handles the "Start Translation" action
-    // Update the version to assign it to current user and set status to IN_PROGRESS
+    // Assign to current user and set to IN_PROGRESS (bypasses validateTransition
+    // intentionally — this is the "Start Translation" flow which can re-claim
+    // a version from PENDING_TRANSLATION or reassign from other statuses)
     const version = await prisma.documentVersion.update({
       where: { id: existingVersion.id },
       data: {

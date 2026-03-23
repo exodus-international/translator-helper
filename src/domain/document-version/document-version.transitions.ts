@@ -1,7 +1,5 @@
 import { DocumentStatus } from '@prisma/client';
 
-// ─── Valid transitions map ───────────────────────────────────
-
 export const VALID_TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
   [DocumentStatus.PENDING_TRANSLATION]: [DocumentStatus.IN_PROGRESS],
   [DocumentStatus.IN_PROGRESS]: [DocumentStatus.PENDING_TRANSLATION, DocumentStatus.PENDING_REVIEW],
@@ -10,13 +8,20 @@ export const VALID_TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
   [DocumentStatus.DEPLOYED]: [DocumentStatus.APPROVED],
 };
 
-// ─── Transition context for guards ───────────────────────────
+const STATUS_ORDER: DocumentStatus[] = [
+  DocumentStatus.PENDING_TRANSLATION,
+  DocumentStatus.IN_PROGRESS,
+  DocumentStatus.PENDING_REVIEW,
+  DocumentStatus.APPROVED,
+  DocumentStatus.DEPLOYED,
+];
+
+// Guards only apply on forward transitions to these statuses
+const FORWARD_GUARDED_STATUSES: DocumentStatus[] = [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED];
 
 export interface TransitionContext {
-  openSuggestionsCount?: number;
+  openSuggestionsCount: number;
 }
-
-// ─── Validation ──────────────────────────────────────────────
 
 export function validateTransition(
   from: DocumentStatus,
@@ -25,20 +30,23 @@ export function validateTransition(
 ): void {
   const allowed = VALID_TRANSITIONS[from];
 
-  if (!allowed || !allowed.includes(to)) {
+  if (!allowed.includes(to)) {
     throw new Error(
-      `Invalid status transition: ${from} → ${to}. Allowed transitions from ${from}: ${allowed?.join(', ') || 'none'}`,
+      `Invalid status transition: ${from} → ${to}. Allowed transitions from ${from}: ${allowed.join(', ')}`,
     );
   }
 
-  // Guards
-  if (
-    (to === DocumentStatus.APPROVED || to === DocumentStatus.DEPLOYED) &&
-    context?.openSuggestionsCount !== undefined &&
-    context.openSuggestionsCount > 0
-  ) {
-    throw new Error(
-      `Cannot transition to ${to}: there are ${context.openSuggestionsCount} open suggestions that must be resolved first`,
-    );
+  // Guards only apply on forward transitions (moving up the sequence)
+  const isForward = STATUS_ORDER.indexOf(to) > STATUS_ORDER.indexOf(from);
+
+  if (isForward && FORWARD_GUARDED_STATUSES.includes(to)) {
+    if (!context) {
+      throw new Error(`Transition to ${to} requires context with openSuggestionsCount`);
+    }
+    if (context.openSuggestionsCount > 0) {
+      throw new Error(
+        `Cannot transition to ${to}: there are ${context.openSuggestionsCount} open suggestions that must be resolved first`,
+      );
+    }
   }
 }
