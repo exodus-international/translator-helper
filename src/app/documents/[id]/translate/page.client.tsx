@@ -1,7 +1,8 @@
 'use client';
 
 import { ActivityLog } from '@/components/activity-log';
-import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
+import { DocumentInfoCard } from '@/components/document-info-card';
+import { EditorDialogs } from '@/components/editor-dialogs';
 import { SourceTranslationViewer, SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Badge } from '@/components/ui/badge';
@@ -15,34 +16,6 @@ import {
   StepperTitle,
   StepperTrigger,
 } from '@/components/ui/stepper';
-import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
-import {
-  assignDocumentVersionAction,
-  createDocumentVersionAction,
-  deleteDocumentVersionAction,
-  submitForReviewAction,
-  updateDocumentVersionAction,
-} from '@/domain/document-version/document-version.actions';
-import { deleteDocumentAction } from '@/domain/document/document.actions';
-import {
-  applySuggestionAction,
-  createSuggestionAction,
-  createSuggestionReplyAction,
-  dismissSuggestionAction,
-  getSuggestionsByDocumentVersionAction,
-  reopenSuggestionAction,
-} from '@/domain/suggestion/suggestion.actions';
-import { translateDocumentAction } from '@/domain/translation/translation.actions';
-import { getStatusStep, isStepCompleted } from '@/lib/document-status';
-import { isDeployerClient } from '@/lib/permissions-client';
-import { SessionUser } from '@/lib/session';
-import { DocumentStatus, SuggestionType } from '@prisma/client';
-import matter from 'gray-matter';
-import { AlertCircle, Calendar, Check, ChevronDown, ChevronRight, Cloud, CloudOff, Loader2, Maximize2, Minimize2, Save, Send, Sparkles, Trash2, User } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,17 +27,39 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DocumentInfoCard } from '@/components/document-info-card';
-import { Input } from '@/components/ui/input';
+import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import {
-  createDocumentAssignmentAction,
-  updateDocumentAssignmentAction,
-} from '@/domain/document-assignment/document-assignment.actions';
-import { assignReviewerToVersionAction } from '@/domain/document-version/document-version.actions';
-import { getProjectReviewersAction, listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+  assignDocumentVersionAction,
+  createDocumentVersionAction,
+  deleteDocumentVersionAction,
+} from '@/domain/document-version/document-version.actions';
+import { translateDocumentAction } from '@/domain/translation/translation.actions';
+import { getStatusStep, isStepCompleted } from '@/lib/document-status';
+import { isDeployerClient } from '@/lib/permissions-client';
+import { SessionUser } from '@/lib/session';
+import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
+import { useAutoSave } from '@/lib/stores/hooks';
+import { DocumentStatus } from '@prisma/client';
+import {
+  AlertCircle,
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  Cloud,
+  CloudOff,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Save,
+  Send,
+  Sparkles,
+  Trash2,
+  User,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 interface TranslateClientProps {
   document: any;
@@ -77,10 +72,14 @@ interface TranslateClientProps {
   initialSuggestions?: any[];
 }
 
-function SaveStatusIndicator({ status, lastSavedAt }: { status: 'saved' | 'unsaved' | 'saving' | 'error'; lastSavedAt: Date | null }) {
-  const timeStr = lastSavedAt
-    ? lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : null;
+function SaveStatusIndicator({
+  status,
+  lastSavedAt,
+}: {
+  status: 'saved' | 'unsaved' | 'saving' | 'error';
+  lastSavedAt: Date | null;
+}) {
+  const timeStr = lastSavedAt ? lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
 
   switch (status) {
     case 'saving':
@@ -114,6 +113,8 @@ function SaveStatusIndicator({ status, lastSavedAt }: { status: 'saved' | 'unsav
   }
 }
 
+import matter from 'gray-matter';
+
 function getContentWithoutFrontmatter(text: string) {
   try {
     const { content: parsedContent } = matter(text);
@@ -133,108 +134,83 @@ export default function TranslateClient({
   user,
   initialSuggestions = [],
 }: TranslateClientProps) {
-  const router = useRouter();
-  const [targetVersion, setTargetVersion] = useState(initialTargetVersion);
-  const [content, setContent] = useState(initialTargetVersion?.content || '');
-  const [loading, setLoading] = useState(false);
-  const [zenMode, setZenMode] = useState(false);
-  const [suggestions, setSuggestions] = useState<SuggestionWithUser[]>(
-    initialSuggestions.map((s: any) => ({
-      ...s,
-      createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
-      replies: (s.replies || []).map((r: any) => ({
-        ...r,
-        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
-      })),
-    })) as SuggestionWithUser[],
+  return (
+    <EditorProvider
+      documentId={document.id}
+      targetVersion={initialTargetVersion}
+      sourceContent={sourceVersion.content}
+      initialSuggestions={initialSuggestions}
+      translationProjectId={translationProject?.id ?? null}
+      assignmentId={assignment?.id ?? null}
+    >
+      <TranslateInner
+        document={document}
+        sourceVersion={sourceVersion}
+        targetLanguageId={targetLanguageId}
+        translationProject={translationProject}
+        assignment={assignment}
+        user={user}
+      />
+    </EditorProvider>
   );
+}
+
+function TranslateInner({
+  document,
+  sourceVersion,
+  targetLanguageId,
+  translationProject,
+  assignment,
+  user,
+}: Omit<TranslateClientProps, 'targetVersion' | 'initialSuggestions'>) {
+  const router = useRouter();
+
+  // ─── Store state (selectors for granular re-renders) ─────
+  const targetVersion = useEditorStore((s) => s.targetVersion);
+  const content = useEditorStore((s) => s.content);
+  const setContent = useEditorStore((s) => s.setContent);
+  const suggestions = useEditorStore((s) => s.suggestions);
+  const sourceEditContent = useEditorStore((s) => s.sourceEditContent);
+  const setSourceEditContent = useEditorStore((s) => s.setSourceEditContent);
+  const saveStatus = useEditorStore((s) => s.saveStatus());
+
+  // Store actions
+  const saveContent = useEditorStore((s) => s.saveContent);
+  const saveSource = useEditorStore((s) => s.saveSource);
+  const deleteSource = useEditorStore((s) => s.deleteSource);
+  const handleStatusChange = useEditorStore((s) => s.handleStatusChange);
+  const applySuggestion = useEditorStore((s) => s.applySuggestion);
+  const dismissSuggestion = useEditorStore((s) => s.dismissSuggestion);
+  const reopenSuggestion = useEditorStore((s) => s.reopenSuggestion);
+  const createSuggestion = useEditorStore((s) => s.createSuggestion);
+  const createGeneralThread = useEditorStore((s) => s.createGeneralThread);
+  const replySuggestion = useEditorStore((s) => s.replySuggestion);
+  const openReviewDialog = useEditorStore((s) => s.openReviewDialog);
+  const openAssignTranslatorDialog = useEditorStore((s) => s.openAssignTranslatorDialog);
+  const openAssignReviewerDialog = useEditorStore((s) => s.openAssignReviewerDialog);
+  const unassignTranslator = useEditorStore((s) => s.unassignTranslator);
+  const unassignReviewer = useEditorStore((s) => s.unassignReviewer);
+  const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
+  const setTargetVersion = useEditorStore((s) => s.setTargetVersion);
+
+  // ─── Auto-save ───────────────────────────────────────────
+  useAutoSave({ delayMs: 3000 });
+
+  // ─── Local state (translate-specific) ────────────────────
+  const [zenMode, setZenMode] = useState(false);
   const [translating, setTranslating] = useState(false);
-  const [sourceEditContent, setSourceEditContent] = useState(sourceVersion.content);
-  const [sourceSaving, setSourceSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving' | 'error'>('saved');
+  const [loading, setLoading] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const savedContentRef = useRef(initialTargetVersion?.content || '');
-  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isMountedRef = useRef(true);
-  const contentRef = useRef(content);
-  const targetVersionRef = useRef(targetVersion);
-  const autoSavingRef = useRef(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const viewerRef = useRef<SourceTranslationViewerHandle>(null);
 
-  // Keep refs in sync with state
-  useEffect(() => { contentRef.current = content; }, [content]);
-  useEffect(() => { targetVersionRef.current = targetVersion; }, [targetVersion]);
-
-  // Track unsaved changes
-  useEffect(() => {
-    if (content !== savedContentRef.current) {
-      setSaveStatus('unsaved');
-    }
-  }, [content]);
-
-  // Track mount state for auto-save
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  }, []);
-
-  // Stable auto-save function that reads from refs (no state dependencies)
-  const performAutoSave = useCallback(async () => {
-    const tv = targetVersionRef.current;
-    const currentContent = contentRef.current;
-    if (!tv || tv.status === 'PENDING_TRANSLATION') return;
-    if (currentContent === savedContentRef.current) return;
-    if (autoSavingRef.current) return;
-
-    autoSavingRef.current = true;
-    setSaveStatus('saving');
-    try {
-      await updateDocumentVersionAction(tv.id, { content: currentContent });
-      if (!isMountedRef.current) return;
-      savedContentRef.current = currentContent;
-      setSaveStatus('saved');
-      setLastSavedAt(new Date());
-    } catch (error: any) {
-      if (!isMountedRef.current) return;
-      console.error('Auto-save failed:', error);
-      setSaveStatus('error');
-    } finally {
-      autoSavingRef.current = false;
-    }
-  }, []);
-
-  // Debounced auto-save: triggers 3 seconds after last edit, only depends on content
-  useEffect(() => {
-    if (!targetVersion || targetVersion.status === 'PENDING_TRANSLATION') return;
-    if (content === savedContentRef.current) return;
-
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-
-    autoSaveTimerRef.current = setTimeout(() => {
-      performAutoSave();
-    }, 3000);
-
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  }, [content, performAutoSave]); // no targetVersion dependency — read from ref inside performAutoSave
-
-  // Check if user can edit source (deployer only)
   const canEditSource = isDeployerClient(user);
   const statusSteps = DOCUMENT_STATUS_SEQUENCE.map((status, index) => ({
     status,
     step: index + 1,
     config: getDocumentStatusConfig(status),
   }));
-  const viewerRef = useRef<SourceTranslationViewerHandle>(null);
+
   const sourceFormattedContent = useMemo(
     () => getContentWithoutFrontmatter(sourceVersion.content),
     [sourceVersion.content],
@@ -244,11 +220,6 @@ export default function TranslateClient({
     [content],
   );
 
-  const handleStatusChange = (status: DocumentStatus) => {
-    setTargetVersion((prev: any | null) => (prev ? { ...prev, status } : prev));
-  };
-
-  // Extract reviewer and deployer from activity logs
   const reviewer = useMemo(() => {
     if (!targetVersion?.activityLogs) return null;
     const reviewLog = targetVersion.activityLogs.find(
@@ -257,13 +228,7 @@ export default function TranslateClient({
     return reviewLog?.user || null;
   }, [targetVersion?.activityLogs]);
 
-  const deployer = useMemo(() => {
-    if (!targetVersion?.activityLogs) return null;
-    const deployLog = targetVersion.activityLogs.find((log: any) => log.action === 'deployed');
-    return deployLog?.user || null;
-  }, [targetVersion?.activityLogs]);
-
-  // Keyboard shortcut for Zen mode (F11 or Escape)
+  // Keyboard shortcut for Zen mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F11') {
@@ -273,28 +238,18 @@ export default function TranslateClient({
         setZenMode(false);
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [zenMode]);
 
-  const handleSave = async () => {
-    // Cancel any pending auto-save
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
+  // ─── Translate-specific handlers ─────────────────────────
 
+  const handleSave = async () => {
     setLoading(true);
-    setSaveStatus('saving');
     try {
       if (targetVersion) {
-        // Update existing version
-        const updated = await updateDocumentVersionAction(targetVersion.id, {
-          content,
-        });
-        setTargetVersion(updated);
+        await saveContent();
       } else {
-        // Create new version
         const created = await createDocumentVersionAction({
           documentId: document.id,
           languageId: targetLanguageId,
@@ -302,187 +257,14 @@ export default function TranslateClient({
         });
         setTargetVersion(created);
       }
-      savedContentRef.current = content;
-      setSaveStatus('saved');
       setLastSavedAt(new Date());
-      toast.success('Translation saved successfully!');
     } catch (error: any) {
-      console.error('Error saving translation:', error);
-      setSaveStatus('error');
-      toast.error(error.message || 'Failed to save translation');
+      // Error already toasted by store or caught here
+      if (!targetVersion) {
+        toast.error(error.message || 'Failed to save translation');
+      }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [reviewers, setReviewers] = useState<{ id: string; user: { id: string; name: string; email: string } }[]>([]);
-  const [selectedReviewerId, setSelectedReviewerId] = useState('');
-  const [loadingReviewers, setLoadingReviewers] = useState(false);
-
-  // Assign translator dialog state
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [assignMembers, setAssignMembers] = useState<{ id: string; userId: string; user: { id: string; name: string | null; email: string } }[]>([]);
-  const [assignUserId, setAssignUserId] = useState('');
-  const [assignDeadline, setAssignDeadline] = useState('');
-  const [assignSaving, setAssignSaving] = useState(false);
-
-  // Assign reviewer dialog state
-  const [reviewerAssignDialogOpen, setReviewerAssignDialogOpen] = useState(false);
-  const [reviewerCandidates, setReviewerCandidates] = useState<{ id: string; user: { id: string; name: string; email: string } }[]>([]);
-  const [selectedReviewerForAssign, setSelectedReviewerForAssign] = useState('');
-  const [reviewerAssignSaving, setReviewerAssignSaving] = useState(false);
-
-  const handleOpenReviewDialog = async () => {
-    if (!targetVersion) {
-      await handleSave();
-      return;
-    }
-
-    if (translationProject) {
-      setLoadingReviewers(true);
-      try {
-        const members = await getProjectReviewersAction(translationProject.id);
-        setReviewers(members);
-      } catch (error) {
-        console.error('Error loading reviewers:', error);
-        toast.error('Failed to load reviewers');
-        return;
-      } finally {
-        setLoadingReviewers(false);
-      }
-    }
-
-    setReviewDialogOpen(true);
-  };
-
-  const handleSubmitForReview = async () => {
-    if (!targetVersion) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await submitForReviewAction({ versionId: targetVersion.id, ...(selectedReviewerId ? { reviewerId: selectedReviewerId } : {}) });
-      toast.success('Translation submitted for review!');
-      setReviewDialogOpen(false);
-      router.push(`/documents/${document.id}/review?version=${targetVersion.id}`);
-    } catch (error: any) {
-      console.error('Error submitting for review:', error);
-      toast.error(error.message || 'Failed to submit for review');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenAssignDialog = async () => {
-    if (!translationProject) return;
-    try {
-      const members = await listProjectMembersAction(translationProject.id);
-      const seen = new Map<string, typeof members[number]>();
-      for (const m of members) {
-        if (!seen.has(m.user.id)) seen.set(m.user.id, m);
-      }
-      setAssignMembers(Array.from(seen.values()));
-    } catch (error) {
-      console.error('Error loading members:', error);
-      toast.error('Failed to load team members');
-      return;
-    }
-    setAssignUserId('');
-    setAssignDeadline('');
-    setAssignDialogOpen(true);
-  };
-
-  const handleAssignTranslator = async () => {
-    if (!assignUserId || !translationProject) return;
-    setAssignSaving(true);
-    try {
-      if (assignment?.id) {
-        await updateDocumentAssignmentAction(assignment.id, {
-          userId: assignUserId,
-          deadline: assignDeadline ? new Date(assignDeadline) : null,
-        });
-      } else {
-        await createDocumentAssignmentAction({
-          documentId: document.id,
-          translationProjectId: translationProject.id,
-          userId: assignUserId,
-          deadline: assignDeadline ? new Date(assignDeadline) : null,
-        });
-      }
-      const assignedUser = assignMembers.find((m) => m.user.id === assignUserId)?.user ?? null;
-      if (targetVersion && assignedUser) {
-        setTargetVersion((prev: any) => prev ? { ...prev, user: assignedUser } : prev);
-      }
-      toast.success('Translator assigned!');
-      setAssignDialogOpen(false);
-      router.refresh();
-    } catch (error: any) {
-      console.error('Error assigning translator:', error);
-      toast.error(error.message || 'Failed to assign translator');
-    } finally {
-      setAssignSaving(false);
-    }
-  };
-
-  const handleOpenReviewerAssignDialog = async () => {
-    if (!translationProject) return;
-    try {
-      const members = await getProjectReviewersAction(translationProject.id);
-      setReviewerCandidates(members);
-    } catch (error) {
-      console.error('Error loading reviewers:', error);
-      toast.error('Failed to load reviewers');
-      return;
-    }
-    setSelectedReviewerForAssign('');
-    setReviewerAssignDialogOpen(true);
-  };
-
-  const handleAssignReviewer = async () => {
-    if (!selectedReviewerForAssign || !targetVersion) return;
-    setReviewerAssignSaving(true);
-    try {
-      await assignReviewerToVersionAction(targetVersion.id, selectedReviewerForAssign);
-      const assignedReviewer = reviewerCandidates.find((m) => m.user.id === selectedReviewerForAssign)?.user ?? null;
-      if (assignedReviewer) {
-        setTargetVersion((prev: any) => prev ? { ...prev, reviewer: assignedReviewer } : prev);
-      }
-      toast.success('Reviewer assigned!');
-      setReviewerAssignDialogOpen(false);
-      router.refresh();
-    } catch (error: any) {
-      console.error('Error assigning reviewer:', error);
-      toast.error(error.message || 'Failed to assign reviewer');
-    } finally {
-      setReviewerAssignSaving(false);
-    }
-  };
-
-  const handleUnassignTranslator = async () => {
-    if (!assignment?.id) return;
-    try {
-      await updateDocumentAssignmentAction(assignment.id, { userId: null });
-      setTargetVersion((prev: any) => prev ? { ...prev, user: null } : prev);
-      toast.success('Translator unassigned');
-      router.refresh();
-    } catch (error: any) {
-      console.error('Error unassigning translator:', error);
-      toast.error(error.message || 'Failed to unassign translator');
-    }
-  };
-
-  const handleUnassignReviewer = async () => {
-    if (!targetVersion) return;
-    try {
-      await assignReviewerToVersionAction(targetVersion.id, null);
-      setTargetVersion((prev: any) => prev ? { ...prev, reviewer: null } : prev);
-      toast.success('Reviewer unassigned');
-      router.refresh();
-    } catch (error: any) {
-      console.error('Error unassigning reviewer:', error);
-      toast.error(error.message || 'Failed to unassign reviewer');
     }
   };
 
@@ -491,7 +273,6 @@ export default function TranslateClient({
       toast.warning('Please select a target language first');
       return;
     }
-
     setLoading(true);
     try {
       const version = await assignDocumentVersionAction({
@@ -502,7 +283,6 @@ export default function TranslateClient({
       setTargetVersion(version);
       setContent(version.content || '');
     } catch (error: any) {
-      console.error('Error starting translation:', error);
       toast.error(error.message || 'Failed to start translation');
     } finally {
       setLoading(false);
@@ -510,28 +290,19 @@ export default function TranslateClient({
   };
 
   const handleDeleteTranslation = async () => {
-    if (!targetVersion) {
-      return;
-    }
-
+    if (!targetVersion) return;
     setLoading(true);
     try {
       await deleteDocumentVersionAction(targetVersion.id);
       toast.success('Translation version deleted successfully!');
-      // Reset state and redirect back to documents page
       setTargetVersion(null);
       setContent('');
       router.push('/documents');
     } catch (error: any) {
-      console.error('Error deleting translation:', error);
       toast.error(error.message || 'Failed to delete translation');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDeleteTranslationConfirm = async () => {
-    await handleDeleteTranslation();
   };
 
   const handleAutoTranslate = async () => {
@@ -539,7 +310,6 @@ export default function TranslateClient({
       toast.warning('Select a target language before requesting an AI translation.');
       return;
     }
-
     setTranslating(true);
     try {
       const result = await translateDocumentAction({
@@ -549,178 +319,34 @@ export default function TranslateClient({
         sourceContent: sourceVersion.content,
         currentTranslation: content || undefined,
       });
-
       setContent(result.translatedContent);
       viewerRef.current?.enterTranslationEditMode();
       toast.success('AI translation generated successfully!');
     } catch (error: any) {
-      console.error('AI translation failed:', error);
       toast.error(error.message || 'Failed to generate AI translation');
     } finally {
       setTranslating(false);
     }
   };
 
-  const handleAutoTranslateConfirm = async () => {
-    await handleAutoTranslate();
-  };
-
-  const handleSourceChange = (value: string) => {
-    setSourceEditContent(value);
-  };
-
   const handleSourceSave = async () => {
-    setSourceSaving(true);
-    try {
-      const updated = await updateDocumentVersionAction(sourceVersion.id, {
-        content: sourceEditContent,
-      });
-      // Update the source version in the component
-      sourceVersion.content = updated.content;
-      sourceVersion.status = updated.status;
-      toast.success('Source document saved successfully!');
-      router.refresh();
-    } catch (error: any) {
-      console.error('Error saving source:', error);
-      toast.error(error.message || 'Failed to save source document');
-    } finally {
-      setSourceSaving(false);
-    }
+    await saveSource(sourceVersion.id);
+    sourceVersion.content = sourceEditContent;
+    router.refresh();
   };
 
   const handleSourceDelete = async () => {
-    try {
-      // Delete the entire document, which will cascade delete all versions
-      await deleteDocumentAction(document.id);
-      toast.success('Document deleted successfully!');
-      router.push('/documents');
-    } catch (error: any) {
-      console.error('Error deleting document:', error);
-      toast.error(error.message || 'Failed to delete document');
-    }
+    await deleteSource();
+    router.push('/documents');
   };
 
-  const reloadSuggestions = async () => {
-    if (!targetVersion) return;
-    try {
-      const updated = await getSuggestionsByDocumentVersionAction(targetVersion.id);
-      const formatted = updated.map((s: any) => ({
-        ...s,
-        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
-        replies: (s.replies || []).map((r: any) => ({
-          ...r,
-          createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
-        })),
-      }));
-      setSuggestions(formatted as SuggestionWithUser[]);
-    } catch (error) {
-      console.error('Error loading suggestions:', error);
+  const handleOpenReviewDialog = async () => {
+    if (!targetVersion) {
+      await handleSave();
+      return;
     }
+    await openReviewDialog();
   };
-
-  const handleApplySuggestion = async (suggestionId: string) => {
-    try {
-      const updatedVersion = await applySuggestionAction({ suggestionId });
-      setTargetVersion(updatedVersion);
-      setContent(updatedVersion.content);
-      savedContentRef.current = updatedVersion.content;
-      setSaveStatus('saved');
-      toast.success('Suggestion applied!');
-      await reloadSuggestions();
-    } catch (error: any) {
-      console.error('Error applying suggestion:', error);
-      toast.error(error.message || 'Failed to apply suggestion');
-    }
-  };
-
-  const handleDismissSuggestion = async (suggestionId: string, reason?: string) => {
-    try {
-      await dismissSuggestionAction({ suggestionId, dismissedReason: reason });
-      toast.success('Suggestion dismissed!');
-      await reloadSuggestions();
-    } catch (error: any) {
-      console.error('Error dismissing suggestion:', error);
-      toast.error(error.message || 'Failed to dismiss suggestion');
-    }
-  };
-
-  const handleReopenSuggestion = async (suggestionId: string) => {
-    try {
-      const result = await reopenSuggestionAction({ suggestionId });
-      if (result.updatedVersion) {
-        setContent(result.updatedVersion.content);
-        setTargetVersion(result.updatedVersion);
-        savedContentRef.current = result.updatedVersion.content;
-        setSaveStatus('saved');
-      }
-      toast.success('Suggestion reopened!');
-      await reloadSuggestions();
-    } catch (error: any) {
-      console.error('Error reopening suggestion:', error);
-      toast.error(error.message || 'Failed to reopen suggestion');
-    }
-  };
-
-  const handleCreateSuggestion = async (data: {
-    comment: string;
-    proposedText?: string;
-    type: SuggestionType;
-    range: { startLine: number; startColumn: number; endLine: number; endColumn: number };
-    version: number;
-  }) => {
-    if (!targetVersion) return;
-    try {
-      await createSuggestionAction({
-        documentVersionId: targetVersion.id,
-        startLine: data.range.startLine,
-        startColumn: data.range.startColumn,
-        endLine: data.range.endLine,
-        endColumn: data.range.endColumn,
-        type: data.type,
-        comment: data.comment,
-        proposedText: data.proposedText,
-        version: data.version,
-      });
-      toast.success('Suggestion created!');
-      await reloadSuggestions();
-    } catch (error: any) {
-      console.error('Error creating suggestion:', error);
-      toast.error(error.message || 'Failed to create suggestion');
-    }
-  };
-
-  const handleReply = async (suggestionId: string, content: string) => {
-    try {
-      await createSuggestionReplyAction({ suggestionId, content });
-      await reloadSuggestions();
-    } catch (error: any) {
-      console.error('Error replying:', error);
-      toast.error(error.message || 'Failed to post reply');
-    }
-  };
-
-  const handleCreateGeneralThread = async (comment: string) => {
-    if (!targetVersion) return;
-    try {
-      await createSuggestionAction({
-        documentVersionId: targetVersion.id,
-        startLine: null,
-        startColumn: null,
-        endLine: null,
-        endColumn: null,
-        type: 'COMMENT' as SuggestionType,
-        comment,
-        version: targetVersion.version ?? 1,
-      });
-      toast.success('Comment added!');
-      await reloadSuggestions();
-    } catch (error: any) {
-      console.error('Error creating general thread:', error);
-      toast.error(error.message || 'Failed to create comment');
-    }
-  };
-
-  const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   return (
     <div className={zenMode ? 'fixed inset-0 bg-white z-50' : 'min-h-screen bg-gray-50'}>
@@ -753,7 +379,7 @@ export default function TranslateClient({
                         variant="outline"
                         size="sm"
                         onClick={handleAutoTranslate}
-                        disabled={loading || translating || !targetLanguageId}
+                        disabled={loading || translating || isAnyLoading || !targetLanguageId}
                       >
                         <Sparkles className="h-4 w-4 mr-1" />
                         {translating ? 'Translating...' : 'AI Translate'}
@@ -762,7 +388,12 @@ export default function TranslateClient({
                         <Maximize2 className="h-4 w-4" />
                       </Button>
                       <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
-                      <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={loading || translating || isAnyLoading}
+                      >
                         <Save className="h-4 w-4 mr-1" />
                         Save
                       </Button>
@@ -774,12 +405,17 @@ export default function TranslateClient({
                     user={user}
                     documentId={document.id}
                     languageId={targetLanguageId}
-                    disabled={loading || translating}
+                    disabled={loading || translating || isAnyLoading}
                     onStatusChange={handleStatusChange}
                     onReviewRequested={handleOpenReviewDialog}
                   />
                   {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
-                    <Button variant="outline" size="sm" onClick={handleDeleteTranslation} disabled={loading}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDeleteTranslation}
+                      disabled={loading || isAnyLoading}
+                    >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
                     </Button>
@@ -812,14 +448,18 @@ export default function TranslateClient({
                     user={user}
                     documentId={document.id}
                     languageId={targetLanguageId}
-                    disabled={loading || translating}
+                    disabled={loading || translating || isAnyLoading}
                     onStatusChange={handleStatusChange}
                     onReviewRequested={handleOpenReviewDialog}
                   />
                   {content.trim().length > 0 ? (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={loading || translating || !targetLanguageId}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={loading || translating || isAnyLoading || !targetLanguageId}
+                        >
                           <Sparkles className="h-4 w-4 mr-2" />
                           {translating ? 'Translating...' : 'Translate'}
                         </Button>
@@ -833,7 +473,7 @@ export default function TranslateClient({
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleAutoTranslateConfirm}>Continue</AlertDialogAction>
+                          <AlertDialogAction onClick={handleAutoTranslate}>Continue</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -842,7 +482,7 @@ export default function TranslateClient({
                       variant="outline"
                       size="sm"
                       onClick={handleAutoTranslate}
-                      disabled={loading || translating || !targetLanguageId}
+                      disabled={loading || translating || isAnyLoading || !targetLanguageId}
                     >
                       <Sparkles className="h-4 w-4 mr-2" />
                       {translating ? 'Translating...' : 'Translate'}
@@ -851,14 +491,23 @@ export default function TranslateClient({
                   {targetVersion.status !== 'PENDING_TRANSLATION' && (
                     <>
                       <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
-                      <Button variant="outline" size="sm" onClick={handleSave} disabled={loading || translating}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={loading || translating || isAnyLoading}
+                      >
                         <Save className="h-4 w-4 mr-2" />
                         Save
                       </Button>
                     </>
                   )}
                   {targetVersion.status === 'IN_PROGRESS' && (
-                    <Button size="sm" onClick={handleOpenReviewDialog} disabled={loading || translating}>
+                    <Button
+                      size="sm"
+                      onClick={handleOpenReviewDialog}
+                      disabled={loading || translating || isAnyLoading}
+                    >
                       <Send className="h-4 w-4 mr-2" />
                       Submit
                     </Button>
@@ -866,7 +515,7 @@ export default function TranslateClient({
                   {targetVersion.status === 'PENDING_TRANSLATION' && isDeployerClient(user) && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={loading}>
+                        <Button variant="outline" size="sm" disabled={loading || isAnyLoading}>
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
                         </Button>
@@ -880,7 +529,7 @@ export default function TranslateClient({
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleDeleteTranslationConfirm}>Delete</AlertDialogAction>
+                          <AlertDialogAction onClick={handleDeleteTranslation}>Delete</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -921,18 +570,18 @@ export default function TranslateClient({
             sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
             translationBadge={<Badge variant="secondary">{targetVersion?.language.name || 'New Translation'}</Badge>}
             canEditSource={canEditSource}
-            onSourceChange={handleSourceChange}
+            onSourceChange={setSourceEditContent}
             onSourceSave={handleSourceSave}
             onSourceDelete={handleSourceDelete}
             sourceEditContent={sourceEditContent}
             suggestions={suggestions}
             currentUserId={user.id}
-            onApplySuggestion={handleApplySuggestion}
-            onDismissSuggestion={handleDismissSuggestion}
-            onReopenSuggestion={handleReopenSuggestion}
-            onCreateSuggestion={handleCreateSuggestion}
-            onReply={handleReply}
-            onCreateGeneralThread={handleCreateGeneralThread}
+            onApplySuggestion={applySuggestion}
+            onDismissSuggestion={dismissSuggestion}
+            onReopenSuggestion={reopenSuggestion}
+            onCreateSuggestion={createSuggestion}
+            onReply={replySuggestion}
+            onCreateGeneralThread={createGeneralThread}
             documentVersion={targetVersion?.version ?? 1}
             sidebarHeader={
               targetVersion && (
@@ -942,27 +591,32 @@ export default function TranslateClient({
                   reviewer={targetVersion.reviewer || reviewer}
                   language={targetVersion.language?.name}
                   onAssignTranslator={
-                    isDeployerClient(user) && translationProject &&
+                    isDeployerClient(user) &&
+                    translationProject &&
                     (targetVersion.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion.user)
-                      ? handleOpenAssignDialog
+                      ? openAssignTranslatorDialog
                       : undefined
                   }
                   onUnassignTranslator={
-                    isDeployerClient(user) && assignment?.id && targetVersion.user &&
+                    isDeployerClient(user) &&
+                    assignment?.id &&
+                    targetVersion.user &&
                     targetVersion.status === DocumentStatus.PENDING_TRANSLATION
-                      ? handleUnassignTranslator
+                      ? unassignTranslator
                       : undefined
                   }
                   onAssignReviewer={
-                    isDeployerClient(user) && translationProject &&
+                    isDeployerClient(user) &&
+                    translationProject &&
                     targetVersion.status === DocumentStatus.PENDING_TRANSLATION
-                      ? handleOpenReviewerAssignDialog
+                      ? openAssignReviewerDialog
                       : undefined
                   }
                   onUnassignReviewer={
-                    isDeployerClient(user) && targetVersion.reviewer &&
+                    isDeployerClient(user) &&
+                    targetVersion.reviewer &&
                     targetVersion.status === DocumentStatus.PENDING_TRANSLATION
-                      ? handleUnassignReviewer
+                      ? unassignReviewer
                       : undefined
                   }
                 />
@@ -1031,123 +685,14 @@ export default function TranslateClient({
                   </div>
                 )}
 
-                {targetVersion && targetVersion.activityLogs && (
-                  <ActivityLog entries={targetVersion.activityLogs} />
-                )}
+                {targetVersion && targetVersion.activityLogs && <ActivityLog entries={targetVersion.activityLogs} />}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Reviewer picker dialog */}
-      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Submit for Review</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Select a reviewer <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder={loadingReviewers ? 'Loading...' : 'Choose reviewer'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {reviewers.map((member) => (
-                    <SelectItem key={member.user.id} value={member.user.id}>
-                      {member.user.name} ({member.user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">A reviewer can be assigned later if not known yet.</p>
-            </div>
-            <Button
-              onClick={handleSubmitForReview}
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? 'Submitting...' : 'Submit for Review'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign translator dialog */}
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Translator</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Translator</Label>
-              <Select value={assignUserId} onValueChange={setAssignUserId}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select translator..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {assignMembers.map((m) => (
-                    <SelectItem key={m.user.id} value={m.user.id}>
-                      {m.user.name || m.user.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Deadline (optional)</Label>
-              <Input
-                type="date"
-                value={assignDeadline}
-                onChange={(e) => setAssignDeadline(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <Button
-              onClick={handleAssignTranslator}
-              disabled={!assignUserId || assignSaving}
-              className="w-full"
-            >
-              {assignSaving ? 'Assigning...' : 'Assign'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign reviewer dialog */}
-      <Dialog open={reviewerAssignDialogOpen} onOpenChange={setReviewerAssignDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Reviewer</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Reviewer</Label>
-              <Select value={selectedReviewerForAssign} onValueChange={setSelectedReviewerForAssign}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select reviewer..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {reviewerCandidates.map((m) => (
-                    <SelectItem key={m.user.id} value={m.user.id}>
-                      {m.user.name} ({m.user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              onClick={handleAssignReviewer}
-              disabled={!selectedReviewerForAssign || reviewerAssignSaving}
-              className="w-full"
-            >
-              {reviewerAssignSaving ? 'Assigning...' : 'Assign Reviewer'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EditorDialogs />
     </div>
   );
 }
