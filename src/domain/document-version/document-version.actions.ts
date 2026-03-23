@@ -1,9 +1,8 @@
 'use server';
 
 import prisma from '@/lib/db';
-import { canDeploy, canReviewInProject, canTranslateInProject, isAdmin, isProjectMember } from '@/lib/permissions';
-import { requireUser } from '@/lib/session';
-import { DocumentStatus, ProjectRole } from '@prisma/client';
+import { authorize } from '@/lib/authorize';
+import { DocumentStatus, ProjectRole, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { createComment } from '../comment/comment.repository';
@@ -32,15 +31,12 @@ import {
 } from './document-version.types';
 
 export async function getDocumentVersionAction(id: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentVersionById(id);
 }
 
 export async function assignReviewerToVersionAction(versionId: string, reviewerId: string | null) {
-  const user = await requireUser();
-  if (!isAdmin(user)) {
-    throw new Error('Forbidden: Only deployers can pre-assign reviewers');
-  }
+  await authorize('admin');
 
   const version = await prisma.documentVersion.update({
     where: { id: versionId },
@@ -57,12 +53,12 @@ export async function assignReviewerToVersionAction(versionId: string, reviewerI
 }
 
 export async function getDocumentVersionByDocumentAndLanguageAction(documentId: string, languageId: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getDocumentVersionByDocumentAndLanguage(documentId, languageId);
 }
 
 export async function createDocumentVersionAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = createDocumentVersionSchema.parse(input);
 
   const version = await createDocumentVersion({
@@ -84,7 +80,7 @@ export async function createDocumentVersionAction(input: unknown) {
 }
 
 export async function updateDocumentVersionAction(id: string, input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = updateDocumentVersionSchema.parse(input);
 
   // Get existing version to check permissions
@@ -101,7 +97,7 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
 
   // If this is a source (English) version, only deployers can edit it
   if (language.code === 'en') {
-    if (!isAdmin(user)) {
+    if (user.role !== Role.ADMIN) {
       throw new Error('Forbidden: Only deployers can edit source (English) document versions');
     }
   } else {
@@ -124,18 +120,9 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
     );
 
     if (translationProject) {
-      // Check if user is a project member
-      const isMember = await isProjectMember(user, translationProject.id);
-      if (!isMember) {
-        throw new Error('You are not a member of this translation project');
-      }
-
       // Only the owner of the version or users with higher permissions can edit
       if (existingVersion.userId !== user.id) {
-        const canTranslate = await canTranslateInProject(user, translationProject.id);
-        if (!canTranslate) {
-          throw new Error('You do not have permission to edit this translation');
-        }
+        await authorize({ project: translationProject.id, role: 'translator' });
       }
     }
   }
@@ -153,7 +140,7 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
 }
 
 export async function submitForReviewAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = submitForReviewSchema.parse(input);
 
   // Get existing version to check permissions
@@ -180,11 +167,7 @@ export async function submitForReviewAction(input: unknown) {
   );
 
   if (translationProject) {
-    // Check if user is a project member
-    const isMember = await isProjectMember(user, translationProject.id);
-    if (!isMember) {
-      throw new Error('You are not a member of this translation project');
-    }
+    await authorize({ project: translationProject.id, role: 'member' });
   }
 
   const version = await updateDocumentVersionStatus(
@@ -205,7 +188,7 @@ export async function submitForReviewAction(input: unknown) {
 }
 
 export async function reviewVersionAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = reviewVersionSchema.parse(input);
 
   // Get current version to check if it has content
@@ -228,11 +211,10 @@ export async function reviewVersionAction(input: unknown) {
   );
 
   if (translationProject) {
-    // Check if user can review in this project
-    const canReview = await canReviewInProject(user, translationProject.id, validated.versionId);
-    if (!canReview) {
-      throw new Error('You do not have permission to review translations in this project');
-    }
+    await authorize({ project: translationProject.id, role: 'reviewer' });
+  } else {
+    // No translation project — require admin to prevent unauthorized reviews
+    await authorize('admin');
   }
 
   // Determine new status based on approval decision
@@ -265,12 +247,8 @@ export async function reviewVersionAction(input: unknown) {
 
 export async function deployVersionAction(versionId: string) {
   console.log('[Deploy] deployVersionAction called with versionId:', versionId);
-  const user = await requireUser();
+  const { user } = await authorize('can:deploy');
   console.log('[Deploy] User:', user.id, user.name);
-
-  if (!canDeploy(user)) {
-    throw new Error('Forbidden: Only deployers can deploy documents');
-  }
 
   const version = await updateDocumentVersionStatus(versionId, DocumentStatus.DEPLOYED);
   console.log('[Deploy] Version status updated to DEPLOYED');
@@ -319,7 +297,7 @@ export async function deployVersionAction(versionId: string) {
 }
 
 export async function deleteDocumentVersionAction(id: string) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
 
   // Get existing version to check permissions
   const existingVersion = await getDocumentVersionById(id);
@@ -335,7 +313,7 @@ export async function deleteDocumentVersionAction(id: string) {
 
   // If this is a source (English) version, only deployers can delete it
   if (language.code === 'en') {
-    if (!isAdmin(user)) {
+    if (user.role !== Role.ADMIN) {
       throw new Error('Forbidden: Only deployers can delete source (English) document versions');
     }
   }
@@ -351,11 +329,11 @@ export async function updateDocumentVersionStatusAction(
   version: Awaited<ReturnType<typeof updateDocumentVersionStatus>>;
   github?: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string };
 }> {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   console.log('[StatusUpdate] updateDocumentVersionStatusAction called:', versionId, '→', status);
 
   // Check permission for DEPLOYED status
-  if (status === DocumentStatus.DEPLOYED && !canDeploy(user)) {
+  if (status === DocumentStatus.DEPLOYED && user.role !== Role.ADMIN) {
     throw new Error('Forbidden: Only deployers can deploy documents');
   }
 
@@ -417,7 +395,7 @@ export async function updateDocumentVersionStatusAction(
 }
 
 export async function assignDocumentVersionAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = createDocumentVersionSchema.parse(input);
 
   // Get document to find source project
@@ -458,7 +436,7 @@ export async function assignDocumentVersionAction(input: unknown) {
 
     // If user is not an admin, add them as a member with TRANSLATOR role
     // (Deployers have access to all projects automatically)
-    if (!canDeploy(user)) {
+    if (user.role !== Role.ADMIN) {
       // Fetch the created project to get its ID
       const createdProject = await getTranslationProjectBySourceAndLanguage(
         document.sourceProject.id,
@@ -485,17 +463,7 @@ export async function assignDocumentVersionAction(input: unknown) {
     throw new Error('Failed to create or retrieve translation project');
   }
 
-  // Check if user is a project member
-  const isMember = await isProjectMember(user, translationProject.id);
-  if (!isMember) {
-    throw new Error('You are not a member of this translation project');
-  }
-
-  // Check if user can translate in this project
-  const canTranslate = await canTranslateInProject(user, translationProject.id);
-  if (!canTranslate) {
-    throw new Error('You do not have permission to translate in this project');
-  }
+  await authorize({ project: translationProject.id, role: 'translator' });
 
   // Check document assignment
   const assignment = await getDocumentAssignmentByDocumentAndProject(validated.documentId, translationProject.id);
@@ -576,8 +544,8 @@ export async function assignDocumentVersionAction(input: unknown) {
 }
 
 export async function getApprovedVersionsAction() {
-  const user = await requireUser();
-  if (!isAdmin(user)) {
+  const { user } = await authorize('authenticated');
+  if (user.role !== Role.ADMIN) {
     return [];
   }
 
@@ -607,7 +575,7 @@ export async function getApprovedVersionsAction() {
 }
 
 export async function getVersionsTranslatingByUserAction() {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
 
   return prisma.documentVersion.findMany({
     where: {
@@ -637,7 +605,7 @@ export async function getVersionsTranslatingByUserAction() {
 }
 
 export async function getVersionsForReviewByUserAction() {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
 
   return prisma.documentVersion.findMany({
     where: {

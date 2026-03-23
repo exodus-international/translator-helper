@@ -1,163 +1,15 @@
-import { Role, ProjectRole } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { SessionUser } from './session';
 import {
-  getUserRoleInProject as getUserRoleInProjectRepo,
-  getUserRolesInProject as getUserRolesInProjectRepo,
   isUserProjectManagerForSourceProject as isUserProjectManagerForSourceProjectRepo,
   isUserMemberOfSourceProject as isUserMemberOfSourceProjectRepo,
 } from '@/domain/project-member/project-member.repository';
 
-export function isTranslator(user: SessionUser): boolean {
-  return user.role === Role.USER;
-}
-
-export function isAdmin(user: SessionUser): boolean {
-  return user.role === Role.ADMIN;
-}
-
-export function canTranslate(user: SessionUser): boolean {
-  return user.role === Role.USER || user.role === Role.ADMIN;
-}
-
-export function canReview(user: SessionUser): boolean {
-  return user.role === Role.USER || user.role === Role.ADMIN;
-}
-
-export function canDeploy(user: SessionUser): boolean {
-  return user.role === Role.ADMIN;
-}
-
-export function canManageLanguages(user: SessionUser): boolean {
-  return user.role === Role.ADMIN;
-}
-
-export function canManageFolders(user: SessionUser): boolean {
-  return user.role === Role.ADMIN;
-}
-
-// Project-scoped permissions
-export async function isProjectManager(user: SessionUser, translationProjectId: string): Promise<boolean> {
-  // Deployers have all permissions
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return roles.includes(ProjectRole.PROJECT_MANAGER);
-}
-
-export async function isReviewer(user: SessionUser, translationProjectId: string): Promise<boolean> {
-  // Deployers have all permissions
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return (
-    roles.includes(ProjectRole.REVIEWER) ||
-    roles.includes(ProjectRole.EDITOR) ||
-    roles.includes(ProjectRole.PROJECT_MANAGER)
-  );
-}
-
-export async function isEditor(user: SessionUser, translationProjectId: string): Promise<boolean> {
-  // Deployers have all permissions
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return roles.includes(ProjectRole.EDITOR) || roles.includes(ProjectRole.PROJECT_MANAGER);
-}
-
-export async function canAssignDocuments(user: SessionUser, translationProjectId: string): Promise<boolean> {
-  // Deployers have all permissions
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return roles.includes(ProjectRole.PROJECT_MANAGER);
-}
-
-export async function canReviewInProject(
-  user: SessionUser,
-  translationProjectId: string,
-  documentVersionId?: string,
-): Promise<boolean> {
-  // Deployers have all permissions
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return (
-    roles.includes(ProjectRole.REVIEWER) ||
-    roles.includes(ProjectRole.EDITOR) ||
-    roles.includes(ProjectRole.PROJECT_MANAGER)
-  );
-}
-
-export async function canEditInProject(
-  user: SessionUser,
-  translationProjectId: string,
-  documentVersionId?: string,
-): Promise<boolean> {
-  // Deployers have all permissions
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return roles.includes(ProjectRole.EDITOR) || roles.includes(ProjectRole.PROJECT_MANAGER);
-}
-
-export async function canTranslateInProject(user: SessionUser, translationProjectId: string): Promise<boolean> {
-  // Deployers have all permissions
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return (
-    roles.includes(ProjectRole.TRANSLATOR) ||
-    roles.includes(ProjectRole.REVIEWER) ||
-    roles.includes(ProjectRole.EDITOR) ||
-    roles.includes(ProjectRole.PROJECT_MANAGER)
-  );
-}
-
-export async function isProjectMember(user: SessionUser, translationProjectId: string): Promise<boolean> {
-  // Deployers have access to all projects
-  if (user.role === Role.ADMIN) {
-    return true;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return roles.length > 0;
-}
-
-export async function getUserRolesInProject(user: SessionUser, translationProjectId: string): Promise<ProjectRole[]> {
-  // Deployers are treated as PROJECT_MANAGER for all projects
-  if (user.role === Role.ADMIN) {
-    return [ProjectRole.PROJECT_MANAGER];
-  }
-
-  return await getUserRolesInProjectRepo(user.id, translationProjectId);
-}
-
-export async function getUserRoleInProject(
-  user: SessionUser,
-  translationProjectId: string,
-): Promise<ProjectRole | null> {
-  // Deployers are treated as PROJECT_MANAGER for all projects
-  if (user.role === Role.ADMIN) {
-    return ProjectRole.PROJECT_MANAGER;
-  }
-
-  const roles = await getUserRolesInProjectRepo(user.id, translationProjectId);
-  return roles.length > 0 ? roles[0] : null;
-}
+// ─── Source-project-scoped permissions ───────────────────────
+// These check membership across translation projects within a source project.
+// They use different DB queries than the authorize() gateway (which operates
+// on translation project IDs), so they remain here until source-project
+// permissions are integrated into the gateway.
 
 export async function canAccessSourceProject(user: SessionUser, sourceProjectId: string): Promise<boolean> {
   if (user.role === Role.ADMIN) {
@@ -168,11 +20,19 @@ export async function canAccessSourceProject(user: SessionUser, sourceProjectId:
 }
 
 export async function canManageSourceProject(user: SessionUser, sourceProjectId: string): Promise<boolean> {
-  // Deployers can manage all source projects
   if (user.role === Role.ADMIN) {
     return true;
   }
 
-  // Check if user is a project manager for any translation project within this source project
   return await isUserProjectManagerForSourceProjectRepo(user.id, sourceProjectId);
+}
+
+export async function canAssignDocuments(user: SessionUser, translationProjectId: string): Promise<boolean> {
+  if (user.role === Role.ADMIN) {
+    return true;
+  }
+
+  const { getUserRolesInProject } = await import('@/domain/project-member/project-member.repository');
+  const roles = await getUserRolesInProject(user.id, translationProjectId);
+  return roles.includes('PROJECT_MANAGER');
 }

@@ -1,7 +1,7 @@
 'use server';
 
 import { getUserById } from '@/domain/user/user.repository';
-import { requireUser } from '@/lib/session';
+import { authorize } from '@/lib/authorize';
 import {
   createProjectMember,
   deleteProjectMember,
@@ -16,26 +16,24 @@ import {
 import { createProjectMemberSchema, updateProjectMemberSchema } from './project-member.types';
 
 export async function listProjectMembersAction(translationProjectId: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await listProjectMembers(translationProjectId);
 }
 
 export async function getProjectMemberAction(id: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getProjectMemberById(id);
 }
 
 export async function getProjectMembersByUserAndProjectAction(translationProjectId: string) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   return await getProjectMembersByUserAndProject(user.id, translationProjectId);
 }
 
 export async function createProjectMemberAction(input: unknown) {
-  const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER or ADMIN can add members
-  // This will be implemented after permissions system is updated
-
   const validated = createProjectMemberSchema.parse(input);
+
+  await authorize({ project: validated.translationProjectId, role: 'manager' });
 
   // Check if user exists in database
   const targetUser = await getUserById(validated.userId);
@@ -51,8 +49,12 @@ export async function createProjectMemberAction(input: unknown) {
 }
 
 export async function updateProjectMemberAction(id: string, input: unknown) {
-  const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER or ADMIN can update members
+  const member = await getProjectMemberById(id);
+  if (!member) {
+    throw new Error('Project member not found');
+  }
+
+  await authorize({ project: member.translationProjectId, role: 'manager' });
 
   const validated = updateProjectMemberSchema.parse(input);
   return await updateProjectMember(id, {
@@ -61,21 +63,24 @@ export async function updateProjectMemberAction(id: string, input: unknown) {
 }
 
 export async function deleteProjectMemberAction(id: string) {
-  const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER or ADMIN can remove members
+  const member = await getProjectMemberById(id);
+  if (!member) {
+    throw new Error('Project member not found');
+  }
+
+  await authorize({ project: member.translationProjectId, role: 'manager' });
 
   return await deleteProjectMember(id);
 }
 
 export async function deleteProjectMembersByUserAction(userId: string, translationProjectId: string) {
-  const user = await requireUser();
-  // TODO: Add permission check - only PROJECT_MANAGER or ADMIN can remove members
+  await authorize({ project: translationProjectId, role: 'manager' });
 
   return await deleteProjectMembersByUser(userId, translationProjectId);
 }
 
 export async function getProjectReviewersAction(translationProjectId: string) {
-  await requireUser();
+  await authorize('authenticated');
   const members = await getProjectReviewers(translationProjectId);
   // Deduplicate by user ID (a user might have multiple reviewer-eligible roles)
   const seen = new Set<string>();
@@ -87,6 +92,6 @@ export async function getProjectReviewersAction(translationProjectId: string) {
 }
 
 export async function getUserRoleInProjectAction(translationProjectId: string) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   return await getUserRoleInProject(user.id, translationProjectId);
 }

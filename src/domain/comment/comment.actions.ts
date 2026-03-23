@@ -1,6 +1,6 @@
 'use server';
 
-import { requireUser } from '@/lib/session';
+import { authorize } from '@/lib/authorize';
 import { createCommentSchema, updateCommentSchema } from './comment.types';
 import {
   getCommentsByDocumentVersion,
@@ -11,17 +11,17 @@ import {
 } from './comment.repository';
 
 export async function getCommentsByDocumentVersionAction(documentVersionId: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getCommentsByDocumentVersion(documentVersionId);
 }
 
 export async function getCommentAction(id: string) {
-  await requireUser();
+  await authorize('authenticated');
   return await getCommentById(id);
 }
 
 export async function createCommentAction(input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = createCommentSchema.parse(input);
 
   return await createComment({
@@ -32,7 +32,7 @@ export async function createCommentAction(input: unknown) {
 }
 
 export async function updateCommentAction(id: string, input: unknown) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
   const validated = updateCommentSchema.parse(input);
 
   // Check if user owns the comment
@@ -45,7 +45,7 @@ export async function updateCommentAction(id: string, input: unknown) {
 }
 
 export async function deleteCommentAction(id: string) {
-  const user = await requireUser();
+  const { user } = await authorize('authenticated');
 
   // Check if user owns the comment
   const comment = await getCommentById(id);

@@ -43,10 +43,3 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
-export async function requireRole(role: Role): Promise<SessionUser> {
-  const user = await requireUser();
-  if (user.role !== role) {
-    throw new Error('Forbidden: Insufficient permissions');
-  }
-  return user;
-}
