@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // If accessing public auth pages with session cookie, redirect to dashboard
-  if ((pathname === '/login' || pathname === '/register') && sessionCookie) {
+  if ((pathname === '/login' || pathname.startsWith('/register')) && sessionCookie) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
