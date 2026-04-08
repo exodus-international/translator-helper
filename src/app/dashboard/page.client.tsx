@@ -71,9 +71,9 @@ interface DashboardClientProps {
         name: string;
         code: string;
       };
-      _count: {
-        members: number;
-      };
+      members: {
+        userId: string;
+      }[];
     }[];
   }[];
   assignments: {

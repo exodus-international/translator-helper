@@ -272,7 +272,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     `- **Language**: ${language.name} (${language.code})`,
     `- **File**: \`${filePath}\``,
     `- **Source Project**: ${document.sourceProject.name}`,
-    `- **Translator**: ${version.user.name}`,
+    `- **Translator**: ${version.user?.name ?? 'Unassigned'}`,
     `- **Link to document**: ${process.env.NEXT_PUBLIC_APP_URL}/documents/${document.id}/review?version=${version.id}`,
   ].join('\n');
 

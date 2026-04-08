@@ -402,32 +402,16 @@ function ReviewInner({
                 reviewer={targetVersion?.reviewer}
                 language={targetVersion?.language?.name}
                 onAssignTranslator={
-                  isAdminClient(user) &&
-                  translationProjectId &&
-                  (targetVersion?.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion?.user)
-                    ? openAssignTranslatorDialog
-                    : undefined
+                  isAdminClient(user) && translationProjectId ? openAssignTranslatorDialog : undefined
                 }
                 onUnassignTranslator={
-                  isAdminClient(user) &&
-                  targetVersion?.user &&
-                  targetVersion?.status === DocumentStatus.PENDING_TRANSLATION
-                    ? unassignTranslator
-                    : undefined
+                  isAdminClient(user) && targetVersion?.user ? unassignTranslator : undefined
                 }
                 onAssignReviewer={
-                  isAdminClient(user) &&
-                  translationProjectId &&
-                  (targetVersion?.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion?.reviewer)
-                    ? openAssignReviewerDialog
-                    : undefined
+                  isAdminClient(user) && translationProjectId ? openAssignReviewerDialog : undefined
                 }
                 onUnassignReviewer={
-                  isAdminClient(user) &&
-                  targetVersion?.reviewer &&
-                  targetVersion?.status === DocumentStatus.PENDING_TRANSLATION
-                    ? unassignReviewer
-                    : undefined
+                  isAdminClient(user) && targetVersion?.reviewer ? unassignReviewer : undefined
                 }
               />
             }

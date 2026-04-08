@@ -244,6 +244,7 @@ export default function TranslationProjectClient({
       setAssignmentDialogOpen(false);
       resetAssignmentForm();
       router.refresh();
+      toast.success('Document assigned!');
     } catch (error: any) {
       console.error('Error assigning document:', error);
       toast.error(error.message || 'Failed to assign document');
@@ -261,6 +262,7 @@ export default function TranslationProjectClient({
       });
       setAssignments(assignments.map((a) => (a.id === updated.id ? (updated as (typeof assignments)[0]) : a)));
       router.refresh();
+      toast.success(userId ? 'Assignment updated!' : 'Translator unassigned');
     } catch (error: any) {
       console.error('Error updating assignment:', error);
       toast.error(error.message || 'Failed to update assignment');

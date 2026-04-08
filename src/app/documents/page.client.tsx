@@ -37,7 +37,7 @@ type DocumentWithVersions = Document & {
       id: string;
       name: string;
       email: string;
-    };
+    } | null;
     updatedAt: Date;
   }>;
 };
