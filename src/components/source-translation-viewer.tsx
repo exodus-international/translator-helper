@@ -12,10 +12,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
-import { Edit, Eye, FileEdit, PanelRightOpen, Save, X } from 'lucide-react';
+import { Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -98,10 +99,23 @@ const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number)
 };
 
 export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle, SourceTranslationViewerProps>(
-  function SourceTranslationViewer(
+  function SourceTranslationViewerOuter(props, ref) {
+    const hasSidebar = (props.suggestions?.length ?? 0) > 0 || props.canCreateSuggestions;
+    return (
+      <SidebarProvider
+        defaultOpen={hasSidebar || !!props.sidebarHeader}
+        className={cn(props.className, props.layout === 'zen' && 'h-full')}
+      >
+        <SourceTranslationViewerInner ref={ref} {...props} />
+      </SidebarProvider>
+    );
+  },
+);
+
+const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, SourceTranslationViewerProps>(
+  function SourceTranslationViewerInner(
     {
       variant,
-      className,
       layout = 'default',
       sourceContent,
       sourceFormattedContent,
@@ -130,8 +144,6 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       onEditSuggestion,
       onCreateSuggestion,
       documentVersion = 1,
-      isApplyingSuggestion = false,
-      isDismissingSuggestion = false,
       editorRef: externalEditorRef,
       onReply,
       onCreateGeneralThread,
@@ -141,8 +153,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     ref,
   ) {
     const isZen = layout === 'zen';
+    const { open: sidebarOpen, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
     const [mounted, setMounted] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
@@ -180,6 +192,9 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     const openSuggestionsCount = useMemo(() => {
       return suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length;
     }, [suggestions]);
+
+    const sourceLineCount = useMemo(() => sourceContent.split('\n').length, [sourceContent]);
+    const translationLineCount = useMemo(() => translationContent.split('\n').length, [translationContent]);
 
     const translationPreview = translationFormattedContent ?? translationContent;
     const translationRawVisible =
@@ -241,8 +256,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
         return;
       }
 
-      const sourceTotalLines = sourceContent.split('\n').length;
-      const translationTotalLines = translationContent.split('\n').length;
+      const sourceTotalLines = sourceLineCount;
+      const translationTotalLines = translationLineCount;
       const translationTargetLine = mapLineNumber(lineNumber, sourceTotalLines, translationTotalLines);
       setSyncedTranslationLine(translationTargetLine);
       // Update the translation pane's displayed line to match the synced target
@@ -258,8 +273,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
         return;
       }
 
-      const sourceTotalLines = sourceContent.split('\n').length;
-      const translationTotalLines = translationContent.split('\n').length;
+      const sourceTotalLines = sourceLineCount;
+      const translationTotalLines = translationLineCount;
       const sourceTargetLine = mapLineNumber(lineNumber, translationTotalLines, sourceTotalLines);
       setSyncedSourceLine(sourceTargetLine);
       // Update the source pane's displayed line to match the synced target
@@ -537,68 +552,61 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     };
 
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
-    const sidebarHidden = isZen && sidebarCollapsed;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
     const showSelectionToolbar = canCreateSuggestions && (isReviewMode || showSuggestionDecorations);
 
     return (
-      <div
-        className={cn(
-          'grid border-0',
-          hasSidebar || sidebarHeader ? (sidebarHidden ? 'grid-cols-2' : 'grid-cols-[1fr_1fr_340px]') : 'grid-cols-2',
-          className,
-          isZen && 'h-full',
-        )}
-      >
-        <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
-          <div className="flex items-center justify-between py-1.5 px-2">
-            <h2 className="text-sm font-semibold">Source (English)</h2>
-            <div className="flex items-center gap-2">
-              {!isSourceEditing &&
-                (mounted ? (
-                  <Tabs
-                    value={sourceViewMode}
-                    onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}
-                  >
-                    <TabsList>
-                      <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                      <TabsTrigger value="raw">Raw</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                ) : (
-                  <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                    <button
-                      type="button"
-                      disabled
-                      className={cn(
-                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                        sourceViewMode === 'formatted' && 'bg-background shadow-sm',
-                      )}
+      <>
+        <div className={cn('grid grid-cols-2 border-0 flex-1 min-w-0', isZen && 'h-full')}>
+          <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
+            <div className="flex items-center justify-between py-1.5 px-2">
+              <h2 className="text-sm font-semibold">Source (English)</h2>
+              <div className="flex items-center gap-2">
+                {!isSourceEditing &&
+                  (mounted ? (
+                    <Tabs
+                      value={sourceViewMode}
+                      onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}
                     >
-                      Formatted
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      className={cn(
-                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                        sourceViewMode === 'raw' && 'bg-background shadow-sm',
-                      )}
-                    >
-                      Raw
-                    </button>
-                  </div>
-                ))}
-              {sourceBadge}
-              {canEditSource && !isSourceEditing && (
-                <>
-                  <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  {/* <AlertDialog>
+                      <TabsList>
+                        <TabsTrigger value="formatted">Formatted</TabsTrigger>
+                        <TabsTrigger value="raw">Raw</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  ) : (
+                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                      <button
+                        type="button"
+                        disabled
+                        className={cn(
+                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                          sourceViewMode === 'formatted' && 'bg-background shadow-sm',
+                        )}
+                      >
+                        Formatted
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        className={cn(
+                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                          sourceViewMode === 'raw' && 'bg-background shadow-sm',
+                        )}
+                      >
+                        Raw
+                      </button>
+                    </div>
+                  ))}
+                {sourceBadge}
+                {canEditSource && !isSourceEditing && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    {/* <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm">
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -618,283 +626,195 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog> */}
-                </>
-              )}
-              {isSourceEditing && (
-                <>
-                  <Button variant="outline" size="sm" onClick={handleSourceSave} disabled={sourceSaving}>
-                    <Save className="h-4 w-4 mr-2" />
-                    {sourceSaving ? 'Saving...' : 'Save'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleSourceCancel} disabled={sourceSaving}>
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
-                </>
-              )}
-              {sourceHeaderExtra}
-            </div>
-          </div>
-          <div className={bodyClassName}>
-            {isSourceEditing ? (
-              <RawEditorPane
-                value={sourceEditValue}
-                onChange={handleSourceEditChange}
-                currentLine={sourceLine}
-                highlightLine={syncedSourceLine}
-                onCursorChange={handleSourceCursorChange}
-                fullHeight
-                lineInfo={{
-                  primaryLabel: 'Source Line',
-                  primaryValue: sourceLine,
-                  secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                  secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
-                  direction: 'to',
-                }}
-              />
-            ) : sourceViewMode === 'formatted' ? (
-              <div className="prose max-w-none h-full overflow-y-auto p-3">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
+                  </>
+                )}
+                {isSourceEditing && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={handleSourceSave} disabled={sourceSaving}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {sourceSaving ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleSourceCancel} disabled={sourceSaving}>
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
+                  </>
+                )}
+                {sourceHeaderExtra}
               </div>
-            ) : (
-              <RawEditorPane
-                value={sourceContent}
-                readOnly
-                currentLine={sourceLine}
-                highlightLine={syncedSourceLine}
-                onCursorChange={handleSourceCursorChange}
-                fullHeight
-                lineInfo={{
-                  primaryLabel: 'Source Line',
-                  primaryValue: sourceLine,
-                  secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                  secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
-                  direction: 'to',
-                }}
-              />
-            )}
-          </div>
-        </Card>
+            </div>
+            <div className={bodyClassName}>
+              {isSourceEditing ? (
+                <RawEditorPane
+                  value={sourceEditValue}
+                  onChange={handleSourceEditChange}
+                  currentLine={sourceLine}
+                  highlightLine={syncedSourceLine}
+                  onCursorChange={handleSourceCursorChange}
+                  fullHeight
+                  lineInfo={{
+                    primaryLabel: 'Source Line',
+                    primaryValue: sourceLine,
+                    secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
+                    secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
+                    direction: 'to',
+                  }}
+                />
+              ) : sourceViewMode === 'formatted' ? (
+                <div className="prose max-w-none h-full overflow-y-auto p-3">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
+                </div>
+              ) : (
+                <RawEditorPane
+                  value={sourceContent}
+                  readOnly
+                  currentLine={sourceLine}
+                  highlightLine={syncedSourceLine}
+                  onCursorChange={handleSourceCursorChange}
+                  fullHeight
+                  lineInfo={{
+                    primaryLabel: 'Source Line',
+                    primaryValue: sourceLine,
+                    secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
+                    secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
+                    direction: 'to',
+                  }}
+                />
+              )}
+            </div>
+          </Card>
 
-        <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
-          <div className="flex items-center justify-between py-1.5 px-2">
-            <h2 className="text-sm font-semibold">Translation</h2>
-            <div className="flex items-center gap-2">
-              {variant === 'translate' ? (
-                mounted ? (
-                  <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
-                    <TabsList>
-                      <TabsTrigger value="edit">
+          <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
+            <div className="flex items-center justify-between py-1.5 px-2">
+              <h2 className="text-sm font-semibold">Translation</h2>
+              <div className="flex items-center gap-2">
+                {variant === 'translate' ? (
+                  mounted ? (
+                    <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
+                      <TabsList>
+                        <TabsTrigger value="edit">
+                          <FileEdit className="h-4 w-4 mr-2" />
+                          Edit
+                        </TabsTrigger>
+                        <TabsTrigger value="preview">
+                          <Eye className="h-4 w-4 mr-2" />
+                          Preview
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  ) : (
+                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                      <button
+                        type="button"
+                        disabled
+                        className={cn(
+                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                          translateTab === 'edit' && 'bg-background shadow-sm',
+                        )}
+                      >
                         <FileEdit className="h-4 w-4 mr-2" />
                         Edit
-                      </TabsTrigger>
-                      <TabsTrigger value="preview">
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        className={cn(
+                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                          translateTab === 'preview' && 'bg-background shadow-sm',
+                        )}
+                      >
                         <Eye className="h-4 w-4 mr-2" />
                         Preview
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                ) : (
-                  <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                    <button
-                      type="button"
-                      disabled
-                      className={cn(
-                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                        translateTab === 'edit' && 'bg-background shadow-sm',
-                      )}
+                      </button>
+                    </div>
+                  )
+                ) : !isReviewEditing ? (
+                  mounted ? (
+                    <Tabs
+                      value={reviewViewMode}
+                      onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'review')}
                     >
-                      <FileEdit className="h-4 w-4 mr-2" />
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      className={cn(
-                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                        translateTab === 'preview' && 'bg-background shadow-sm',
-                      )}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      Preview
-                    </button>
-                  </div>
-                )
-              ) : !isReviewEditing ? (
-                mounted ? (
-                  <Tabs
-                    value={reviewViewMode}
-                    onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'review')}
-                  >
-                    <TabsList>
-                      <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                      <TabsTrigger value="review" className="relative">
+                      <TabsList>
+                        <TabsTrigger value="formatted">Formatted</TabsTrigger>
+                        <TabsTrigger value="review" className="relative">
+                          Review
+                          {openSuggestionsCount > 0 && (
+                            <Badge
+                              variant="primary"
+                              className="absolute -top-3 -right-3 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
+                            >
+                              {openSuggestionsCount}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  ) : (
+                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                      <button
+                        type="button"
+                        disabled
+                        className={cn(
+                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                          reviewViewMode === 'formatted' && 'bg-background shadow-sm',
+                        )}
+                      >
+                        Formatted
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        className={cn(
+                          'relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+                          reviewViewMode === 'review' && 'bg-background shadow-sm',
+                        )}
+                      >
                         Review
                         {openSuggestionsCount > 0 && (
                           <Badge
                             variant="primary"
-                            className="absolute -top-3 -right-3 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
+                            className="absolute -top-1 -left-1 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
                           >
                             {openSuggestionsCount}
                           </Badge>
                         )}
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                ) : (
-                  <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                    <button
-                      type="button"
-                      disabled
-                      className={cn(
-                        'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                        reviewViewMode === 'formatted' && 'bg-background shadow-sm',
-                      )}
-                    >
-                      Formatted
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      className={cn(
-                        'relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                        reviewViewMode === 'review' && 'bg-background shadow-sm',
-                      )}
-                    >
-                      Review
-                      {openSuggestionsCount > 0 && (
-                        <Badge
-                          variant="primary"
-                          className="absolute -top-1 -left-1 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
-                        >
-                          {openSuggestionsCount}
-                        </Badge>
-                      )}
-                    </button>
-                  </div>
-                )
-              ) : null}
-              {translationBadge}
-              {translationHeaderExtra}
-              {variant === 'review' && reviewConfig?.headerExtra}
-              {isZen && hasSidebar && sidebarCollapsed && (
-                <Button variant="outline" size="sm" onClick={() => setSidebarCollapsed(false)} className="h-7 text-xs">
-                  <PanelRightOpen className="h-3.5 w-3.5 mr-1" />
-                  Feedback
-                  {openSuggestionsCount > 0 && (
-                    <Badge variant="primary" className="ml-1 h-4 min-w-4 px-1 text-[10px]">
-                      {openSuggestionsCount}
-                    </Badge>
-                  )}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className={bodyClassName}>
-            {variant === 'translate' ? (
-              translateTab === 'edit' ? (
-                <div ref={translationContainerRef} className="relative h-full">
-                  <RawEditorPane
-                    ref={translationEditorRef}
-                    value={translationContent}
-                    onChange={onTranslationChange}
-                    onCursorChange={handleTranslationCursorChange}
-                    placeholder={translationPlaceholder}
-                    currentLine={translationLine}
-                    highlightLine={syncedTranslationLine}
-                    fullHeight
-                    suggestions={showSuggestionDecorations ? suggestions : undefined}
-                    onSuggestionClick={showSuggestionDecorations ? handleSuggestionClickInternal : undefined}
-                    onSelectionChange={showSelectionToolbar ? handleSelectionChange : undefined}
-                    lineInfo={{
-                      primaryLabel: 'Translation Line',
-                      primaryValue: translationLine,
-                      secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                      secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
-                      direction: 'from',
-                    }}
-                  />
-                  {toolbarPosition && canCreateSuggestions && (
-                    <SuggestionInlineToolbar
-                      position={toolbarPosition}
-                      containerRef={translationContainerRef}
-                      onComment={() => handleCreateSuggestion(SuggestionType.COMMENT)}
-                      onSuggestEdit={() => handleCreateSuggestion(SuggestionType.CHANGE)}
-                    />
-                  )}
-                  {showSuggestionForm && selectedRange && (
-                    <div className="absolute right-4 w-96 bg-green-400 border rounded-lg shadow-lg p-4 z-50">
-                      <SuggestionForm
-                        type={suggestionFormType}
-                        initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
-                        onSubmit={handleSuggestionFormSubmit}
-                        onCancel={() => requestCloseSuggestionForm()}
-                        onDirtyChange={(dirty) => {
-                          suggestionFormDirtyRef.current = dirty;
-                        }}
-                      />
+                      </button>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="prose max-w-none h-full overflow-y-auto p-3">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {translationPreview || translationPreviewEmptyText}
-                  </ReactMarkdown>
-                </div>
-              )
-            ) : isReviewEditing ? (
-              <div className="h-full flex flex-col space-y-2">
-                <RawEditorPane
-                  value={translationContent}
-                  onChange={onTranslationChange}
-                  onCursorChange={handleTranslationCursorChange}
-                  currentLine={translationLine}
-                  highlightLine={syncedTranslationLine}
-                  fullHeight
-                  lineInfo={
-                    sourceViewMode === 'raw'
-                      ? {
-                          primaryLabel: 'Translation Line',
-                          primaryValue: translationLine,
-                          secondaryLabel: 'Source Line',
-                          secondaryValue: sourceLine,
-                          direction: 'from',
-                        }
-                      : undefined
-                  }
-                />
-                {translationEditActions}
+                  )
+                ) : null}
+                {translationBadge}
+                {translationHeaderExtra}
+                {variant === 'review' && reviewConfig?.headerExtra}
+                {hasSidebar && !sidebarOpen && (
+                  <Button variant="outline" size="sm" onClick={toggleSidebar} className="h-7 text-xs">
+                    <PanelRightOpen className="h-3.5 w-3.5 mr-1" />
+                    Show panel
+                    {openSuggestionsCount > 0 && (
+                      <Badge variant="primary" className="ml-1 h-4 min-w-4 px-1 text-[10px]">
+                        {openSuggestionsCount}
+                      </Badge>
+                    )}
+                  </Button>
+                )}
               </div>
-            ) : reviewViewMode === 'formatted' ? (
-              <div className="prose max-w-none h-full overflow-y-auto p-3">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
-              </div>
-            ) : (
-              <div ref={translationContainerRef} className="relative h-full">
-                {selectedUserId ? (
-                  // Show diff view when user filter is active
-                  <SuggestionDiffViewer
-                    originalContent={translationContent}
-                    suggestions={suggestions}
-                    selectedUserId={selectedUserId}
-                    className="h-full"
-                    onSuggestionClick={handleSuggestionClickInternal}
-                  />
-                ) : (
-                  // Show normal editor with suggestions
-                  <>
+            </div>
+
+            <div className={bodyClassName}>
+              {variant === 'translate' ? (
+                translateTab === 'edit' ? (
+                  <div ref={translationContainerRef} className="relative h-full">
                     <RawEditorPane
                       ref={translationEditorRef}
                       value={translationContent}
-                      readOnly
+                      onChange={onTranslationChange}
+                      onCursorChange={handleTranslationCursorChange}
+                      placeholder={translationPlaceholder}
                       currentLine={translationLine}
                       highlightLine={syncedTranslationLine}
-                      onCursorChange={handleTranslationCursorChange}
-                      suggestions={suggestions}
-                      onSuggestionClick={handleSuggestionClickInternal}
-                      onSelectionChange={handleSelectionChange}
+                      fullHeight
+                      suggestions={showSuggestionDecorations ? suggestions : undefined}
+                      onSuggestionClick={showSuggestionDecorations ? handleSuggestionClickInternal : undefined}
+                      onSelectionChange={showSelectionToolbar ? handleSelectionChange : undefined}
                       lineInfo={{
                         primaryLabel: 'Translation Line',
                         primaryValue: translationLine,
@@ -912,7 +832,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                       />
                     )}
                     {showSuggestionForm && selectedRange && (
-                      <div className="absolute top-4 right-4 w-[75%] bg-white border rounded-lg shadow-lg p-4 z-50">
+                      <div className="absolute right-4 w-96 bg-green-400 border rounded-lg shadow-lg p-4 z-50">
                         <SuggestionForm
                           type={suggestionFormType}
                           initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
@@ -924,57 +844,159 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
                         />
                       </div>
                     )}
-                  </>
-                )}
+                  </div>
+                ) : (
+                  <div className="prose max-w-none h-full overflow-y-auto p-3">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {translationPreview || translationPreviewEmptyText}
+                    </ReactMarkdown>
+                  </div>
+                )
+              ) : isReviewEditing ? (
+                <div className="h-full flex flex-col space-y-2">
+                  <RawEditorPane
+                    value={translationContent}
+                    onChange={onTranslationChange}
+                    onCursorChange={handleTranslationCursorChange}
+                    currentLine={translationLine}
+                    highlightLine={syncedTranslationLine}
+                    fullHeight
+                    lineInfo={
+                      sourceViewMode === 'raw'
+                        ? {
+                            primaryLabel: 'Translation Line',
+                            primaryValue: translationLine,
+                            secondaryLabel: 'Source Line',
+                            secondaryValue: sourceLine,
+                            direction: 'from',
+                          }
+                        : undefined
+                    }
+                  />
+                  {translationEditActions}
+                </div>
+              ) : reviewViewMode === 'formatted' ? (
+                <div className="prose max-w-none h-full overflow-y-auto p-3">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
+                </div>
+              ) : (
+                <div ref={translationContainerRef} className="relative h-full">
+                  {selectedUserId ? (
+                    // Show diff view when user filter is active
+                    <SuggestionDiffViewer
+                      originalContent={translationContent}
+                      suggestions={suggestions}
+                      selectedUserId={selectedUserId}
+                      className="h-full"
+                      onSuggestionClick={handleSuggestionClickInternal}
+                    />
+                  ) : (
+                    // Show normal editor with suggestions
+                    <>
+                      <RawEditorPane
+                        ref={translationEditorRef}
+                        value={translationContent}
+                        readOnly
+                        currentLine={translationLine}
+                        highlightLine={syncedTranslationLine}
+                        onCursorChange={handleTranslationCursorChange}
+                        suggestions={suggestions}
+                        onSuggestionClick={handleSuggestionClickInternal}
+                        onSelectionChange={handleSelectionChange}
+                        lineInfo={{
+                          primaryLabel: 'Translation Line',
+                          primaryValue: translationLine,
+                          secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
+                          secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
+                          direction: 'from',
+                        }}
+                      />
+                      {toolbarPosition && canCreateSuggestions && (
+                        <SuggestionInlineToolbar
+                          position={toolbarPosition}
+                          containerRef={translationContainerRef}
+                          onComment={() => handleCreateSuggestion(SuggestionType.COMMENT)}
+                          onSuggestEdit={() => handleCreateSuggestion(SuggestionType.CHANGE)}
+                        />
+                      )}
+                      {showSuggestionForm && selectedRange && (
+                        <div className="absolute top-4 right-4 w-[75%] bg-white border rounded-lg shadow-lg p-4 z-50">
+                          <SuggestionForm
+                            type={suggestionFormType}
+                            initialProposedText={
+                              suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined
+                            }
+                            onSubmit={handleSuggestionFormSubmit}
+                            onCancel={() => requestCloseSuggestionForm()}
+                            onDirtyChange={(dirty) => {
+                              suggestionFormDirtyRef.current = dirty;
+                            }}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <AlertDialog
+            open={showDiscardDialog}
+            onOpenChange={(open) => {
+              if (!open) handleDiscardCancel();
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Discard unsaved suggestion?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved changes in your suggestion. Are you sure you want to discard them?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={handleDiscardCancel}>Keep editing</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDiscardConfirm}>Discard</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+
+        {(hasSidebar || sidebarHeader) && (
+          <Sidebar side="right" collapsible="offcanvas">
+            <SidebarHeader className="p-0 gap-0">
+              <div className="px-3 py-2 flex items-center justify-between border-b">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Document info
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="h-7 w-7 p-0">
+                  <PanelRightClose className="h-4 w-4" />
+                </Button>
               </div>
-            )}
-          </div>
-        </Card>
-
-        {(hasSidebar || sidebarHeader) && !sidebarHidden && (
-          <div className="flex flex-col overflow-hidden">
-            {sidebarHeader}
+              {sidebarHeader}
+            </SidebarHeader>
             {hasSidebar && (
-              <ThreadSidebar
-                suggestions={suggestions}
-                currentUserId={currentUserId || ''}
-                translationContent={translationContent}
-                canCreateSuggestions={canCreateSuggestions}
-                onReply={onReply}
-                onApply={onApplySuggestion}
-                onDismiss={(id) => onDismissSuggestion?.(id)}
-                onReopen={(id) => onReopenSuggestion?.(id)}
-                onEdit={onEditSuggestion}
-                onSuggestionClick={handleSuggestionClickInternal}
-                onCreateGeneralThread={onCreateGeneralThread}
-                activeThreadId={activeThreadId}
-                onCollapse={isZen ? () => setSidebarCollapsed(true) : undefined}
-                disableReopen={disableReopen}
-              />
+              <SidebarContent className="p-0">
+                <ThreadSidebar
+                  suggestions={suggestions}
+                  currentUserId={currentUserId || ''}
+                  translationContent={translationContent}
+                  canCreateSuggestions={canCreateSuggestions}
+                  onReply={onReply}
+                  onApply={onApplySuggestion}
+                  onDismiss={(id) => onDismissSuggestion?.(id)}
+                  onReopen={(id) => onReopenSuggestion?.(id)}
+                  onEdit={onEditSuggestion}
+                  onSuggestionClick={handleSuggestionClickInternal}
+                  onCreateGeneralThread={onCreateGeneralThread}
+                  activeThreadId={activeThreadId}
+                  disableReopen={disableReopen}
+                />
+              </SidebarContent>
             )}
-          </div>
+          </Sidebar>
         )}
-
-        <AlertDialog
-          open={showDiscardDialog}
-          onOpenChange={(open) => {
-            if (!open) handleDiscardCancel();
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Discard unsaved suggestion?</AlertDialogTitle>
-              <AlertDialogDescription>
-                You have unsaved changes in your suggestion. Are you sure you want to discard them?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={handleDiscardCancel}>Keep editing</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDiscardConfirm}>Discard</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      </>
     );
   },
 );

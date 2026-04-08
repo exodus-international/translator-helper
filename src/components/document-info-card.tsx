@@ -2,10 +2,10 @@
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import { DocumentStatus } from '@prisma/client';
-import { Eye, FileText, Pencil, User, UserMinus, UserPlus } from 'lucide-react';
+import { Eye, Pencil, User, UserMinus, UserPlus } from 'lucide-react';
 
 interface DocumentInfoCardProps {
   status: DocumentStatus;
@@ -41,12 +41,6 @@ export function DocumentInfoCard({
 
   return (
     <Card className="rounded-none border-l border-t-0 shrink-0">
-      <CardHeader className="px-2 border-b pb-0">
-        <CardTitle className="h-7 text-xs uppercase tracking-wider flex items-center">
-          <FileText className="h-3.5 w-3.5" />
-          Document Info
-        </CardTitle>
-      </CardHeader>
       <CardContent className=" space-y-2.5">
         {/* Status */}
         <div className="flex items-center justify-between">
