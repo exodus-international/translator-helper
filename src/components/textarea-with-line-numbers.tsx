@@ -197,7 +197,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
           hideCursorInOverviewRuler: true,
           overviewRulerBorder: false,
           renderLineHighlight: 'all',
-          renderLineHighlightOnlyWhenFocus: false,
+          renderLineHighlightOnlyWhenFocus: true,
           automaticLayout: true,
           quickSuggestions: false,
           suggest: { showWords: false },

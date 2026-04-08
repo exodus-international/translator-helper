@@ -234,6 +234,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
 
     const handleSourceCursorChange = (lineNumber: number) => {
       setSourceLine(lineNumber);
+      // Clear stale decoration on the source pane (user is now active here)
+      setSyncedSourceLine(undefined);
       if (!translationRawVisible) {
         setSyncedTranslationLine(undefined);
         return;
@@ -243,10 +245,14 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       const translationTotalLines = translationContent.split('\n').length;
       const translationTargetLine = mapLineNumber(lineNumber, sourceTotalLines, translationTotalLines);
       setSyncedTranslationLine(translationTargetLine);
+      // Update the translation pane's displayed line to match the synced target
+      setTranslationLine(translationTargetLine);
     };
 
     const handleTranslationCursorChange = (lineNumber: number) => {
       setTranslationLine(lineNumber);
+      // Clear stale decoration on the translation pane (user is now active here)
+      setSyncedTranslationLine(undefined);
       if (sourceViewMode !== 'raw') {
         setSyncedSourceLine(undefined);
         return;
@@ -256,6 +262,8 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
       const translationTotalLines = translationContent.split('\n').length;
       const sourceTargetLine = mapLineNumber(lineNumber, translationTotalLines, sourceTotalLines);
       setSyncedSourceLine(sourceTargetLine);
+      // Update the source pane's displayed line to match the synced target
+      setSourceLine(sourceTargetLine);
     };
 
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {

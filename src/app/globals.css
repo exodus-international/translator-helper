@@ -211,6 +211,11 @@
   padding-left: 12px !important;
 } */
 
+/* Cross-pane synced line highlight */
+.monaco-editor .synced-line-highlight {
+  background-color: rgba(59, 130, 246, 0.12) !important; /* blue-500 with opacity */
+}
+
 /* Suggestion decorations */
 .monaco-editor .suggestion-comment-open {
   background-color: rgba(251, 191, 36, 0.15) !important; /* yellow-400 with opacity */
