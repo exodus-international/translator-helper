@@ -39,7 +39,6 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
 ) {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
-  const ignoreNextCursorEventRef = useRef(false);
   const [editorMounted, setEditorMounted] = useState(false);
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
@@ -54,29 +53,36 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
     [editorMounted],
   );
 
-  // Sync cursor position to show blue highlight on the specified line
-  // This works for both readonly and editable editors
+  // Highlight the synced line from the other pane using deltaDecorations.
+  // This works regardless of focus state (no cursor move, no focus steal).
+  const highlightDecorationsRef = useRef<string[]>([]);
+
   useEffect(() => {
     const editor = editorRef.current;
-    if (!editor || !highlightLine) return;
-
-    const currentPosition = editor.getPosition();
-
-    // Only update if we're not already on that line
-    // This prevents cursor jumps while user is typing
-    if (currentPosition && currentPosition.lineNumber === highlightLine) {
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) {
       return;
     }
 
-    // Only move cursor if the editor currently has focus — otherwise
-    // setPosition steals focus from other inputs (e.g. reply input)
-    if (!editor.hasTextFocus()) return;
+    if (!highlightLine) {
+      // Clear decorations when there's no highlight line
+      highlightDecorationsRef.current = editor.deltaDecorations(highlightDecorationsRef.current, []);
+      return;
+    }
 
-    // Set cursor position to the highlighted line
-    // This will trigger Monaco's native blue line highlight
-    ignoreNextCursorEventRef.current = true;
-    editor.setPosition({ lineNumber: highlightLine, column: 1 });
-    editor.revealLineInCenter(highlightLine);
+    // Apply a line-wide background decoration on the target line
+    highlightDecorationsRef.current = editor.deltaDecorations(highlightDecorationsRef.current, [
+      {
+        range: new monaco.Range(highlightLine, 1, highlightLine, 1),
+        options: {
+          isWholeLine: true,
+          className: 'synced-line-highlight',
+        },
+      },
+    ]);
+
+    // Scroll the line into view (does NOT steal focus)
+    editor.revealLineInCenterIfOutsideViewport(highlightLine);
   }, [highlightLine]);
 
   const handleEditorChange = (value: string | undefined) => {
@@ -111,17 +117,10 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
 
     // Listen for cursor position changes
     editor.onDidChangeCursorPosition((e: any) => {
-      // Prevent sync loops: when we move the cursor programmatically (e.g. highlightLine sync),
-      // Monaco emits a cursor position change which would feed back into React state updates.
-      if (ignoreNextCursorEventRef.current) {
-        ignoreNextCursorEventRef.current = false;
-        return;
-      }
       if (e?.source === 'api') {
         return;
       }
       if (onCursorChange && e.position) {
-        // Pass line number directly
         onCursorChange(e.position.lineNumber);
       }
     });
