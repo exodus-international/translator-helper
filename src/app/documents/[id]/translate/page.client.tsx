@@ -584,43 +584,28 @@ function TranslateInner({
             onCreateGeneralThread={createGeneralThread}
             documentVersion={targetVersion?.version ?? 1}
             sidebarHeader={
-              targetVersion && (
-                <DocumentInfoCard
-                  status={targetVersion.status}
-                  translator={targetVersion.user}
-                  reviewer={targetVersion.reviewer || reviewer}
-                  language={targetVersion.language?.name}
-                  onAssignTranslator={
-                    isAdminClient(user) &&
-                    translationProject &&
-                    (targetVersion.status === DocumentStatus.PENDING_TRANSLATION || !targetVersion.user)
-                      ? openAssignTranslatorDialog
-                      : undefined
-                  }
-                  onUnassignTranslator={
-                    isAdminClient(user) &&
-                    assignment?.id &&
-                    targetVersion.user &&
-                    targetVersion.status === DocumentStatus.PENDING_TRANSLATION
-                      ? unassignTranslator
-                      : undefined
-                  }
-                  onAssignReviewer={
-                    isAdminClient(user) &&
-                    translationProject &&
-                    targetVersion.status === DocumentStatus.PENDING_TRANSLATION
-                      ? openAssignReviewerDialog
-                      : undefined
-                  }
-                  onUnassignReviewer={
-                    isAdminClient(user) &&
-                    targetVersion.reviewer &&
-                    targetVersion.status === DocumentStatus.PENDING_TRANSLATION
-                      ? unassignReviewer
-                      : undefined
-                  }
-                />
-              )
+              <DocumentInfoCard
+                status={targetVersion?.status ?? DocumentStatus.PENDING_TRANSLATION}
+                translator={targetVersion?.user ?? null}
+                reviewer={targetVersion?.reviewer || reviewer}
+                language={targetVersion?.language?.name}
+                onAssignTranslator={
+                  isAdminClient(user) && translationProject && targetVersion
+                    ? openAssignTranslatorDialog
+                    : undefined
+                }
+                onUnassignTranslator={
+                  isAdminClient(user) && targetVersion?.user ? unassignTranslator : undefined
+                }
+                onAssignReviewer={
+                  isAdminClient(user) && translationProject && targetVersion
+                    ? openAssignReviewerDialog
+                    : undefined
+                }
+                onUnassignReviewer={
+                  isAdminClient(user) && targetVersion?.reviewer ? unassignReviewer : undefined
+                }
+              />
             }
           />
         </div>

@@ -60,9 +60,9 @@ export async function getSourceProjectsForUser(userId: string, isAdmin: boolean)
               code: true,
             },
           },
-          _count: {
+          members: {
             select: {
-              members: true,
+              userId: true,
             },
           },
         },

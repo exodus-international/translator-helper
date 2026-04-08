@@ -22,15 +22,16 @@ interface ProjectCardProps {
         name: string;
         code: string;
       };
-      _count: {
-        members: number;
-      };
+      members: {
+        userId: string;
+      }[];
     }[];
   };
 }
 
 export default function ProjectCard({ project }: ProjectCardProps) {
-  const totalMembers = project.translationProjects.reduce((sum, tp) => sum + tp._count.members, 0);
+  const uniqueUserIds = new Set(project.translationProjects.flatMap((tp) => tp.members.map((m) => m.userId)));
+  const totalMembers = uniqueUserIds.size;
 
   return (
     <Link href={`/projects/${project.id}`}>
@@ -64,12 +65,20 @@ export default function ProjectCard({ project }: ProjectCardProps) {
             )}
           </div>
           {project.translationProjects.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-3">
-              {project.translationProjects.map((tp) => (
-                <Badge key={tp.id} variant="secondary" size="xs">
-                  {tp.language.name}
-                </Badge>
-              ))}
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {project.translationProjects.map((tp) => {
+                const uniqueMembers = new Set(tp.members.map((m) => m.userId)).size;
+                return (
+                  <Badge key={tp.id} variant="secondary" size="xs" className="gap-1">
+                    {tp.language.name}
+                    {uniqueMembers > 0 && (
+                      <span className="text-muted-foreground">
+                        <Users className="inline h-3 w-3 ml-0.5" /> {uniqueMembers}
+                      </span>
+                    )}
+                  </Badge>
+                );
+              })}
             </div>
           )}
         </CardContent>

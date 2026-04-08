@@ -253,8 +253,8 @@ model DocumentVersion {
   content      String         @db.Text // Markdown content
   status       DocumentStatus @default(PENDING_TRANSLATION)
   version      Int            @default(1)
-  userId       String
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String?
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   reviewerId   String?
   reviewer     User?          @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
   createdAt    DateTime       @default(now())

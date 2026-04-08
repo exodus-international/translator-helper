@@ -440,10 +440,18 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     unassignTranslator: async () => {
-      const { assignmentId, targetVersion } = get();
-      if (!assignmentId) return;
+      const { assignmentId, documentId, translationProjectId, targetVersion } = get();
+      if (!assignmentId && !translationProjectId) return;
       try {
-        await updateDocumentAssignmentAction(assignmentId, { userId: null });
+        if (assignmentId) {
+          await updateDocumentAssignmentAction(assignmentId, { userId: null });
+        } else {
+          await createDocumentAssignmentAction({
+            documentId,
+            translationProjectId: translationProjectId!,
+            userId: null,
+          });
+        }
         if (targetVersion) {
           set({ targetVersion: { ...targetVersion, user: null } });
         }
