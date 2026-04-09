@@ -18,19 +18,20 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { updateUserRoleAction } from '@/domain/user/user.actions';
 import {
   createInvitationAction,
   revokeInvitationAction,
 } from '@/domain/invitation/invitation.actions';
-import { authClient } from '@/lib/auth-client';
-import { Role, InvitationStatus } from '@prisma/client';
 import {
   getInvitationDisplayStatus,
   type InvitationDisplayStatus,
 } from '@/domain/invitation/invitation.display-status';
-import { Ban, Check, Clock, Copy, Link2, Plus, Shield, Unlock, X } from 'lucide-react';
-import { useState } from 'react';
+import { authClient } from '@/lib/auth-client';
+import { Role, InvitationStatus } from '@prisma/client';
+import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Link2, Plus, Shield, Unlock, Users, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 // ─── Types ──────────────────────────────────────────────────
@@ -66,7 +67,7 @@ interface UsersClientProps {
 
 // ─── Helpers ────────────────────────────────────────────────
 
-function statusBadge(status: InvitationDisplayStatus) {
+function invitationStatusBadge(status: InvitationDisplayStatus) {
   switch (status) {
     case 'active':
       return <Badge variant="success"><Clock className="h-3 w-3 mr-1" />Active</Badge>;
@@ -82,6 +83,10 @@ function statusBadge(status: InvitationDisplayStatus) {
 function truncateToken(token: string) {
   return token.length > 12 ? `${token.slice(0, 8)}...${token.slice(-4)}` : token;
 }
+
+const INVITATIONS_PER_PAGE = 10;
+
+type InvitationFilter = 'active' | 'inactive';
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -99,6 +104,29 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
   const [maxUses, setMaxUses] = useState('');
   const [expiresInDays, setExpiresInDays] = useState('30');
   const [createdInviteUrl, setCreatedInviteUrl] = useState<string | null>(null);
+  const [invitationFilter, setInvitationFilter] = useState<InvitationFilter>('active');
+  const [invitationPage, setInvitationPage] = useState(1);
+
+  // ─── Filtered & paginated invitations ───────────────────
+
+  const filteredInvitations = useMemo(() => {
+    return invitations.filter((inv) => {
+      const status = getInvitationDisplayStatus(inv);
+      return invitationFilter === 'active' ? status === 'active' : status !== 'active';
+    });
+  }, [invitations, invitationFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredInvitations.length / INVITATIONS_PER_PAGE));
+  const clampedPage = Math.min(invitationPage, totalPages);
+  const paginatedInvitations = filteredInvitations.slice(
+    (clampedPage - 1) * INVITATIONS_PER_PAGE,
+    clampedPage * INVITATIONS_PER_PAGE,
+  );
+
+  const handleFilterChange = (filter: InvitationFilter) => {
+    setInvitationFilter(filter);
+    setInvitationPage(1);
+  };
 
   // ─── User actions ───────────────────────────────────────
 
@@ -246,181 +274,234 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
-          <div>
-            <h1 className="text-2xl font-bold">User Management</h1>
-            <p className="text-gray-600">Manage users, roles, bans, and invitations</p>
-          </div>
+          <h1 className="text-2xl font-bold">User Management</h1>
+          <p className="text-gray-600">Manage users, roles, bans, and invitations</p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-4 space-y-8">
-        {/* ── Invitations Section ────────────────────────── */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Invitations</h2>
-            <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Invitation
-            </Button>
-          </div>
+      <div className="container mx-auto px-4 py-4">
+        <Tabs defaultValue="users">
+          <TabsList>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+          </TabsList>
 
-          {invitations.length === 0 ? (
-            <Card className="p-6 text-center text-gray-500">
-              No invitations yet. Create one to invite translators.
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {invitations.map((inv) => {
-                const displayStatus = getInvitationDisplayStatus(inv);
-                return (
-                  <Card key={inv.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <code className="text-sm bg-gray-100 px-2 py-0.5 rounded font-mono">
-                            {truncateToken(inv.token)}
-                          </code>
-                          {statusBadge(displayStatus)}
-                        </div>
-                        <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                          <span>
-                            Uses: {inv.usedCount}/{inv.maxUses ?? '∞'}
-                          </span>
-                          <span>
-                            Expires: {new Date(inv.expiresAt).toLocaleDateString()}
-                          </span>
-                          <span>
-                            By: {inv.createdBy.name}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 ml-4">
-                        {displayStatus === 'active' && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCopyUrl(`${baseUrl}/register/${inv.token}`)}
-                            >
-                              <Copy className="h-4 w-4 mr-1" />
-                              Copy Link
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm" disabled={loading}>
-                                  <X className="h-4 w-4 mr-1" />
-                                  Revoke
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Revoke Invitation</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will permanently invalidate this invitation link. Anyone with the link will no longer be able to register.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleRevoke(inv.id)}>Revoke</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </>
+          {/* ── Users Tab ──────────────────────────────────── */}
+          <TabsContent value="users">
+            <div className="grid gap-4">
+              {users.map((user) => (
+                <Card key={user.id} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold text-lg">{user.name}</h3>
+                        <Badge variant={user.role === Role.ADMIN ? 'primary' : 'secondary'}>
+                          {user.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
+                          {user.role}
+                        </Badge>
+                        {user.banned && (
+                          <Badge variant="destructive">
+                            <Ban className="h-3 w-3 mr-1" />
+                            Banned
+                          </Badge>
                         )}
                       </div>
+                      <p className="text-sm text-gray-600 mt-1">{user.email}</p>
+                      {user.banned && user.banReason && (
+                        <p className="text-sm text-red-600 mt-1">Reason: {user.banReason}</p>
+                      )}
+                      {user.banned && user.banExpires && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          Expires: {new Date(user.banExpires).toLocaleDateString()}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
                     </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* ── Users Section ──────────────────────────────── */}
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Users</h2>
-          <div className="grid gap-4">
-            {users.map((user) => (
-              <Card key={user.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-lg">{user.name}</h3>
-                      <Badge variant={user.role === Role.ADMIN ? 'primary' : 'secondary'}>
-                        {user.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
-                        {user.role}
-                      </Badge>
-                      {user.banned && (
-                        <Badge variant="destructive">
-                          <Ban className="h-3 w-3 mr-1" />
-                          Banned
-                        </Badge>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
+                        Change Role
+                      </Button>
+                      {user.banned ? (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={loading}>
+                              <Unlock className="h-4 w-4 mr-2" />
+                              Unban
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Unban User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to unban {user.name}? They will be able to access the system again.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleUnbanUser(user.id)}>Unban</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      ) : (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={loading}>
+                              <Ban className="h-4 w-4 mr-2" />
+                              Ban
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Ban User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to ban {user.name}? This will prevent them from accessing the system.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleBanUser(user.id)}>Ban</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">{user.email}</p>
-                    {user.banned && user.banReason && (
-                      <p className="text-sm text-red-600 mt-1">Reason: {user.banReason}</p>
-                    )}
-                    {user.banned && user.banExpires && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Expires: {new Date(user.banExpires).toLocaleDateString()}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-1">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
-                      Change Role
-                    </Button>
-                    {user.banned ? (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm" disabled={loading}>
-                            <Unlock className="h-4 w-4 mr-2" />
-                            Unban
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Unban User</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to unban {user.name}? They will be able to access the system again.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleUnbanUser(user.id)}>Unban</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    ) : (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm" disabled={loading}>
-                            <Ban className="h-4 w-4 mr-2" />
-                            Ban
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Ban User</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to ban {user.name}? This will prevent them from accessing the system.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleBanUser(user.id)}>Ban</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                </div>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* ── Invitations Tab ────────────────────────────── */}
+          <TabsContent value="invitations">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={invitationFilter === 'active' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleFilterChange('active')}
+                >
+                  Active
+                </Button>
+                <Button
+                  variant={invitationFilter === 'inactive' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleFilterChange('inactive')}
+                >
+                  Inactive
+                </Button>
+              </div>
+              <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Invitation
+              </Button>
+            </div>
+
+            {filteredInvitations.length === 0 ? (
+              <Card className="p-6 text-center text-gray-500">
+                {invitationFilter === 'active'
+                  ? 'No active invitations. Create one to invite translators.'
+                  : 'No inactive invitations.'}
               </Card>
-            ))}
-          </div>
-        </section>
+            ) : (
+              <>
+                <div className="grid gap-3">
+                  {paginatedInvitations.map((inv) => {
+                    const displayStatus = getInvitationDisplayStatus(inv);
+                    return (
+                      <Card key={inv.id} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3">
+                              <code className="text-sm bg-gray-100 px-2 py-0.5 rounded font-mono">
+                                {truncateToken(inv.token)}
+                              </code>
+                              {invitationStatusBadge(displayStatus)}
+                            </div>
+                            <div className="flex gap-4 mt-2 text-sm text-gray-600">
+                              <span>
+                                Uses: {inv.usedCount}/{inv.maxUses ?? '\u221e'}
+                              </span>
+                              <span>
+                                Expires: {new Date(inv.expiresAt).toLocaleDateString()}
+                              </span>
+                              <span>
+                                By: {inv.createdBy.name}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            {displayStatus === 'active' && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCopyUrl(`${baseUrl}/register/${inv.token}`)}
+                                >
+                                  <Copy className="h-4 w-4 mr-1" />
+                                  Copy Link
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm" disabled={loading}>
+                                      <X className="h-4 w-4 mr-1" />
+                                      Revoke
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Revoke Invitation</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently invalidate this invitation link. Anyone with the link will no longer be able to register.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleRevoke(inv.id)}>Revoke</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <p className="text-sm text-gray-500">
+                      {filteredInvitations.length} invitation{filteredInvitations.length !== 1 ? 's' : ''}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={clampedPage <= 1}
+                        onClick={() => setInvitationPage(clampedPage - 1)}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm text-gray-600">
+                        {clampedPage} / {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={clampedPage >= totalPages}
+                        onClick={() => setInvitationPage(clampedPage + 1)}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* ── Role Change Dialog ────────────────────────────── */}
