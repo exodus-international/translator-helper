@@ -73,6 +73,18 @@ pnpm dev
 
 Visit [http://localhost:3000](http://localhost:3000)
 
+By default the dev server runs on port 3000. To use a different port, set `PORT` in your `.env` file:
+
+```env
+PORT=4000
+```
+
+Or override it inline:
+
+```bash
+PORT=4000 pnpm dev
+```
+
 ## User Roles
 
 ### Translator (Default)
