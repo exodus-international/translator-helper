@@ -128,11 +128,11 @@ async function seedUsers(langs: Record<string, string>) {
 
   const usersData = [
     { key: 'admin1', email: 'admin@example.org', name: 'Fr. Thomas More', role: Role.ADMIN, langCodes: ['en', 'cs', 'sk'] },
-    { key: 'admin2', email: 'deploy@example.org', name: 'Sarah Mitchell', role: Role.ADMIN, langCodes: ['en', 'de', 'fr'] },
-    { key: 'translator1', email: 'jan.novak@example.org', name: 'Jan Novak', role: Role.USER, langCodes: ['cs', 'sk'] },
-    { key: 'translator2', email: 'maria.schmidt@example.org', name: 'Maria Schmidt', role: Role.USER, langCodes: ['de'] },
-    { key: 'reviewer1', email: 'ivan.horvat@example.org', name: 'Ivan Horvat', role: Role.USER, langCodes: ['hr', 'sk'] },
-    { key: 'banned1', email: 'peter.zilka@example.org', name: 'Peter Zilka', role: Role.USER, langCodes: ['cs'] },
+    { key: 'admin2', email: 'admin2@example.org', name: 'Sarah Mitchell', role: Role.ADMIN, langCodes: ['en', 'de', 'fr'] },
+    { key: 'translator1', email: 'translator@example.org', name: 'Jan Novak', role: Role.USER, langCodes: ['cs', 'sk'] },
+    { key: 'translator2', email: 'translator2@example.org', name: 'Maria Schmidt', role: Role.USER, langCodes: ['de'] },
+    { key: 'reviewer1', email: 'reviewer@example.org', name: 'Ivan Horvat', role: Role.USER, langCodes: ['hr', 'sk'] },
+    { key: 'banned1', email: 'banned@example.org', name: 'Peter Zilka', role: Role.USER, langCodes: ['cs'] },
   ];
 
   const users: Record<string, string> = {};
@@ -1699,12 +1699,12 @@ async function main() {
 
   console.log('\n=== Database seeding completed! ===\n');
   console.log('Login credentials:');
-  console.log('  Admin:      admin@example.org / Hello123456');
-  console.log('  Admin 2:    deploy@example.org / Hello123456');
-  console.log('  Translator: jan.novak@example.org / Hello123456');
-  console.log('  Translator: maria.schmidt@example.org / Hello123456');
-  console.log('  Reviewer:   ivan.horvat@example.org / Hello123456');
-  console.log('  Banned:     peter.zilka@example.org / Hello123456');
+  console.log('  Admin:        admin@example.org / Hello123456');
+  console.log('  Admin 2:      admin2@example.org / Hello123456');
+  console.log('  Translator:   translator@example.org / Hello123456');
+  console.log('  Translator 2: translator2@example.org / Hello123456');
+  console.log('  Reviewer:     reviewer@example.org / Hello123456');
+  console.log('  Banned:       banned@example.org / Hello123456');
 }
 
 main()
