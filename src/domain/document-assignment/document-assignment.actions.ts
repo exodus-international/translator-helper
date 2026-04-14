@@ -21,9 +21,6 @@ import {
  * stay consistent.
  */
 async function syncVersionTranslator(documentId: string, translationProjectId: string, userId: string | null) {
-  // Only sync when assigning (not unassigning) — DocumentVersion.userId is required
-  if (!userId) return;
-
   const translationProject = await prisma.translationProject.findUnique({
     where: { id: translationProjectId },
     select: { languageId: true },

@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Send } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 interface ThreadReplyInputProps {
   onSubmit: (content: string) => void;
@@ -11,12 +11,16 @@ interface ThreadReplyInputProps {
 
 export function ThreadReplyInput({ onSubmit, disabled }: ThreadReplyInputProps) {
   const [value, setValue] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed) return;
     onSubmit(trimmed);
     setValue('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -26,16 +30,24 @@ export function ThreadReplyInput({ onSubmit, disabled }: ThreadReplyInputProps) 
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setValue(e.target.value);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
   return (
-    <div className="flex items-center gap-1.5 mt-2">
-      <input
-        type="text"
+    <div className="flex items-start gap-1.5 mt-2">
+      <textarea
+        ref={textareaRef}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder="Reply..."
         disabled={disabled}
-        className="flex-1 text-xs px-2 py-1.5 rounded border border-border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+        rows={1}
+        className="flex-1 text-xs px-2 py-1.5 rounded border border-border bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-none overflow-hidden"
       />
       <Button
         size="sm"

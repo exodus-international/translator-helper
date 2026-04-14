@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { updateLanguageInstructionsAction } from '@/domain/language/language.actions';
+import { TRANSLATION_INSTRUCTIONS_MAX_LENGTH } from '@/domain/language/language.types';
 import { toast } from 'sonner';
 
 interface LanguageInstructionsClientProps {
@@ -40,6 +41,7 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
         ...prev,
         [languageId]: 'Saved just now',
       }));
+      toast.success('Instructions saved');
     } catch (error: any) {
       console.error('Failed to save instructions', error);
       toast.error(error.message || 'Failed to save instructions');
@@ -87,9 +89,16 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
                 }
                 placeholder="Explain tone, glossary terms, markdown dos/don'ts..."
                 rows={6}
+                maxLength={TRANSLATION_INSTRUCTIONS_MAX_LENGTH}
+                aria-invalid={(instructionsByLanguage[language.id]?.length ?? 0) > TRANSLATION_INSTRUCTIONS_MAX_LENGTH}
               />
-              <div className="text-xs text-gray-500 mt-2">
-                {lastSavedMessage[language.id] || 'These instructions are appended to the system prompt.'}
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-xs text-gray-500">
+                  {lastSavedMessage[language.id] || 'These instructions are appended to the system prompt.'}
+                </div>
+                <div className={`text-xs ${(instructionsByLanguage[language.id]?.length ?? 0) > TRANSLATION_INSTRUCTIONS_MAX_LENGTH * 0.9 ? (instructionsByLanguage[language.id]?.length ?? 0) > TRANSLATION_INSTRUCTIONS_MAX_LENGTH ? 'text-red-500 font-medium' : 'text-amber-500' : 'text-gray-400'}`}>
+                  {instructionsByLanguage[language.id]?.length ?? 0} / {TRANSLATION_INSTRUCTIONS_MAX_LENGTH.toLocaleString()}
+                </div>
               </div>
             </Card>
           ))}

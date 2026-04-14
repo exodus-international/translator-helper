@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
-import { ChevronDown, ChevronRight, MessageSquarePlus, PanelRightClose } from 'lucide-react';
+import { ChevronDown, ChevronRight, MessageSquarePlus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
 import { ThreadCard } from './thread-card';
@@ -21,7 +21,6 @@ interface ThreadSidebarProps {
   onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
   onCreateGeneralThread?: (comment: string) => void;
   activeThreadId?: string | null;
-  onCollapse?: () => void;
   disableReopen?: boolean;
 }
 
@@ -38,7 +37,6 @@ export function ThreadSidebar({
   onSuggestionClick,
   onCreateGeneralThread,
   activeThreadId,
-  onCollapse,
   disableReopen = false,
 }: ThreadSidebarProps) {
   const [showGeneralInput, setShowGeneralInput] = useState(false);
@@ -106,7 +104,7 @@ export function ThreadSidebar({
   );
 
   return (
-    <div className="flex flex-col h-full border-l rounded-none bg-white overflow-hidden border-b">
+    <div className="flex flex-col h-full bg-white overflow-hidden">
       {/* Header */}
       <div className="px-3 py-2 border-b bg-white shrink-0">
         <div className="flex items-center justify-between">
@@ -123,17 +121,6 @@ export function ThreadSidebar({
               >
                 <MessageSquarePlus className="h-3.5 w-3.5 mr-1" />
                 General
-              </Button>
-            )}
-            {onCollapse && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={onCollapse}
-                className="h-7 w-7 p-0"
-                title="Collapse feedback panel"
-              >
-                <PanelRightClose className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
