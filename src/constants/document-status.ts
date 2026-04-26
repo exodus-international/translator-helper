@@ -2,7 +2,7 @@ import { DocumentStatus } from '@prisma/client';
 import type { LucideIcon } from 'lucide-react';
 import { AlertCircle, CheckCircle2, Circle, Clock3, PenLine, Rocket } from 'lucide-react';
 
-export type DocumentStatusKey = DocumentStatus | 'NO_STATUS';
+type DocumentStatusKey = DocumentStatus | 'NO_STATUS';
 
 interface DocumentStatusConfig {
   status: DocumentStatusKey;
