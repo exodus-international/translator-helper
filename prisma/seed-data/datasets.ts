@@ -208,7 +208,7 @@ export const DOCUMENTS: {
 // Document Versions (target languages)
 // ---------------------------------------------------------------------------
 
-export type VersionDef = {
+type VersionDef = {
   docKey: string;
   langCode: string;
   status: DocumentStatus;
@@ -324,7 +324,7 @@ export const DOCUMENT_ASSIGNMENTS: { docKey: string; langCode: string; userKey: 
 // Suggestions & Replies
 // ---------------------------------------------------------------------------
 
-export type SuggestionDef = {
+type SuggestionDef = {
   versionKey: string;
   userKey: string;
   type: SuggestionType;

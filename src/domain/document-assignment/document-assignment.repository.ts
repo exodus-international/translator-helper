@@ -372,40 +372,6 @@ export async function deleteDocumentAssignment(id: string): Promise<Prisma.Docum
   });
 }
 
-export async function getUnassignedDocuments(translationProjectId: string): Promise<
-  Prisma.DocumentGetPayload<{
-    include: {
-      sourceProject: true;
-      versions: {
-        include: {
-          language: true;
-        };
-      };
-    };
-  }>[]
-> {
-  const assignments = await prisma.documentAssignment.findMany({
-    where: {
-      translationProjectId,
-      userId: null,
-    },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-          versions: {
-            include: {
-              language: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  return assignments.map((a) => a.document);
-}
-
 export async function getAssignedDocumentsForUser(
   userId: string,
   translationProjectId?: string,

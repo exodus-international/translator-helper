@@ -4,9 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 // Paths that require authentication
 const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding'];
 
-// Paths that are public (auth pages)
-const publicPaths = ['/login', '/register', '/'];
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 

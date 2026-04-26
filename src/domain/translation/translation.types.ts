@@ -8,4 +8,3 @@ export const translateDocumentSchema = z.object({
   currentTranslation: z.string().optional(),
 });
 
-export type TranslateDocumentInput = z.infer<typeof translateDocumentSchema>;

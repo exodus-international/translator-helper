@@ -20,7 +20,6 @@ import { Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'l
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { toast } from 'sonner';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
@@ -131,7 +130,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       canEditSource = false,
       onSourceChange,
       onSourceSave,
-      onSourceDelete,
       sourceEditContent,
       reviewConfig,
       suggestions = [],
@@ -175,7 +173,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
     const translationEditorRef = useRef<any>(null);
     const translationContainerRef = useRef<HTMLDivElement>(null);
-    const [selectedUserId, setSelectedUserId] = useState<string | null>(null); // Filter by user for diff view
+    const [selectedUserId] = useState<string | null>(null); // Filter by user for diff view
     const [isSourceEditing, setIsSourceEditing] = useState(false);
     const [sourceEditValue, setSourceEditValue] = useState(sourceEditContent ?? sourceContent);
     const [sourceSaving, setSourceSaving] = useState(false);
@@ -229,15 +227,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const handleSourceCancel = () => {
       setSourceEditValue(sourceEditContent ?? sourceContent);
       setIsSourceEditing(false);
-    };
-
-    const handleSourceDelete = async () => {
-      if (!onSourceDelete) return;
-      try {
-        await onSourceDelete();
-      } catch (error) {
-        console.error('Error deleting source:', error);
-      }
     };
 
     const enterSourceEditMode = () => {
@@ -508,47 +497,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setShowSuggestionForm(false);
       setSelectedRange(null);
       setSelectedText('');
-    };
-
-    const handleAddSuggestionClick = () => {
-      // Try to get cursor position from editor
-      const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-      const editor = editorWrapper?.editor;
-      if (editor && typeof editor.getPosition === 'function') {
-        try {
-          const position = editor.getPosition();
-          if (position) {
-            // Create a range at the current cursor position (single character)
-            const range = {
-              startLine: position.lineNumber,
-              startColumn: position.column,
-              endLine: position.lineNumber,
-              endColumn: position.column,
-            };
-            setSelectedRange(range);
-            setSuggestionFormType(SuggestionType.COMMENT);
-            setShowSuggestionForm(true);
-            return;
-          }
-        } catch (error) {
-          console.error('Error getting editor position:', error);
-        }
-      }
-      // If no editor or position, use current translation line
-      if (translationLine > 0) {
-        const range = {
-          startLine: translationLine,
-          startColumn: 1,
-          endLine: translationLine,
-          endColumn: 1,
-        };
-        setSelectedRange(range);
-        setSuggestionFormType('COMMENT');
-        setShowSuggestionForm(true);
-        return;
-      }
-      // If no line info, show instructions
-      toast.info('Please select text in the translation editor, or click on a line to add a comment');
     };
 
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;

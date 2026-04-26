@@ -13,16 +13,11 @@ import {
   dismissSuggestionSchema,
   editSuggestionSchema,
   reopenSuggestionSchema,
-  updateSuggestionStatusSchema,
 } from './suggestion.types';
 import {
-  checkSuggestionConflict,
   createSuggestion,
   createSuggestionReply,
-  deleteSuggestion,
-  deleteSuggestionReply,
   getSuggestionById,
-  getSuggestionReplyById,
   getSuggestionsByDocumentVersion,
   updateSuggestionContent,
   updateSuggestionStatus,
@@ -35,11 +30,6 @@ function truncate(text: string, max = 80) {
 export async function getSuggestionsByDocumentVersionAction(documentVersionId: string, filters?: any) {
   await authorize('authenticated');
   return await getSuggestionsByDocumentVersion(documentVersionId, filters);
-}
-
-export async function getSuggestionByIdAction(id: string) {
-  await authorize('authenticated');
-  return await getSuggestionById(id);
 }
 
 export async function createSuggestionAction(input: unknown) {
@@ -362,44 +352,6 @@ export async function editSuggestionAction(input: unknown) {
   return updated;
 }
 
-export async function deleteSuggestionAction(id: string) {
-  const { user } = await authorize('authenticated');
-
-  // Get suggestion
-  const suggestion = await getSuggestionById(id);
-  if (!suggestion) {
-    throw new Error('Suggestion not found');
-  }
-
-  // Only the author can delete their suggestion
-  if (suggestion.userId !== user.id) {
-    throw new Error('Forbidden: You can only delete your own suggestions');
-  }
-
-  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
-
-  const result = await deleteSuggestion(id);
-
-  await createActivityLog({
-    documentVersionId: suggestion.documentVersionId,
-    userId: user.id,
-    action: 'deleted_suggestion',
-    details: {
-      suggestionId: id,
-      type: suggestion.type,
-      startLine: suggestion.startLine ?? null,
-      endLine: suggestion.endLine ?? null,
-      comment: suggestion.comment ? truncate(suggestion.comment) : null,
-    },
-  });
-
-  if (documentVersion) {
-    revalidatePath(`/documents/${documentVersion.documentId}/review`);
-  }
-
-  return result;
-}
-
 export async function createSuggestionReplyAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = createSuggestionReplySchema.parse(input);
@@ -415,43 +367,4 @@ export async function createSuggestionReplyAction(input: unknown) {
     userId: user.id,
     content: validated.content,
   });
-}
-
-export async function deleteSuggestionReplyAction(replyId: string) {
-  const { user } = await authorize('authenticated');
-
-  const reply = await getSuggestionReplyById(replyId);
-  if (!reply) {
-    throw new Error('Reply not found');
-  }
-
-  // Only the reply author can delete
-  if (reply.userId !== user.id) {
-    throw new Error('Forbidden: You can only delete your own replies');
-  }
-
-  return await deleteSuggestionReply(replyId);
-}
-
-export async function updateSuggestionAction(id: string, input: unknown) {
-  const { user } = await authorize('authenticated');
-  const validated = updateSuggestionStatusSchema.parse(input);
-
-  // Get suggestion
-  const suggestion = await getSuggestionById(id);
-  if (!suggestion) {
-    throw new Error('Suggestion not found');
-  }
-
-  // Only the author can update their suggestion
-  if (suggestion.userId !== user.id) {
-    throw new Error('Forbidden: You can only edit your own suggestions');
-  }
-
-  // Only allow updating OPEN suggestions
-  if (suggestion.status !== SuggestionStatus.OPEN) {
-    throw new Error('Only open suggestions can be updated');
-  }
-
-  return await updateSuggestionStatus(id, validated.status, validated.dismissedReason);
 }

@@ -19,7 +19,7 @@ const STATUS_ORDER: DocumentStatus[] = [
 // Guards only apply on forward transitions to these statuses
 const FORWARD_GUARDED_STATUSES: DocumentStatus[] = [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED];
 
-export interface TransitionContext {
+interface TransitionContext {
   openSuggestionsCount: number;
 }
 

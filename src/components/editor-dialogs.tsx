@@ -7,13 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEditorStore } from '@/lib/stores/editor-provider';
-import type { DialogState, LoadingKey } from '@/lib/stores/editor-store';
+import type { LoadingKey } from '@/lib/stores/editor-store';
 
 function useDialogLoading(key: LoadingKey) {
   return useEditorStore((s) => s.loading.has(key));
 }
 
-export function SubmitReviewDialog() {
+function SubmitReviewDialog() {
   const dialog = useEditorStore((s) => s.dialog);
   const closeDialog = useEditorStore((s) => s.closeDialog);
   const submitForReview = useEditorStore((s) => s.submitForReview);
@@ -79,7 +79,7 @@ export function SubmitReviewDialog() {
   );
 }
 
-export function AssignTranslatorDialog() {
+function AssignTranslatorDialog() {
   const dialog = useEditorStore((s) => s.dialog);
   const closeDialog = useEditorStore((s) => s.closeDialog);
   const assignTranslator = useEditorStore((s) => s.assignTranslator);
@@ -149,7 +149,7 @@ export function AssignTranslatorDialog() {
   );
 }
 
-export function AssignReviewerDialog() {
+function AssignReviewerDialog() {
   const dialog = useEditorStore((s) => s.dialog);
   const closeDialog = useEditorStore((s) => s.closeDialog);
   const assignReviewer = useEditorStore((s) => s.assignReviewer);

@@ -2,8 +2,6 @@ import { createStore } from 'zustand';
 import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
 import {
   updateDocumentVersionAction,
-  assignDocumentVersionAction,
-  deleteDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
 import { submitForReviewAction } from '@/domain/document-version/document-version.actions';
 import {
@@ -39,7 +37,7 @@ export type LoadingKey =
   | 'deleteTranslation'
   | 'deleteSource';
 
-export interface MemberInfo {
+interface MemberInfo {
   id: string;
   userId?: string;
   user: { id: string; name: string | null; email: string };
@@ -135,7 +133,7 @@ export type EditorStore = EditorState & EditorActions;
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-export function normalizeSuggestions(raw: any[]): SuggestionWithUser[] {
+function normalizeSuggestions(raw: any[]): SuggestionWithUser[] {
   return raw.map((s) => ({
     ...s,
     createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,

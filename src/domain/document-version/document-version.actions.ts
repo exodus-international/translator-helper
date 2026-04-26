@@ -5,10 +5,8 @@ import { authorize } from '@/lib/authorize';
 import { DocumentStatus, ProjectRole, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
-import { createComment } from '../comment/comment.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
 import { validateTransition } from './document-version.transitions';
-import { resolveTranslationProject } from './resolve-translation-project';
 import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
@@ -28,15 +26,9 @@ import {
 } from './document-version.repository';
 import {
   createDocumentVersionSchema,
-  reviewVersionSchema,
   submitForReviewSchema,
   updateDocumentVersionSchema,
 } from './document-version.types';
-
-export async function getDocumentVersionAction(id: string) {
-  await authorize('authenticated');
-  return await getDocumentVersionById(id);
-}
 
 export async function assignReviewerToVersionAction(versionId: string, reviewerId: string | null) {
   await authorize('admin');
@@ -53,11 +45,6 @@ export async function assignReviewerToVersionAction(versionId: string, reviewerI
 
   revalidatePath(`/documents/${version.documentId}`, 'layout');
   return version;
-}
-
-export async function getDocumentVersionByDocumentAndLanguageAction(documentId: string, languageId: string) {
-  await authorize('authenticated');
-  return await getDocumentVersionByDocumentAndLanguage(documentId, languageId);
 }
 
 export async function createDocumentVersionAction(input: unknown) {
@@ -189,53 +176,6 @@ export async function submitForReviewAction(input: unknown) {
     userId: user.id,
     action: 'submitted_for_review',
     details: { reviewerId: validated.reviewerId },
-  });
-
-  return version;
-}
-
-export async function reviewVersionAction(input: unknown) {
-  const { user } = await authorize('authenticated');
-  const validated = reviewVersionSchema.parse(input);
-
-  const { version: currentVersion, translationProject } = await resolveTranslationProject(validated.versionId);
-
-  if (translationProject) {
-    await authorize({ project: translationProject.id, role: 'reviewer' });
-  } else {
-    // No translation project — require admin to prevent unauthorized reviews
-    await authorize('admin');
-  }
-
-  // Determine new status based on approval decision
-  const newStatus = validated.approved
-    ? DocumentStatus.APPROVED
-    : DocumentStatus.IN_PROGRESS;
-
-  if (validated.approved) {
-    const openCount = await countOpenSuggestions(validated.versionId);
-    validateTransition(currentVersion.status, newStatus, { openSuggestionsCount: openCount });
-  } else {
-    validateTransition(currentVersion.status, newStatus);
-  }
-
-  const version = await updateDocumentVersionStatus(validated.versionId, newStatus);
-
-  // Add comment if provided
-  if (validated.comment) {
-    await createComment({
-      documentVersionId: validated.versionId,
-      userId: user.id,
-      content: validated.comment,
-    });
-  }
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: validated.approved ? 'approved' : 'requested_changes',
-    details: { hasComment: !!validated.comment },
   });
 
   return version;

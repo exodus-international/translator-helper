@@ -18,7 +18,6 @@ export function SuggestionDiffViewer({
   suggestions,
   selectedUserId,
   className,
-  onSuggestionClick,
 }: SuggestionDiffViewerProps) {
   const diffEditorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);

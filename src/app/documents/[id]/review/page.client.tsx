@@ -18,7 +18,7 @@ import {
   StepperTrigger,
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
-import { deployVersionAction, updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
+import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { toggleDocumentLabelAction } from '@/domain/document/document.actions';
 import { editSuggestionAction } from '@/domain/suggestion/suggestion.actions';
 import { getStatusStep, isStepCompleted } from '@/lib/document-status';
@@ -190,27 +190,6 @@ function ReviewInner({
     } catch (error: any) {
       toast.error(error.message || 'Failed to save changes');
       return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeploy = async () => {
-    if (!targetVersion) return;
-    setLoading(true);
-    try {
-      await deployVersionAction(targetVersion.id);
-      const blob = new Blob([content], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = window.document.createElement('a');
-      a.href = url;
-      a.download = getDownloadFilename(document);
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Document deployed and downloaded!');
-      router.push('/dashboard');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to deploy');
     } finally {
       setLoading(false);
     }

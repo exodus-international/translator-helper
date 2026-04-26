@@ -3,7 +3,7 @@
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 import { useEffect, useRef } from 'react';
 
-export interface SuggestionReplyWithUser {
+interface SuggestionReplyWithUser {
   id: string;
   suggestionId: string;
   content: string;

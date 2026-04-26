@@ -200,6 +200,7 @@ function Badge({
   );
 }
 
+// @ts-expect-error kept for future use
 function BadgeButton({
   className,
   variant,
@@ -217,6 +218,7 @@ function BadgeButton({
   );
 }
 
+// @ts-expect-error kept for future use
 function BadgeDot({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
@@ -227,4 +229,4 @@ function BadgeDot({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
-export { Badge, BadgeButton, BadgeDot, badgeVariants };
+export { Badge };

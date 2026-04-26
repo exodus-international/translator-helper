@@ -114,7 +114,6 @@ function RoleCombobox({
 
 export default function ProjectTeamTab({
   translationProjectId,
-  user,
   canManage,
   selectedLanguageName,
 }: ProjectTeamTabProps) {

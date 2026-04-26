@@ -8,7 +8,7 @@ export interface TranslateWithChatGPTParams {
   currentTranslation?: string;
 }
 
-export const DEFAULT_SYSTEM_PROMPT = `You are an expert technical translator.
+const DEFAULT_SYSTEM_PROMPT = `You are an expert technical translator.
 - Maintain the original Markdown structure, code blocks, and frontmatter.
 - Preserve variables, placeholders, and punctuation.
 - Write in a natural tone that matches the source unless instructed otherwise.`;

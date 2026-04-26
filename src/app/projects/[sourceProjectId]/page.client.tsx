@@ -95,9 +95,6 @@ export default function ProjectDetailClient({
   // Find the translation project for the selected language
   const selectedTranslationProject = translationProjects.find((tp) => tp.languageId === selectedLanguage);
 
-  const canManageTeam =
-    isAdminClient(user) || selectedTranslationProject?.members?.some((m) => m.userId === user.id);
-
   const handleSaveSettings = async () => {
     setSettingsSaving(true);
     try {

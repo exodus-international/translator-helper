@@ -4,8 +4,6 @@ import { authorize } from '@/lib/authorize';
 import {
   createLanguage,
   deleteLanguage,
-  getLanguageById,
-  listLanguages,
   updateLanguage,
   updateLanguageBranchName,
   updateLanguageInstructions,
@@ -17,15 +15,6 @@ import {
   updateLanguageSchema,
 } from './language.types';
 
-export async function listLanguagesAction() {
-  await authorize('authenticated');
-  return await listLanguages();
-}
-
-export async function getLanguageAction(id: string) {
-  await authorize('authenticated');
-  return await getLanguageById(id);
-}
 
 export async function createLanguageAction(input: unknown) {
   await authorize('can:manage-languages');
