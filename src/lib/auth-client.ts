@@ -30,4 +30,5 @@ export const authClient = createAuthClient({
   ],
 });
 
+// fallow-ignore-next-line unused-export
 export const { signIn, signUp, signOut, useSession } = authClient;
