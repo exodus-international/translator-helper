@@ -162,6 +162,9 @@ importers:
       eslint-config-next:
         specifier: 16.0.2
         version: 16.0.2(@typescript-eslint/parser@8.46.4(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
+      fallow:
+        specifier: ^2.48.1
+        version: 2.48.1
       tailwindcss:
         specifier: ^4
         version: 4.1.17
@@ -522,6 +525,46 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fallow-cli/darwin-arm64@2.48.1':
+    resolution: {integrity: sha512-HUONVavqEpTSEsVTblQqoiy3zSQMSqjpv8WaIaX9v8VshkbuSI7m7uLD0RbbBTp8CiLe59dP1DiT4/LAQkKSZA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@fallow-cli/darwin-x64@2.48.1':
+    resolution: {integrity: sha512-xtDc6DWP1eg83S14ffHpSgttiOG+ioTmLDRwVmrfV0bQA4dVJROTCYggy96sicBTTZInxh89VUxJChO6GFMHbA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@fallow-cli/linux-arm64-gnu@2.48.1':
+    resolution: {integrity: sha512-CpwFQ8f5psPFkHYG+OQrZEv3+iEDhGRZMg508Xxowz/KiW1Y/8/5SZJ0j0fVVufmLB2FDITwPUnqx+yqfqFW7w==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@fallow-cli/linux-arm64-musl@2.48.1':
+    resolution: {integrity: sha512-65ghEd9RDRH0N5RT0L+Chqpep6NuhmYFH+jSuznuLG4Au+FKN5+YvkwG9zUeyxYP7Aqd7BOpc122s7gD/ye3DA==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@fallow-cli/linux-x64-gnu@2.48.1':
+    resolution: {integrity: sha512-y0+lnUuhs6XZgd7/Y25cHWmQydk63gVS5hxKseZM0N2ceM8U7OcKL5SFMrkCdFUXPz2Jyx8ZY3Z3Eixew0eHAQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@fallow-cli/linux-x64-musl@2.48.1':
+    resolution: {integrity: sha512-Gpf28d44dEFWp2RREkWO/PXRS/15HzkZjVcqucqO5HkWJhEQ8c7/RHOb5uygcd2fNkmYcIbVREhqytiFH5rc0A==}
+    cpu: [x64]
+    os: [linux]
+
+  '@fallow-cli/win32-arm64-msvc@2.48.1':
+    resolution: {integrity: sha512-ApERvuiGOQKOAWvzo+ZHeMPbEgnSqxIvChcTAbH/ddrIG2ABYHzuTsUqpAfAkeXuA9QamIUfUbxVWF4LF1+Tjw==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@fallow-cli/win32-x64-msvc@2.48.1':
+    resolution: {integrity: sha512-1lfizU40QLzt+fERX73gH62EzjKjtbGymdIpUDJVb/lSApYTwrOF0BkSl7cqFDHkwOIqCGVcDEXXh5GuclP/hg==}
+    cpu: [x64]
+    os: [win32]
 
   '@floating-ui/core@1.7.3':
     resolution: {integrity: sha512-sGnvb5dmrJaKEZ+LDIpguvdX3bDlEllmv4/ClQ9awcmCZrlx5jQyyMWFM5kBI+EyNOCDDiKk8il0zeuX3Zlg/w==}
@@ -3230,6 +3273,11 @@ packages:
   extend@3.0.2:
     resolution: {integrity: sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==}
 
+  fallow@2.48.1:
+    resolution: {integrity: sha512-toacpvZeG7gGSAV8RC8PW1lLA5BUGnKeRgoQt7Xm1U1IBRRfH+COVHbID90AlPcUaJuFNeTheLongCtV+37wtw==}
+    engines: {node: '>=16'}
+    hasBin: true
+
   fast-content-type-parse@3.0.0:
     resolution: {integrity: sha512-ZvLdcY8P+N8mGQJahJV5G4U88CSvT1rP8ApL6uETe88MBXrBHAkZlSEySdUlyztF7ccb+Znos3TFqaepHxdhBg==}
 
@@ -5264,6 +5312,30 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fallow-cli/darwin-arm64@2.48.1':
+    optional: true
+
+  '@fallow-cli/darwin-x64@2.48.1':
+    optional: true
+
+  '@fallow-cli/linux-arm64-gnu@2.48.1':
+    optional: true
+
+  '@fallow-cli/linux-arm64-musl@2.48.1':
+    optional: true
+
+  '@fallow-cli/linux-x64-gnu@2.48.1':
+    optional: true
+
+  '@fallow-cli/linux-x64-musl@2.48.1':
+    optional: true
+
+  '@fallow-cli/win32-arm64-msvc@2.48.1':
+    optional: true
+
+  '@fallow-cli/win32-x64-msvc@2.48.1':
+    optional: true
 
   '@floating-ui/core@1.7.3':
     dependencies:
@@ -8281,6 +8353,19 @@ snapshots:
       is-extendable: 0.1.1
 
   extend@3.0.2: {}
+
+  fallow@2.48.1:
+    dependencies:
+      detect-libc: 2.1.2
+    optionalDependencies:
+      '@fallow-cli/darwin-arm64': 2.48.1
+      '@fallow-cli/darwin-x64': 2.48.1
+      '@fallow-cli/linux-arm64-gnu': 2.48.1
+      '@fallow-cli/linux-arm64-musl': 2.48.1
+      '@fallow-cli/linux-x64-gnu': 2.48.1
+      '@fallow-cli/linux-x64-musl': 2.48.1
+      '@fallow-cli/win32-arm64-msvc': 2.48.1
+      '@fallow-cli/win32-x64-msvc': 2.48.1
 
   fast-content-type-parse@3.0.0: {}
 
