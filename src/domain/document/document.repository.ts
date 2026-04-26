@@ -1,45 +1,65 @@
 import prisma from '@/lib/db';
 import { Prisma, SuggestionStatus } from '@prisma/client';
 
+const userWithLanguages = {
+  select: {
+    id: true,
+    name: true,
+    email: true,
+    languages: { select: { languageId: true } },
+  },
+} as const;
+
+const userBrief = { select: { id: true, name: true, email: true } } as const;
+
+const versionWithUser = {
+  include: { language: true, user: userWithLanguages },
+  orderBy: { updatedAt: 'desc' },
+} as const;
+
+const assignmentWithDetails = {
+  include: {
+    translationProject: { include: { language: true } },
+    user: userWithLanguages,
+  },
+} as const;
+
+const documentListInclude = {
+  folder: true, // Deprecated - kept for backward compatibility
+  sourceProject: true,
+  versions: versionWithUser,
+} satisfies Prisma.DocumentInclude;
+
+const documentDetailInclude = {
+  folder: true, // Deprecated
+  sourceProject: true,
+  assignments: assignmentWithDetails,
+  versions: versionWithUser,
+} satisfies Prisma.DocumentInclude;
+
+const documentBasicInclude = {
+  folder: true, // Deprecated
+  sourceProject: true,
+  versions: true,
+} satisfies Prisma.DocumentInclude;
+
+type DocumentList = Prisma.DocumentGetPayload<{ include: typeof documentListInclude }>;
+type DocumentDetail = Prisma.DocumentGetPayload<{ include: typeof documentDetailInclude }>;
+type DocumentBasic = Prisma.DocumentGetPayload<{ include: typeof documentBasicInclude }>;
+
 export async function listDocuments(filters?: {
   sourceProjectId?: string;
   folderId?: string; // Deprecated - kept for backward compatibility
   labels?: string[];
   search?: string;
-}): Promise<
-  Prisma.DocumentGetPayload<{
-    include: {
-      folder: true;
-      sourceProject: true;
-      versions: {
-        include: {
-          language: true;
-          user: {
-            select: {
-              id: true;
-              name: true;
-              email: true;
-              languages: {
-                select: {
-                  languageId: true;
-                };
-              };
-            };
-          };
-        };
-      };
-    };
-  }>[]
-> {
+}): Promise<DocumentList[]> {
   return prisma.document.findMany({
     where: {
       ...(filters?.sourceProjectId && { sourceProjectId: filters.sourceProjectId }),
       ...(filters?.folderId && { folderId: filters.folderId }), // Deprecated
       ...(filters?.labels &&
         filters.labels.length > 0 && {
-          labels: {
-            hasSome: filters.labels,
-          },
+          labels: { hasSome: filters.labels },
         }),
       ...(filters?.search && {
         OR: [
@@ -48,127 +68,15 @@ export async function listDocuments(filters?: {
         ],
       }),
     },
-    include: {
-      folder: true, // Deprecated - kept for backward compatibility
-      sourceProject: true,
-      versions: {
-        include: {
-          language: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              languages: {
-                select: {
-                  languageId: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-      },
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
+    include: documentListInclude,
+    orderBy: { updatedAt: 'desc' },
   });
 }
 
-export async function getDocumentById(id: string): Promise<Prisma.DocumentGetPayload<{
-  include: {
-    folder: true;
-    sourceProject: true;
-    assignments: {
-      include: {
-        translationProject: {
-          include: {
-            language: true;
-          };
-        };
-        user: {
-          select: {
-            id: true;
-            name: true;
-            email: true;
-            languages: {
-              select: {
-                languageId: true;
-              };
-            };
-          };
-        };
-      };
-    };
-    versions: {
-      include: {
-        language: true;
-        user: {
-          select: {
-            id: true;
-            name: true;
-            email: true;
-            languages: {
-              select: {
-                languageId: true;
-              };
-            };
-          };
-        };
-      };
-    };
-  };
-}> | null> {
+export async function getDocumentById(id: string): Promise<DocumentDetail | null> {
   return prisma.document.findUnique({
     where: { id },
-    include: {
-      folder: true, // Deprecated - kept for backward compatibility
-      sourceProject: true,
-      assignments: {
-        include: {
-          translationProject: {
-            include: {
-              language: true,
-            },
-          },
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              languages: {
-                select: {
-                  languageId: true,
-                },
-              },
-            },
-          },
-        },
-      },
-      versions: {
-        include: {
-          language: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              languages: {
-                select: {
-                  languageId: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-      },
-    },
+    include: documentDetailInclude,
   });
 }
 
@@ -181,15 +89,7 @@ export async function createDocument(data: {
   deadline?: Date;
   originalFilename?: string;
   type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT';
-}): Promise<
-  Prisma.DocumentGetPayload<{
-    include: {
-      folder: true;
-      sourceProject: true;
-      versions: true;
-    };
-  }>
-> {
+}): Promise<DocumentBasic> {
   return prisma.document.create({
     data: {
       slug: data.slug,
@@ -201,11 +101,7 @@ export async function createDocument(data: {
       originalFilename: data.originalFilename,
       type: data.type,
     },
-    include: {
-      folder: true, // Deprecated
-      sourceProject: true,
-      versions: true,
-    },
+    include: documentBasicInclude,
   });
 }
 
@@ -220,23 +116,11 @@ export async function updateDocument(
     type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT' | null;
     originalFilename?: string | null;
   },
-): Promise<
-  Prisma.DocumentGetPayload<{
-    include: {
-      folder: true;
-      sourceProject: true;
-      versions: true;
-    };
-  }>
-> {
+): Promise<DocumentBasic> {
   return prisma.document.update({
     where: { id },
     data,
-    include: {
-      folder: true, // Deprecated
-      sourceProject: true,
-      versions: true,
-    },
+    include: documentBasicInclude,
   });
 }
 
@@ -247,59 +131,10 @@ export async function deleteDocument(id: string): Promise<Prisma.DocumentGetPayl
 }
 
 // Get all versions of documents for overview (showing translation status per language)
-export async function getDocumentsWithAllVersions(): Promise<
-  Prisma.DocumentGetPayload<{
-    include: {
-      folder: true;
-      sourceProject: true;
-      versions: {
-        include: {
-          language: true;
-          user: {
-            select: {
-              id: true;
-              name: true;
-              email: true;
-              languages: {
-                select: {
-                  languageId: true;
-                };
-              };
-            };
-          };
-        };
-      };
-    };
-  }>[]
-> {
+export async function getDocumentsWithAllVersions(): Promise<DocumentList[]> {
   return prisma.document.findMany({
-    include: {
-      folder: true, // Deprecated
-      sourceProject: true,
-      versions: {
-        include: {
-          language: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              languages: {
-                select: {
-                  languageId: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-      },
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
+    include: documentListInclude,
+    orderBy: { updatedAt: 'desc' },
   });
 }
 
@@ -310,42 +145,11 @@ export async function getDashboardDocuments(
   Prisma.DocumentGetPayload<{
     include: {
       sourceProject: true;
-      assignments: {
-        include: {
-          translationProject: {
-            include: {
-              language: true;
-            };
-          };
-          user: {
-            select: {
-              id: true;
-              name: true;
-              email: true;
-              languages: {
-                select: {
-                  languageId: true;
-                };
-              };
-            };
-          };
-        };
-      };
+      assignments: typeof assignmentWithDetails;
       versions: {
         include: {
           language: true;
-          user: {
-            select: {
-              id: true;
-              name: true;
-              email: true;
-              languages: {
-                select: {
-                  languageId: true;
-                };
-              };
-            };
-          };
+          user: typeof userWithLanguages;
         };
       };
     };
@@ -356,91 +160,35 @@ export async function getDashboardDocuments(
   if (sourceProjectId) {
     const translationProject = await prisma.translationProject.findUnique({
       where: {
-        sourceProjectId_languageId: {
-          sourceProjectId,
-          languageId,
-        },
+        sourceProjectId_languageId: { sourceProjectId, languageId },
       },
-      select: {
-        id: true,
-      },
+      select: { id: true },
     });
     translationProjectId = translationProject?.id;
   }
 
   const documents = await prisma.document.findMany({
     where: {
-      ...(sourceProjectId && {
-        sourceProjectId,
-      }),
+      ...(sourceProjectId && { sourceProjectId }),
     },
     include: {
       sourceProject: true,
       assignments: {
-        where: translationProjectId
-          ? {
-              translationProjectId,
-            }
-          : undefined,
-        include: {
-          translationProject: {
-            include: {
-              language: true,
-            },
-          },
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              languages: {
-                select: {
-                  languageId: true,
-                },
-              },
-            },
-          },
-        },
+        where: translationProjectId ? { translationProjectId } : undefined,
+        include: assignmentWithDetails.include,
       },
       versions: {
-        where: {
-          languageId,
-        },
+        where: { languageId },
         include: {
           language: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              languages: {
-                select: {
-                  languageId: true,
-                },
-              },
-            },
-          },
-          reviewer: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          activityLogs: {
-            orderBy: {
-              createdAt: 'desc',
-            },
-          },
+          user: userWithLanguages,
+          reviewer: userBrief,
+          activityLogs: { orderBy: { createdAt: 'desc' } },
         },
-        orderBy: {
-          updatedAt: 'desc',
-        },
+        orderBy: { updatedAt: 'desc' },
       },
     },
-    orderBy: {
-      updatedAt: 'desc',
-    },
+    orderBy: { updatedAt: 'desc' },
   });
 
   const versionIds = documents.flatMap((doc) => doc.versions.map((v) => v.id));
@@ -451,14 +199,10 @@ export async function getDashboardDocuments(
   const grouped = await prisma.suggestion.groupBy({
     by: ['documentVersionId'],
     where: {
-      documentVersionId: {
-        in: versionIds,
-      },
+      documentVersionId: { in: versionIds },
       status: SuggestionStatus.OPEN,
     },
-    _count: {
-      _all: true,
-    },
+    _count: { _all: true },
   });
 
   const countByVersionId = new Map(grouped.map((g) => [g.documentVersionId, g._count._all]));

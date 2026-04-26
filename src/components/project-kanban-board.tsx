@@ -37,6 +37,57 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 // Radix Select doesn't allow empty string values, so we use a sentinel for "unassign"
 const UNASSIGN_VALUE = '__none__';
 
+const getInitials = (name: string | null | undefined) =>
+  (name ?? '')
+    .split(' ')
+    .map((n) => n.charAt(0))
+    .join('');
+
+type MemberLike = { id: string; name: string | null };
+
+function MemberAvatarStack({ users }: { users: MemberLike[] }) {
+  return (
+    <>
+      {users.map((u) => (
+        <Avatar
+          key={u.id}
+          size="sm"
+          name={u.name || undefined}
+          className="border-2 border-background"
+          title={u.name || undefined}
+        >
+          <AvatarFallback name={u.name || undefined}>{getInitials(u.name)}</AvatarFallback>
+        </Avatar>
+      ))}
+    </>
+  );
+}
+
+function MemberSelectItems({
+  members,
+  showUnassign,
+  unassignLabel,
+}: {
+  members: { user: { id: string; name: string | null; email: string } }[];
+  showUnassign: boolean;
+  unassignLabel: string;
+}) {
+  return (
+    <>
+      {showUnassign && (
+        <SelectItem value={UNASSIGN_VALUE} className="text-destructive">
+          {unassignLabel}
+        </SelectItem>
+      )}
+      {members.map((m) => (
+        <SelectItem key={m.user.id} value={m.user.id}>
+          {m.user.name || m.user.email}
+        </SelectItem>
+      ))}
+    </>
+  );
+}
+
 type KanbanCardData = {
   id: string;
   name: string;
@@ -421,12 +472,7 @@ export default function ProjectKanbanBoard({
               <SelectItem value="me">
                 <div className="flex items-center gap-2">
                   <Avatar size="sm" name={user.name || undefined} className="pointer-events-none">
-                    <AvatarFallback name={user.name || undefined}>
-                      {user.name
-                        .split(' ')
-                        .map((name) => name.charAt(0))
-                        .join('')}
-                    </AvatarFallback>
+                    <AvatarFallback name={user.name || undefined}>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
                   <span>Me</span>
                 </div>
@@ -437,12 +483,7 @@ export default function ProjectKanbanBoard({
                   <SelectItem key={u.id} value={u.id}>
                     <div className="flex items-center gap-2">
                       <Avatar size="sm" name={u.name || undefined} className="pointer-events-none">
-                        <AvatarFallback name={u.name || undefined}>
-                          {u.name
-                            .split(' ')
-                            .map((name) => name.charAt(0))
-                            .join('')}
-                        </AvatarFallback>
+                        <AvatarFallback name={u.name || undefined}>{getInitials(u.name)}</AvatarFallback>
                       </Avatar>
                       <span>{u.name}</span>
                     </div>
@@ -605,44 +646,14 @@ export default function ProjectKanbanBoard({
                                           className="flex items-center gap-1 -space-x-1 cursor-pointer hover:opacity-70 transition-opacity"
                                           title="Reassign translator"
                                         >
-                                          {usersToShow.map((u) => (
-                                            <Avatar
-                                              key={u.id}
-                                              size="sm"
-                                              name={u.name || undefined}
-                                              className="border-2 border-background"
-                                              title={u.name || undefined}
-                                            >
-                                              <AvatarFallback name={u.name || undefined}>
-                                                {u.name
-                                                  .split(' ')
-                                                  .map((name: string) => name.charAt(0))
-                                                  .join('')}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                          ))}
+                                          <MemberAvatarStack users={usersToShow} />
                                         </button>
                                       );
                                     }
 
                                     return (
                                       <div className="flex items-center gap-1 -space-x-1">
-                                        {usersToShow.map((u) => (
-                                          <Avatar
-                                            key={u.id}
-                                            size="sm"
-                                            name={u.name || undefined}
-                                            className="border-2 border-background"
-                                            title={u.name || undefined}
-                                          >
-                                            <AvatarFallback name={u.name || undefined}>
-                                              {u.name
-                                                .split(' ')
-                                                .map((name: string) => name.charAt(0))
-                                                .join('')}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                        ))}
+                                        <MemberAvatarStack users={usersToShow} />
                                       </div>
                                     );
                                   })()}
@@ -692,16 +703,11 @@ export default function ProjectKanbanBoard({
                   <SelectValue placeholder="Select translator..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {(assignExistingId || assignUserId) && (
-                    <SelectItem value={UNASSIGN_VALUE} className="text-destructive">
-                      Unassign translator
-                    </SelectItem>
-                  )}
-                  {projectMembers.map((m) => (
-                    <SelectItem key={m.user.id} value={m.user.id}>
-                      {m.user.name || m.user.email}
-                    </SelectItem>
-                  ))}
+                  <MemberSelectItems
+                    members={projectMembers}
+                    showUnassign={Boolean(assignExistingId || assignUserId)}
+                    unassignLabel="Unassign translator"
+                  />
                 </SelectContent>
               </Select>
             </div>
@@ -713,14 +719,7 @@ export default function ProjectKanbanBoard({
                     <SelectValue placeholder="Select reviewer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={UNASSIGN_VALUE} className="text-destructive">
-                      Unassign reviewer
-                    </SelectItem>
-                    {projectMembers.map((m) => (
-                      <SelectItem key={m.user.id} value={m.user.id}>
-                        {m.user.name || m.user.email}
-                      </SelectItem>
-                    ))}
+                    <MemberSelectItems members={projectMembers} showUnassign unassignLabel="Unassign reviewer" />
                   </SelectContent>
                 </Select>
               </div>

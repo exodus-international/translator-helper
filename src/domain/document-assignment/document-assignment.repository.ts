@@ -1,46 +1,46 @@
 import prisma from '@/lib/db';
 import { Prisma } from '@prisma/client';
 
+const userBrief = { select: { id: true, name: true, email: true } } as const;
+
+const assignmentInclude = {
+  document: { include: { sourceProject: true } },
+  translationProject: { include: { sourceProject: true, language: true } },
+  user: userBrief,
+  assignedBy: userBrief,
+} satisfies Prisma.DocumentAssignmentInclude;
+
+const assignmentIncludeWithVersions = {
+  ...assignmentInclude,
+  document: {
+    include: {
+      sourceProject: true,
+      versions: { include: { language: true } },
+    },
+  },
+} satisfies Prisma.DocumentAssignmentInclude;
+
+const assignmentIncludeForUserScoped = {
+  document: assignmentIncludeWithVersions.document,
+  translationProject: { include: { sourceProject: true, language: true } },
+  assignedBy: userBrief,
+} satisfies Prisma.DocumentAssignmentInclude;
+
+type AssignmentWithVersions = Prisma.DocumentAssignmentGetPayload<{
+  include: typeof assignmentIncludeWithVersions;
+}>;
+type Assignment = Prisma.DocumentAssignmentGetPayload<{
+  include: typeof assignmentInclude;
+}>;
+type AssignmentForUserScoped = Prisma.DocumentAssignmentGetPayload<{
+  include: typeof assignmentIncludeForUserScoped;
+}>;
+
 export async function listDocumentAssignments(filters?: {
   translationProjectId?: string;
   userId?: string;
   documentId?: string;
-}): Promise<
-  Prisma.DocumentAssignmentGetPayload<{
-    include: {
-      document: {
-        include: {
-          sourceProject: true;
-          versions: {
-            include: {
-              language: true;
-            };
-          };
-        };
-      };
-      translationProject: {
-        include: {
-          sourceProject: true;
-          language: true;
-        };
-      };
-      user: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-      assignedBy: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-    };
-  }>[]
-> {
+}): Promise<AssignmentWithVersions[]> {
   return prisma.documentAssignment.findMany({
     where: {
       ...(filters?.translationProjectId && {
@@ -49,181 +49,25 @@ export async function listDocumentAssignments(filters?: {
       ...(filters?.userId && { userId: filters.userId }),
       ...(filters?.documentId && { documentId: filters.documentId }),
     },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-          versions: {
-            include: {
-              language: true,
-            },
-          },
-        },
-      },
-      translationProject: {
-        include: {
-          sourceProject: true,
-          language: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      assignedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-    orderBy: {
-      assignedAt: 'desc',
-    },
+    include: assignmentIncludeWithVersions,
+    orderBy: { assignedAt: 'desc' },
   });
 }
 
-export async function getDocumentAssignmentById(id: string): Promise<Prisma.DocumentAssignmentGetPayload<{
-  include: {
-    document: {
-      include: {
-        sourceProject: true;
-        versions: {
-          include: {
-            language: true;
-          };
-        };
-      };
-    };
-    translationProject: {
-      include: {
-        sourceProject: true;
-        language: true;
-      };
-    };
-    user: {
-      select: {
-        id: true;
-        name: true;
-        email: true;
-      };
-    };
-    assignedBy: {
-      select: {
-        id: true;
-        name: true;
-        email: true;
-      };
-    };
-  };
-}> | null> {
+export async function getDocumentAssignmentById(id: string): Promise<AssignmentWithVersions | null> {
   return prisma.documentAssignment.findUnique({
     where: { id },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-          versions: {
-            include: {
-              language: true,
-            },
-          },
-        },
-      },
-      translationProject: {
-        include: {
-          sourceProject: true,
-          language: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      assignedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
+    include: assignmentIncludeWithVersions,
   });
 }
 
 export async function getDocumentAssignmentByDocumentAndProject(
   documentId: string,
   translationProjectId: string,
-): Promise<Prisma.DocumentAssignmentGetPayload<{
-  include: {
-    document: {
-      include: {
-        sourceProject: true;
-      };
-    };
-    translationProject: {
-      include: {
-        sourceProject: true;
-        language: true;
-      };
-    };
-    user: {
-      select: {
-        id: true;
-        name: true;
-        email: true;
-      };
-    };
-    assignedBy: {
-      select: {
-        id: true;
-        name: true;
-        email: true;
-      };
-    };
-  };
-}> | null> {
+): Promise<Assignment | null> {
   return prisma.documentAssignment.findUnique({
-    where: {
-      documentId_translationProjectId: {
-        documentId,
-        translationProjectId,
-      },
-    },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      translationProject: {
-        include: {
-          sourceProject: true,
-          language: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      assignedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
+    where: { documentId_translationProjectId: { documentId, translationProjectId } },
+    include: assignmentInclude,
   });
 }
 
@@ -233,66 +77,10 @@ export async function createDocumentAssignment(data: {
   userId: string | null;
   deadline: Date | null;
   assignedById: string;
-}): Promise<
-  Prisma.DocumentAssignmentGetPayload<{
-    include: {
-      document: {
-        include: {
-          sourceProject: true;
-        };
-      };
-      translationProject: {
-        include: {
-          sourceProject: true;
-          language: true;
-        };
-      };
-      user: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-      assignedBy: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-    };
-  }>
-> {
+}): Promise<Assignment> {
   return prisma.documentAssignment.create({
     data,
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      translationProject: {
-        include: {
-          sourceProject: true,
-          language: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      assignedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
+    include: assignmentInclude,
   });
 }
 
@@ -302,67 +90,11 @@ export async function updateDocumentAssignment(
     userId?: string | null;
     deadline?: Date | null;
   },
-): Promise<
-  Prisma.DocumentAssignmentGetPayload<{
-    include: {
-      document: {
-        include: {
-          sourceProject: true;
-        };
-      };
-      translationProject: {
-        include: {
-          sourceProject: true;
-          language: true;
-        };
-      };
-      user: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-      assignedBy: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-    };
-  }>
-> {
+): Promise<Assignment> {
   return prisma.documentAssignment.update({
     where: { id },
     data,
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      translationProject: {
-        include: {
-          sourceProject: true,
-          language: true,
-        },
-      },
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      assignedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
+    include: assignmentInclude,
   });
 }
 
@@ -375,70 +107,15 @@ export async function deleteDocumentAssignment(id: string): Promise<Prisma.Docum
 export async function getAssignedDocumentsForUser(
   userId: string,
   translationProjectId?: string,
-): Promise<
-  Prisma.DocumentAssignmentGetPayload<{
-    include: {
-      document: {
-        include: {
-          sourceProject: true;
-          versions: {
-            include: {
-              language: true;
-            };
-          };
-        };
-      };
-      translationProject: {
-        include: {
-          sourceProject: true;
-          language: true;
-        };
-      };
-      assignedBy: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-    };
-  }>[]
-> {
+): Promise<AssignmentForUserScoped[]> {
   return prisma.documentAssignment.findMany({
     where: {
       userId,
       ...(translationProjectId && { translationProjectId }),
     },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-          versions: {
-            include: {
-              language: true,
-            },
-          },
-        },
-      },
-      translationProject: {
-        include: {
-          sourceProject: true,
-          language: true,
-        },
-      },
-      assignedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
+    include: assignmentIncludeForUserScoped,
     orderBy: {
-      deadline: {
-        sort: 'asc',
-        nulls: 'last',
-      },
+      deadline: { sort: 'asc', nulls: 'last' },
     },
   });
 }
