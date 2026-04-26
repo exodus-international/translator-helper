@@ -26,11 +26,13 @@ import {
 } from '@/domain/document-version/document-version.actions';
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import { DocumentSearchInput } from '@/components/document-search-input';
+import { getCanonicalEditorPath } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { toast } from 'sonner';
 import { DocumentStatus, Language } from '@prisma/client';
-import { FileCheck, FileText, Search, UserPlus } from 'lucide-react';
+import { FileCheck, FileText, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
@@ -448,17 +450,7 @@ export default function ProjectKanbanBoard({
   return (
     <div>
       <div className="flex gap-4 items-center mb-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
+        <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
         <div className="flex gap-4 items-center text-sm text-gray-600">
           <span>Filters:</span>
           <Select value={selectedUser} onValueChange={setSelectedUser}>
@@ -526,21 +518,11 @@ export default function ProjectKanbanBoard({
                       version?.status === DocumentStatus.PENDING_REVIEW &&
                       doc.labels?.includes('Waiting for final label');
 
-                    const getDocumentUrl = () => {
-                      if (
-                        hasVersion &&
-                        (version?.status === 'PENDING_TRANSLATION' || version?.status === 'IN_PROGRESS')
-                      ) {
-                        return `/documents/${doc.id}/translate?lang=${selectedLanguage}&version=${version.id}`;
-                      }
-                      if (hasVersion && version?.status === 'PENDING_REVIEW') {
-                        return `/documents/${doc.id}/review?version=${version.id}`;
-                      }
-                      if (hasVersion) {
-                        return `/documents/${doc.id}/review?version=${version.id}`;
-                      }
-                      return `/documents/${doc.id}/translate?lang=${selectedLanguage}`;
-                    };
+                    const getDocumentUrl = () =>
+                      getCanonicalEditorPath(doc.id, hasVersion ? (version?.status ?? null) : null, {
+                        versionId: hasVersion ? version?.id : undefined,
+                        lang: selectedLanguage,
+                      });
 
                     const cardsInColumn = kanbanData.filter((c) => c.column === column.id);
                     const cardIndexInColumn = cardsInColumn.findIndex((c) => c.id === card.id);

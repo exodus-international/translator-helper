@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { applyTextEditAtRange, isRangeWithinBounds } from '@/lib/text-range';
 import { DiffEditor } from '@monaco-editor/react';
 import { useEffect, useRef, useState } from 'react';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
@@ -36,48 +37,29 @@ export function SuggestionDiffViewer({
       return;
     }
 
-    // Filter to only anchored suggestions and sort by line number
-    const anchoredSuggestions = filteredSuggestions.filter(
-      (s) => s.startLine != null && s.startColumn != null && s.endLine != null && s.endColumn != null,
-    );
-    const sortedSuggestions = [...anchoredSuggestions].sort((a, b) => {
-      if (a.startLine! !== b.startLine!) return a.startLine! - b.startLine!;
-      return a.startColumn! - b.startColumn!;
-    });
+    // Apply CHANGE suggestions bottom-up so earlier line indices stay valid
+    // even when a multi-line replacement collapses or extends rows.
+    const sortedSuggestions = filteredSuggestions
+      .filter((s) => s.startLine != null && s.startColumn != null && s.endLine != null && s.endColumn != null)
+      .sort((a, b) => {
+        if (a.startLine! !== b.startLine!) return b.startLine! - a.startLine!;
+        return b.startColumn! - a.startColumn!;
+      });
 
-    // Apply suggestions in reverse order (bottom to top) to maintain line numbers
     let content = originalContent;
-    const lines = content.split('\n');
+    for (const s of sortedSuggestions) {
+      if (s.type !== 'CHANGE' || !s.proposedText) continue;
+      const range = {
+        startLine: s.startLine!,
+        startColumn: s.startColumn!,
+        endLine: s.endLine!,
+        endColumn: s.endColumn!,
+      };
+      if (!isRangeWithinBounds(range, content.split('\n').length)) continue;
+      content = applyTextEditAtRange(content, range, s.proposedText);
+    }
 
-    // Apply each suggestion
-    sortedSuggestions.forEach((suggestion) => {
-      if (suggestion.type === 'CHANGE' && suggestion.proposedText) {
-        const startLine = suggestion.startLine! - 1; // Convert to 0-based
-        const endLine = suggestion.endLine! - 1;
-        const startColumn = suggestion.startColumn! - 1;
-        const endColumn = suggestion.endColumn! - 1;
-
-        if (startLine >= 0 && endLine < lines.length) {
-          if (startLine === endLine) {
-            // Single line replacement
-            const line = lines[startLine];
-            const before = line.substring(0, startColumn);
-            const after = line.substring(endColumn);
-            lines[startLine] = before + suggestion.proposedText + after;
-          } else {
-            // Multi-line replacement
-            const firstLine = lines[startLine];
-            const lastLine = lines[endLine];
-            const before = firstLine.substring(0, startColumn);
-            const after = lastLine.substring(endColumn);
-            const newLines = [before + suggestion.proposedText + after];
-            lines.splice(startLine, endLine - startLine + 1, ...newLines);
-          }
-        }
-      }
-    });
-
-    setModifiedContent(lines.join('\n'));
+    setModifiedContent(content);
   }, [originalContent, filteredSuggestions]);
 
   const handleEditorDidMount = (editor: any, monaco: any) => {

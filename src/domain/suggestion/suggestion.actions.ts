@@ -1,6 +1,7 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
+import { applyTextEditAtRange, extractTextAtRange, isRangeWithinBounds } from '@/lib/text-range';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
@@ -123,46 +124,19 @@ export async function applySuggestionAction(input: unknown) {
   }
 
   // Apply the suggestion by replacing the text at the range
-  const lines = documentVersion.content.split('\n');
-  const startLine = suggestion.startLine - 1; // Convert to 0-based
-  const endLine = suggestion.endLine - 1;
-  const startColumn = suggestion.startColumn - 1;
-  const endColumn = suggestion.endColumn - 1;
+  const range = {
+    startLine: suggestion.startLine,
+    startColumn: suggestion.startColumn,
+    endLine: suggestion.endLine,
+    endColumn: suggestion.endColumn,
+  };
 
-  if (startLine >= lines.length || endLine >= lines.length) {
+  if (!isRangeWithinBounds(range, documentVersion.content.split('\n').length)) {
     throw new Error('Suggestion range is out of bounds');
   }
 
-  // Extract the original text at the range before replacing
-  let originalText: string;
-  if (startLine === endLine) {
-    const line = lines[startLine];
-    originalText = line.substring(startColumn, endColumn);
-  } else {
-    const firstLine = lines[startLine].substring(startColumn);
-    const lastLine = lines[endLine].substring(0, endColumn);
-    const middleLines = lines.slice(startLine + 1, endLine);
-    originalText = [firstLine, ...middleLines, lastLine].join('\n');
-  }
-
-  // Replace the text
-  if (startLine === endLine) {
-    // Single line replacement
-    const line = lines[startLine];
-    const before = line.substring(0, startColumn);
-    const after = line.substring(endColumn);
-    lines[startLine] = before + suggestion.proposedText + after;
-  } else {
-    // Multi-line replacement
-    const firstLine = lines[startLine];
-    const lastLine = lines[endLine];
-    const before = firstLine.substring(0, startColumn);
-    const after = lastLine.substring(endColumn);
-    const newLines = [before + suggestion.proposedText + after];
-    lines.splice(startLine, endLine - startLine + 1, ...newLines);
-  }
-
-  const newContent = lines.join('\n');
+  const originalText = extractTextAtRange(documentVersion.content, range);
+  const newContent = applyTextEditAtRange(documentVersion.content, range, suggestion.proposedText);
 
   // Update document version
   const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, newContent, user.id);
