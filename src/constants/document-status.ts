@@ -132,13 +132,6 @@ export function getDocumentStatusConfig(status?: DocumentStatus | DocumentStatus
   return DOCUMENT_STATUS_CONFIGS[status] ?? NO_STATUS_CONFIG;
 }
 
-export function getDocumentStatusByStep(step: number): DocumentStatus | null {
-  if (step < 1 || step > DOCUMENT_STATUS_SEQUENCE.length) {
-    return null;
-  }
-  return DOCUMENT_STATUS_SEQUENCE[step - 1];
-}
-
 export function getStepForDocumentStatus(status?: DocumentStatus | DocumentStatusKey | null): number {
   if (!status || status === 'NO_STATUS') {
     return 1;

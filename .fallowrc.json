@@ -4,6 +4,6 @@
     "src/index.{ts,tsx,js,jsx}",
     "src/main.{ts,tsx,js,jsx}"
   ],
-  "ignorePatterns": ["**/components/ui/*.ts"],
+  "ignorePatterns": ["**/components/ui/*.tsx"],
   "rules": {}
 }

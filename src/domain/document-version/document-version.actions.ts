@@ -181,62 +181,6 @@ export async function submitForReviewAction(input: unknown) {
   return version;
 }
 
-export async function deployVersionAction(versionId: string) {
-  const { user } = await authorize('can:deploy');
-
-  const currentVersion = await getDocumentVersionById(versionId);
-  if (!currentVersion) {
-    throw new Error('Document version not found');
-  }
-
-  const openCount = await countOpenSuggestions(versionId);
-  validateTransition(currentVersion.status, DocumentStatus.DEPLOYED, { openSuggestionsCount: openCount });
-
-  const version = await updateDocumentVersionStatus(versionId, DocumentStatus.DEPLOYED);
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'deployed',
-    details: {},
-  });
-
-  // Attempt GitHub deploy (non-blocking — deploy succeeds regardless of GitHub outcome)
-  try {
-    console.log('[GitHub] Checking if GitHub is configured...');
-    const { isGitHubConfigured } = await import('@/lib/github-config');
-    if (isGitHubConfigured()) {
-      console.log('[GitHub] GitHub is configured, starting deploy for version:', versionId);
-      const { deployToGitHub } = await import('../github/github.service');
-      await deployToGitHub(versionId);
-
-      console.log('[GitHub] Deploy succeeded, logging activity');
-      await createActivityLog({
-        documentVersionId: version.id,
-        userId: user.id,
-        action: 'github_deployed',
-        details: {},
-      });
-      revalidatePath(`/documents/${version.documentId}/review`);
-    } else {
-      console.log('[GitHub] GitHub is not configured, skipping deploy');
-    }
-  } catch (error: any) {
-    console.error('[GitHub] Deploy failed:', error.message);
-    console.error('[GitHub] Full error:', error);
-    await createActivityLog({
-      documentVersionId: version.id,
-      userId: user.id,
-      action: 'github_deploy_failed',
-      details: { error: error.message },
-    });
-    revalidatePath(`/documents/${version.documentId}/review`);
-  }
-
-  return version;
-}
-
 export async function deleteDocumentVersionAction(id: string) {
   const { user } = await authorize('authenticated');
 
