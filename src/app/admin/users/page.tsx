@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { listUsersAction } from '@/domain/user/user.actions';
+import { listInvitationsAction } from '@/domain/invitation/invitation.actions';
 import UsersClient from './page.client';
 
 export default async function UsersPage() {
@@ -14,7 +15,10 @@ export default async function UsersPage() {
     redirect('/dashboard');
   }
 
-  const users = await listUsersAction();
+  const [users, invitations] = await Promise.all([
+    listUsersAction(),
+    listInvitationsAction(),
+  ]);
 
-  return <UsersClient users={users} />;
+  return <UsersClient users={users} invitations={invitations} />;
 }
