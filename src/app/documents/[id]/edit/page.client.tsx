@@ -10,6 +10,7 @@ import { DocumentTypeSelect } from '@/components/document-form/document-type-sel
 import { LabelsField } from '@/components/document-form/labels-field';
 import { OriginalFilenameField } from '@/components/document-form/original-filename-field';
 import { validateDailyContentFilename } from '@/components/document-form/validate-daily-content-filename';
+import { validateMeetingFilename } from '@/components/document-form/validate-meeting-filename';
 import { updateDocumentAction } from '@/domain/document/document.actions';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { ArrowLeft } from 'lucide-react';
@@ -50,7 +51,9 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
   const [content, setContent] = useState(sourceVersion?.content || '');
   const [loading, setLoading] = useState(false);
 
-  const dailyContentFilenameError = validateDailyContentFilename(documentType, originalFilename);
+  const filenameError =
+    validateDailyContentFilename(documentType, originalFilename) ||
+    validateMeetingFilename(documentType, originalFilename);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +124,7 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
                   value={originalFilename}
                   onChange={setOriginalFilename}
                   documentType={documentType}
-                  error={dailyContentFilenameError}
+                  error={filenameError}
                 />
               </div>
 
@@ -166,7 +169,7 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
                     Cancel
                   </Button>
                 </Link>
-                <Button type="submit" disabled={loading || !title || !!dailyContentFilenameError}>
+                <Button type="submit" disabled={loading || !title || !!filenameError}>
                   {loading ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>

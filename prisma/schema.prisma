@@ -59,6 +59,7 @@ enum DocumentType {
   DAY
   FIELD_GUIDE
   DAILY_CONTENT
+  MEETING
 }
 
 enum GitHubPRStatus {

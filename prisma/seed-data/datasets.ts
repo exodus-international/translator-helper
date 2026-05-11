@@ -106,6 +106,13 @@ export const SOURCE_PROJECTS = [
     status: SourceProjectStatus.ACTIVE,
   },
   {
+    key: 'easter',
+    name: 'Easter 2026',
+    description: 'Weekly meeting guides for the Easter season — group reflection on Sunday readings.',
+    identifier: 'easter2026',
+    status: SourceProjectStatus.ACTIVE,
+  },
+  {
     key: 'retreat',
     name: 'Summer Retreat 2025',
     description: 'Weekend retreat materials including talks and small group guides.',
@@ -151,6 +158,8 @@ export const PROJECT_MEMBERS: { tp: string; user: string; role: ProjectRole }[] 
   { tp: 'lent:fr', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
   // Advent
   { tp: 'advent:cs', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
+  { tp: 'easter:cs', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
+  { tp: 'easter:cs', user: 'translator1', role: ProjectRole.TRANSLATOR },
   { tp: 'advent:cs', user: 'translator1', role: ProjectRole.TRANSLATOR },
   { tp: 'advent:sk', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
   { tp: 'advent:sk', user: 'reviewer1', role: ProjectRole.TRANSLATOR },
@@ -200,6 +209,8 @@ export const DOCUMENTS: {
   { key: 'ad-w1', slug: 'advent-week-1', title: 'First Week: Hope', type: DocumentType.DAY, labels: ['week-1'], project: 'advent' },
   { key: 'ad-w2', slug: 'advent-week-2', title: 'Second Week: Peace', type: DocumentType.DAY, labels: ['week-2'], project: 'advent' },
   { key: 'ad-fg', slug: 'advent-wreath-guide', title: 'Advent Wreath Guide', type: DocumentType.FIELD_GUIDE, labels: ['reference', 'family'], project: 'advent' },
+  // Easter
+  { key: 'ea-m1', slug: 'easter-week-6-meeting', title: 'Easter Week 6 Meeting', type: DocumentType.MEETING, labels: ['week-6', 'easter'], originalFilename: '1-7.md', project: 'easter' },
   // Summer Retreat
   { key: 're-t1', slug: 'retreat-opening-talk', title: 'Opening Talk: Finding Silence', type: DocumentType.DAILY_CONTENT, labels: ['talk', 'day-1'], project: 'retreat' },
 ];
@@ -271,6 +282,9 @@ export const TARGET_VERSIONS: VersionDef[] = [
   { docKey: 'ad-w1', langCode: 'sk', status: DocumentStatus.DEPLOYED, userKey: 'reviewer1', reviewerKey: 'admin1', versionNum: 5 },
   { docKey: 'ad-w2', langCode: 'sk', status: DocumentStatus.DEPLOYED, userKey: 'reviewer1', reviewerKey: 'admin1', versionNum: 5 },
 
+  // Easter
+  { docKey: 'ea-m1', langCode: 'cs', status: DocumentStatus.PENDING_TRANSLATION, userKey: 'admin1', versionNum: 1 },
+
   // Summer Retreat (all DEPLOYED)
   { docKey: 're-t1', langCode: 'cs', status: DocumentStatus.DEPLOYED, userKey: 'translator1', reviewerKey: 'admin1', versionNum: 5 },
   { docKey: 're-t1', langCode: 'sk', status: DocumentStatus.DEPLOYED, userKey: 'reviewer1', reviewerKey: 'admin1', versionNum: 5 },
@@ -318,6 +332,8 @@ export const DOCUMENT_ASSIGNMENTS: { docKey: string; langCode: string; userKey: 
   { docKey: 'le-fg', langCode: 'sk', userKey: 'reviewer1' },
   // Lent German
   { docKey: 'le-aw', langCode: 'de', userKey: 'translator2' },
+  // Easter
+  { docKey: 'ea-m1', langCode: 'cs', userKey: 'translator1' },
 ];
 
 // ---------------------------------------------------------------------------

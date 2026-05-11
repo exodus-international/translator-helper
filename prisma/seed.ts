@@ -146,6 +146,7 @@ async function seedTranslationProjects(
     exodus: 'Exodus90 2026',
     lent: 'Lent 2026',
     advent: 'Advent 2025',
+    easter: 'Easter 2026',
     retreat: 'Summer Retreat 2025',
   };
   const langNames: Record<string, string> = {
@@ -307,6 +308,7 @@ async function seedDocumentAssignments(
     if (key.startsWith('ex-')) docToProject[key] = 'exodus';
     else if (key.startsWith('le-')) docToProject[key] = 'lent';
     else if (key.startsWith('ad-')) docToProject[key] = 'advent';
+    else if (key.startsWith('ea-')) docToProject[key] = 'easter';
     else if (key.startsWith('re-')) docToProject[key] = 'retreat';
   }
 

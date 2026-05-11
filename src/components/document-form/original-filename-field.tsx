@@ -18,7 +18,13 @@ export function OriginalFilenameField({ value, onChange, documentType, error }: 
         id="originalFilename"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={documentType === 'DAILY_CONTENT' ? 'e.g., 20260201-5.md' : 'e.g., 1.md'}
+        placeholder={
+          documentType === 'DAILY_CONTENT'
+            ? 'e.g., 20260201-5.md'
+            : documentType === 'MEETING'
+              ? 'e.g., 1-7.md'
+              : 'e.g., 1.md'
+        }
         className={error ? 'border-red-500' : ''}
       />
       {error ? (

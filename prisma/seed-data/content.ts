@@ -212,6 +212,34 @@ This week I will pray especially for:
 ### Scripture to Carry
 Choose one verse to memorize or meditate on throughout the week:`,
 
+  'ea-m1': `---
+title: Easter Week 6 Meeting
+subtitle: May 10 - May 16
+caption: Easter
+sort_order: 4
+hero: meetings-easter_2026
+---
+
+# Easter Week 6 Meeting
+
+## Opening Prayer
+
+Risen Lord, gather us in Your peace as we share what You have done in our lives this week.
+
+## Scripture for Reflection
+
+> "Peace I leave with you; my peace I give to you. Not as the world gives do I give to you." — John 14:27
+
+## Group Discussion
+
+1. Where did you experience the Risen Christ this week?
+2. What invitation is the Lord offering you in this Easter season?
+3. How can the group support you in living out that invitation?
+
+## Closing
+
+End with the Regina Caeli and a moment of silent thanksgiving.`,
+
   'le-aw': `# Ash Wednesday Reflection
 
 > "Remember that you are dust, and to dust you shall return." — Genesis 3:19

@@ -42,6 +42,10 @@ function resolveFilePath(params: FilePathParams): string {
       path = `translations/${languageCode}/exercises/${identifier}/field_guide/${filename}`;
       break;
 
+    case DocumentType.MEETING:
+      path = `translations/${languageCode}/exercises/${identifier}/meetings/${filename}`;
+      break;
+
     case DocumentType.DAILY_CONTENT: {
       const { year, month } = parseDailyContentDate(originalFilename);
       path = `translations/${languageCode}/daily_content/${year}/${month}/${filename}`;

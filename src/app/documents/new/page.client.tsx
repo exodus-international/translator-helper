@@ -11,6 +11,7 @@ import { DocumentTypeSelect } from '@/components/document-form/document-type-sel
 import { LabelsField } from '@/components/document-form/labels-field';
 import { OriginalFilenameField } from '@/components/document-form/original-filename-field';
 import { validateDailyContentFilename } from '@/components/document-form/validate-daily-content-filename';
+import { validateMeetingFilename } from '@/components/document-form/validate-meeting-filename';
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import matter from 'gray-matter';
@@ -64,7 +65,9 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [loading, setLoading] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
 
-  const dailyContentFilenameError = validateDailyContentFilename(documentType, originalFilename);
+  const filenameError =
+    validateDailyContentFilename(documentType, originalFilename) ||
+    validateMeetingFilename(documentType, originalFilename);
 
   const processFile = useCallback((file: File) => {
     setOriginalFilename(file.name);
@@ -240,7 +243,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                       value={originalFilename}
                       onChange={setOriginalFilename}
                       documentType={documentType}
-                      error={dailyContentFilenameError}
+                      error={filenameError}
                     />
                   </div>
 
@@ -355,7 +358,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                     <Button
                       type="submit"
                       disabled={
-                        loading || !sourceProjectId || sourceProjects.length === 0 || !!dailyContentFilenameError
+                        loading || !sourceProjectId || sourceProjects.length === 0 || !!filenameError
                       }
                     >
                       {loading ? 'Creating...' : 'Create Document'}

@@ -19,6 +19,7 @@ export function DocumentTypeSelect({ value, onChange }: DocumentTypeSelectProps)
         <SelectContent>
           <SelectItem value="DAY">Day</SelectItem>
           <SelectItem value="FIELD_GUIDE">Field Guide</SelectItem>
+          <SelectItem value="MEETING">Meeting</SelectItem>
           <SelectItem value="DAILY_CONTENT">Daily Content</SelectItem>
         </SelectContent>
       </Select>
