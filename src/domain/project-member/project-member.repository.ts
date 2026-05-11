@@ -70,51 +70,6 @@ export async function getProjectMemberById(id: string): Promise<Prisma.ProjectMe
   });
 }
 
-export async function getProjectMembersByUserAndProject(
-  userId: string,
-  translationProjectId: string,
-): Promise<
-  Prisma.ProjectMemberGetPayload<{
-    include: {
-      user: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-      translationProject: {
-        include: {
-          sourceProject: true;
-          language: true;
-        };
-      };
-    };
-  }>[]
-> {
-  return prisma.projectMember.findMany({
-    where: {
-      translationProjectId,
-      userId,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      translationProject: {
-        include: {
-          sourceProject: true,
-          language: true,
-        },
-      },
-    },
-  });
-}
-
 export async function createProjectMember(data: {
   translationProjectId: string;
   userId: string;
@@ -139,49 +94,6 @@ export async function createProjectMember(data: {
   }>
 > {
   return prisma.projectMember.create({
-    data,
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      translationProject: {
-        include: {
-          sourceProject: true,
-          language: true,
-        },
-      },
-    },
-  });
-}
-
-export async function updateProjectMember(
-  id: string,
-  data: { role: ProjectRole },
-): Promise<
-  Prisma.ProjectMemberGetPayload<{
-    include: {
-      user: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-      translationProject: {
-        include: {
-          sourceProject: true;
-          language: true;
-        };
-      };
-    };
-  }>
-> {
-  return prisma.projectMember.update({
-    where: { id },
     data,
     include: {
       user: {
@@ -231,12 +143,6 @@ export async function getUserRolesInProject(userId: string, translationProjectId
   });
 
   return members.map((m) => m.role);
-}
-
-// Legacy function for backward compatibility - returns first role or null
-export async function getUserRoleInProject(userId: string, translationProjectId: string): Promise<ProjectRole | null> {
-  const roles = await getUserRolesInProject(userId, translationProjectId);
-  return roles.length > 0 ? roles[0] : null;
 }
 
 export async function isUserProjectManagerForSourceProject(userId: string, sourceProjectId: string): Promise<boolean> {

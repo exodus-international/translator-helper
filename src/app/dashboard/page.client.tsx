@@ -16,7 +16,7 @@ import { createSourceProjectAction } from '@/domain/source-project/source-projec
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@prisma/client';
-import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Rocket, Search } from 'lucide-react';
+import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -131,12 +131,6 @@ function getDocumentUrl(assignment: DashboardClientProps['assignments'][number])
   }
 
   return `/documents/${doc.id}/review?version=${version.id}`;
-}
-
-function getVersionStatus(assignment: DashboardClientProps['assignments'][number]): DocumentStatus | null {
-  const langId = assignment.translationProject.language.id;
-  const version = assignment.document.versions.find((v) => v.languageId === langId);
-  return version?.status || null;
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat('en-US', {

@@ -9,7 +9,7 @@ const githubConfigSchema = z.object({
   installationId: z.coerce.number().int().positive('GITHUB_INSTALLATION_ID must be a positive integer'),
 });
 
-export type GitHubConfig = z.infer<typeof githubConfigSchema>;
+type GitHubConfig = z.infer<typeof githubConfigSchema>;
 
 let cachedConfig: GitHubConfig | null = null;
 

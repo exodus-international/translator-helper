@@ -7,7 +7,7 @@ export interface InvitationForValidation {
   maxUses: number | null;
 }
 
-export type ValidationResult =
+type ValidationResult =
   | { valid: true }
   | { valid: false; reason: string };
 

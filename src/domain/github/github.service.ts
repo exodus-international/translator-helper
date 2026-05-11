@@ -28,7 +28,7 @@ async function getOctokit() {
   return app.getInstallationOctokit(config.installationId);
 }
 
-export function resolveFilePath(params: FilePathParams): string {
+function resolveFilePath(params: FilePathParams): string {
   const { documentType, languageCode, identifier, originalFilename, slug } = params;
   const filename = originalFilename || `${slug}.md`;
 
@@ -72,7 +72,7 @@ function parseDailyContentDate(originalFilename: string | null): { year: string;
   return { year: match[1], month: match[2] };
 }
 
-export async function verifyBranchExists(branch: string): Promise<boolean> {
+async function verifyBranchExists(branch: string): Promise<boolean> {
   const config = getGitHubConfig();
   const octokit = await getOctokit();
 
@@ -95,7 +95,7 @@ export async function verifyBranchExists(branch: string): Promise<boolean> {
   }
 }
 
-export async function commitFileToRepo(params: {
+async function commitFileToRepo(params: {
   branch: string;
   filePath: string;
   content: string;
@@ -143,7 +143,7 @@ export async function commitFileToRepo(params: {
   return commitSha;
 }
 
-export async function findOrCreatePullRequest(
+async function findOrCreatePullRequest(
   branch: string,
   title: string,
   body: string,

@@ -15,14 +15,6 @@ export function isAdminClient(user: SessionUser): boolean {
   return user.role === Role.ADMIN;
 }
 
-export function isUserClient(user: SessionUser): boolean {
-  return user.role === Role.USER;
-}
-
-export function canTranslateClient(user: SessionUser): boolean {
-  return user.role === Role.USER || user.role === Role.ADMIN;
-}
-
 export function canReviewClient(user: SessionUser): boolean {
   return user.role === Role.USER || user.role === Role.ADMIN;
 }

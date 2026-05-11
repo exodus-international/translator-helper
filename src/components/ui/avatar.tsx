@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import * as React from 'react';
 
-export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
+interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
   fallback?: string;
@@ -9,9 +9,9 @@ export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   name?: string; // Name used to generate color
 }
 
-export interface AvatarImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {}
+interface AvatarImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {}
 
-export interface AvatarFallbackProps extends React.HTMLAttributes<HTMLDivElement> {
+interface AvatarFallbackProps extends React.HTMLAttributes<HTMLDivElement> {
   name?: string; // Name used to generate color
 }
 
@@ -102,4 +102,4 @@ const AvatarFallback = React.forwardRef<HTMLDivElement, AvatarFallbackProps>(
 );
 AvatarFallback.displayName = 'AvatarFallback';
 
-export { Avatar, AvatarFallback, AvatarImage };
+export { Avatar, AvatarFallback };

@@ -6,7 +6,7 @@ import { getUserRolesInProject } from '@/domain/project-member/project-member.re
 
 type ProjectPermissionRole = 'manager' | 'reviewer' | 'editor' | 'translator' | 'member';
 
-export type Permission =
+type Permission =
   | 'authenticated'
   | 'admin'
   | 'can:deploy'
@@ -15,7 +15,7 @@ export type Permission =
   | { project: string; role: ProjectPermissionRole }
   | { project: string; roles: ProjectPermissionRole[] };
 
-export interface AuthResult {
+interface AuthResult {
   user: SessionUser;
   projectRoles?: ProjectRole[];
 }

@@ -29,10 +29,12 @@ function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return <div data-slot="card-title" className={cn('leading-none font-semibold', className)} {...props} />;
 }
 
+// @ts-expect-error kept for future use
 function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
   return <div data-slot="card-description" className={cn('text-muted-foreground text-sm', className)} {...props} />;
 }
 
+// @ts-expect-error kept for future use
 function CardAction({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -47,10 +49,11 @@ function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
   return <div data-slot="card-content" className={cn('px-4', className)} {...props} />;
 }
 
+// @ts-expect-error kept for future use
 function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div data-slot="card-footer" className={cn('flex items-center px-4 [.border-t]:pt-3', className)} {...props} />
   );
 }
 
-export { Card, CardHeader, CardFooter, CardTitle, CardAction, CardDescription, CardContent };
+export { Card, CardHeader, CardTitle, CardContent };

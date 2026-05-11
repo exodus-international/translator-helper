@@ -445,7 +445,7 @@ Find a quiet place outside. Sit for 15 minutes. Do nothing. Simply notice what y
 *God speaks in the silence. Will you listen?*`,
 };
 
-export const CZECH_CONTENT: Record<string, string> = {
+const CZECH_CONTENT: Record<string, string> = {
   'ex-d1': `# Den 1 - Povolani
 
 > "Pojdte za mnou a ucinim z vas rybare lidi." — Matous 4,19
@@ -667,7 +667,7 @@ Nase zivoty jsou prosyceny hlukem:
 **Ticho neni neprítomnost zvuku. Je to pritomnost pozornosti.**`,
 };
 
-export const SLOVAK_CONTENT: Record<string, string> = {
+const SLOVAK_CONTENT: Record<string, string> = {
   'ex-d1': `# Den 1 - Povolanie
 
 > "Podte za mnou a urobim z vas rybarov ludi." — Matus 4,19
@@ -746,7 +746,7 @@ Tento tyzden pridavame druhu sviecu — sviecu **Pokoja**.`,
 Bratia, vitajte na tomto duchovnom cviceni.`,
 };
 
-export const CROATIAN_CONTENT: Record<string, string> = {
+const CROATIAN_CONTENT: Record<string, string> = {
   'ex-d1': `# Dan 1 - Poziv
 
 > "Dodite za mnom i ucinit cu vas ribarima ljudi." — Matej 4,19
@@ -789,7 +789,7 @@ Ovaj vodic predstavlja nekoliko metoda molitve koristenih u programu Exodus90.
 Braco, dobrodosli na ovo duhovno povlacenje.`,
 };
 
-export const GERMAN_CONTENT: Record<string, string> = {
+const GERMAN_CONTENT: Record<string, string> = {
   'ex-d1': `# Tag 1 - Die Berufung
 
 > "Kommt, folgt mir nach! Ich werde euch zu Menschenfischern machen." — Matthaus 4,19

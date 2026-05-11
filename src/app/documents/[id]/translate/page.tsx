@@ -7,6 +7,7 @@ import { getDocumentById } from '@/domain/document/document.repository';
 import { getLanguageByCode } from '@/domain/language/language.repository';
 import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.repository';
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
+import { getCanonicalEditorPath } from '@/lib/document-status';
 import { getCurrentUser } from '@/lib/session';
 import { notFound, redirect } from 'next/navigation';
 import TranslateClient from './page.client';
@@ -61,6 +62,18 @@ export default async function TranslatePage({
     translationProject = await getTranslationProjectBySourceAndLanguage(document.sourceProject.id, lang);
     if (translationProject) {
       assignment = await getDocumentAssignmentByDocumentAndProject(id, translationProject.id);
+    }
+  }
+
+  // Route guard: /translate is for PENDING_TRANSLATION / IN_PROGRESS / no-version only.
+  // If a target version exists in a post-translation status, send to /review.
+  if (targetVersion) {
+    const canonical = getCanonicalEditorPath(id, targetVersion.status, {
+      versionId: targetVersion.id,
+      lang,
+    });
+    if (!canonical.startsWith(`/documents/${id}/translate`)) {
+      redirect(canonical);
     }
   }
 

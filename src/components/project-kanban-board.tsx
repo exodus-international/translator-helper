@@ -26,16 +26,69 @@ import {
 } from '@/domain/document-version/document-version.actions';
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import { DocumentSearchInput } from '@/components/document-search-input';
+import { getCanonicalEditorPath } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { toast } from 'sonner';
 import { DocumentStatus, Language } from '@prisma/client';
-import { FileCheck, FileText, Search, UserPlus } from 'lucide-react';
+import { FileCheck, FileText, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
 // Radix Select doesn't allow empty string values, so we use a sentinel for "unassign"
 const UNASSIGN_VALUE = '__none__';
+
+const getInitials = (name: string | null | undefined) =>
+  (name ?? '')
+    .split(' ')
+    .map((n) => n.charAt(0))
+    .join('');
+
+type MemberLike = { id: string; name: string | null };
+
+function MemberAvatarStack({ users }: { users: MemberLike[] }) {
+  return (
+    <>
+      {users.map((u) => (
+        <Avatar
+          key={u.id}
+          size="sm"
+          name={u.name || undefined}
+          className="border-2 border-background"
+          title={u.name || undefined}
+        >
+          <AvatarFallback name={u.name || undefined}>{getInitials(u.name)}</AvatarFallback>
+        </Avatar>
+      ))}
+    </>
+  );
+}
+
+function MemberSelectItems({
+  members,
+  showUnassign,
+  unassignLabel,
+}: {
+  members: { user: { id: string; name: string | null; email: string } }[];
+  showUnassign: boolean;
+  unassignLabel: string;
+}) {
+  return (
+    <>
+      {showUnassign && (
+        <SelectItem value={UNASSIGN_VALUE} className="text-destructive">
+          {unassignLabel}
+        </SelectItem>
+      )}
+      {members.map((m) => (
+        <SelectItem key={m.user.id} value={m.user.id}>
+          {m.user.name || m.user.email}
+        </SelectItem>
+      ))}
+    </>
+  );
+}
 
 type KanbanCardData = {
   id: string;
@@ -397,17 +450,7 @@ export default function ProjectKanbanBoard({
   return (
     <div>
       <div className="flex gap-4 items-center mb-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
+        <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
         <div className="flex gap-4 items-center text-sm text-gray-600">
           <span>Filters:</span>
           <Select value={selectedUser} onValueChange={setSelectedUser}>
@@ -421,12 +464,7 @@ export default function ProjectKanbanBoard({
               <SelectItem value="me">
                 <div className="flex items-center gap-2">
                   <Avatar size="sm" name={user.name || undefined} className="pointer-events-none">
-                    <AvatarFallback name={user.name || undefined}>
-                      {user.name
-                        .split(' ')
-                        .map((name) => name.charAt(0))
-                        .join('')}
-                    </AvatarFallback>
+                    <AvatarFallback name={user.name || undefined}>{getInitials(user.name)}</AvatarFallback>
                   </Avatar>
                   <span>Me</span>
                 </div>
@@ -437,12 +475,7 @@ export default function ProjectKanbanBoard({
                   <SelectItem key={u.id} value={u.id}>
                     <div className="flex items-center gap-2">
                       <Avatar size="sm" name={u.name || undefined} className="pointer-events-none">
-                        <AvatarFallback name={u.name || undefined}>
-                          {u.name
-                            .split(' ')
-                            .map((name) => name.charAt(0))
-                            .join('')}
-                        </AvatarFallback>
+                        <AvatarFallback name={u.name || undefined}>{getInitials(u.name)}</AvatarFallback>
                       </Avatar>
                       <span>{u.name}</span>
                     </div>
@@ -485,21 +518,11 @@ export default function ProjectKanbanBoard({
                       version?.status === DocumentStatus.PENDING_REVIEW &&
                       doc.labels?.includes('Waiting for final label');
 
-                    const getDocumentUrl = () => {
-                      if (
-                        hasVersion &&
-                        (version?.status === 'PENDING_TRANSLATION' || version?.status === 'IN_PROGRESS')
-                      ) {
-                        return `/documents/${doc.id}/translate?lang=${selectedLanguage}&version=${version.id}`;
-                      }
-                      if (hasVersion && version?.status === 'PENDING_REVIEW') {
-                        return `/documents/${doc.id}/review?version=${version.id}`;
-                      }
-                      if (hasVersion) {
-                        return `/documents/${doc.id}/review?version=${version.id}`;
-                      }
-                      return `/documents/${doc.id}/translate?lang=${selectedLanguage}`;
-                    };
+                    const getDocumentUrl = () =>
+                      getCanonicalEditorPath(doc.id, hasVersion ? (version?.status ?? null) : null, {
+                        versionId: hasVersion ? version?.id : undefined,
+                        lang: selectedLanguage,
+                      });
 
                     const cardsInColumn = kanbanData.filter((c) => c.column === column.id);
                     const cardIndexInColumn = cardsInColumn.findIndex((c) => c.id === card.id);
@@ -605,44 +628,14 @@ export default function ProjectKanbanBoard({
                                           className="flex items-center gap-1 -space-x-1 cursor-pointer hover:opacity-70 transition-opacity"
                                           title="Reassign translator"
                                         >
-                                          {usersToShow.map((u) => (
-                                            <Avatar
-                                              key={u.id}
-                                              size="sm"
-                                              name={u.name || undefined}
-                                              className="border-2 border-background"
-                                              title={u.name || undefined}
-                                            >
-                                              <AvatarFallback name={u.name || undefined}>
-                                                {u.name
-                                                  .split(' ')
-                                                  .map((name: string) => name.charAt(0))
-                                                  .join('')}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                          ))}
+                                          <MemberAvatarStack users={usersToShow} />
                                         </button>
                                       );
                                     }
 
                                     return (
                                       <div className="flex items-center gap-1 -space-x-1">
-                                        {usersToShow.map((u) => (
-                                          <Avatar
-                                            key={u.id}
-                                            size="sm"
-                                            name={u.name || undefined}
-                                            className="border-2 border-background"
-                                            title={u.name || undefined}
-                                          >
-                                            <AvatarFallback name={u.name || undefined}>
-                                              {u.name
-                                                .split(' ')
-                                                .map((name: string) => name.charAt(0))
-                                                .join('')}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                        ))}
+                                        <MemberAvatarStack users={usersToShow} />
                                       </div>
                                     );
                                   })()}
@@ -692,16 +685,11 @@ export default function ProjectKanbanBoard({
                   <SelectValue placeholder="Select translator..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {(assignExistingId || assignUserId) && (
-                    <SelectItem value={UNASSIGN_VALUE} className="text-destructive">
-                      Unassign translator
-                    </SelectItem>
-                  )}
-                  {projectMembers.map((m) => (
-                    <SelectItem key={m.user.id} value={m.user.id}>
-                      {m.user.name || m.user.email}
-                    </SelectItem>
-                  ))}
+                  <MemberSelectItems
+                    members={projectMembers}
+                    showUnassign={Boolean(assignExistingId || assignUserId)}
+                    unassignLabel="Unassign translator"
+                  />
                 </SelectContent>
               </Select>
             </div>
@@ -713,14 +701,7 @@ export default function ProjectKanbanBoard({
                     <SelectValue placeholder="Select reviewer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={UNASSIGN_VALUE} className="text-destructive">
-                      Unassign reviewer
-                    </SelectItem>
-                    {projectMembers.map((m) => (
-                      <SelectItem key={m.user.id} value={m.user.id}>
-                        {m.user.name || m.user.email}
-                      </SelectItem>
-                    ))}
+                    <MemberSelectItems members={projectMembers} showUnassign unassignLabel="Unassign reviewer" />
                   </SelectContent>
                 </Select>
               </div>

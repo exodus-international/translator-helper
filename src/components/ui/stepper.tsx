@@ -469,8 +469,4 @@ export {
   StepperTrigger,
   useStepItem,
   useStepper,
-  type StepperContentProps,
-  type StepperItemProps,
-  type StepperProps,
-  type StepperTriggerProps,
 };

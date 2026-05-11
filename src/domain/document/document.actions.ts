@@ -14,11 +14,6 @@ import {
   deleteDocument,
   getDashboardDocuments,
   getDocumentById,
-  getDocumentBySlug,
-  getDocumentsByUser,
-  getDocumentsNeedingTranslation,
-  getDocumentsPendingReview,
-  getDocumentsReadyToDeploy,
   getDocumentsWithAllVersions,
   listDocuments,
   updateDocument,
@@ -33,16 +28,6 @@ export async function listDocumentsAction(filters?: {
 }) {
   await authorize('authenticated');
   return await listDocuments(filters);
-}
-
-export async function getDocumentAction(id: string) {
-  await authorize('authenticated');
-  return await getDocumentById(id);
-}
-
-export async function getDocumentBySlugAction(slug: string) {
-  await authorize('authenticated');
-  return await getDocumentBySlug(slug);
 }
 
 export async function createDocumentAction(input: unknown) {
@@ -113,26 +98,6 @@ export async function deleteDocumentActionVoid(id: string): Promise<void> {
   await deleteDocumentAction(id);
   await deleteDocumentVersionsByDocumentId(id);
   revalidatePath('/documents');
-}
-
-export async function getDocumentsNeedingTranslationAction(languageId: string, translationProjectId?: string) {
-  await authorize('authenticated');
-  return await getDocumentsNeedingTranslation(languageId, translationProjectId);
-}
-
-export async function getDocumentsPendingReviewAction(languageId?: string, translationProjectId?: string) {
-  await authorize('authenticated');
-  return await getDocumentsPendingReview(languageId, translationProjectId);
-}
-
-export async function getDocumentsReadyToDeployAction(languageId?: string, translationProjectId?: string) {
-  await authorize('authenticated');
-  return await getDocumentsReadyToDeploy(languageId, translationProjectId);
-}
-
-export async function getDocumentsByUserAction(languageId?: string, translationProjectId?: string) {
-  const { user } = await authorize('authenticated');
-  return await getDocumentsByUser(user.id, languageId, translationProjectId);
 }
 
 export async function getDocumentsWithAllVersionsAction() {

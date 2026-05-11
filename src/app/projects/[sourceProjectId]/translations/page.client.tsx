@@ -59,7 +59,7 @@ export default function TranslationsClient({
   languages,
 }: TranslationsClientProps) {
   const router = useRouter();
-  const [translationProjects, setTranslationProjects] = useState(initialTranslationProjects);
+  const [translationProjects] = useState(initialTranslationProjects);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [selectedLanguageId, setSelectedLanguageId] = useState<string>('');

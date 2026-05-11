@@ -1,15 +1,6 @@
 import { z } from 'zod';
 import { DocumentType } from '@prisma/client';
 
-export interface GitHubDeployParams {
-  documentVersionId: string;
-  content: string;
-  branchName: string;
-  filePath: string;
-  languageCode: string;
-  documentTitle: string;
-}
-
 export interface FilePathParams {
   documentType: DocumentType;
   languageCode: string;
@@ -30,4 +21,3 @@ export const pullRequestWebhookSchema = z.object({
   }),
 });
 
-export type PullRequestWebhookPayload = z.infer<typeof pullRequestWebhookSchema>;

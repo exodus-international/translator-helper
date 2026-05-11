@@ -20,7 +20,3 @@ export const updateLanguageBranchNameSchema = z.object({
   branchName: z.string().nullable(),
 });
 
-export type CreateLanguageInput = z.infer<typeof createLanguageSchema>;
-export type UpdateLanguageInput = z.infer<typeof updateLanguageSchema>;
-export type UpdateLanguageInstructionsInput = z.infer<typeof updateLanguageInstructionsSchema>;
-export type UpdateLanguageBranchNameInput = z.infer<typeof updateLanguageBranchNameSchema>;

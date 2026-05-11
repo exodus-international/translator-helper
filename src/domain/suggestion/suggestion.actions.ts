@@ -1,6 +1,7 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
+import { applyTextEditAtRange, extractTextAtRange, isRangeWithinBounds } from '@/lib/text-range';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
@@ -13,16 +14,11 @@ import {
   dismissSuggestionSchema,
   editSuggestionSchema,
   reopenSuggestionSchema,
-  updateSuggestionStatusSchema,
 } from './suggestion.types';
 import {
-  checkSuggestionConflict,
   createSuggestion,
   createSuggestionReply,
-  deleteSuggestion,
-  deleteSuggestionReply,
   getSuggestionById,
-  getSuggestionReplyById,
   getSuggestionsByDocumentVersion,
   updateSuggestionContent,
   updateSuggestionStatus,
@@ -35,11 +31,6 @@ function truncate(text: string, max = 80) {
 export async function getSuggestionsByDocumentVersionAction(documentVersionId: string, filters?: any) {
   await authorize('authenticated');
   return await getSuggestionsByDocumentVersion(documentVersionId, filters);
-}
-
-export async function getSuggestionByIdAction(id: string) {
-  await authorize('authenticated');
-  return await getSuggestionById(id);
 }
 
 export async function createSuggestionAction(input: unknown) {
@@ -133,46 +124,19 @@ export async function applySuggestionAction(input: unknown) {
   }
 
   // Apply the suggestion by replacing the text at the range
-  const lines = documentVersion.content.split('\n');
-  const startLine = suggestion.startLine - 1; // Convert to 0-based
-  const endLine = suggestion.endLine - 1;
-  const startColumn = suggestion.startColumn - 1;
-  const endColumn = suggestion.endColumn - 1;
+  const range = {
+    startLine: suggestion.startLine,
+    startColumn: suggestion.startColumn,
+    endLine: suggestion.endLine,
+    endColumn: suggestion.endColumn,
+  };
 
-  if (startLine >= lines.length || endLine >= lines.length) {
+  if (!isRangeWithinBounds(range, documentVersion.content.split('\n').length)) {
     throw new Error('Suggestion range is out of bounds');
   }
 
-  // Extract the original text at the range before replacing
-  let originalText: string;
-  if (startLine === endLine) {
-    const line = lines[startLine];
-    originalText = line.substring(startColumn, endColumn);
-  } else {
-    const firstLine = lines[startLine].substring(startColumn);
-    const lastLine = lines[endLine].substring(0, endColumn);
-    const middleLines = lines.slice(startLine + 1, endLine);
-    originalText = [firstLine, ...middleLines, lastLine].join('\n');
-  }
-
-  // Replace the text
-  if (startLine === endLine) {
-    // Single line replacement
-    const line = lines[startLine];
-    const before = line.substring(0, startColumn);
-    const after = line.substring(endColumn);
-    lines[startLine] = before + suggestion.proposedText + after;
-  } else {
-    // Multi-line replacement
-    const firstLine = lines[startLine];
-    const lastLine = lines[endLine];
-    const before = firstLine.substring(0, startColumn);
-    const after = lastLine.substring(endColumn);
-    const newLines = [before + suggestion.proposedText + after];
-    lines.splice(startLine, endLine - startLine + 1, ...newLines);
-  }
-
-  const newContent = lines.join('\n');
+  const originalText = extractTextAtRange(documentVersion.content, range);
+  const newContent = applyTextEditAtRange(documentVersion.content, range, suggestion.proposedText);
 
   // Update document version
   const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, newContent, user.id);
@@ -362,44 +326,6 @@ export async function editSuggestionAction(input: unknown) {
   return updated;
 }
 
-export async function deleteSuggestionAction(id: string) {
-  const { user } = await authorize('authenticated');
-
-  // Get suggestion
-  const suggestion = await getSuggestionById(id);
-  if (!suggestion) {
-    throw new Error('Suggestion not found');
-  }
-
-  // Only the author can delete their suggestion
-  if (suggestion.userId !== user.id) {
-    throw new Error('Forbidden: You can only delete your own suggestions');
-  }
-
-  const documentVersion = await getDocumentVersionById(suggestion.documentVersionId);
-
-  const result = await deleteSuggestion(id);
-
-  await createActivityLog({
-    documentVersionId: suggestion.documentVersionId,
-    userId: user.id,
-    action: 'deleted_suggestion',
-    details: {
-      suggestionId: id,
-      type: suggestion.type,
-      startLine: suggestion.startLine ?? null,
-      endLine: suggestion.endLine ?? null,
-      comment: suggestion.comment ? truncate(suggestion.comment) : null,
-    },
-  });
-
-  if (documentVersion) {
-    revalidatePath(`/documents/${documentVersion.documentId}/review`);
-  }
-
-  return result;
-}
-
 export async function createSuggestionReplyAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = createSuggestionReplySchema.parse(input);
@@ -415,43 +341,4 @@ export async function createSuggestionReplyAction(input: unknown) {
     userId: user.id,
     content: validated.content,
   });
-}
-
-export async function deleteSuggestionReplyAction(replyId: string) {
-  const { user } = await authorize('authenticated');
-
-  const reply = await getSuggestionReplyById(replyId);
-  if (!reply) {
-    throw new Error('Reply not found');
-  }
-
-  // Only the reply author can delete
-  if (reply.userId !== user.id) {
-    throw new Error('Forbidden: You can only delete your own replies');
-  }
-
-  return await deleteSuggestionReply(replyId);
-}
-
-export async function updateSuggestionAction(id: string, input: unknown) {
-  const { user } = await authorize('authenticated');
-  const validated = updateSuggestionStatusSchema.parse(input);
-
-  // Get suggestion
-  const suggestion = await getSuggestionById(id);
-  if (!suggestion) {
-    throw new Error('Suggestion not found');
-  }
-
-  // Only the author can update their suggestion
-  if (suggestion.userId !== user.id) {
-    throw new Error('Forbidden: You can only edit your own suggestions');
-  }
-
-  // Only allow updating OPEN suggestions
-  if (suggestion.status !== SuggestionStatus.OPEN) {
-    throw new Error('Only open suggestions can be updated');
-  }
-
-  return await updateSuggestionStatus(id, validated.status, validated.dismissedReason);
 }
