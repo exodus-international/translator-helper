@@ -14,14 +14,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DocumentSearchInput } from '@/components/document-search-input';
 import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { Document, DocumentStatus, Language } from '@prisma/client';
-import { FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
@@ -146,17 +146,7 @@ export default function DocumentsClient({
           </div>
 
           <div className="mt-4 flex gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search documents..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
+            <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
             <div className="w-48">
               <Select value={selectedSourceProject} onValueChange={setSelectedSourceProject}>
                 <SelectTrigger>

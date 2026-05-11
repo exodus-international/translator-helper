@@ -2,8 +2,32 @@
 
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
+import { type SessionUser } from '@/lib/session';
 import { DocumentStatus, ProjectRole, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+
+/**
+ * Load a version + its language and assert the caller may edit/delete a source
+ * (English) version. For non-source versions returns successfully — caller is
+ * responsible for any further project-scoped permission check.
+ */
+async function loadVersionAndGateSourceEdits(id: string, user: SessionUser) {
+  const version = await getDocumentVersionById(id);
+  if (!version) {
+    throw new Error('Document version not found');
+  }
+
+  const language = await getLanguageById(version.languageId);
+  if (!language) {
+    throw new Error('Language not found');
+  }
+
+  if (language.code === 'en' && user.role !== Role.ADMIN) {
+    throw new Error('Forbidden: Only deployers can edit source (English) document versions');
+  }
+
+  return { version, language, isSourceEnglish: language.code === 'en' };
+}
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
 import { validateTransition } from './document-version.transitions';
@@ -73,26 +97,10 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = updateDocumentVersionSchema.parse(input);
 
-  // Get existing version to check permissions
-  const existingVersion = await getDocumentVersionById(id);
-  if (!existingVersion) {
-    throw new Error('Document version not found');
-  }
+  const { version: existingVersion, isSourceEnglish } = await loadVersionAndGateSourceEdits(id, user);
 
-  // Check if this is a source (English) version
-  const language = await getLanguageById(existingVersion.languageId);
-  if (!language) {
-    throw new Error('Language not found');
-  }
-
-  // If this is a source (English) version, only deployers can edit it
-  if (language.code === 'en') {
-    if (user.role !== Role.ADMIN) {
-      throw new Error('Forbidden: Only deployers can edit source (English) document versions');
-    }
-  } else {
+  if (!isSourceEnglish) {
     // For translation versions, use existing permission logic
-    // Get document to find source project
     const document = await getDocumentById(existingVersion.documentId);
     if (!document) {
       throw new Error('Document not found');
@@ -103,7 +111,6 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
       );
     }
 
-    // Get translation project
     const translationProject = await getTranslationProjectBySourceAndLanguage(
       document.sourceProject.id,
       existingVersion.languageId,
@@ -183,27 +190,8 @@ export async function submitForReviewAction(input: unknown) {
 
 export async function deleteDocumentVersionAction(id: string) {
   const { user } = await authorize('authenticated');
-
-  // Get existing version to check permissions
-  const existingVersion = await getDocumentVersionById(id);
-  if (!existingVersion) {
-    throw new Error('Document version not found');
-  }
-
-  // Check if this is a source (English) version
-  const language = await getLanguageById(existingVersion.languageId);
-  if (!language) {
-    throw new Error('Language not found');
-  }
-
-  // If this is a source (English) version, only deployers can delete it
-  if (language.code === 'en') {
-    if (user.role !== Role.ADMIN) {
-      throw new Error('Forbidden: Only deployers can delete source (English) document versions');
-    }
-  }
+  await loadVersionAndGateSourceEdits(id, user);
   // For translation versions, allow deletion (or add appropriate checks if needed)
-
   return await deleteDocumentVersion(id);
 }
 
