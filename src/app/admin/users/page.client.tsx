@@ -15,13 +15,26 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { updateUserRoleAction } from '@/domain/user/user.actions';
+import {
+  createInvitationAction,
+  revokeInvitationAction,
+} from '@/domain/invitation/invitation.actions';
+import {
+  getInvitationDisplayStatus,
+  type InvitationDisplayStatus,
+} from '@/domain/invitation/invitation.display-status';
 import { authClient } from '@/lib/auth-client';
-import { Role } from '@prisma/client';
-import { Ban, Shield, Unlock } from 'lucide-react';
-import { useState } from 'react';
+import { Role, InvitationStatus } from '@prisma/client';
+import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Link2, Plus, Shield, Unlock, Users, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+
+// ─── Types ──────────────────────────────────────────────────
 
 interface User {
   id: string;
@@ -36,16 +49,86 @@ interface User {
   updatedAt: Date;
 }
 
-interface UsersClientProps {
-  users: User[];
+interface Invitation {
+  id: string;
+  token: string;
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: Date;
+  status: InvitationStatus;
+  createdAt: Date;
+  createdBy: { id: string; name: string; email: string };
 }
 
-export default function UsersClient({ users: initialUsers }: UsersClientProps) {
+interface UsersClientProps {
+  users: User[];
+  invitations: Invitation[];
+}
+
+// ─── Helpers ────────────────────────────────────────────────
+
+function invitationStatusBadge(status: InvitationDisplayStatus) {
+  switch (status) {
+    case 'active':
+      return <Badge variant="success"><Clock className="h-3 w-3 mr-1" />Active</Badge>;
+    case 'revoked':
+      return <Badge variant="destructive"><X className="h-3 w-3 mr-1" />Revoked</Badge>;
+    case 'expired':
+      return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Expired</Badge>;
+    case 'exhausted':
+      return <Badge variant="secondary"><Check className="h-3 w-3 mr-1" />Fully Used</Badge>;
+  }
+}
+
+function truncateToken(token: string) {
+  return token.length > 12 ? `${token.slice(0, 8)}...${token.slice(-4)}` : token;
+}
+
+const INVITATIONS_PER_PAGE = 10;
+
+type InvitationFilter = 'active' | 'inactive';
+
+// ─── Component ──────────────────────────────────────────────
+
+export default function UsersClient({ users: initialUsers, invitations: initialInvitations }: UsersClientProps) {
+  // Users state
   const [users, setUsers] = useState(initialUsers);
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
   const [loading, setLoading] = useState(false);
+
+  // Invitations state
+  const [invitations, setInvitations] = useState(initialInvitations);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [maxUses, setMaxUses] = useState('');
+  const [expiresInDays, setExpiresInDays] = useState('30');
+  const [createdInviteUrl, setCreatedInviteUrl] = useState<string | null>(null);
+  const [invitationFilter, setInvitationFilter] = useState<InvitationFilter>('active');
+  const [invitationPage, setInvitationPage] = useState(1);
+
+  // ─── Filtered & paginated invitations ───────────────────
+
+  const filteredInvitations = useMemo(() => {
+    return invitations.filter((inv) => {
+      const status = getInvitationDisplayStatus(inv);
+      return invitationFilter === 'active' ? status === 'active' : status !== 'active';
+    });
+  }, [invitations, invitationFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredInvitations.length / INVITATIONS_PER_PAGE));
+  const clampedPage = Math.min(invitationPage, totalPages);
+  const paginatedInvitations = filteredInvitations.slice(
+    (clampedPage - 1) * INVITATIONS_PER_PAGE,
+    clampedPage * INVITATIONS_PER_PAGE,
+  );
+
+  const handleFilterChange = (filter: InvitationFilter) => {
+    setInvitationFilter(filter);
+    setInvitationPage(1);
+  };
+
+  // ─── User actions ───────────────────────────────────────
 
   const handleRoleChange = async (userId: string, newRole: Role) => {
     setLoading(true);
@@ -64,14 +147,8 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
   const handleBanUser = async (userId: string) => {
     setLoading(true);
     try {
-      const result = await authClient.admin.banUser({
-        userId,
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-
+      const result = await authClient.admin.banUser({ userId });
+      if (result.error) throw new Error(result.error.message);
       setUsers(
         users.map((u) =>
           u.id === userId
@@ -93,21 +170,11 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
     }
   };
 
-  const handleBanUserConfirm = async (userId: string) => {
-    await handleBanUser(userId);
-  };
-
   const handleUnbanUser = async (userId: string) => {
     setLoading(true);
     try {
-      const result = await authClient.admin.unbanUser({
-        userId,
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-
+      const result = await authClient.admin.unbanUser({ userId });
+      if (result.error) throw new Error(result.error.message);
       setUsers(users.map((u) => (u.id === userId ? { ...u, banned: false, banReason: null, banExpires: null } : u)));
       toast.success('User unbanned successfully');
     } catch (error: any) {
@@ -116,10 +183,6 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleUnbanUserConfirm = async (userId: string) => {
-    await handleUnbanUser(userId);
   };
 
   const openRoleDialog = (user: User) => {
@@ -131,7 +194,6 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
   const handleRoleDialogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser || !selectedRole) return;
-
     setLoading(true);
     try {
       await handleRoleChange(editingUser.id, selectedRole);
@@ -146,101 +208,303 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
     }
   };
 
+  // ─── Invitation actions ─────────────────────────────────
+
+  const handleCreateInvitation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const expiresAt = expiresInDays
+        ? new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000)
+        : undefined;
+      const result = await createInvitationAction({
+        maxUses: maxUses ? Number(maxUses) : null,
+        expiresAt,
+      });
+      setCreatedInviteUrl(result.inviteUrl);
+      setInvitations([
+        {
+          ...result,
+          usedCount: 0,
+          status: 'ACTIVE' as InvitationStatus,
+          createdBy: { id: '', name: 'You', email: '' },
+        },
+        ...invitations,
+      ]);
+      toast.success('Invitation created');
+    } catch (error: any) {
+      console.error('Error creating invitation:', error);
+      toast.error(error.message || 'Failed to create invitation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyUrl = async (url: string) => {
+    await navigator.clipboard.writeText(url);
+    toast.success('Invite link copied to clipboard');
+  };
+
+  const handleRevoke = async (id: string) => {
+    setLoading(true);
+    try {
+      await revokeInvitationAction(id);
+      setInvitations(invitations.map((inv) => (inv.id === id ? { ...inv, status: 'REVOKED' as InvitationStatus } : inv)));
+      toast.success('Invitation revoked');
+    } catch (error: any) {
+      console.error('Error revoking invitation:', error);
+      toast.error(error.message || 'Failed to revoke invitation');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetCreateDialog = () => {
+    setCreateDialogOpen(false);
+    setMaxUses('');
+    setExpiresInDays('30');
+    setCreatedInviteUrl(null);
+  };
+
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
+  // ─── Render ─────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
-          <div>
-            <h1 className="text-2xl font-bold">User Management</h1>
-            <p className="text-gray-600">Manage users, roles, and bans</p>
-          </div>
+          <h1 className="text-2xl font-bold">User Management</h1>
+          <p className="text-gray-600">Manage users, roles, bans, and invitations</p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-4">
-        <div className="grid gap-4">
-          {users.map((user) => (
-            <Card key={user.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-lg">{user.name}</h3>
-                    <Badge variant={user.role === Role.ADMIN ? 'primary' : 'secondary'}>
-                      {user.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
-                      {user.role}
-                    </Badge>
-                    {user.banned && (
-                      <Badge variant="destructive">
-                        <Ban className="h-3 w-3 mr-1" />
-                        Banned
-                      </Badge>
-                    )}
+        <Tabs defaultValue="users">
+          <TabsList>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+          </TabsList>
+
+          {/* ── Users Tab ──────────────────────────────────── */}
+          <TabsContent value="users">
+            <div className="grid gap-4">
+              {users.map((user) => (
+                <Card key={user.id} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold text-lg">{user.name}</h3>
+                        <Badge variant={user.role === Role.ADMIN ? 'primary' : 'secondary'}>
+                          {user.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
+                          {user.role}
+                        </Badge>
+                        {user.banned && (
+                          <Badge variant="destructive">
+                            <Ban className="h-3 w-3 mr-1" />
+                            Banned
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{user.email}</p>
+                      {user.banned && user.banReason && (
+                        <p className="text-sm text-red-600 mt-1">Reason: {user.banReason}</p>
+                      )}
+                      {user.banned && user.banExpires && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          Expires: {new Date(user.banExpires).toLocaleDateString()}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
+                        Change Role
+                      </Button>
+                      {user.banned ? (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={loading}>
+                              <Unlock className="h-4 w-4 mr-2" />
+                              Unban
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Unban User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to unban {user.name}? They will be able to access the system again.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleUnbanUser(user.id)}>Unban</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      ) : (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={loading}>
+                              <Ban className="h-4 w-4 mr-2" />
+                              Ban
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Ban User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to ban {user.name}? This will prevent them from accessing the system.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleBanUser(user.id)}>Ban</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">{user.email}</p>
-                  {user.banned && user.banReason && (
-                    <p className="text-sm text-red-600 mt-1">Reason: {user.banReason}</p>
-                  )}
-                  {user.banned && user.banExpires && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Expires: {new Date(user.banExpires).toLocaleDateString()}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-400 mt-1">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
-                    Change Role
-                  </Button>
-                  {user.banned ? (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={loading}>
-                          <Unlock className="h-4 w-4 mr-2" />
-                          Unban
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Unban User</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to unban {user.name}? They will be able to access the system again.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleUnbanUserConfirm(user.id)}>Unban</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  ) : (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={loading}>
-                          <Ban className="h-4 w-4 mr-2" />
-                          Ban
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Ban User</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to ban {user.name}? This will prevent them from accessing the system.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleBanUserConfirm(user.id)}>Ban</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* ── Invitations Tab ────────────────────────────── */}
+          <TabsContent value="invitations">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={invitationFilter === 'active' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleFilterChange('active')}
+                >
+                  Active
+                </Button>
+                <Button
+                  variant={invitationFilter === 'inactive' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleFilterChange('inactive')}
+                >
+                  Inactive
+                </Button>
               </div>
-            </Card>
-          ))}
-        </div>
+              <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Invitation
+              </Button>
+            </div>
+
+            {filteredInvitations.length === 0 ? (
+              <Card className="p-6 text-center text-gray-500">
+                {invitationFilter === 'active'
+                  ? 'No active invitations. Create one to invite translators.'
+                  : 'No inactive invitations.'}
+              </Card>
+            ) : (
+              <>
+                <div className="grid gap-3">
+                  {paginatedInvitations.map((inv) => {
+                    const displayStatus = getInvitationDisplayStatus(inv);
+                    return (
+                      <Card key={inv.id} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3">
+                              <code className="text-sm bg-gray-100 px-2 py-0.5 rounded font-mono">
+                                {truncateToken(inv.token)}
+                              </code>
+                              {invitationStatusBadge(displayStatus)}
+                            </div>
+                            <div className="flex gap-4 mt-2 text-sm text-gray-600">
+                              <span>
+                                Uses: {inv.usedCount}/{inv.maxUses ?? '\u221e'}
+                              </span>
+                              <span>
+                                Expires: {new Date(inv.expiresAt).toLocaleDateString()}
+                              </span>
+                              <span>
+                                By: {inv.createdBy.name}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            {displayStatus === 'active' && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleCopyUrl(`${baseUrl}/register/${inv.token}`)}
+                                >
+                                  <Copy className="h-4 w-4 mr-1" />
+                                  Copy Link
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm" disabled={loading}>
+                                      <X className="h-4 w-4 mr-1" />
+                                      Revoke
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Revoke Invitation</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently invalidate this invitation link. Anyone with the link will no longer be able to register.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleRevoke(inv.id)}>Revoke</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <p className="text-sm text-gray-500">
+                      {filteredInvitations.length} invitation{filteredInvitations.length !== 1 ? 's' : ''}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={clampedPage <= 1}
+                        onClick={() => setInvitationPage(clampedPage - 1)}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm text-gray-600">
+                        {clampedPage} / {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={clampedPage >= totalPages}
+                        onClick={() => setInvitationPage(clampedPage + 1)}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
+      {/* ── Role Change Dialog ────────────────────────────── */}
       <Dialog
         open={roleDialogOpen}
         onOpenChange={(open) => {
@@ -277,6 +541,78 @@ export default function UsersClient({ users: initialUsers }: UsersClientProps) {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Create Invitation Dialog ──────────────────────── */}
+      <Dialog open={createDialogOpen} onOpenChange={(open) => { if (!open) resetCreateDialog(); else setCreateDialogOpen(true); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {createdInviteUrl ? 'Invitation Created' : 'Create Invitation'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {createdInviteUrl ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Share this link with the person you want to invite:
+              </p>
+              <div className="flex items-center gap-2">
+                <Input value={createdInviteUrl} readOnly className="font-mono text-sm" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCopyUrl(createdInviteUrl)}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" onClick={resetCreateDialog}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleCreateInvitation} className="space-y-4">
+              <div>
+                <Label htmlFor="max-uses">Max Uses</Label>
+                <Input
+                  id="max-uses"
+                  type="number"
+                  min="1"
+                  value={maxUses}
+                  onChange={(e) => setMaxUses(e.target.value)}
+                  placeholder="Leave empty for unlimited"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  How many people can register with this link. Empty = unlimited.
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="expires-in">Expires In (days)</Label>
+                <Input
+                  id="expires-in"
+                  type="number"
+                  min="1"
+                  value={expiresInDays}
+                  onChange={(e) => setExpiresInDays(e.target.value)}
+                  placeholder="30"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={resetCreateDialog}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  {loading ? 'Creating...' : 'Create'}
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
