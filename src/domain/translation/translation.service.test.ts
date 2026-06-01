@@ -19,6 +19,35 @@ test('buildTranslationMessages includes system and user context', () => {
   assert.ok(messages[1].content.includes('Hello **world**'));
 });
 
+const promptBase = {
+  documentTitle: 'Sample Doc',
+  sourceLanguageName: 'English',
+  targetLanguageName: 'French',
+  targetLanguageCode: 'fr',
+  sourceContent: 'title: Hello',
+};
+
+test('buildTranslationMessages uses the Markdown prompt by default', () => {
+  const messages = buildTranslationMessages({ ...promptBase, originalFilename: 'description.md' });
+  assert.ok(messages[0].content.includes('Markdown'));
+  assert.ok(messages[1].content.includes('Return only the translated Markdown'));
+});
+
+test('buildTranslationMessages uses the Markdown prompt when no filename is given', () => {
+  const messages = buildTranslationMessages(promptBase);
+  assert.ok(messages[0].content.includes('Markdown'));
+});
+
+test('buildTranslationMessages switches to a YAML-aware prompt for .yml/.yaml files', () => {
+  for (const originalFilename of ['disciplines.yml', 'metadata.yaml', 'CONFIG.YML']) {
+    const messages = buildTranslationMessages({ ...promptBase, originalFilename });
+    assert.ok(messages[0].content.includes('YAML'), `system prompt for ${originalFilename}`);
+    assert.ok(messages[0].content.includes('Translate only the human-readable string values'));
+    assert.ok(messages[1].content.includes('Return only the translated YAML'));
+    assert.ok(!messages[1].content.includes('Return only the translated Markdown'));
+  }
+});
+
 test('translateWithChatGPT returns API content and forwards instructions', async () => {
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CHATGPT_API;

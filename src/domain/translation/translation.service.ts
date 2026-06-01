@@ -6,12 +6,23 @@ export interface TranslateWithChatGPTParams {
   sourceContent: string;
   languageInstructions?: string | null;
   currentTranslation?: string;
+  originalFilename?: string | null;
 }
 
-const DEFAULT_SYSTEM_PROMPT = `You are an expert technical translator.
+const MARKDOWN_SYSTEM_PROMPT = `You are an expert technical translator.
 - Maintain the original Markdown structure, code blocks, and frontmatter.
 - Preserve variables, placeholders, and punctuation.
 - Write in a natural tone that matches the source unless instructed otherwise.`;
+
+const YAML_SYSTEM_PROMPT = `You are an expert technical translator working on a YAML file.
+- Keep the file as valid YAML: preserve every key, the nesting, and the indentation exactly.
+- Translate only the human-readable string values, never the keys.
+- Preserve anchors, references, comments, variables, placeholders, and punctuation.
+- Write in a natural tone that matches the source unless instructed otherwise.`;
+
+function isYamlFilename(originalFilename?: string | null): boolean {
+  return /\.ya?ml$/i.test(originalFilename ?? '');
+}
 
 export function buildTranslationMessages({
   documentTitle,
@@ -21,9 +32,12 @@ export function buildTranslationMessages({
   sourceContent,
   languageInstructions,
   currentTranslation,
+  originalFilename,
 }: TranslateWithChatGPTParams) {
+  const isYaml = isYamlFilename(originalFilename);
+
   const systemPrompt = [
-    DEFAULT_SYSTEM_PROMPT,
+    isYaml ? YAML_SYSTEM_PROMPT : MARKDOWN_SYSTEM_PROMPT,
     `Target language: ${targetLanguageName} (${targetLanguageCode}).`,
     languageInstructions ? `Custom instructions:\n${languageInstructions}` : '',
   ]
@@ -32,7 +46,9 @@ export function buildTranslationMessages({
 
   const userPrompt = [
     `Translate the following document titled "${documentTitle}" from ${sourceLanguageName} to ${targetLanguageName}.`,
-    'Return only the translated Markdown. Do not add explanations.',
+    isYaml
+      ? 'Return only the translated YAML, preserving its structure. Do not add explanations.'
+      : 'Return only the translated Markdown. Do not add explanations.',
     currentTranslation ? `Existing translation draft (use as reference if it is helpful):\n${currentTranslation}` : '',
     'Source content:',
     sourceContent,

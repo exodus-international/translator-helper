@@ -12,7 +12,7 @@ export const createDocumentSchema = z.object({
   labels: z.array(z.string()).default([]),
   deadline: z.coerce.date().optional(),
   originalFilename: z.string().optional(),
-  type: z.enum(['DAY', 'FIELD_GUIDE', 'DAILY_CONTENT']).optional(),
+  type: z.enum(['DAY', 'FIELD_GUIDE', 'DAILY_CONTENT', 'ROOT_FILE', 'MEETING']).optional(),
 });
 
 export const updateDocumentSchema = z.object({
@@ -21,7 +21,7 @@ export const updateDocumentSchema = z.object({
   folderId: z.string().nullable().optional(), // Deprecated - kept for backward compatibility
   labels: z.array(z.string()).optional(),
   deadline: z.coerce.date().nullable().optional(),
-  type: z.enum(['DAY', 'FIELD_GUIDE', 'DAILY_CONTENT']).nullable().optional(),
+  type: z.enum(['DAY', 'FIELD_GUIDE', 'DAILY_CONTENT', 'ROOT_FILE', 'MEETING']).nullable().optional(),
   originalFilename: z.string().nullable().optional(),
 });
 

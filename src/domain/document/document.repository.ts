@@ -88,7 +88,7 @@ export async function createDocument(data: {
   labels: string[];
   deadline?: Date;
   originalFilename?: string;
-  type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT';
+  type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT' | 'ROOT_FILE' | 'MEETING';
 }): Promise<DocumentBasic> {
   return prisma.document.create({
     data: {
@@ -113,7 +113,7 @@ export async function updateDocument(
     folderId?: string | null; // Deprecated - kept for backward compatibility
     labels?: string[];
     deadline?: Date | null;
-    type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT' | null;
+    type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT' | 'ROOT_FILE' | 'MEETING' | null;
     originalFilename?: string | null;
   },
 ): Promise<DocumentBasic> {

@@ -264,6 +264,7 @@ function TranslateToolbar({
         targetLanguageId,
         sourceContent: sourceVersion.content,
         currentTranslation: content || undefined,
+        originalFilename: document.originalFilename ?? undefined,
       });
       setContent(result.translatedContent);
       viewerRef.current?.enterTranslationEditMode();
