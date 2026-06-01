@@ -24,6 +24,17 @@ function isYamlFilename(originalFilename?: string | null): boolean {
   return /\.ya?ml$/i.test(originalFilename ?? '');
 }
 
+/**
+ * Removes a single Markdown code fence that wraps the ENTIRE content
+ * (e.g. the model returning ```yaml\n...\n```). Leaves content untouched when
+ * it isn't fully wrapped, so genuine inline code blocks are preserved.
+ */
+export function stripWrappingCodeFence(content: string): string {
+  const trimmed = content.trim();
+  const match = trimmed.match(/^```[^\n]*\n([\s\S]*?)\n?```$/);
+  return match ? match[1] : content;
+}
+
 export function buildTranslationMessages({
   documentTitle,
   sourceLanguageName,
@@ -47,7 +58,7 @@ export function buildTranslationMessages({
   const userPrompt = [
     `Translate the following document titled "${documentTitle}" from ${sourceLanguageName} to ${targetLanguageName}.`,
     isYaml
-      ? 'Return only the translated YAML, preserving its structure. Do not add explanations.'
+      ? 'Return only the raw translated YAML, preserving its structure. Do not wrap it in Markdown code fences (```). Do not add explanations.'
       : 'Return only the translated Markdown. Do not add explanations.',
     currentTranslation ? `Existing translation draft (use as reference if it is helpful):\n${currentTranslation}` : '',
     'Source content:',
@@ -93,7 +104,7 @@ export async function translateWithChatGPT(params: TranslateWithChatGPTParams): 
     choices?: Array<{ message?: { content?: string } }>;
   };
 
-  const translatedContent = payload.choices?.[0]?.message?.content?.trim() || '';
+  const translatedContent = stripWrappingCodeFence(payload.choices?.[0]?.message?.content?.trim() || '');
 
   if (!translatedContent) {
     throw new Error('ChatGPT API returned an empty translation.');

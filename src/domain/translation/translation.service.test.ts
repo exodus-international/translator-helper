@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildTranslationMessages, translateWithChatGPT, TranslateWithChatGPTParams } from './translation.service';
+import {
+  buildTranslationMessages,
+  stripWrappingCodeFence,
+  translateWithChatGPT,
+  TranslateWithChatGPTParams,
+} from './translation.service';
+
+test('stripWrappingCodeFence removes a fence wrapping the whole content', () => {
+  assert.equal(stripWrappingCodeFence('```yaml\ntitle: Ahoj\n```'), 'title: Ahoj');
+  assert.equal(stripWrappingCodeFence('```\nplain\n```'), 'plain');
+  // tolerant of surrounding whitespace
+  assert.equal(stripWrappingCodeFence('\n```yaml\ntitle: Ahoj\n```\n'), 'title: Ahoj');
+});
+
+test('stripWrappingCodeFence leaves unwrapped content and inline blocks intact', () => {
+  assert.equal(stripWrappingCodeFence('title: Ahoj'), 'title: Ahoj');
+  const md = '# Heading\n\n```js\ncode\n```\n\nmore text';
+  assert.equal(stripWrappingCodeFence(md), md);
+});
 
 test('buildTranslationMessages includes system and user context', () => {
   const messages = buildTranslationMessages({
@@ -43,7 +61,8 @@ test('buildTranslationMessages switches to a YAML-aware prompt for .yml/.yaml fi
     const messages = buildTranslationMessages({ ...promptBase, originalFilename });
     assert.ok(messages[0].content.includes('YAML'), `system prompt for ${originalFilename}`);
     assert.ok(messages[0].content.includes('Translate only the human-readable string values'));
-    assert.ok(messages[1].content.includes('Return only the translated YAML'));
+    assert.ok(messages[1].content.includes('Return only the raw translated YAML'));
+    assert.ok(messages[1].content.includes('Do not wrap it in Markdown code fences'));
     assert.ok(!messages[1].content.includes('Return only the translated Markdown'));
   }
 });
