@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import { Prisma, SuggestionStatus } from '@prisma/client';
+import { DocumentType, Prisma, SuggestionStatus } from '@prisma/client';
 
 const userWithLanguages = {
   select: {
@@ -88,7 +88,7 @@ export async function createDocument(data: {
   labels: string[];
   deadline?: Date;
   originalFilename?: string;
-  type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT' | 'ROOT_FILE' | 'MEETING';
+  type?: DocumentType;
 }): Promise<DocumentBasic> {
   return prisma.document.create({
     data: {
@@ -113,7 +113,7 @@ export async function updateDocument(
     folderId?: string | null; // Deprecated - kept for backward compatibility
     labels?: string[];
     deadline?: Date | null;
-    type?: 'DAY' | 'FIELD_GUIDE' | 'DAILY_CONTENT' | 'ROOT_FILE' | 'MEETING' | null;
+    type?: DocumentType | null;
     originalFilename?: string | null;
   },
 ): Promise<DocumentBasic> {
