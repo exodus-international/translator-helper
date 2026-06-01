@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DocumentTypeSelect } from '@/components/document-form/document-type-select';
 import { LabelsField } from '@/components/document-form/labels-field';
 import { OriginalFilenameField } from '@/components/document-form/original-filename-field';
+import { getContentFormat } from '@/components/document-form/content-format';
 import { validateFilename } from '@/components/document-form/validate-filename';
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
@@ -65,6 +66,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [creatingProject, setCreatingProject] = useState(false);
 
   const filenameError = validateFilename(documentType, originalFilename);
+  const contentFormat = getContentFormat(originalFilename);
 
   const processFile = useCallback((file: File) => {
     setOriginalFilename(file.name);
@@ -326,13 +328,13 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                   <LabelsField labels={labels} onChange={setLabels} />
 
                   <div>
-                    <Label htmlFor="content">Content (Markdown) *</Label>
+                    <Label htmlFor="content">Content ({contentFormat}) *</Label>
                     <Textarea
                       id="content"
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
                       required
-                      placeholder="# Your markdown content here..."
+                      placeholder={contentFormat === 'YAML' ? 'key: value' : '# Your markdown content here...'}
                       rows={15}
                       className="font-mono"
                     />
