@@ -3,12 +3,12 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
+import { getDocumentStatusConfig } from '@/constants/document-status';
 import { DocumentStatus } from '@prisma/client';
 import { Eye, Pencil, User, UserMinus, UserPlus } from 'lucide-react';
 
 interface DocumentInfoCardProps {
-  status: DocumentStatus;
+  status?: DocumentStatus | null;
   translator?: { id: string; name: string | null; email: string } | null;
   reviewer?: { id: string; name: string | null; email: string } | null;
   language?: string;
@@ -37,7 +37,7 @@ export function DocumentInfoCard({
   onAssignReviewer,
   onUnassignReviewer,
 }: DocumentInfoCardProps) {
-  const statusConfig = DOCUMENT_STATUS_CONFIGS[status];
+  const statusConfig = getDocumentStatusConfig(status);
 
   return (
     <Card className="rounded-none border-l border-t-0 shrink-0">
