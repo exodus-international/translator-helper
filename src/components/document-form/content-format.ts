@@ -7,3 +7,11 @@
 export function getContentFormat(originalFilename: string): 'YAML' | 'Markdown' {
   return /\.ya?ml$/i.test(originalFilename) ? 'YAML' : 'Markdown';
 }
+
+/**
+ * Monaco language id for syntax highlighting, derived from the same signal as
+ * {@link getContentFormat}.
+ */
+export function getEditorLanguage(originalFilename: string): 'yaml' | 'markdown' {
+  return getContentFormat(originalFilename) === 'YAML' ? 'yaml' : 'markdown';
+}

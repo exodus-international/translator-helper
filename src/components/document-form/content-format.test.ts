@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { getContentFormat } from './content-format';
+import { getContentFormat, getEditorLanguage } from './content-format';
 
 describe('getContentFormat', () => {
   it('treats .yml and .yaml as YAML (case-insensitive)', () => {
@@ -17,5 +17,17 @@ describe('getContentFormat', () => {
 
   it('defaults to Markdown when no filename is set', () => {
     assert.equal(getContentFormat(''), 'Markdown');
+  });
+});
+
+describe('getEditorLanguage', () => {
+  it('maps YAML files to the monaco yaml language', () => {
+    assert.equal(getEditorLanguage('disciplines.yml'), 'yaml');
+    assert.equal(getEditorLanguage('metadata.yaml'), 'yaml');
+  });
+
+  it('maps everything else to markdown', () => {
+    assert.equal(getEditorLanguage('description.md'), 'markdown');
+    assert.equal(getEditorLanguage(''), 'markdown');
   });
 });

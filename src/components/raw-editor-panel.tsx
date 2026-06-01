@@ -19,6 +19,7 @@ interface RawEditorPaneProps {
   placeholder?: string;
   currentLine?: number;
   highlightLine?: number;
+  language?: string;
   lineInfo?: LineInfo;
   fullHeight?: boolean;
   className?: string;
@@ -39,6 +40,7 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
     placeholder,
     currentLine,
     highlightLine,
+    language,
     lineInfo,
     fullHeight = false,
     className,
@@ -72,6 +74,7 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
           placeholder={placeholder}
           currentLine={currentLine}
           highlightLine={highlightLine}
+          language={language}
           suggestions={suggestions}
           onSuggestionClick={onSuggestionClick}
           onSelectionChange={onSelectionChange}
