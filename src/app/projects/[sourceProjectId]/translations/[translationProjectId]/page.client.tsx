@@ -252,7 +252,6 @@ export default function TranslationProjectClient({
     }
   };
 
-
   const handleDeleteAssignment = async (assignmentId: string) => {
     setLoading(true);
     try {
