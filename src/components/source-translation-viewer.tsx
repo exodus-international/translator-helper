@@ -513,7 +513,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       <>
         <div className={cn('grid grid-cols-2 border-0 flex-1 min-w-0', isZen && 'h-full')}>
           <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
-            <div className="flex items-center justify-between py-1.5 px-2">
+            <div className="flex h-12 items-center justify-between px-2">
               <h2 className="text-sm font-semibold">Source (English)</h2>
               <div className="flex items-center gap-2">
                 {!isSourceEditing &&
@@ -640,7 +640,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Card>
 
           <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
-            <div className="flex items-center justify-between py-1.5 px-2">
+            <div className="flex h-12 items-center justify-between px-2">
               <h2 className="text-sm font-semibold">Translation</h2>
               <div className="flex items-center gap-2">
                 {variant === 'translate' ? (
