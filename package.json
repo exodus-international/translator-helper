@@ -10,7 +10,7 @@
     "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/domain/translation/translation.service.test.ts src/lib/authorize.test.ts src/domain/document-version/document-version.transitions.test.ts src/domain/invitation/invitation.validation.test.ts src/domain/invitation/invitation.types.test.ts src/domain/invitation/invitation.display-status.test.ts",
+    "test": "tsx --test src/domain/translation/translation.service.test.ts src/domain/github/github.paths.test.ts src/domain/document/validate-filename.test.ts src/domain/document/document.types.test.ts src/components/document-form/content-format.test.ts src/lib/authorize.test.ts src/domain/document-version/document-version.transitions.test.ts src/domain/invitation/invitation.validation.test.ts src/domain/invitation/invitation.types.test.ts src/domain/invitation/invitation.display-status.test.ts",
     "db:seed": "tsx prisma/seed.ts",
     "format": "prettier --write ."
   },

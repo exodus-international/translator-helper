@@ -482,15 +482,15 @@ export default function DashboardClient({
             <Card>
               <Table>
                 <TableHeader>
-                  {/* <TableRow> */}
-                  <TableHead className={headClass}>Document</TableHead>
-                  <TableHead className={headClass}>Project</TableHead>
-                  <TableHead className={headClass}>Language</TableHead>
-                  <TableHead className={headClass}>Translator</TableHead>
-                  <TableHead className={headClass}>Reviewer</TableHead>
-                  <TableHead className={headClass}>Status</TableHead>
-                  <TableHead className="w-[60px]" />
-                  {/* </TableRow> */}
+                  <TableRow>
+                    <TableHead className={headClass}>Document</TableHead>
+                    <TableHead className={headClass}>Project</TableHead>
+                    <TableHead className={headClass}>Language</TableHead>
+                    <TableHead className={headClass}>Translator</TableHead>
+                    <TableHead className={headClass}>Reviewer</TableHead>
+                    <TableHead className={headClass}>Status</TableHead>
+                    <TableHead className="w-[60px]" />
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredApprovedVersions.map((version) => {
@@ -565,16 +565,16 @@ export default function DashboardClient({
             <Card>
               <Table>
                 <TableHeader>
-                  {/* <TableRow> */}
-                  <TableHead className={headClass}>Document</TableHead>
-                  <TableHead className={headClass}>Project</TableHead>
-                  <TableHead className={headClass}>Language</TableHead>
-                  <TableHead className={headClass}>Translator</TableHead>
-                  <TableHead className={headClass}>Reviewer</TableHead>
-                  <TableHead className={headClass}>Status</TableHead>
-                  <TableHead className={headClass}>Deadline</TableHead>
-                  <TableHead className="w-[60px]" />
-                  {/* </TableRow> */}
+                  <TableRow>
+                    <TableHead className={headClass}>Document</TableHead>
+                    <TableHead className={headClass}>Project</TableHead>
+                    <TableHead className={headClass}>Language</TableHead>
+                    <TableHead className={headClass}>Translator</TableHead>
+                    <TableHead className={headClass}>Reviewer</TableHead>
+                    <TableHead className={headClass}>Status</TableHead>
+                    <TableHead className={headClass}>Deadline</TableHead>
+                    <TableHead className="w-[60px]" />
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {workItems.map((item) => {

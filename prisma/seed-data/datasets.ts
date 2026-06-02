@@ -190,6 +190,10 @@ export const DOCUMENTS: {
   { key: 'ex-d45', slug: 'ex90-day-45', title: 'Day 45 - Midpoint Reflection', type: DocumentType.DAY, labels: ['week-7', 'milestone'], deadline: daysFromNow(61), originalFilename: '45.md', project: 'exodus' },
   { key: 'ex-fg', slug: 'ex90-field-guide', title: 'Field Guide: Prayer Methods', type: DocumentType.FIELD_GUIDE, labels: ['reference'], project: 'exodus', originalFilename: 'field-guide-prayer.md' },
   { key: 'ex-dc', slug: 'ex90-weekly-checkin', title: 'Weekly Check-in Template', type: DocumentType.DAILY_CONTENT, labels: ['template'], project: 'exodus' },
+  { key: 'ex-desc', slug: 'ex90-description', title: 'Program Description', type: DocumentType.ROOT_FILE, labels: ['root'], originalFilename: 'description.md', project: 'exodus' },
+  { key: 'ex-disc', slug: 'ex90-disciplines', title: 'Disciplines', type: DocumentType.ROOT_FILE, labels: ['root', 'yaml'], originalFilename: 'disciplines.yml', project: 'exodus' },
+  { key: 'ex-m1', slug: 'ex90-meeting-1-6', title: 'Fraternity Meeting (Days 1-6)', type: DocumentType.MEETING, labels: ['meeting'], originalFilename: '1-6.md', project: 'exodus' },
+  { key: 'ex-m2', slug: 'ex90-meeting-7-13', title: 'Fraternity Meeting (Days 7-13)', type: DocumentType.MEETING, labels: ['meeting'], originalFilename: '7-13.md', project: 'exodus' },
   // Lent
   { key: 'le-aw', slug: 'lent-ash-wednesday', title: 'Ash Wednesday Reflection', type: DocumentType.DAY, labels: ['week-1', 'special'], deadline: daysFromNow(10), project: 'lent' },
   { key: 'le-d5', slug: 'lent-day-5', title: 'Friday of the First Week', type: DocumentType.DAY, labels: ['week-1'], deadline: daysFromNow(15), originalFilename: '5.md', project: 'lent' },

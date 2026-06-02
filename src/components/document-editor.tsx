@@ -8,6 +8,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { ActivityLog } from '@/components/activity-log';
 import { DocumentInfoCard } from '@/components/document-info-card';
+import { getEditorLanguage } from '@/components/document-form/content-format';
 import { EditorDialogs } from '@/components/editor-dialogs';
 import { SourceTranslationViewer, SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +101,7 @@ interface ViewerConfig {
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
+  contentLanguage?: 'markdown' | 'yaml';
 }
 
 function evalCap<T>(cap: T | ((tv: any) => T), tv: any): T {
@@ -119,6 +121,7 @@ function EditorViewer({
   translationPlaceholder,
   translationPreviewEmptyText,
   onEditSuggestion,
+  contentLanguage,
 }: ViewerConfig) {
   const router = useRouter();
   const targetVersion = useEditorStore((s) => s.targetVersion);
@@ -178,6 +181,7 @@ function EditorViewer({
       variant={variant}
       layout={layout}
       className="h-full"
+      contentLanguage={contentLanguage}
       sourceContent={sourceVersion.content}
       sourceFormattedContent={sourceFormattedContent}
       translationContent={content}
@@ -401,6 +405,7 @@ export function DocumentEditor({
   const outer = outerClassName ?? (fullscreen ? 'fixed inset-0 bg-white z-50' : 'min-h-screen bg-gray-50');
   const viewerHeight = fullscreen ? 'h-full' : 'h-[calc(100vh-7.5rem)]';
   const viewerWrapper = fullscreen ? 'h-[calc(100vh-3.5rem)] p-4' : 'border-0';
+  const contentLanguage = getEditorLanguage(document.originalFilename ?? '');
 
   return (
     <EditorProvider
@@ -433,6 +438,7 @@ export function DocumentEditor({
               translationPlaceholder={translationPlaceholder}
               translationPreviewEmptyText={translationPreviewEmptyText}
               onEditSuggestion={onEditSuggestion}
+              contentLanguage={contentLanguage}
             />
           </div>
 

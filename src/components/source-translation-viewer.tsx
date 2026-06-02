@@ -91,6 +91,8 @@ interface SourceTranslationViewerProps {
   onCreateGeneralThread?: (comment: string) => void;
   disableReopen?: boolean;
   sidebarHeader?: ReactNode;
+  /** Monaco language for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
+  contentLanguage?: 'markdown' | 'yaml';
 }
 
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
@@ -147,10 +149,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       onCreateGeneralThread,
       disableReopen = false,
       sidebarHeader,
+      contentLanguage = 'markdown',
     },
     ref,
   ) {
     const isZen = layout === 'zen';
+    const isYaml = contentLanguage === 'yaml';
     const { open: sidebarOpen, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
     const [mounted, setMounted] = useState(false);
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -509,10 +513,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       <>
         <div className={cn('grid grid-cols-2 border-0 flex-1 min-w-0', isZen && 'h-full')}>
           <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
-            <div className="flex items-center justify-between py-1.5 px-2">
+            <div className="flex h-12 items-center justify-between px-2">
               <h2 className="text-sm font-semibold">Source (English)</h2>
               <div className="flex items-center gap-2">
                 {!isSourceEditing &&
+                  !isYaml &&
                   (mounted ? (
                     <Tabs
                       value={sourceViewMode}
@@ -600,6 +605,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
+                  language={contentLanguage}
                   lineInfo={{
                     primaryLabel: 'Source Line',
                     primaryValue: sourceLine,
@@ -608,7 +614,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     direction: 'to',
                   }}
                 />
-              ) : sourceViewMode === 'formatted' ? (
+              ) : !isYaml && sourceViewMode === 'formatted' ? (
                 <div className="prose max-w-none h-full overflow-y-auto p-3">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
                 </div>
@@ -616,6 +622,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 <RawEditorPane
                   value={sourceContent}
                   readOnly
+                  language={contentLanguage}
                   currentLine={sourceLine}
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
@@ -633,11 +640,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Card>
 
           <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
-            <div className="flex items-center justify-between py-1.5 px-2">
+            <div className="flex h-12 items-center justify-between px-2">
               <h2 className="text-sm font-semibold">Translation</h2>
               <div className="flex items-center gap-2">
                 {variant === 'translate' ? (
-                  mounted ? (
+                  isYaml ? null : mounted ? (
                     <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
                       <TabsList>
                         <TabsTrigger value="edit">
@@ -676,7 +683,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       </button>
                     </div>
                   )
-                ) : !isReviewEditing ? (
+                ) : !isReviewEditing && !isYaml ? (
                   mounted ? (
                     <Tabs
                       value={reviewViewMode}
@@ -749,13 +756,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
             <div className={bodyClassName}>
               {variant === 'translate' ? (
-                translateTab === 'edit' ? (
+                isYaml || translateTab === 'edit' ? (
                   <div ref={translationContainerRef} className="relative h-full">
                     <RawEditorPane
                       ref={translationEditorRef}
                       value={translationContent}
                       onChange={onTranslationChange}
                       onCursorChange={handleTranslationCursorChange}
+                      language={contentLanguage}
                       placeholder={translationPlaceholder}
                       currentLine={translationLine}
                       highlightLine={syncedTranslationLine}
@@ -808,6 +816,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     onCursorChange={handleTranslationCursorChange}
                     currentLine={translationLine}
                     highlightLine={syncedTranslationLine}
+                    language={contentLanguage}
                     fullHeight
                     lineInfo={
                       sourceViewMode === 'raw'
@@ -823,7 +832,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                   {translationEditActions}
                 </div>
-              ) : reviewViewMode === 'formatted' ? (
+              ) : !isYaml && reviewViewMode === 'formatted' ? (
                 <div className="prose max-w-none h-full overflow-y-auto p-3">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
                 </div>
@@ -845,6 +854,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         ref={translationEditorRef}
                         value={translationContent}
                         readOnly
+                        language={contentLanguage}
                         currentLine={translationLine}
                         highlightLine={syncedTranslationLine}
                         onCursorChange={handleTranslationCursorChange}

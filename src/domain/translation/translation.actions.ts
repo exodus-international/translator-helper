@@ -23,6 +23,7 @@ export async function translateDocumentAction(input: unknown) {
     sourceContent: validated.sourceContent,
     languageInstructions: targetLanguage.translationInstructions ?? '',
     currentTranslation: validated.currentTranslation,
+    originalFilename: validated.originalFilename,
   });
 
   return { translatedContent };

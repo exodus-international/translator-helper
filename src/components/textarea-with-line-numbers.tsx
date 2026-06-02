@@ -15,6 +15,7 @@ interface TextareaWithLineNumbersProps {
   className?: string;
   currentLine?: number;
   highlightLine?: number; // Line to highlight from external source
+  language?: string; // Monaco language id for syntax highlighting (e.g. 'markdown', 'yaml')
   suggestions?: SuggestionWithUser[];
   onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
   onSelectionChange?: (
@@ -31,6 +32,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
     className,
     currentLine,
     highlightLine,
+    language = 'markdown',
     suggestions = [],
     onSuggestionClick,
     onSelectionChange,
@@ -162,7 +164,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
     <div className={cn('border-t overflow-hidden h-full', className)}>
       <Editor
         height="100%"
-        defaultLanguage="markdown"
+        language={language}
         value={value}
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
