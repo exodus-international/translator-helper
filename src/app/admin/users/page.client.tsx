@@ -30,7 +30,7 @@ import {
 } from '@/domain/invitation/invitation.display-status';
 import { authClient } from '@/lib/auth-client';
 import { Role, InvitationStatus } from '@prisma/client';
-import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Link2, Plus, Shield, Unlock, Users, X } from 'lucide-react';
+import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Link2, Plus, Shield, Unlock, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 

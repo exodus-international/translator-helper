@@ -1,9 +1,45 @@
 'use server';
 
+import crypto from 'node:crypto';
 import { auth } from '@/lib/auth';
-import { findInvitationByToken, incrementUsedCount, rollbackInvitationUse } from './invitation.repository';
-import { registerWithInviteSchema } from './invitation.types';
+import { authorize } from '@/lib/authorize';
+import {
+  createInvitation,
+  findInvitationByToken,
+  incrementUsedCount,
+  listInvitations,
+  revokeInvitation,
+  rollbackInvitationUse,
+} from './invitation.repository';
+import { createInvitationSchema, registerWithInviteSchema } from './invitation.types';
 import { validateInvitationToken } from './invitation.validation';
+
+const DEFAULT_EXPIRY_DAYS = 30;
+
+export async function createInvitationAction(input: unknown) {
+  const { user } = await authorize('admin');
+  const parsed = createInvitationSchema.parse(input);
+
+  const token = crypto.randomUUID();
+  const expiresAt = parsed.expiresAt ?? new Date(Date.now() + DEFAULT_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+  const invitation = await createInvitation(token, parsed.maxUses ?? null, expiresAt, user.id);
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const inviteUrl = `${baseUrl}/register/${invitation.token}`;
+
+  return { ...invitation, inviteUrl };
+}
+
+export async function listInvitationsAction() {
+  await authorize('admin');
+  return listInvitations();
+}
+
+export async function revokeInvitationAction(id: string) {
+  await authorize('admin');
+  return revokeInvitation(id);
+}
 
 export async function validateInvitationTokenAction(
   token: string,

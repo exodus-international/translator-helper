@@ -1,4 +1,42 @@
+import type { InvitationStatus } from '@prisma/client';
 import prisma from '@/lib/db';
+
+export async function createInvitation(
+  token: string,
+  maxUses: number | null,
+  expiresAt: Date,
+  createdById: string,
+) {
+  return prisma.invitation.create({
+    data: { token, maxUses, expiresAt, createdById },
+    select: {
+      id: true,
+      token: true,
+      maxUses: true,
+      expiresAt: true,
+      createdAt: true,
+    },
+  });
+}
+
+export async function listInvitations() {
+  return prisma.invitation.findMany({
+    include: {
+      createdBy: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function revokeInvitation(id: string) {
+  return prisma.invitation.update({
+    where: { id },
+    data: { status: 'REVOKED' as InvitationStatus },
+    select: { id: true, status: true },
+  });
+}
 
 export async function findInvitationByToken(token: string) {
   return prisma.invitation.findUnique({
