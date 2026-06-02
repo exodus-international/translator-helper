@@ -10,7 +10,7 @@ import { DocumentTypeSelect } from '@/components/document-form/document-type-sel
 import { LabelsField } from '@/components/document-form/labels-field';
 import { OriginalFilenameField } from '@/components/document-form/original-filename-field';
 import { getContentFormat } from '@/components/document-form/content-format';
-import { validateFilename } from '@/components/document-form/validate-filename';
+import { validateFilename } from '@/domain/document/validate-filename';
 import { updateDocumentAction } from '@/domain/document/document.actions';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { ArrowLeft } from 'lucide-react';

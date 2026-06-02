@@ -42,6 +42,14 @@ test('falls back to {slug}.md when no original filename is provided', () => {
   assert.equal(path, 'translations/cs/exercises/summer_2025/days/some-doc.md');
 });
 
+test('throws when MEETING is missing an original filename (no slug fallback)', () => {
+  assert.throws(() => resolveFilePath({ ...base, documentType: DocumentType.MEETING, originalFilename: null }));
+});
+
+test('throws when ROOT_FILE is missing an original filename (no slug fallback)', () => {
+  assert.throws(() => resolveFilePath({ ...base, documentType: DocumentType.ROOT_FILE, originalFilename: null }));
+});
+
 test('throws for an unknown document type', () => {
   assert.throws(() =>
     resolveFilePath({ ...base, documentType: 'NONSENSE' as DocumentType, originalFilename: 'x.md' }),

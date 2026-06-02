@@ -104,7 +104,10 @@ export async function translateWithChatGPT(params: TranslateWithChatGPTParams): 
     choices?: Array<{ message?: { content?: string } }>;
   };
 
-  const translatedContent = stripWrappingCodeFence(payload.choices?.[0]?.message?.content?.trim() || '');
+  const rawContent = payload.choices?.[0]?.message?.content?.trim() || '';
+  // Only YAML output should be unwrapped — a legitimate Markdown doc may itself
+  // be a single fenced code block, which stripping would corrupt.
+  const translatedContent = isYamlFilename(params.originalFilename) ? stripWrappingCodeFence(rawContent) : rawContent;
 
   if (!translatedContent) {
     throw new Error('ChatGPT API returned an empty translation.');

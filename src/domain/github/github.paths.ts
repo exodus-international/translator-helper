@@ -23,14 +23,32 @@ export function resolveFilePath(params: FilePathParams): string {
     }
 
     case DocumentType.MEETING:
-      return `translations/${languageCode}/exercises/${identifier}/meetings/${filename}`;
+      return `translations/${languageCode}/exercises/${identifier}/meetings/${requireOriginalFilename(
+        originalFilename,
+        documentType,
+      )}`;
 
     case DocumentType.ROOT_FILE:
-      return `translations/${languageCode}/exercises/${identifier}/${filename}`;
+      return `translations/${languageCode}/exercises/${identifier}/${requireOriginalFilename(
+        originalFilename,
+        documentType,
+      )}`;
 
     default:
       throw new Error(`Unknown document type: ${documentType}`);
   }
+}
+
+/**
+ * For types whose filename IS the routing contract (MEETING, ROOT_FILE), the
+ * `{slug}.md` fallback would deploy to an unintended path, so the original
+ * filename is required rather than silently substituted.
+ */
+function requireOriginalFilename(originalFilename: string | null, documentType: DocumentType): string {
+  if (!originalFilename) {
+    throw new Error(`${documentType} documents require an originalFilename to resolve their deploy path`);
+  }
+  return originalFilename;
 }
 
 function parseDailyContentDate(originalFilename: string | null): { year: string; month: string } {

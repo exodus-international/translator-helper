@@ -106,3 +106,41 @@ test('translateWithChatGPT returns API content and forwards instructions', async
   global.fetch = originalFetch;
   process.env.CHATGPT_API = originalApiKey;
 });
+
+async function translateReturning(content: string, originalFilename?: string): Promise<string> {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CHATGPT_API;
+  process.env.CHATGPT_API = 'test-key';
+
+  global.fetch = (async () =>
+    new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })) as typeof fetch;
+
+  try {
+    return await translateWithChatGPT({
+      documentTitle: 'Sample Doc',
+      sourceLanguageName: 'English',
+      targetLanguageName: 'French',
+      targetLanguageCode: 'fr',
+      sourceContent: 'irrelevant',
+      originalFilename,
+    });
+  } finally {
+    global.fetch = originalFetch;
+    process.env.CHATGPT_API = originalApiKey;
+  }
+}
+
+test('translateWithChatGPT strips a wrapping fence for YAML output', async () => {
+  const output = await translateReturning('```yaml\ntitle: Ahoj\n```', 'disciplines.yml');
+  assert.equal(output, 'title: Ahoj');
+});
+
+test('translateWithChatGPT leaves a fully-fenced Markdown response intact', async () => {
+  const fenced = '```js\nconst x = 1;\n```';
+  assert.equal(await translateReturning(fenced, 'snippet.md'), fenced);
+  // also when no filename is provided (defaults to Markdown handling)
+  assert.equal(await translateReturning(fenced), fenced);
+});
