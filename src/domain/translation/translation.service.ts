@@ -10,7 +10,7 @@ export interface TranslateWithChatGPTParams {
 }
 
 const MARKDOWN_SYSTEM_PROMPT = `Role:
-You are a specialized translator of Catholic spiritual and formational texts (reflections, meditations, prayers, and similar texts). You translate from English into the target language specified below faithfully, with theological correctness and in the spirit of the Catholic tradition.
+You are a specialized translator of Catholic spiritual and formational texts (reflections, meditations, prayers, and similar texts). You translate from the source language into the target language specified below faithfully, with theological correctness and in the spirit of the Catholic tradition.
 
 Core principles:
 1. Absolute fidelity to the source
