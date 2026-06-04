@@ -51,6 +51,50 @@ test('buildTranslationMessages uses the Markdown prompt by default', () => {
   assert.ok(messages[1].content.includes('Return only the translated Markdown'));
 });
 
+test('Markdown system prompt carries the Catholic spiritual formation guidance', () => {
+  const [system] = buildTranslationMessages({ ...promptBase, originalFilename: 'reflection.md' });
+  const content = system.content;
+
+  // Role: specialized Catholic spiritual / formational translator
+  assert.ok(/Catholic spiritual and formational texts/.test(content), 'role description');
+  // Fidelity rules
+  assert.ok(content.includes('Do not summarize.'), 'no summarizing');
+  assert.ok(content.includes('Do not paraphrase.'), 'no paraphrasing');
+  assert.ok(content.includes('Do not add interpretations.'), 'no adding');
+  assert.ok(content.includes('Do not omit parts.'), 'no omitting');
+  assert.ok(content.includes('Do not embellish the content.'), 'no embellishing');
+  // Formatting preservation
+  assert.ok(content.includes('Preserve formatting 1:1'), 'formatting preservation');
+  assert.ok(content.includes('block quotes'), 'block quotes');
+  assert.ok(content.includes('Markdown must remain equivalent to the source.'), 'markdown equivalence');
+  // Theological fidelity
+  assert.ok(/official or standard Catholic terminology in the target language/.test(content), 'catholic terminology');
+  assert.ok(/biblical quotations.*Catholic biblical tradition/s.test(content), 'biblical quotations');
+  // Forbidden actions
+  assert.ok(content.includes('Strictly forbidden:'), 'forbidden section');
+  assert.ok(content.includes('emojis'), 'no emojis');
+  assert.ok(/adding comments, explanations, or summaries/.test(content), 'no comments/explanations');
+  // Generic target-language phrasing (no leftover [target language] placeholders)
+  assert.ok(!content.includes('[target language]'), 'no unresolved placeholders');
+  // Target language injection still present
+  assert.ok(content.includes('Target language: French (fr).'), 'target language name and code');
+});
+
+test('Markdown system prompt appends custom language instructions when provided', () => {
+  const [system] = buildTranslationMessages({
+    ...promptBase,
+    originalFilename: 'reflection.md',
+    languageInstructions: 'Prefer the liturgical register.',
+  });
+  assert.ok(system.content.includes('Custom instructions:'), 'custom instructions section');
+  assert.ok(system.content.includes('Prefer the liturgical register.'), 'custom instructions content');
+});
+
+test('Markdown system prompt omits the custom instructions section when none provided', () => {
+  const [system] = buildTranslationMessages({ ...promptBase, originalFilename: 'reflection.md' });
+  assert.ok(!system.content.includes('Custom instructions:'), 'no empty custom instructions section');
+});
+
 test('buildTranslationMessages uses the Markdown prompt when no filename is given', () => {
   const messages = buildTranslationMessages(promptBase);
   assert.ok(messages[0].content.includes('Markdown'));
@@ -101,6 +145,10 @@ test('translateWithChatGPT returns API content and forwards instructions', async
   assert.ok(
     capturedBody.messages[0].content.includes('Use friendly tone'),
     'custom instructions forwarded to system prompt',
+  );
+  assert.ok(
+    capturedBody.messages[0].content.includes('Catholic spiritual and formational texts'),
+    'Catholic spiritual formation guidance forwarded to the API',
   );
 
   global.fetch = originalFetch;

@@ -9,10 +9,72 @@ export interface TranslateWithChatGPTParams {
   originalFilename?: string | null;
 }
 
-const MARKDOWN_SYSTEM_PROMPT = `You are an expert technical translator.
-- Maintain the original Markdown structure, code blocks, and frontmatter.
-- Preserve variables, placeholders, and punctuation.
-- Write in a natural tone that matches the source unless instructed otherwise.`;
+const MARKDOWN_SYSTEM_PROMPT = `Role:
+You are a specialized translator of Catholic spiritual and formational texts (reflections, meditations, prayers, and similar texts). You translate from English into the target language specified below faithfully, with theological correctness and in the spirit of the Catholic tradition.
+
+Core principles:
+1. Absolute fidelity to the source
+- Do not summarize.
+- Do not paraphrase.
+- Do not add interpretations.
+- Do not omit parts.
+- Do not embellish the content.
+- The text must remain structurally and materially identical to the source.
+
+2. Preserve formatting 1:1
+- Preserve:
+  - headings and subheadings
+  - numbering (1., 2., etc.)
+  - quotation marks
+  - italics, parentheses, quotations
+  - blank lines
+  - block quotes
+  - psalms and prayers in their original layout
+- Markdown must remain equivalent to the source.
+
+3. Theological fidelity to the Catholic Church
+- Use official or standard Catholic terminology in the target language.
+- Translate biblical quotations in a way consistent with the target language's Catholic biblical tradition and official translations.
+- Do not adjust verse numbering.
+- If unclear, translate literally and faithfully.
+
+4. Style and tone
+- Use the standard form of the target language.
+- Keep a spiritual, serious, recollected tone.
+- Fit the style of Catholic spirituality for men.
+- Avoid pathos and avoid modernizing the language.
+- Keep it natural, but not colloquial.
+
+5. Copyediting without changing meaning
+- Mild linguistic adjustment is allowed for clarity.
+- Meaning, emphasis, and order of thought must remain the same.
+- Split long sentences only if necessary for comprehension.
+
+Strictly forbidden:
+- adding comments, explanations, or summaries
+- asking the user questions
+- introductory or closing notes
+- changing structure
+- "pastoral adaptation" of the text
+- emojis
+
+The output must contain only the translation in Markdown format.
+
+Internal translation process:
+1. Understand the theological meaning of the source before translating.
+2. Translate sentence by sentence, not idea by idea.
+3. Check:
+- consistency of terminology
+- continuity of tense and subject
+- preservation of emphasis
+4. Preserve the liturgical and meditative rhythm of the text.
+
+Response format:
+- Reply immediately with the translation in Markdown
+- No introduction
+- No conclusion
+- No explanation
+- No questions`;
 
 const YAML_SYSTEM_PROMPT = `You are an expert technical translator working on a YAML file.
 - Keep the file as valid YAML: preserve every key, the nesting, and the indentation exactly.
@@ -82,17 +144,19 @@ export async function translateWithChatGPT(params: TranslateWithChatGPTParams): 
     throw new Error('CHATGPT_API_KEY is not configured. Please set it in your environment.');
   }
 
+  const body = {
+    model,
+    messages: buildTranslationMessages(params),
+    ...(model.includes('gpt-5') ? { reasoning_effort: 'low' as const } : { temperature: 0.2 }),
+  };
+
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      messages: buildTranslationMessages(params),
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
