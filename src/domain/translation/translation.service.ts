@@ -30,6 +30,9 @@ Core principles:
   - blank lines
   - block quotes
   - psalms and prayers in their original layout
+  - code blocks, inline code, and any backticks
+  - frontmatter (if present)
+  - variables/placeholders (e.g., {{var}}, {var}, %s) exactly as written
 - Markdown must remain equivalent to the source.
 
 3. Theological fidelity to the Catholic Church

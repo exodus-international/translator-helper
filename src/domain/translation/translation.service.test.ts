@@ -67,9 +67,13 @@ test('Markdown system prompt carries the Catholic spiritual formation guidance',
   assert.ok(content.includes('Preserve formatting 1:1'), 'formatting preservation');
   assert.ok(content.includes('block quotes'), 'block quotes');
   assert.ok(content.includes('Markdown must remain equivalent to the source.'), 'markdown equivalence');
+  // Technical preservation (code, frontmatter, placeholders) carried over from the original prompt
+  assert.ok(/code blocks, inline code/.test(content), 'code blocks and inline code preserved');
+  assert.ok(content.includes('frontmatter'), 'frontmatter preserved');
+  assert.ok(/variables\/placeholders/.test(content), 'variables and placeholders preserved');
   // Theological fidelity
   assert.ok(/official or standard Catholic terminology in the target language/.test(content), 'catholic terminology');
-  assert.ok(/biblical quotations.*Catholic biblical tradition/s.test(content), 'biblical quotations');
+  assert.ok(/biblical quotations.*Catholic biblical tradition/.test(content), 'biblical quotations');
   // Forbidden actions
   assert.ok(content.includes('Strictly forbidden:'), 'forbidden section');
   assert.ok(content.includes('emojis'), 'no emojis');
