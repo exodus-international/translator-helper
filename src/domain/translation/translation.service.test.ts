@@ -155,6 +155,54 @@ test('translateWithChatGPT returns API content and forwards instructions', async
   process.env.CHATGPT_API = originalApiKey;
 });
 
+async function captureRequestBodyForModel(model: string): Promise<any> {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CHATGPT_API;
+  const originalModel = process.env.CHATGPT_MODEL;
+  process.env.CHATGPT_API = 'test-key';
+  process.env.CHATGPT_MODEL = model;
+  let capturedBody: any = null;
+
+  global.fetch = (async (_input: RequestInfo, init?: RequestInit) => {
+    capturedBody = JSON.parse((init?.body as string) || '{}');
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  try {
+    await translateWithChatGPT({
+      documentTitle: 'Sample Doc',
+      sourceLanguageName: 'English',
+      targetLanguageName: 'French',
+      targetLanguageCode: 'fr',
+      sourceContent: 'Hello world',
+    });
+    return capturedBody;
+  } finally {
+    global.fetch = originalFetch;
+    process.env.CHATGPT_API = originalApiKey;
+    if (originalModel === undefined) {
+      delete process.env.CHATGPT_MODEL;
+    } else {
+      process.env.CHATGPT_MODEL = originalModel;
+    }
+  }
+}
+
+test('translateWithChatGPT sends temperature for models that support it', async () => {
+  const body = await captureRequestBodyForModel('gpt-4o-mini');
+  assert.equal(body.temperature, 0.2);
+  assert.equal('reasoning_effort' in body, false, 'reasoning_effort omitted for non-gpt-5 models');
+});
+
+test('translateWithChatGPT swaps temperature for reasoning_effort on gpt-5 models', async () => {
+  const body = await captureRequestBodyForModel('gpt-5.5');
+  assert.equal(body.reasoning_effort, 'low');
+  assert.equal('temperature' in body, false, 'temperature omitted for gpt-5 family models');
+});
+
 async function translateReturning(content: string, originalFilename?: string): Promise<string> {
   const originalFetch = global.fetch;
   const originalApiKey = process.env.CHATGPT_API;
