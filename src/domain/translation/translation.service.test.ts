@@ -51,6 +51,29 @@ test('buildTranslationMessages uses the Markdown prompt by default', () => {
   assert.ok(messages[1].content.includes('Return only the translated Markdown'));
 });
 
+test('Markdown system prompt injects the resolved target language with no leftover placeholders', () => {
+  const [system] = buildTranslationMessages({ ...promptBase, originalFilename: 'reflection.md' });
+  // resolved name AND code are injected
+  assert.ok(system.content.includes('Target language: French (fr).'), 'target language name and code');
+  // the [target language] placeholder was actually substituted
+  assert.ok(!system.content.includes('[target language]'), 'no unresolved placeholders');
+});
+
+test('Markdown system prompt appends custom language instructions when provided', () => {
+  const [system] = buildTranslationMessages({
+    ...promptBase,
+    originalFilename: 'reflection.md',
+    languageInstructions: 'Prefer the liturgical register.',
+  });
+  assert.ok(system.content.includes('Custom instructions:'), 'custom instructions section');
+  assert.ok(system.content.includes('Prefer the liturgical register.'), 'custom instructions content');
+});
+
+test('Markdown system prompt omits the custom instructions section when none provided', () => {
+  const [system] = buildTranslationMessages({ ...promptBase, originalFilename: 'reflection.md' });
+  assert.ok(!system.content.includes('Custom instructions:'), 'no empty custom instructions section');
+});
+
 test('buildTranslationMessages uses the Markdown prompt when no filename is given', () => {
   const messages = buildTranslationMessages(promptBase);
   assert.ok(messages[0].content.includes('Markdown'));
@@ -102,9 +125,61 @@ test('translateWithChatGPT returns API content and forwards instructions', async
     capturedBody.messages[0].content.includes('Use friendly tone'),
     'custom instructions forwarded to system prompt',
   );
+  assert.ok(
+    capturedBody.messages[0].content.includes('Catholic spiritual and formational texts'),
+    'Catholic spiritual formation guidance forwarded to the API',
+  );
 
   global.fetch = originalFetch;
   process.env.CHATGPT_API = originalApiKey;
+});
+
+async function captureRequestBodyForModel(model: string): Promise<any> {
+  const originalFetch = global.fetch;
+  const originalApiKey = process.env.CHATGPT_API;
+  const originalModel = process.env.CHATGPT_MODEL;
+  process.env.CHATGPT_API = 'test-key';
+  process.env.CHATGPT_MODEL = model;
+  let capturedBody: any = null;
+
+  global.fetch = (async (_input: RequestInfo, init?: RequestInit) => {
+    capturedBody = JSON.parse((init?.body as string) || '{}');
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
+
+  try {
+    await translateWithChatGPT({
+      documentTitle: 'Sample Doc',
+      sourceLanguageName: 'English',
+      targetLanguageName: 'French',
+      targetLanguageCode: 'fr',
+      sourceContent: 'Hello world',
+    });
+    return capturedBody;
+  } finally {
+    global.fetch = originalFetch;
+    process.env.CHATGPT_API = originalApiKey;
+    if (originalModel === undefined) {
+      delete process.env.CHATGPT_MODEL;
+    } else {
+      process.env.CHATGPT_MODEL = originalModel;
+    }
+  }
+}
+
+test('translateWithChatGPT sends temperature for models that support it', async () => {
+  const body = await captureRequestBodyForModel('gpt-4o-mini');
+  assert.equal(body.temperature, 0.2);
+  assert.equal('reasoning_effort' in body, false, 'reasoning_effort omitted for non-gpt-5 models');
+});
+
+test('translateWithChatGPT swaps temperature for reasoning_effort on gpt-5 models', async () => {
+  const body = await captureRequestBodyForModel('gpt-5.5');
+  assert.equal(body.reasoning_effort, 'low');
+  assert.equal('temperature' in body, false, 'temperature omitted for gpt-5 family models');
 });
 
 async function translateReturning(content: string, originalFilename?: string): Promise<string> {
