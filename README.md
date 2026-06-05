@@ -241,19 +241,24 @@ pnpm prisma generate
 pnpm prisma studio
 ```
 
-## Production Deployment
+## Releasing & Deployment
 
-1. Set environment variables in your hosting platform
-2. Build the application:
+Deployment is handled by **Coolify**, which auto-deploys every commit:
+
+- `develop` → **staging** environment
+- `production` → **live** environment
+
+So promoting `develop → production` _is_ the release. The build step runs `prisma migrate deploy`, so database migrations apply automatically on deploy.
+
+`develop` and `production` are protected, so a release is **two PRs**. Follow **[docs/RELEASE.md](docs/RELEASE.md)** — the short version:
 
 ```bash
-pnpm build
-```
-
-3. Start the production server:
-
-```bash
-pnpm start
+pnpm test && pnpm lint
+pnpm release:prepare <patch|minor|major>   # bumps version+changelog, opens PR → develop
+# merge that PR, then promote:
+gh pr create --base production --head develop --title "release: vX.Y.Z" --fill
+# merge the promote PR → Coolify deploys → then:
+pnpm release:tag vX.Y.Z
 ```
 
 ## License
