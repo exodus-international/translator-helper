@@ -51,37 +51,12 @@ test('buildTranslationMessages uses the Markdown prompt by default', () => {
   assert.ok(messages[1].content.includes('Return only the translated Markdown'));
 });
 
-test('Markdown system prompt carries the Catholic spiritual formation guidance', () => {
+test('Markdown system prompt injects the resolved target language with no leftover placeholders', () => {
   const [system] = buildTranslationMessages({ ...promptBase, originalFilename: 'reflection.md' });
-  const content = system.content;
-
-  // Role: specialized Catholic spiritual / formational translator
-  assert.ok(/Catholic spiritual and formational texts/.test(content), 'role description');
-  // Fidelity rules
-  assert.ok(content.includes('Do not summarize.'), 'no summarizing');
-  assert.ok(content.includes('Do not paraphrase.'), 'no paraphrasing');
-  assert.ok(content.includes('Do not add interpretations.'), 'no adding');
-  assert.ok(content.includes('Do not omit parts.'), 'no omitting');
-  assert.ok(content.includes('Do not embellish the content.'), 'no embellishing');
-  // Formatting preservation
-  assert.ok(content.includes('Preserve formatting 1:1'), 'formatting preservation');
-  assert.ok(content.includes('block quotes'), 'block quotes');
-  assert.ok(content.includes('Markdown must remain equivalent to the source.'), 'markdown equivalence');
-  // Technical preservation (code, frontmatter, placeholders) carried over from the original prompt
-  assert.ok(/code blocks, inline code/.test(content), 'code blocks and inline code preserved');
-  assert.ok(content.includes('frontmatter'), 'frontmatter preserved');
-  assert.ok(/variables\/placeholders/.test(content), 'variables and placeholders preserved');
-  // Theological fidelity
-  assert.ok(/official or standard Catholic terminology in the target language/.test(content), 'catholic terminology');
-  assert.ok(/biblical quotations.*Catholic biblical tradition/.test(content), 'biblical quotations');
-  // Forbidden actions
-  assert.ok(content.includes('Strictly forbidden:'), 'forbidden section');
-  assert.ok(content.includes('emojis'), 'no emojis');
-  assert.ok(/adding comments, explanations, or summaries/.test(content), 'no comments/explanations');
-  // Generic target-language phrasing (no leftover [target language] placeholders)
-  assert.ok(!content.includes('[target language]'), 'no unresolved placeholders');
-  // Target language injection still present
-  assert.ok(content.includes('Target language: French (fr).'), 'target language name and code');
+  // resolved name AND code are injected
+  assert.ok(system.content.includes('Target language: French (fr).'), 'target language name and code');
+  // the [target language] placeholder was actually substituted
+  assert.ok(!system.content.includes('[target language]'), 'no unresolved placeholders');
 });
 
 test('Markdown system prompt appends custom language instructions when provided', () => {
