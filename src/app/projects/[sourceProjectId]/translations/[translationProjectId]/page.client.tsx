@@ -21,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   createDocumentAssignmentAction,
   deleteDocumentAssignmentAction,
-  updateDocumentAssignmentAction,
 } from '@/domain/document-assignment/document-assignment.actions';
 import {
   createProjectMemberAction,
@@ -248,24 +247,6 @@ export default function TranslationProjectClient({
     } catch (error: any) {
       console.error('Error assigning document:', error);
       toast.error(error.message || 'Failed to assign document');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateAssignment = async (assignmentId: string, userId: string | null, deadline: Date | null) => {
-    setLoading(true);
-    try {
-      const updated = await updateDocumentAssignmentAction(assignmentId, {
-        userId,
-        deadline,
-      });
-      setAssignments(assignments.map((a) => (a.id === updated.id ? (updated as (typeof assignments)[0]) : a)));
-      router.refresh();
-      toast.success(userId ? 'Assignment updated!' : 'Translator unassigned');
-    } catch (error: any) {
-      console.error('Error updating assignment:', error);
-      toast.error(error.message || 'Failed to update assignment');
     } finally {
       setLoading(false);
     }

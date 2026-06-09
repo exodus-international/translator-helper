@@ -7,27 +7,14 @@ import {
   deleteProjectMember,
   deleteProjectMembersByUser,
   getProjectMemberById,
-  getProjectMembersByUserAndProject,
   getProjectReviewers,
-  getUserRoleInProject,
   listProjectMembers,
-  updateProjectMember,
 } from './project-member.repository';
-import { createProjectMemberSchema, updateProjectMemberSchema } from './project-member.types';
+import { createProjectMemberSchema } from './project-member.types';
 
 export async function listProjectMembersAction(translationProjectId: string) {
   await authorize('authenticated');
   return await listProjectMembers(translationProjectId);
-}
-
-export async function getProjectMemberAction(id: string) {
-  await authorize('authenticated');
-  return await getProjectMemberById(id);
-}
-
-export async function getProjectMembersByUserAndProjectAction(translationProjectId: string) {
-  const { user } = await authorize('authenticated');
-  return await getProjectMembersByUserAndProject(user.id, translationProjectId);
 }
 
 export async function createProjectMemberAction(input: unknown) {
@@ -44,20 +31,6 @@ export async function createProjectMemberAction(input: unknown) {
   return await createProjectMember({
     translationProjectId: validated.translationProjectId,
     userId: validated.userId,
-    role: validated.role,
-  });
-}
-
-export async function updateProjectMemberAction(id: string, input: unknown) {
-  const member = await getProjectMemberById(id);
-  if (!member) {
-    throw new Error('Project member not found');
-  }
-
-  await authorize({ project: member.translationProjectId, role: 'manager' });
-
-  const validated = updateProjectMemberSchema.parse(input);
-  return await updateProjectMember(id, {
     role: validated.role,
   });
 }
@@ -89,9 +62,4 @@ export async function getProjectReviewersAction(translationProjectId: string) {
     seen.add(m.user.id);
     return true;
   });
-}
-
-export async function getUserRoleInProjectAction(translationProjectId: string) {
-  const { user } = await authorize('authenticated');
-  return await getUserRoleInProject(user.id, translationProjectId);
 }

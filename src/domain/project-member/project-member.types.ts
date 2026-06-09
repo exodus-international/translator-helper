@@ -7,9 +7,3 @@ export const createProjectMemberSchema = z.object({
   role: z.nativeEnum(ProjectRole),
 });
 
-export const updateProjectMemberSchema = z.object({
-  role: z.nativeEnum(ProjectRole),
-});
-
-export type CreateProjectMemberInput = z.infer<typeof createProjectMemberSchema>;
-export type UpdateProjectMemberInput = z.infer<typeof updateProjectMemberSchema>;

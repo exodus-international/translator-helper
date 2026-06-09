@@ -13,5 +13,3 @@ export const updateSourceProjectSchema = z.object({
   status: z.enum(['ACTIVE', 'COMPLETE']).optional(),
 });
 
-export type CreateSourceProjectInput = z.infer<typeof createSourceProjectSchema>;
-export type UpdateSourceProjectInput = z.infer<typeof updateSourceProjectSchema>;

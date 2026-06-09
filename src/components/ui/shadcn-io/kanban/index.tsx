@@ -23,8 +23,6 @@ import tunnel from 'tunnel-rat';
 
 const t = tunnel();
 
-export type { DragEndEvent } from '@dnd-kit/core';
-
 type KanbanItemProps = {
   id: string;
   name: string;
@@ -51,7 +49,7 @@ const KanbanContext = createContext<KanbanContextProps>({
   activeCardId: null,
 });
 
-export type KanbanBoardProps = {
+type KanbanBoardProps = {
   id: string;
   children: ReactNode;
   className?: string;
@@ -76,7 +74,7 @@ export const KanbanBoard = ({ id, children, className }: KanbanBoardProps) => {
   );
 };
 
-export type KanbanCardProps<T extends KanbanItemProps = KanbanItemProps> = T & {
+type KanbanCardProps<T extends KanbanItemProps = KanbanItemProps> = T & {
   children?: ReactNode;
   className?: string;
   onClick?: (e: React.MouseEvent) => void;
@@ -237,7 +235,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   );
 };
 
-export type KanbanCardsProps<T extends KanbanItemProps = KanbanItemProps> = Omit<
+type KanbanCardsProps<T extends KanbanItemProps = KanbanItemProps> = Omit<
   HTMLAttributes<HTMLDivElement>,
   'children' | 'id'
 > & {
@@ -266,13 +264,13 @@ export const KanbanCards = <T extends KanbanItemProps = KanbanItemProps>({
   );
 };
 
-export type KanbanHeaderProps = HTMLAttributes<HTMLDivElement>;
+type KanbanHeaderProps = HTMLAttributes<HTMLDivElement>;
 
 export const KanbanHeader = ({ className, ...props }: KanbanHeaderProps) => (
   <div className={cn('m-0 p-2 font-semibold text-sm', className)} {...props} />
 );
 
-export type KanbanProviderProps<
+type KanbanProviderProps<
   T extends KanbanItemProps = KanbanItemProps,
   C extends KanbanColumnProps = KanbanColumnProps,
 > = Omit<DndContextProps, 'children'> & {

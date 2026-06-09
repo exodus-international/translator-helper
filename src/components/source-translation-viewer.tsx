@@ -20,7 +20,6 @@ import { Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'l
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { toast } from 'sonner';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
@@ -92,6 +91,8 @@ interface SourceTranslationViewerProps {
   onCreateGeneralThread?: (comment: string) => void;
   disableReopen?: boolean;
   sidebarHeader?: ReactNode;
+  /** Monaco language for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
+  contentLanguage?: 'markdown' | 'yaml';
 }
 
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
@@ -131,7 +132,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       canEditSource = false,
       onSourceChange,
       onSourceSave,
-      onSourceDelete,
       sourceEditContent,
       reviewConfig,
       suggestions = [],
@@ -149,10 +149,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       onCreateGeneralThread,
       disableReopen = false,
       sidebarHeader,
+      contentLanguage = 'markdown',
     },
     ref,
   ) {
     const isZen = layout === 'zen';
+    const isYaml = contentLanguage === 'yaml';
     const { open: sidebarOpen, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
     const [mounted, setMounted] = useState(false);
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -175,7 +177,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
     const translationEditorRef = useRef<any>(null);
     const translationContainerRef = useRef<HTMLDivElement>(null);
-    const [selectedUserId, setSelectedUserId] = useState<string | null>(null); // Filter by user for diff view
+    const [selectedUserId] = useState<string | null>(null); // Filter by user for diff view
     const [isSourceEditing, setIsSourceEditing] = useState(false);
     const [sourceEditValue, setSourceEditValue] = useState(sourceEditContent ?? sourceContent);
     const [sourceSaving, setSourceSaving] = useState(false);
@@ -229,15 +231,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const handleSourceCancel = () => {
       setSourceEditValue(sourceEditContent ?? sourceContent);
       setIsSourceEditing(false);
-    };
-
-    const handleSourceDelete = async () => {
-      if (!onSourceDelete) return;
-      try {
-        await onSourceDelete();
-      } catch (error) {
-        console.error('Error deleting source:', error);
-      }
     };
 
     const enterSourceEditMode = () => {
@@ -510,47 +503,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setSelectedText('');
     };
 
-    const handleAddSuggestionClick = () => {
-      // Try to get cursor position from editor
-      const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-      const editor = editorWrapper?.editor;
-      if (editor && typeof editor.getPosition === 'function') {
-        try {
-          const position = editor.getPosition();
-          if (position) {
-            // Create a range at the current cursor position (single character)
-            const range = {
-              startLine: position.lineNumber,
-              startColumn: position.column,
-              endLine: position.lineNumber,
-              endColumn: position.column,
-            };
-            setSelectedRange(range);
-            setSuggestionFormType(SuggestionType.COMMENT);
-            setShowSuggestionForm(true);
-            return;
-          }
-        } catch (error) {
-          console.error('Error getting editor position:', error);
-        }
-      }
-      // If no editor or position, use current translation line
-      if (translationLine > 0) {
-        const range = {
-          startLine: translationLine,
-          startColumn: 1,
-          endLine: translationLine,
-          endColumn: 1,
-        };
-        setSelectedRange(range);
-        setSuggestionFormType('COMMENT');
-        setShowSuggestionForm(true);
-        return;
-      }
-      // If no line info, show instructions
-      toast.info('Please select text in the translation editor, or click on a line to add a comment');
-    };
-
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
@@ -561,10 +513,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       <>
         <div className={cn('grid grid-cols-2 border-0 flex-1 min-w-0', isZen && 'h-full')}>
           <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
-            <div className="flex items-center justify-between py-1.5 px-2">
+            <div className="flex h-12 items-center justify-between px-2">
               <h2 className="text-sm font-semibold">Source (English)</h2>
               <div className="flex items-center gap-2">
                 {!isSourceEditing &&
+                  !isYaml &&
                   (mounted ? (
                     <Tabs
                       value={sourceViewMode}
@@ -652,6 +605,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
+                  language={contentLanguage}
                   lineInfo={{
                     primaryLabel: 'Source Line',
                     primaryValue: sourceLine,
@@ -660,7 +614,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     direction: 'to',
                   }}
                 />
-              ) : sourceViewMode === 'formatted' ? (
+              ) : !isYaml && sourceViewMode === 'formatted' ? (
                 <div className="prose max-w-none h-full overflow-y-auto p-3">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
                 </div>
@@ -668,6 +622,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 <RawEditorPane
                   value={sourceContent}
                   readOnly
+                  language={contentLanguage}
                   currentLine={sourceLine}
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
@@ -685,11 +640,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Card>
 
           <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
-            <div className="flex items-center justify-between py-1.5 px-2">
+            <div className="flex h-12 items-center justify-between px-2">
               <h2 className="text-sm font-semibold">Translation</h2>
               <div className="flex items-center gap-2">
                 {variant === 'translate' ? (
-                  mounted ? (
+                  isYaml ? null : mounted ? (
                     <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
                       <TabsList>
                         <TabsTrigger value="edit">
@@ -728,7 +683,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       </button>
                     </div>
                   )
-                ) : !isReviewEditing ? (
+                ) : !isReviewEditing && !isYaml ? (
                   mounted ? (
                     <Tabs
                       value={reviewViewMode}
@@ -801,13 +756,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
             <div className={bodyClassName}>
               {variant === 'translate' ? (
-                translateTab === 'edit' ? (
+                isYaml || translateTab === 'edit' ? (
                   <div ref={translationContainerRef} className="relative h-full">
                     <RawEditorPane
                       ref={translationEditorRef}
                       value={translationContent}
                       onChange={onTranslationChange}
                       onCursorChange={handleTranslationCursorChange}
+                      language={contentLanguage}
                       placeholder={translationPlaceholder}
                       currentLine={translationLine}
                       highlightLine={syncedTranslationLine}
@@ -860,6 +816,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     onCursorChange={handleTranslationCursorChange}
                     currentLine={translationLine}
                     highlightLine={syncedTranslationLine}
+                    language={contentLanguage}
                     fullHeight
                     lineInfo={
                       sourceViewMode === 'raw'
@@ -875,7 +832,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                   {translationEditActions}
                 </div>
-              ) : reviewViewMode === 'formatted' ? (
+              ) : !isYaml && reviewViewMode === 'formatted' ? (
                 <div className="prose max-w-none h-full overflow-y-auto p-3">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
                 </div>
@@ -897,6 +854,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         ref={translationEditorRef}
                         value={translationContent}
                         readOnly
+                        language={contentLanguage}
                         currentLine={translationLine}
                         highlightLine={syncedTranslationLine}
                         onCursorChange={handleTranslationCursorChange}

@@ -6,6 +6,6 @@ export const translateDocumentSchema = z.object({
   targetLanguageId: z.string().uuid(),
   sourceContent: z.string().min(1),
   currentTranslation: z.string().optional(),
+  originalFilename: z.string().optional(),
 });
 
-export type TranslateDocumentInput = z.infer<typeof translateDocumentSchema>;

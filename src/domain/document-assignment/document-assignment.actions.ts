@@ -7,11 +7,9 @@ import { createDocumentAssignmentSchema, updateDocumentAssignmentSchema } from '
 import {
   listDocumentAssignments,
   getDocumentAssignmentById,
-  getDocumentAssignmentByDocumentAndProject,
   createDocumentAssignment,
   updateDocumentAssignment,
   deleteDocumentAssignment,
-  getUnassignedDocuments,
   getAssignedDocumentsForUser,
 } from './document-assignment.repository';
 
@@ -43,19 +41,6 @@ export async function listDocumentAssignmentsAction(filters?: {
 }) {
   await authorize('authenticated');
   return await listDocumentAssignments(filters);
-}
-
-export async function getDocumentAssignmentAction(id: string) {
-  await authorize('authenticated');
-  return await getDocumentAssignmentById(id);
-}
-
-export async function getDocumentAssignmentByDocumentAndProjectAction(
-  documentId: string,
-  translationProjectId: string,
-) {
-  await authorize('authenticated');
-  return await getDocumentAssignmentByDocumentAndProject(documentId, translationProjectId);
 }
 
 export async function createDocumentAssignmentAction(input: unknown) {
@@ -119,11 +104,6 @@ export async function deleteDocumentAssignmentAction(id: string) {
   revalidatePath('/dashboard');
   revalidatePath('/documents', 'layout');
   return result;
-}
-
-export async function getUnassignedDocumentsAction(translationProjectId: string) {
-  await authorize('authenticated');
-  return await getUnassignedDocuments(translationProjectId);
 }
 
 export async function getAssignedDocumentsForUserAction(translationProjectId?: string) {

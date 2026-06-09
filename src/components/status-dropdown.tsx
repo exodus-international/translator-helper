@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
+import { getCanonicalEditorPath } from '@/lib/document-status';
 import { canDeployClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -163,33 +164,18 @@ export function StatusDropdown({
       onStatusChange?.(newStatus);
       setOpen(false);
 
-      // Navigate to the correct page based on the new status (only if needed)
+      // Navigate to the canonical page for the new status, or refresh if we're already there
       if (documentId) {
-        const isTranslateStatus =
-          newStatus === DocumentStatus.PENDING_TRANSLATION || newStatus === DocumentStatus.IN_PROGRESS;
-
-        // Check current pathname to avoid unnecessary navigation
+        const canonical = getCanonicalEditorPath(documentId, newStatus, { versionId, lang: languageId });
+        const canonicalPath = canonical.split('?')[0];
         const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-        const shouldBeOnTranslatePage = isTranslateStatus && languageId;
-        const isOnTranslatePage = currentPath.includes('/translate');
-        const isOnReviewPage = currentPath.includes('/review');
-
-        // Only navigate if we need to switch between translate and review pages
-        if (shouldBeOnTranslatePage && !isOnTranslatePage) {
-          // Navigate to translate page
-          router.push(`/documents/${documentId}/translate?lang=${languageId}&version=${versionId}`);
-        } else if (!shouldBeOnTranslatePage && !isOnReviewPage) {
-          // Navigate to review page for other statuses
-          router.push(`/documents/${documentId}/review?version=${versionId}`);
+        if (currentPath !== canonicalPath) {
+          router.push(canonical);
         } else {
-          // Already on the correct page, just refresh to get updated data
           router.refresh();
         }
-      } else {
-        // If no documentId provided, just reload
-        if (typeof window !== 'undefined') {
-          window.location.reload();
-        }
+      } else if (typeof window !== 'undefined') {
+        window.location.reload();
       }
     } catch (error: any) {
       if (deployToastId) toast.dismiss(deployToastId);

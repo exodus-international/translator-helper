@@ -1,10 +1,10 @@
 import prisma from '@/lib/db';
 import { getGitHubConfig } from '@/lib/github-config';
-import { DocumentType, GitHubPRStatus } from '@prisma/client';
+import { GitHubPRStatus } from '@prisma/client';
 import crypto from 'crypto';
 import { App } from 'octokit';
+import { resolveFilePath } from './github.paths';
 import { createGitHubCommit } from './github.repository';
-import { FilePathParams } from './github.types';
 
 const LOG_PREFIX = '[GitHub]';
 
@@ -28,51 +28,7 @@ async function getOctokit() {
   return app.getInstallationOctokit(config.installationId);
 }
 
-export function resolveFilePath(params: FilePathParams): string {
-  const { documentType, languageCode, identifier, originalFilename, slug } = params;
-  const filename = originalFilename || `${slug}.md`;
-
-  let path: string;
-  switch (documentType) {
-    case DocumentType.DAY:
-      path = `translations/${languageCode}/exercises/${identifier}/days/${filename}`;
-      break;
-
-    case DocumentType.FIELD_GUIDE:
-      path = `translations/${languageCode}/exercises/${identifier}/field_guide/${filename}`;
-      break;
-
-    case DocumentType.DAILY_CONTENT: {
-      const { year, month } = parseDailyContentDate(originalFilename);
-      path = `translations/${languageCode}/daily_content/${year}/${month}/${filename}`;
-      break;
-    }
-
-    default:
-      throw new Error(`Unknown document type: ${documentType}`);
-  }
-
-  console.log(`${LOG_PREFIX} Resolved file path: ${path} (type: ${documentType}, lang: ${languageCode})`);
-  return path;
-}
-
-function parseDailyContentDate(originalFilename: string | null): { year: string; month: string } {
-  if (!originalFilename) {
-    throw new Error('DAILY_CONTENT documents require an originalFilename to parse year/month');
-  }
-
-  // Expected format: 20260201-5.md → year=2026, month=02
-  const match = originalFilename.match(/^(\d{4})(\d{2})/);
-  if (!match) {
-    throw new Error(
-      `Cannot parse year/month from filename "${originalFilename}". Expected format like "20260201-5.md"`,
-    );
-  }
-
-  return { year: match[1], month: match[2] };
-}
-
-export async function verifyBranchExists(branch: string): Promise<boolean> {
+async function verifyBranchExists(branch: string): Promise<boolean> {
   const config = getGitHubConfig();
   const octokit = await getOctokit();
 
@@ -95,7 +51,7 @@ export async function verifyBranchExists(branch: string): Promise<boolean> {
   }
 }
 
-export async function commitFileToRepo(params: {
+async function commitFileToRepo(params: {
   branch: string;
   filePath: string;
   content: string;
@@ -143,7 +99,7 @@ export async function commitFileToRepo(params: {
   return commitSha;
 }
 
-export async function findOrCreatePullRequest(
+async function findOrCreatePullRequest(
   branch: string,
   title: string,
   body: string,

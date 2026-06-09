@@ -2,9 +2,10 @@ import { DocumentStatus } from '@prisma/client';
 import type { LucideIcon } from 'lucide-react';
 import { AlertCircle, CheckCircle2, Circle, Clock3, PenLine, Rocket } from 'lucide-react';
 
+// fallow-ignore-next-line unused-type
 export type DocumentStatusKey = DocumentStatus | 'NO_STATUS';
 
-export interface DocumentStatusConfig {
+interface DocumentStatusConfig {
   status: DocumentStatusKey;
   name: string;
   icon: LucideIcon;
@@ -130,13 +131,6 @@ export function getDocumentStatusConfig(status?: DocumentStatus | DocumentStatus
   }
 
   return DOCUMENT_STATUS_CONFIGS[status] ?? NO_STATUS_CONFIG;
-}
-
-export function getDocumentStatusByStep(step: number): DocumentStatus | null {
-  if (step < 1 || step > DOCUMENT_STATUS_SEQUENCE.length) {
-    return null;
-  }
-  return DOCUMENT_STATUS_SEQUENCE[step - 1];
 }
 
 export function getStepForDocumentStatus(status?: DocumentStatus | DocumentStatusKey | null): number {

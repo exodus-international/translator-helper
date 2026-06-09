@@ -4,7 +4,8 @@ import { adminClient } from 'better-auth/client/plugins';
 import { createAccessControl } from 'better-auth/plugins/access';
 import { createAuthClient } from 'better-auth/react';
 
-// Create access control (must match server-side)
+// Create access control (must match server-side; mirrored from src/lib/auth.ts by better-auth convention)
+// fallow-ignore-next-line code-duplication
 const statement = {
   user: ['create', 'read', 'update', 'delete', 'ban', 'unban'],
   session: ['read', 'delete', 'revoke'],
@@ -30,4 +31,5 @@ export const authClient = createAuthClient({
   ],
 });
 
+// fallow-ignore-next-line unused-export
 export const { signIn, signUp, signOut, useSession } = authClient;

@@ -16,7 +16,7 @@ import { createSourceProjectAction } from '@/domain/source-project/source-projec
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@prisma/client';
-import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Rocket, Search } from 'lucide-react';
+import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -131,12 +131,6 @@ function getDocumentUrl(assignment: DashboardClientProps['assignments'][number])
   }
 
   return `/documents/${doc.id}/review?version=${version.id}`;
-}
-
-function getVersionStatus(assignment: DashboardClientProps['assignments'][number]): DocumentStatus | null {
-  const langId = assignment.translationProject.language.id;
-  const version = assignment.document.versions.find((v) => v.languageId === langId);
-  return version?.status || null;
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -488,15 +482,15 @@ export default function DashboardClient({
             <Card>
               <Table>
                 <TableHeader>
-                  {/* <TableRow> */}
-                  <TableHead className={headClass}>Document</TableHead>
-                  <TableHead className={headClass}>Project</TableHead>
-                  <TableHead className={headClass}>Language</TableHead>
-                  <TableHead className={headClass}>Translator</TableHead>
-                  <TableHead className={headClass}>Reviewer</TableHead>
-                  <TableHead className={headClass}>Status</TableHead>
-                  <TableHead className="w-[60px]" />
-                  {/* </TableRow> */}
+                  <TableRow>
+                    <TableHead className={headClass}>Document</TableHead>
+                    <TableHead className={headClass}>Project</TableHead>
+                    <TableHead className={headClass}>Language</TableHead>
+                    <TableHead className={headClass}>Translator</TableHead>
+                    <TableHead className={headClass}>Reviewer</TableHead>
+                    <TableHead className={headClass}>Status</TableHead>
+                    <TableHead className="w-[60px]" />
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredApprovedVersions.map((version) => {
@@ -571,16 +565,16 @@ export default function DashboardClient({
             <Card>
               <Table>
                 <TableHeader>
-                  {/* <TableRow> */}
-                  <TableHead className={headClass}>Document</TableHead>
-                  <TableHead className={headClass}>Project</TableHead>
-                  <TableHead className={headClass}>Language</TableHead>
-                  <TableHead className={headClass}>Translator</TableHead>
-                  <TableHead className={headClass}>Reviewer</TableHead>
-                  <TableHead className={headClass}>Status</TableHead>
-                  <TableHead className={headClass}>Deadline</TableHead>
-                  <TableHead className="w-[60px]" />
-                  {/* </TableRow> */}
+                  <TableRow>
+                    <TableHead className={headClass}>Document</TableHead>
+                    <TableHead className={headClass}>Project</TableHead>
+                    <TableHead className={headClass}>Language</TableHead>
+                    <TableHead className={headClass}>Translator</TableHead>
+                    <TableHead className={headClass}>Reviewer</TableHead>
+                    <TableHead className={headClass}>Status</TableHead>
+                    <TableHead className={headClass}>Deadline</TableHead>
+                    <TableHead className="w-[60px]" />
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {workItems.map((item) => {

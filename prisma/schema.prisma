@@ -19,6 +19,11 @@ enum Role {
   ADMIN
 }
 
+enum InvitationStatus {
+  ACTIVE
+  REVOKED
+}
+
 enum ProjectRole {
   PROJECT_MANAGER
   REVIEWER
@@ -54,6 +59,8 @@ enum DocumentType {
   DAY
   FIELD_GUIDE
   DAILY_CONTENT
+  ROOT_FILE
+  MEETING
 }
 
 enum GitHubPRStatus {
@@ -86,6 +93,7 @@ model User {
   languages           UserLanguage[]
   suggestions         Suggestion[]
   suggestionReplies   SuggestionReply[]
+  invitationsCreated  Invitation[]     @relation("InvitationsCreated")
 
   @@map("user")
 }
@@ -369,4 +377,19 @@ model GitHubCommit {
   updatedAt         DateTime        @updatedAt
 
   @@map("github_commit")
+}
+
+model Invitation {
+  id          String           @id @default(uuid())
+  token       String           @unique
+  maxUses     Int?             // null = unlimited, 1 = single-use, N = max registrations
+  usedCount   Int              @default(0)
+  expiresAt   DateTime
+  status      InvitationStatus @default(ACTIVE)
+  createdById String
+  createdBy   User             @relation("InvitationsCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("invitation")
 }

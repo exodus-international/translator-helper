@@ -12,5 +12,3 @@ export const updateDocumentAssignmentSchema = z.object({
   deadline: z.coerce.date().optional().nullable(),
 });
 
-export type CreateDocumentAssignmentInput = z.infer<typeof createDocumentAssignmentSchema>;
-export type UpdateDocumentAssignmentInput = z.infer<typeof updateDocumentAssignmentSchema>;

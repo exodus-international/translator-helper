@@ -5,7 +5,8 @@ import { admin } from 'better-auth/plugins';
 import { createAccessControl } from 'better-auth/plugins/access';
 import prisma from './db';
 
-// Create access control with user management permissions
+// Create access control with user management permissions (mirrored in src/lib/auth-client.ts by better-auth convention)
+// fallow-ignore-next-line code-duplication
 const statement = {
   user: ['create', 'read', 'update', 'delete', 'ban', 'unban'],
   session: ['read', 'delete', 'revoke'],

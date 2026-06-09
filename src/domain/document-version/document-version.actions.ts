@@ -2,13 +2,35 @@
 
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
+import { type SessionUser } from '@/lib/session';
 import { DocumentStatus, ProjectRole, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+
+/**
+ * Load a version + its language and assert the caller may edit/delete a source
+ * (English) version. For non-source versions returns successfully — caller is
+ * responsible for any further project-scoped permission check.
+ */
+async function loadVersionAndGateSourceEdits(id: string, user: SessionUser) {
+  const version = await getDocumentVersionById(id);
+  if (!version) {
+    throw new Error('Document version not found');
+  }
+
+  const language = await getLanguageById(version.languageId);
+  if (!language) {
+    throw new Error('Language not found');
+  }
+
+  if (language.code === 'en' && user.role !== Role.ADMIN) {
+    throw new Error('Forbidden: Only deployers can edit source (English) document versions');
+  }
+
+  return { version, language, isSourceEnglish: language.code === 'en' };
+}
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
-import { createComment } from '../comment/comment.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
 import { validateTransition } from './document-version.transitions';
-import { resolveTranslationProject } from './resolve-translation-project';
 import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
@@ -28,15 +50,9 @@ import {
 } from './document-version.repository';
 import {
   createDocumentVersionSchema,
-  reviewVersionSchema,
   submitForReviewSchema,
   updateDocumentVersionSchema,
 } from './document-version.types';
-
-export async function getDocumentVersionAction(id: string) {
-  await authorize('authenticated');
-  return await getDocumentVersionById(id);
-}
 
 export async function assignReviewerToVersionAction(versionId: string, reviewerId: string | null) {
   await authorize('admin');
@@ -53,11 +69,6 @@ export async function assignReviewerToVersionAction(versionId: string, reviewerI
 
   revalidatePath(`/documents/${version.documentId}`, 'layout');
   return version;
-}
-
-export async function getDocumentVersionByDocumentAndLanguageAction(documentId: string, languageId: string) {
-  await authorize('authenticated');
-  return await getDocumentVersionByDocumentAndLanguage(documentId, languageId);
 }
 
 export async function createDocumentVersionAction(input: unknown) {
@@ -86,26 +97,10 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = updateDocumentVersionSchema.parse(input);
 
-  // Get existing version to check permissions
-  const existingVersion = await getDocumentVersionById(id);
-  if (!existingVersion) {
-    throw new Error('Document version not found');
-  }
+  const { version: existingVersion, isSourceEnglish } = await loadVersionAndGateSourceEdits(id, user);
 
-  // Check if this is a source (English) version
-  const language = await getLanguageById(existingVersion.languageId);
-  if (!language) {
-    throw new Error('Language not found');
-  }
-
-  // If this is a source (English) version, only deployers can edit it
-  if (language.code === 'en') {
-    if (user.role !== Role.ADMIN) {
-      throw new Error('Forbidden: Only deployers can edit source (English) document versions');
-    }
-  } else {
+  if (!isSourceEnglish) {
     // For translation versions, use existing permission logic
-    // Get document to find source project
     const document = await getDocumentById(existingVersion.documentId);
     if (!document) {
       throw new Error('Document not found');
@@ -116,7 +111,6 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
       );
     }
 
-    // Get translation project
     const translationProject = await getTranslationProjectBySourceAndLanguage(
       document.sourceProject.id,
       existingVersion.languageId,
@@ -194,132 +188,10 @@ export async function submitForReviewAction(input: unknown) {
   return version;
 }
 
-export async function reviewVersionAction(input: unknown) {
-  const { user } = await authorize('authenticated');
-  const validated = reviewVersionSchema.parse(input);
-
-  const { version: currentVersion, translationProject } = await resolveTranslationProject(validated.versionId);
-
-  if (translationProject) {
-    await authorize({ project: translationProject.id, role: 'reviewer' });
-  } else {
-    // No translation project — require admin to prevent unauthorized reviews
-    await authorize('admin');
-  }
-
-  // Determine new status based on approval decision
-  const newStatus = validated.approved
-    ? DocumentStatus.APPROVED
-    : DocumentStatus.IN_PROGRESS;
-
-  if (validated.approved) {
-    const openCount = await countOpenSuggestions(validated.versionId);
-    validateTransition(currentVersion.status, newStatus, { openSuggestionsCount: openCount });
-  } else {
-    validateTransition(currentVersion.status, newStatus);
-  }
-
-  const version = await updateDocumentVersionStatus(validated.versionId, newStatus);
-
-  // Add comment if provided
-  if (validated.comment) {
-    await createComment({
-      documentVersionId: validated.versionId,
-      userId: user.id,
-      content: validated.comment,
-    });
-  }
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: validated.approved ? 'approved' : 'requested_changes',
-    details: { hasComment: !!validated.comment },
-  });
-
-  return version;
-}
-
-export async function deployVersionAction(versionId: string) {
-  const { user } = await authorize('can:deploy');
-
-  const currentVersion = await getDocumentVersionById(versionId);
-  if (!currentVersion) {
-    throw new Error('Document version not found');
-  }
-
-  const openCount = await countOpenSuggestions(versionId);
-  validateTransition(currentVersion.status, DocumentStatus.DEPLOYED, { openSuggestionsCount: openCount });
-
-  const version = await updateDocumentVersionStatus(versionId, DocumentStatus.DEPLOYED);
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'deployed',
-    details: {},
-  });
-
-  // Attempt GitHub deploy (non-blocking — deploy succeeds regardless of GitHub outcome)
-  try {
-    console.log('[GitHub] Checking if GitHub is configured...');
-    const { isGitHubConfigured } = await import('@/lib/github-config');
-    if (isGitHubConfigured()) {
-      console.log('[GitHub] GitHub is configured, starting deploy for version:', versionId);
-      const { deployToGitHub } = await import('../github/github.service');
-      await deployToGitHub(versionId);
-
-      console.log('[GitHub] Deploy succeeded, logging activity');
-      await createActivityLog({
-        documentVersionId: version.id,
-        userId: user.id,
-        action: 'github_deployed',
-        details: {},
-      });
-      revalidatePath(`/documents/${version.documentId}/review`);
-    } else {
-      console.log('[GitHub] GitHub is not configured, skipping deploy');
-    }
-  } catch (error: any) {
-    console.error('[GitHub] Deploy failed:', error.message);
-    console.error('[GitHub] Full error:', error);
-    await createActivityLog({
-      documentVersionId: version.id,
-      userId: user.id,
-      action: 'github_deploy_failed',
-      details: { error: error.message },
-    });
-    revalidatePath(`/documents/${version.documentId}/review`);
-  }
-
-  return version;
-}
-
 export async function deleteDocumentVersionAction(id: string) {
   const { user } = await authorize('authenticated');
-
-  // Get existing version to check permissions
-  const existingVersion = await getDocumentVersionById(id);
-  if (!existingVersion) {
-    throw new Error('Document version not found');
-  }
-
-  // Check if this is a source (English) version
-  const language = await getLanguageById(existingVersion.languageId);
-  if (!language) {
-    throw new Error('Language not found');
-  }
-
-  // If this is a source (English) version, only deployers can delete it
-  if (language.code === 'en') {
-    if (user.role !== Role.ADMIN) {
-      throw new Error('Forbidden: Only deployers can delete source (English) document versions');
-    }
-  }
+  await loadVersionAndGateSourceEdits(id, user);
   // For translation versions, allow deletion (or add appropriate checks if needed)
-
   return await deleteDocumentVersion(id);
 }
 

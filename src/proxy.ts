@@ -4,9 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 // Paths that require authentication
 const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding'];
 
-// Paths that are public (auth pages)
-const publicPaths = ['/login', '/register', '/'];
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -30,7 +27,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // If accessing public auth pages with session cookie, redirect to dashboard
-  if ((pathname === '/login' || pathname === '/register') && sessionCookie) {
+  if ((pathname === '/login' || pathname.startsWith('/register')) && sessionCookie) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": [
+    "src/index.{ts,tsx,js,jsx}",
+    "src/main.{ts,tsx,js,jsx}"
+  ],
+  "ignorePatterns": [
+    "**/components/ui/*.tsx",
+    "src/hooks/use-mobile.ts",
+    "prisma/migrations/**"
+  ],
+  "ignoreDependencies": [
+    "@base-ui/react",
+    "@dnd-kit/core",
+    "@dnd-kit/sortable",
+    "@dnd-kit/utilities",
+    "@radix-ui/react-alert-dialog",
+    "@radix-ui/react-dialog",
+    "@radix-ui/react-label",
+    "@radix-ui/react-scroll-area",
+    "@radix-ui/react-select",
+    "@radix-ui/react-tabs",
+    "class-variance-authority",
+    "next-themes",
+    "radix-ui",
+    "tunnel-rat",
+    "import-in-the-middle",
+    "require-in-the-middle",
+    "baseline-browser-mapping"
+  ],
+  "rules": {}
+}
