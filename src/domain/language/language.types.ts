@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 2000;
+export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
 
 export const createLanguageSchema = z.object({
   code: z.string().min(2).max(5), // e.g., "en", "cs", "en-US"
@@ -19,4 +19,3 @@ export const updateLanguageInstructionsSchema = z.object({
 export const updateLanguageBranchNameSchema = z.object({
   branchName: z.string().nullable(),
 });
-
