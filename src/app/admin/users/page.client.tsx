@@ -285,7 +285,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     if (!languageUser) return;
     setLoading(true);
     try {
-      await adminSetUserLanguagesAction({ userId: languageUser.id, languageIds: selectedLanguageIds });
+      await adminSetUserLanguagesAction(languageUser.id, selectedLanguageIds);
       setUsers(users.map((u) =>
         u.id === languageUser.id
           ? { ...u, languages: selectedLanguageIds.map((id) => ({ language: availableLanguages.find((l) => l.id === id)! })) }
