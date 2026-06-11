@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { updateUserRoleAction, adminUpdateUserProfileAction } from '@/domain/user/user.actions';
+import { updateUserRoleAction, adminUpdateUserProfileAction, archiveUserAction, unarchiveUserAction } from '@/domain/user/user.actions';
 import {
   createInvitationAction,
   revokeInvitationAction,
@@ -32,7 +32,7 @@ import {
 } from '@/domain/invitation/invitation.display-status';
 import { authClient } from '@/lib/auth-client';
 import { Role, InvitationStatus, TShirtSize } from '@prisma/client';
-import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, Pencil, Plus, Shield, Unlock, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, Pencil, Plus, Shield, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -55,9 +55,7 @@ interface User {
   lastName?: string | null;
   role: Role;
   image?: string | null;
-  banned?: boolean;
-  banReason?: string | null;
-  banExpires?: Date | null;
+  archivedAt?: Date | null;
   shippingAddress?: string | null;
   shippingCountry?: string | null;
   tShirtSize?: TShirtSize | null;
@@ -114,6 +112,7 @@ type InvitationFilter = 'active' | 'inactive';
 export default function UsersClient({ users: initialUsers, invitations: initialInvitations, languages: availableLanguages }: UsersClientProps) {
   // Users state
   const [users, setUsers] = useState(initialUsers);
+  const [userFilter, setUserFilter] = useState<'active' | 'archived'>('active');
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
@@ -170,6 +169,14 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     setInvitationPage(1);
   };
 
+  // ─── Filtered users ─────────────────────────────────────
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) =>
+      userFilter === 'active' ? !u.archivedAt : !!u.archivedAt,
+    );
+  }, [users, userFilter]);
+
   // ─── User actions ───────────────────────────────────────
 
   const handleRoleChange = async (userId: string, newRole: Role) => {
@@ -186,42 +193,28 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     }
   };
 
-  const handleBanUser = async (userId: string) => {
+  const handleArchiveUser = async (userId: string) => {
     setLoading(true);
     try {
-      const result = await authClient.admin.banUser({ userId });
-      if (result.error) throw new Error(result.error.message);
-      setUsers(
-        users.map((u) =>
-          u.id === userId
-            ? {
-                ...u,
-                banned: true,
-                banReason: result.data?.user?.banReason || null,
-                banExpires: result.data?.user?.banExpires ? new Date(result.data.user.banExpires) : null,
-              }
-            : u,
-        ),
-      );
-      toast.success('User banned successfully');
+      await archiveUserAction(userId);
+      await authClient.admin.revokeUserSessions({ userId });
+      setUsers(users.map((u) => (u.id === userId ? { ...u, archivedAt: new Date() } : u)));
+      toast.success('User archived');
     } catch (error: any) {
-      console.error('Error banning user:', error);
-      toast.error(error.message || 'Failed to ban user');
+      toast.error(error.message || 'Failed to archive user');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUnbanUser = async (userId: string) => {
+  const handleUnarchiveUser = async (userId: string) => {
     setLoading(true);
     try {
-      const result = await authClient.admin.unbanUser({ userId });
-      if (result.error) throw new Error(result.error.message);
-      setUsers(users.map((u) => (u.id === userId ? { ...u, banned: false, banReason: null, banExpires: null } : u)));
-      toast.success('User unbanned successfully');
+      await unarchiveUserAction(userId);
+      setUsers(users.map((u) => (u.id === userId ? { ...u, archivedAt: null } : u)));
+      toast.success('User restored');
     } catch (error: any) {
-      console.error('Error unbanning user:', error);
-      toast.error(error.message || 'Failed to unban user');
+      toast.error(error.message || 'Failed to restore user');
     } finally {
       setLoading(false);
     }
@@ -440,7 +433,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
       <div className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
           <h1 className="text-2xl font-bold">User Management</h1>
-          <p className="text-gray-600">Manage users, roles, bans, and invitations</p>
+          <p className="text-gray-600">Manage users, roles, and invitations</p>
         </div>
       </div>
 
@@ -453,108 +446,126 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
           {/* ── Users Tab ──────────────────────────────────── */}
           <TabsContent value="users">
-            <div className="grid gap-4">
-              {users.map((user) => (
-                <Card key={user.id} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-semibold text-lg">{user.name}</h3>
-                        <Badge variant={user.role === Role.ADMIN ? 'primary' : 'secondary'}>
-                          {user.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
-                          {user.role}
-                        </Badge>
-                        {user.banned && (
-                          <Badge variant="destructive">
-                            <Ban className="h-3 w-3 mr-1" />
-                            Banned
+            <div className="flex items-center gap-2 mb-4">
+              <Button
+                variant={userFilter === 'active' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setUserFilter('active')}
+              >
+                Active
+              </Button>
+              <Button
+                variant={userFilter === 'archived' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setUserFilter('archived')}
+              >
+                Archived
+              </Button>
+            </div>
+
+            {filteredUsers.length === 0 ? (
+              <Card className="p-6 text-center text-gray-500">
+                {userFilter === 'active' ? 'No active users.' : 'No archived users.'}
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {filteredUsers.map((user) => (
+                  <Card key={user.id} className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <h3 className="font-semibold text-lg">{user.name}</h3>
+                          <Badge variant={user.role === Role.ADMIN ? 'primary' : 'secondary'}>
+                            {user.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
+                            {user.role}
                           </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{user.email}</p>
+                        {user.languages.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {user.languages.map((ul) => (
+                              <Badge key={ul.language.id} variant="outline" size="xs">
+                                {ul.language.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {user.archivedAt && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Archived: {new Date(user.archivedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-1">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {!user.archivedAt && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => openProfileDialog(user)} disabled={loading}>
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Profile
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => openLanguageDialog(user)} disabled={loading}>
+                              <Globe className="h-4 w-4 mr-1" />
+                              Languages
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => openPasswordDialog(user)} disabled={loading}>
+                              <Key className="h-4 w-4 mr-1" />
+                              Password
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
+                              Change Role
+                            </Button>
+                          </>
+                        )}
+                        {user.archivedAt ? (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="sm" disabled={loading}>
+                                <ArchiveRestore className="h-4 w-4 mr-1" />
+                                Restore
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Restore User</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to restore {user.name}? They will be able to log in and access the system again.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleUnarchiveUser(user.id)}>Restore</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        ) : (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="sm" disabled={loading}>
+                                <Archive className="h-4 w-4 mr-1" />
+                                Archive
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Archive User</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to archive {user.name}? They will be signed out and unable to access the system.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleArchiveUser(user.id)}>Archive</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">{user.email}</p>
-                      {user.languages.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {user.languages.map((ul) => (
-                            <Badge key={ul.language.id} variant="outline" size="xs">
-                              {ul.language.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                      {user.banned && user.banReason && (
-                        <p className="text-sm text-red-600 mt-1">Reason: {user.banReason}</p>
-                      )}
-                      {user.banned && user.banExpires && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          Expires: {new Date(user.banExpires).toLocaleDateString()}
-                        </p>
-                      )}
-                      <p className="text-xs text-gray-400 mt-1">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openProfileDialog(user)} disabled={loading}>
-                        <Pencil className="h-4 w-4 mr-1" />
-                        Profile
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => openLanguageDialog(user)} disabled={loading}>
-                        <Globe className="h-4 w-4 mr-1" />
-                        Languages
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => openPasswordDialog(user)} disabled={loading}>
-                        <Key className="h-4 w-4 mr-1" />
-                        Password
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
-                        Change Role
-                      </Button>
-                      {user.banned ? (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" disabled={loading}>
-                              <Unlock className="h-4 w-4 mr-2" />
-                              Unban
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Unban User</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to unban {user.name}? They will be able to access the system again.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleUnbanUser(user.id)}>Unban</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      ) : (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" disabled={loading}>
-                              <Ban className="h-4 w-4 mr-2" />
-                              Ban
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Ban User</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to ban {user.name}? This will prevent them from accessing the system.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleBanUser(user.id)}>Ban</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* ── Invitations Tab ────────────────────────────── */}

@@ -1,6 +1,7 @@
 import { ProjectRole, Role } from '@prisma/client';
 import { requireUser, type SessionUser } from './session';
 import { getUserRolesInProject } from '@/domain/project-member/project-member.repository';
+import prisma from './db';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -35,11 +36,21 @@ const ROLE_HIERARCHY: Record<ProjectPermissionRole, ProjectRole[]> = {
 export interface AuthorizeDeps {
   requireUser: () => Promise<SessionUser>;
   getUserRolesInProject: (userId: string, projectId: string) => Promise<ProjectRole[]>;
+  isUserArchived: (userId: string) => Promise<boolean>;
+}
+
+async function defaultIsUserArchived(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { archivedAt: true },
+  });
+  return user?.archivedAt !== null && user?.archivedAt !== undefined;
 }
 
 const defaultDeps: AuthorizeDeps = {
   requireUser,
   getUserRolesInProject,
+  isUserArchived: defaultIsUserArchived,
 };
 
 // ─── Implementation ──────────────────────────────────────────
@@ -47,6 +58,10 @@ const defaultDeps: AuthorizeDeps = {
 export function createAuthorize(deps: AuthorizeDeps = defaultDeps) {
   return async function authorize(permission: Permission): Promise<AuthResult> {
     const user = await deps.requireUser();
+
+    if (await deps.isUserArchived(user.id)) {
+      throw new Error('Your account has been archived. Please contact an administrator.');
+    }
 
     // Global permissions
     if (typeof permission === 'string') {

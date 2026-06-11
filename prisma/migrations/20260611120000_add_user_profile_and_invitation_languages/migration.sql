@@ -2,21 +2,10 @@
 CREATE TYPE "TShirtSize" AS ENUM ('XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL');
 
 -- AlterTable
-ALTER TABLE "user" ADD COLUMN "firstName" TEXT,
-ADD COLUMN "lastName" TEXT,
-ADD COLUMN "shippingAddress" TEXT,
-ADD COLUMN "shippingCountry" TEXT,
+ALTER TABLE "user" ADD COLUMN "shippingAddress" TEXT,
 ADD COLUMN "tShirtSize" "TShirtSize",
 ADD COLUMN "exodus90AppId" TEXT,
 ADD COLUMN "onboarded" BOOLEAN NOT NULL DEFAULT false;
-
--- Populate firstName/lastName from existing name
-UPDATE "user" SET
-  "firstName" = split_part("name", ' ', 1),
-  "lastName" = CASE
-    WHEN position(' ' in "name") > 0 THEN substring("name" from position(' ' in "name") + 1)
-    ELSE NULL
-  END;
 
 -- CreateTable
 CREATE TABLE "invitation_language" (

@@ -91,6 +91,7 @@ model User {
   banned              Boolean              @default(false)
   banReason           String?
   banExpires          DateTime?
+  archivedAt          DateTime?
   firstName           String?
   lastName            String?
   shippingAddress     String?              @db.Text

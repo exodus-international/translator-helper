@@ -31,9 +31,7 @@ export async function getUserById(id: string) {
       lastName: true,
       role: true,
       image: true,
-      banned: true,
-      banReason: true,
-      banExpires: true,
+      archivedAt: true,
       shippingAddress: true,
       shippingCountry: true,
       tShirtSize: true,
@@ -116,6 +114,22 @@ export async function listUsers() {
     orderBy: {
       createdAt: 'desc',
     },
+  });
+}
+
+export async function archiveUser(userId: string) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { archivedAt: new Date() },
+    select: { id: true, archivedAt: true },
+  });
+}
+
+export async function unarchiveUser(userId: string) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { archivedAt: null },
+    select: { id: true, archivedAt: true },
   });
 }
 
