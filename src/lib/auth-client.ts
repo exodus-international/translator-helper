@@ -7,7 +7,7 @@ import { createAuthClient } from 'better-auth/react';
 // Create access control (must match server-side; mirrored from src/lib/auth.ts by better-auth convention)
 // fallow-ignore-next-line code-duplication
 const statement = {
-  user: ['create', 'read', 'update', 'delete', 'ban', 'unban'],
+  user: ['create', 'read', 'update', 'delete', 'ban', 'unban', 'set-password', 'set-role'],
   session: ['read', 'delete', 'revoke'],
 } as const;
 
@@ -15,7 +15,7 @@ const ac = createAccessControl(statement);
 
 // Define ADMIN role with all admin permissions
 const adminRole = ac.newRole({
-  user: ['create', 'read', 'update', 'delete', 'ban', 'unban'],
+  user: ['create', 'read', 'update', 'delete', 'ban', 'unban', 'set-password', 'set-role'],
   session: ['read', 'delete', 'revoke'],
 });
 
