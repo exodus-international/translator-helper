@@ -2,7 +2,7 @@ import { getSessionCookie } from 'better-auth/cookies';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Paths that require authentication
-const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding'];
+const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding', '/profile'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

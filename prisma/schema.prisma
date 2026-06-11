@@ -63,6 +63,16 @@ enum DocumentType {
   MEETING
 }
 
+enum TShirtSize {
+  XS
+  S
+  M
+  L
+  XL
+  XXL
+  XXXL
+}
+
 enum GitHubPRStatus {
   OPEN
   MERGED
@@ -81,6 +91,13 @@ model User {
   banned              Boolean              @default(false)
   banReason           String?
   banExpires          DateTime?
+  firstName           String?
+  lastName            String?
+  shippingAddress     String?              @db.Text
+  shippingCountry     String?
+  tShirtSize          TShirtSize?
+  exodus90AppId       String?
+  onboarded           Boolean              @default(false)
   sessions            Session[]
   accounts            Account[]
   documentVersions    DocumentVersion[]
@@ -155,6 +172,7 @@ model Language {
   documentVersions        DocumentVersion[]
   translationProjects     TranslationProject[]
   users                   UserLanguage[]
+  invitations             InvitationLanguage[]
 
   @@map("language")
 }
@@ -380,16 +398,28 @@ model GitHubCommit {
 }
 
 model Invitation {
-  id          String           @id @default(uuid())
-  token       String           @unique
-  maxUses     Int?             // null = unlimited, 1 = single-use, N = max registrations
-  usedCount   Int              @default(0)
+  id          String               @id @default(uuid())
+  token       String               @unique
+  maxUses     Int?                 // null = unlimited, 1 = single-use, N = max registrations
+  usedCount   Int                  @default(0)
   expiresAt   DateTime
-  status      InvitationStatus @default(ACTIVE)
+  status      InvitationStatus     @default(ACTIVE)
   createdById String
-  createdBy   User             @relation("InvitationsCreated", fields: [createdById], references: [id], onDelete: Cascade)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  createdBy   User                 @relation("InvitationsCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  languages   InvitationLanguage[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
 
   @@map("invitation")
+}
+
+model InvitationLanguage {
+  id           String     @id @default(uuid())
+  invitationId String
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  languageId   String
+  language     Language   @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, languageId])
+  @@map("invitation_language")
 }

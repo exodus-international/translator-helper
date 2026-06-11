@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import { auth } from '@/lib/auth';
 import { authorize } from '@/lib/authorize';
+import prisma from '@/lib/db';
 import {
   createInvitation,
   findInvitationByToken,
@@ -11,6 +12,7 @@ import {
   revokeInvitation,
   rollbackInvitationUse,
 } from './invitation.repository';
+import { setUserLanguages } from '@/domain/user-language/user-language.repository';
 import { createInvitationSchema, registerWithInviteSchema } from './invitation.types';
 import { validateInvitationToken } from './invitation.validation';
 
@@ -23,7 +25,7 @@ export async function createInvitationAction(input: unknown) {
   const token = crypto.randomUUID();
   const expiresAt = parsed.expiresAt ?? new Date(Date.now() + DEFAULT_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-  const invitation = await createInvitation(token, parsed.maxUses ?? null, expiresAt, user.id);
+  const invitation = await createInvitation(token, parsed.maxUses ?? null, expiresAt, user.id, parsed.languageIds);
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const inviteUrl = `${baseUrl}/register/${invitation.token}`;
@@ -74,18 +76,32 @@ export async function registerWithInviteAction(input: unknown) {
     throw new Error('Invitation has already been used');
   }
 
+  const fullName = `${parsed.firstName} ${parsed.lastName}`.trim();
+
   // 3. Create user — rollback invitation consumption on failure
   try {
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: parsed.email,
         password: parsed.password,
-        name: parsed.name,
+        name: fullName,
       },
     });
 
     if (!signUpResult?.user) {
       throw new Error('Failed to create account');
+    }
+
+    // 4. Set firstName/lastName on user record
+    await prisma.user.update({
+      where: { id: signUpResult.user.id },
+      data: { firstName: parsed.firstName, lastName: parsed.lastName },
+    });
+
+    // 5. Auto-assign languages from invitation
+    const languageIds = invitation!.languages.map((il) => il.language.id);
+    if (languageIds.length > 0) {
+      await setUserLanguages(signUpResult.user.id, languageIds);
     }
   } catch (error) {
     await rollbackInvitationUse(invitation!.id);
