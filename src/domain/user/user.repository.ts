@@ -4,8 +4,11 @@ import { Role, TShirtSize } from '@prisma/client';
 interface ProfileData {
   firstName?: string;
   lastName?: string;
-  shippingAddress?: string | null;
-  shippingCountry?: string | null;
+  streetAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
   tShirtSize?: TShirtSize | null;
   exodus90AppId?: string | null;
 }
@@ -32,8 +35,11 @@ export async function getUserById(id: string) {
       role: true,
       image: true,
       archivedAt: true,
-      shippingAddress: true,
-      shippingCountry: true,
+      streetAddress: true,
+      city: true,
+      state: true,
+      zipCode: true,
+      country: true,
       tShirtSize: true,
       exodus90AppId: true,
       onboarded: true,
@@ -54,8 +60,11 @@ export async function getUserProfile(id: string) {
       lastName: true,
       role: true,
       image: true,
-      shippingAddress: true,
-      shippingCountry: true,
+      streetAddress: true,
+      city: true,
+      state: true,
+      zipCode: true,
+      country: true,
       tShirtSize: true,
       exodus90AppId: true,
       onboarded: true,
@@ -77,8 +86,11 @@ export async function updateUserProfile(userId: string, data: ProfileData) {
       firstName: true,
       lastName: true,
       name: true,
-      shippingAddress: true,
-      shippingCountry: true,
+      streetAddress: true,
+      city: true,
+      state: true,
+      zipCode: true,
+      country: true,
       tShirtSize: true,
       exodus90AppId: true,
       onboarded: true,

@@ -19,7 +19,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { updateUserRoleAction, adminUpdateUserProfileAction, archiveUserAction, unarchiveUserAction } from '@/domain/user/user.actions';
 import {
   createInvitationAction,
@@ -56,8 +55,11 @@ interface User {
   role: Role;
   image?: string | null;
   archivedAt?: Date | null;
-  shippingAddress?: string | null;
-  shippingCountry?: string | null;
+  streetAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
   tShirtSize?: TShirtSize | null;
   exodus90AppId?: string | null;
   onboarded?: boolean;
@@ -133,7 +135,10 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [profileFirstName, setProfileFirstName] = useState('');
   const [profileLastName, setProfileLastName] = useState('');
-  const [profileAddress, setProfileAddress] = useState('');
+  const [profileStreet, setProfileStreet] = useState('');
+  const [profileCity, setProfileCity] = useState('');
+  const [profileState, setProfileState] = useState('');
+  const [profileZip, setProfileZip] = useState('');
   const [profileCountry, setProfileCountry] = useState('');
   const [profileTShirtSize, setProfileTShirtSize] = useState('');
   const [profileExodus90, setProfileExodus90] = useState('');
@@ -313,8 +318,11 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     setProfileUser(user);
     setProfileFirstName(user.firstName ?? user.name.split(' ')[0] ?? '');
     setProfileLastName(user.lastName ?? user.name.split(' ').slice(1).join(' ') ?? '');
-    setProfileAddress(user.shippingAddress ?? '');
-    setProfileCountry(user.shippingCountry ?? '');
+    setProfileStreet(user.streetAddress ?? '');
+    setProfileCity(user.city ?? '');
+    setProfileState(user.state ?? '');
+    setProfileZip(user.zipCode ?? '');
+    setProfileCountry(user.country ?? '');
     setProfileTShirtSize(user.tShirtSize ?? '');
     setProfileExodus90(user.exodus90AppId ?? '');
     setProfileDialogOpen(true);
@@ -328,8 +336,11 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
       await adminUpdateUserProfileAction(profileUser.id, {
         firstName: profileFirstName.trim(),
         lastName: profileLastName.trim(),
-        shippingAddress: profileAddress.trim() || null,
-        shippingCountry: profileCountry.trim() || null,
+        streetAddress: profileStreet.trim() || null,
+        city: profileCity.trim() || null,
+        state: profileState.trim() || null,
+        zipCode: profileZip.trim() || null,
+        country: profileCountry.trim() || null,
         tShirtSize: profileTShirtSize || null,
         exodus90AppId: profileExodus90.trim() || null,
       });
@@ -341,8 +352,11 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
               name: newName,
               firstName: profileFirstName.trim(),
               lastName: profileLastName.trim(),
-              shippingAddress: profileAddress.trim() || null,
-              shippingCountry: profileCountry.trim() || null,
+              streetAddress: profileStreet.trim() || null,
+              city: profileCity.trim() || null,
+              state: profileState.trim() || null,
+              zipCode: profileZip.trim() || null,
+              country: profileCountry.trim() || null,
               tShirtSize: (profileTShirtSize || null) as TShirtSize | null,
               exodus90AppId: profileExodus90.trim() || null,
             }
@@ -846,23 +860,33 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
               </div>
             </div>
             <div>
-              <Label htmlFor="admin-profile-address">Shipping Address</Label>
-              <Textarea
-                id="admin-profile-address"
-                value={profileAddress}
-                onChange={(e) => setProfileAddress(e.target.value)}
-                placeholder="Street, city, zip code"
-                rows={3}
+              <Label htmlFor="admin-profile-street">Street Address</Label>
+              <Input
+                id="admin-profile-street"
+                value={profileStreet}
+                onChange={(e) => setProfileStreet(e.target.value)}
+                placeholder="Street address"
               />
             </div>
-            <div>
-              <Label htmlFor="admin-profile-country">Country</Label>
-              <Input
-                id="admin-profile-country"
-                value={profileCountry}
-                onChange={(e) => setProfileCountry(e.target.value)}
-                placeholder="Country"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="admin-profile-city">City</Label>
+                <Input id="admin-profile-city" value={profileCity} onChange={(e) => setProfileCity(e.target.value)} placeholder="City" />
+              </div>
+              <div>
+                <Label htmlFor="admin-profile-state">State / Province</Label>
+                <Input id="admin-profile-state" value={profileState} onChange={(e) => setProfileState(e.target.value)} placeholder="State or province" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="admin-profile-zip">Zip / Postal Code</Label>
+                <Input id="admin-profile-zip" value={profileZip} onChange={(e) => setProfileZip(e.target.value)} placeholder="Zip code" />
+              </div>
+              <div>
+                <Label htmlFor="admin-profile-country">Country</Label>
+                <Input id="admin-profile-country" value={profileCountry} onChange={(e) => setProfileCountry(e.target.value)} placeholder="Country" />
+              </div>
             </div>
             <div>
               <Label htmlFor="admin-profile-tshirt">T-Shirt Size</Label>

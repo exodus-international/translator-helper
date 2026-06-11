@@ -5,8 +5,11 @@ const tShirtSizeEnum = z.enum(['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']);
 const profileFields = {
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  shippingAddress: z.string().nullable().optional(),
-  shippingCountry: z.string().nullable().optional(),
+  streetAddress: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  zipCode: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
   tShirtSize: tShirtSizeEnum.nullable().optional(),
   exodus90AppId: z.string().nullable().optional(),
 };
@@ -14,8 +17,11 @@ const profileFields = {
 export const updateUserProfileSchema = z.object({
   firstName: profileFields.firstName.optional(),
   lastName: profileFields.lastName.optional(),
-  shippingAddress: profileFields.shippingAddress,
-  shippingCountry: profileFields.shippingCountry,
+  streetAddress: profileFields.streetAddress,
+  city: profileFields.city,
+  state: profileFields.state,
+  zipCode: profileFields.zipCode,
+  country: profileFields.country,
   tShirtSize: profileFields.tShirtSize,
   exodus90AppId: profileFields.exodus90AppId,
 });
@@ -23,8 +29,11 @@ export const updateUserProfileSchema = z.object({
 export const completeOnboardingSchema = z.object({
   firstName: profileFields.firstName,
   lastName: profileFields.lastName,
-  shippingAddress: profileFields.shippingAddress,
-  shippingCountry: profileFields.shippingCountry,
+  streetAddress: profileFields.streetAddress,
+  city: profileFields.city,
+  state: profileFields.state,
+  zipCode: profileFields.zipCode,
+  country: profileFields.country,
   tShirtSize: profileFields.tShirtSize,
   exodus90AppId: profileFields.exodus90AppId,
 });
@@ -32,8 +41,11 @@ export const completeOnboardingSchema = z.object({
 export const adminUpdateUserProfileSchema = z.object({
   firstName: profileFields.firstName.optional(),
   lastName: profileFields.lastName.optional(),
-  shippingAddress: profileFields.shippingAddress,
-  shippingCountry: profileFields.shippingCountry,
+  streetAddress: profileFields.streetAddress,
+  city: profileFields.city,
+  state: profileFields.state,
+  zipCode: profileFields.zipCode,
+  country: profileFields.country,
   tShirtSize: profileFields.tShirtSize,
   exodus90AppId: profileFields.exodus90AppId,
 });

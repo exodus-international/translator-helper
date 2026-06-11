@@ -94,8 +94,11 @@ model User {
   archivedAt          DateTime?
   firstName           String?
   lastName            String?
-  shippingAddress     String?              @db.Text
-  shippingCountry     String?
+  streetAddress       String?
+  city                String?
+  state               String?
+  zipCode             String?
+  country             String?
   tShirtSize          TShirtSize?
   exodus90AppId       String?
   onboarded           Boolean              @default(false)

@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { updateUserProfileAction } from '@/domain/user/user.actions';
 import { authClient } from '@/lib/auth-client';
 import type { TShirtSize } from '@prisma/client';
@@ -24,8 +23,11 @@ interface UserProfile {
   lastName: string | null;
   role: string;
   image: string | null;
-  shippingAddress: string | null;
-  shippingCountry: string | null;
+  streetAddress: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  country: string | null;
   tShirtSize: TShirtSize | null;
   exodus90AppId: string | null;
   onboarded: boolean;
@@ -60,8 +62,11 @@ function ProfileInfoSection({ profile }: { profile: UserProfile }) {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState(profile.firstName ?? profile.name.split(' ')[0] ?? '');
   const [lastName, setLastName] = useState(profile.lastName ?? profile.name.split(' ').slice(1).join(' ') ?? '');
-  const [shippingAddress, setShippingAddress] = useState(profile.shippingAddress ?? '');
-  const [shippingCountry, setShippingCountry] = useState(profile.shippingCountry ?? '');
+  const [streetAddress, setStreetAddress] = useState(profile.streetAddress ?? '');
+  const [city, setCity] = useState(profile.city ?? '');
+  const [state, setState] = useState(profile.state ?? '');
+  const [zipCode, setZipCode] = useState(profile.zipCode ?? '');
+  const [country, setCountry] = useState(profile.country ?? '');
   const [tShirtSize, setTShirtSize] = useState<string>(profile.tShirtSize ?? '');
   const [exodus90AppId, setExodus90AppId] = useState(profile.exodus90AppId ?? '');
 
@@ -78,8 +83,11 @@ function ProfileInfoSection({ profile }: { profile: UserProfile }) {
       await updateUserProfileAction({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        shippingAddress: shippingAddress.trim() || null,
-        shippingCountry: shippingCountry.trim() || null,
+        streetAddress: streetAddress.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        zipCode: zipCode.trim() || null,
+        country: country.trim() || null,
         tShirtSize: tShirtSize || null,
         exodus90AppId: exodus90AppId.trim() || null,
       });
@@ -153,24 +161,55 @@ function ProfileInfoSection({ profile }: { profile: UserProfile }) {
           </div>
 
           <div>
-            <Label htmlFor="profile-address">Shipping Address</Label>
-            <Textarea
-              id="profile-address"
-              value={shippingAddress}
-              onChange={(e) => setShippingAddress(e.target.value)}
-              placeholder="Street, city, zip code"
-              rows={3}
+            <Label htmlFor="profile-street">Street Address</Label>
+            <Input
+              id="profile-street"
+              value={streetAddress}
+              onChange={(e) => setStreetAddress(e.target.value)}
+              placeholder="Street address"
             />
           </div>
 
-          <div>
-            <Label htmlFor="profile-country">Country</Label>
-            <Input
-              id="profile-country"
-              value={shippingCountry}
-              onChange={(e) => setShippingCountry(e.target.value)}
-              placeholder="Country"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="profile-city">City</Label>
+              <Input
+                id="profile-city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="City"
+              />
+            </div>
+            <div>
+              <Label htmlFor="profile-state">State / Province</Label>
+              <Input
+                id="profile-state"
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                placeholder="State or province"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="profile-zip">Zip / Postal Code</Label>
+              <Input
+                id="profile-zip"
+                value={zipCode}
+                onChange={(e) => setZipCode(e.target.value)}
+                placeholder="Zip code"
+              />
+            </div>
+            <div>
+              <Label htmlFor="profile-country">Country</Label>
+              <Input
+                id="profile-country"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                placeholder="Country"
+              />
+            </div>
           </div>
 
           <div>

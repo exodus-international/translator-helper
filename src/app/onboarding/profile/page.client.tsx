@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { completeOnboardingAction } from '@/domain/user/user.actions';
 import { useRouter } from 'next/navigation';
@@ -23,8 +22,11 @@ export default function OnboardingProfileClient({ userFirstName, userLastName }:
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState(userFirstName);
   const [lastName, setLastName] = useState(userLastName);
-  const [shippingAddress, setShippingAddress] = useState('');
-  const [shippingCountry, setShippingCountry] = useState('');
+  const [streetAddress, setStreetAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [country, setCountry] = useState('');
   const [tShirtSize, setTShirtSize] = useState<string>('');
   const [exodus90AppId, setExodus90AppId] = useState('');
 
@@ -41,8 +43,11 @@ export default function OnboardingProfileClient({ userFirstName, userLastName }:
       await completeOnboardingAction({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        shippingAddress: shippingAddress.trim() || null,
-        shippingCountry: shippingCountry.trim() || null,
+        streetAddress: streetAddress.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        zipCode: zipCode.trim() || null,
+        country: country.trim() || null,
         tShirtSize: tShirtSize || null,
         exodus90AppId: exodus90AppId.trim() || null,
       });
@@ -93,24 +98,55 @@ export default function OnboardingProfileClient({ userFirstName, userLastName }:
           </div>
 
           <div>
-            <Label htmlFor="onboarding-address">Shipping Address</Label>
-            <Textarea
-              id="onboarding-address"
-              value={shippingAddress}
-              onChange={(e) => setShippingAddress(e.target.value)}
-              placeholder="Street, city, zip code"
-              rows={3}
+            <Label htmlFor="onboarding-street">Street Address</Label>
+            <Input
+              id="onboarding-street"
+              value={streetAddress}
+              onChange={(e) => setStreetAddress(e.target.value)}
+              placeholder="Street address"
             />
           </div>
 
-          <div>
-            <Label htmlFor="onboarding-country">Country</Label>
-            <Input
-              id="onboarding-country"
-              value={shippingCountry}
-              onChange={(e) => setShippingCountry(e.target.value)}
-              placeholder="Country"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="onboarding-city">City</Label>
+              <Input
+                id="onboarding-city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="City"
+              />
+            </div>
+            <div>
+              <Label htmlFor="onboarding-state">State / Province</Label>
+              <Input
+                id="onboarding-state"
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                placeholder="State or province"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="onboarding-zip">Zip / Postal Code</Label>
+              <Input
+                id="onboarding-zip"
+                value={zipCode}
+                onChange={(e) => setZipCode(e.target.value)}
+                placeholder="Zip code"
+              />
+            </div>
+            <div>
+              <Label htmlFor="onboarding-country">Country</Label>
+              <Input
+                id="onboarding-country"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                placeholder="Country"
+              />
+            </div>
           </div>
 
           <div>
