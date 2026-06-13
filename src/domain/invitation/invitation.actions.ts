@@ -3,7 +3,6 @@
 import crypto from 'node:crypto';
 import { auth } from '@/lib/auth';
 import { authorize } from '@/lib/authorize';
-import prisma from '@/lib/db';
 import {
   createInvitation,
   findInvitationByToken,
@@ -76,15 +75,13 @@ export async function registerWithInviteAction(input: unknown) {
     throw new Error('Invitation has already been used');
   }
 
-  const fullName = `${parsed.firstName} ${parsed.lastName}`.trim();
-
   // 3. Create user — rollback invitation consumption on failure
   try {
     const signUpResult = await auth.api.signUpEmail({
       body: {
         email: parsed.email,
         password: parsed.password,
-        name: fullName,
+        name: parsed.name,
       },
     });
 
@@ -92,13 +89,7 @@ export async function registerWithInviteAction(input: unknown) {
       throw new Error('Failed to create account');
     }
 
-    // 4. Set firstName/lastName on user record
-    await prisma.user.update({
-      where: { id: signUpResult.user.id },
-      data: { firstName: parsed.firstName, lastName: parsed.lastName },
-    });
-
-    // 5. Auto-assign languages from invitation
+    // 4. Auto-assign languages from invitation
     const languageIds = invitation!.languages.map((il) => il.language.id);
     if (languageIds.length > 0) {
       await setUserLanguages(signUpResult.user.id, languageIds);

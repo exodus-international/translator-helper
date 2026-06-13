@@ -19,8 +19,6 @@ interface UserProfile {
   id: string;
   email: string;
   name: string;
-  firstName: string | null;
-  lastName: string | null;
   role: string;
   image: string | null;
   streetAddress: string | null;
@@ -60,8 +58,7 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
 
 function ProfileInfoSection({ profile }: { profile: UserProfile }) {
   const [loading, setLoading] = useState(false);
-  const [firstName, setFirstName] = useState(profile.firstName ?? profile.name.split(' ')[0] ?? '');
-  const [lastName, setLastName] = useState(profile.lastName ?? profile.name.split(' ').slice(1).join(' ') ?? '');
+  const [name, setName] = useState(profile.name);
   const [streetAddress, setStreetAddress] = useState(profile.streetAddress ?? '');
   const [city, setCity] = useState(profile.city ?? '');
   const [state, setState] = useState(profile.state ?? '');
@@ -73,16 +70,15 @@ function ProfileInfoSection({ profile }: { profile: UserProfile }) {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!firstName.trim() || !lastName.trim()) {
-      toast.error('First and last name are required');
+    if (!name.trim()) {
+      toast.error('Full name is required');
       return;
     }
 
     setLoading(true);
     try {
       await updateUserProfileAction({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        name: name.trim(),
         streetAddress: streetAddress.trim() || null,
         city: city.trim() || null,
         state: state.trim() || null,
@@ -135,29 +131,16 @@ function ProfileInfoSection({ profile }: { profile: UserProfile }) {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="profile-first-name">
-                First Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="profile-first-name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="profile-last-name">
-                Last Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="profile-last-name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-              />
-            </div>
+          <div>
+            <Label htmlFor="profile-name">
+              Full Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="profile-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
           </div>
 
           <div>

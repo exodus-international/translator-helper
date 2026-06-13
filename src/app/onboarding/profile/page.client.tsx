@@ -13,15 +13,13 @@ import { toast } from 'sonner';
 const T_SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
 
 interface OnboardingProfileClientProps {
-  userFirstName: string;
-  userLastName: string;
+  userName: string;
 }
 
-export default function OnboardingProfileClient({ userFirstName, userLastName }: OnboardingProfileClientProps) {
+export default function OnboardingProfileClient({ userName }: OnboardingProfileClientProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [firstName, setFirstName] = useState(userFirstName);
-  const [lastName, setLastName] = useState(userLastName);
+  const [name, setName] = useState(userName);
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
@@ -33,16 +31,15 @@ export default function OnboardingProfileClient({ userFirstName, userLastName }:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!firstName.trim() || !lastName.trim()) {
-      toast.error('First and last name are required');
+    if (!name.trim()) {
+      toast.error('Full name is required');
       return;
     }
 
     setLoading(true);
     try {
       await completeOnboardingAction({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        name: name.trim(),
         streetAddress: streetAddress.trim() || null,
         city: city.trim() || null,
         state: state.trim() || null,
@@ -70,31 +67,17 @@ export default function OnboardingProfileClient({ userFirstName, userLastName }:
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="onboarding-first-name">
-                First Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="onboarding-first-name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                placeholder="First name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="onboarding-last-name">
-                Last Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="onboarding-last-name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                placeholder="Last name"
-              />
-            </div>
+          <div>
+            <Label htmlFor="onboarding-name">
+              Full Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="onboarding-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="Full name"
+            />
           </div>
 
           <div>

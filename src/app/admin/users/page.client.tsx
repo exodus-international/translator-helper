@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { updateUserRoleAction, adminUpdateUserProfileAction, archiveUserAction, unarchiveUserAction } from '@/domain/user/user.actions';
+import { updateUserRoleAction, adminUpdateUserProfileAction } from '@/domain/user/user.actions';
 import {
   createInvitationAction,
   revokeInvitationAction,
@@ -31,7 +31,7 @@ import {
 } from '@/domain/invitation/invitation.display-status';
 import { authClient } from '@/lib/auth-client';
 import { Role, InvitationStatus, TShirtSize } from '@prisma/client';
-import { Archive, ArchiveRestore, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, Pencil, Plus, Shield, X } from 'lucide-react';
+import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, Pencil, Plus, Shield, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -50,11 +50,9 @@ interface User {
   id: string;
   email: string;
   name: string;
-  firstName?: string | null;
-  lastName?: string | null;
   role: Role;
   image?: string | null;
-  archivedAt?: Date | null;
+  banned?: boolean;
   streetAddress?: string | null;
   city?: string | null;
   state?: string | null;
@@ -114,7 +112,7 @@ type InvitationFilter = 'active' | 'inactive';
 export default function UsersClient({ users: initialUsers, invitations: initialInvitations, languages: availableLanguages }: UsersClientProps) {
   // Users state
   const [users, setUsers] = useState(initialUsers);
-  const [userFilter, setUserFilter] = useState<'active' | 'archived'>('active');
+  const [userFilter, setUserFilter] = useState<'active' | 'banned'>('active');
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
@@ -133,8 +131,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
   // Profile edit state
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [profileUser, setProfileUser] = useState<User | null>(null);
-  const [profileFirstName, setProfileFirstName] = useState('');
-  const [profileLastName, setProfileLastName] = useState('');
+  const [profileName, setProfileName] = useState('');
   const [profileStreet, setProfileStreet] = useState('');
   const [profileCity, setProfileCity] = useState('');
   const [profileState, setProfileState] = useState('');
@@ -178,7 +175,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) =>
-      userFilter === 'active' ? !u.archivedAt : !!u.archivedAt,
+      userFilter === 'active' ? !u.banned : !!u.banned,
     );
   }, [users, userFilter]);
 
@@ -198,28 +195,27 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     }
   };
 
-  const handleArchiveUser = async (userId: string) => {
+  const handleBanUser = async (userId: string) => {
     setLoading(true);
     try {
-      await archiveUserAction(userId);
-      await authClient.admin.revokeUserSessions({ userId });
-      setUsers(users.map((u) => (u.id === userId ? { ...u, archivedAt: new Date() } : u)));
-      toast.success('User archived');
+      await authClient.admin.banUser({ userId });
+      setUsers(users.map((u) => (u.id === userId ? { ...u, banned: true } : u)));
+      toast.success('User banned');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to archive user');
+      toast.error(error.message || 'Failed to ban user');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUnarchiveUser = async (userId: string) => {
+  const handleUnbanUser = async (userId: string) => {
     setLoading(true);
     try {
-      await unarchiveUserAction(userId);
-      setUsers(users.map((u) => (u.id === userId ? { ...u, archivedAt: null } : u)));
-      toast.success('User restored');
+      await authClient.admin.unbanUser({ userId });
+      setUsers(users.map((u) => (u.id === userId ? { ...u, banned: false } : u)));
+      toast.success('User unbanned');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to restore user');
+      toast.error(error.message || 'Failed to unban user');
     } finally {
       setLoading(false);
     }
@@ -316,8 +312,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
   const openProfileDialog = (user: User) => {
     setProfileUser(user);
-    setProfileFirstName(user.firstName ?? user.name.split(' ')[0] ?? '');
-    setProfileLastName(user.lastName ?? user.name.split(' ').slice(1).join(' ') ?? '');
+    setProfileName(user.name);
     setProfileStreet(user.streetAddress ?? '');
     setProfileCity(user.city ?? '');
     setProfileState(user.state ?? '');
@@ -330,12 +325,11 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profileUser || !profileFirstName.trim() || !profileLastName.trim()) return;
+    if (!profileUser || !profileName.trim()) return;
     setLoading(true);
     try {
       await adminUpdateUserProfileAction(profileUser.id, {
-        firstName: profileFirstName.trim(),
-        lastName: profileLastName.trim(),
+        name: profileName.trim(),
         streetAddress: profileStreet.trim() || null,
         city: profileCity.trim() || null,
         state: profileState.trim() || null,
@@ -344,14 +338,11 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         tShirtSize: profileTShirtSize || null,
         exodus90AppId: profileExodus90.trim() || null,
       });
-      const newName = `${profileFirstName.trim()} ${profileLastName.trim()}`;
       setUsers(users.map((u) =>
         u.id === profileUser.id
           ? {
               ...u,
-              name: newName,
-              firstName: profileFirstName.trim(),
-              lastName: profileLastName.trim(),
+              name: profileName.trim(),
               streetAddress: profileStreet.trim() || null,
               city: profileCity.trim() || null,
               state: profileState.trim() || null,
@@ -362,7 +353,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
             }
           : u,
       ));
-      toast.success(`Profile updated for ${newName}`);
+      toast.success(`Profile updated for ${profileName.trim()}`);
       setProfileDialogOpen(false);
       setProfileUser(null);
     } catch (error: any) {
@@ -469,17 +460,17 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                 Active
               </Button>
               <Button
-                variant={userFilter === 'archived' ? 'default' : 'outline'}
+                variant={userFilter === 'banned' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setUserFilter('archived')}
+                onClick={() => setUserFilter('banned')}
               >
-                Archived
+                Banned
               </Button>
             </div>
 
             {filteredUsers.length === 0 ? (
               <Card className="p-6 text-center text-gray-500">
-                {userFilter === 'active' ? 'No active users.' : 'No archived users.'}
+                {userFilter === 'active' ? 'No active users.' : 'No banned users.'}
               </Card>
             ) : (
               <div className="grid gap-4">
@@ -504,15 +495,13 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                             ))}
                           </div>
                         )}
-                        {user.archivedAt && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Archived: {new Date(user.archivedAt).toLocaleDateString()}
-                          </p>
+                        {user.banned && (
+                          <Badge variant="destructive" size="sm">Banned</Badge>
                         )}
                         <p className="text-xs text-gray-400 mt-1">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {!user.archivedAt && (
+                        {!user.banned && (
                           <>
                             <Button variant="outline" size="sm" onClick={() => openProfileDialog(user)} disabled={loading}>
                               <Pencil className="h-4 w-4 mr-1" />
@@ -531,24 +520,23 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                             </Button>
                           </>
                         )}
-                        {user.archivedAt ? (
+                        {user.banned ? (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="outline" size="sm" disabled={loading}>
-                                <ArchiveRestore className="h-4 w-4 mr-1" />
-                                Restore
+                                Unban
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Restore User</AlertDialogTitle>
+                                <AlertDialogTitle>Unban User</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to restore {user.name}? They will be able to log in and access the system again.
+                                  Are you sure you want to unban {user.name}? They will be able to log in and access the system again.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleUnarchiveUser(user.id)}>Restore</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleUnbanUser(user.id)}>Unban</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -556,20 +544,20 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="outline" size="sm" disabled={loading}>
-                                <Archive className="h-4 w-4 mr-1" />
-                                Archive
+                                <Ban className="h-4 w-4 mr-1" />
+                                Ban
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Archive User</AlertDialogTitle>
+                                <AlertDialogTitle>Ban User</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to archive {user.name}? They will be signed out and unable to access the system.
+                                  Are you sure you want to ban {user.name}? They will be signed out and unable to access the system.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleArchiveUser(user.id)}>Archive</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleBanUser(user.id)}>Ban</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -849,15 +837,9 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
             <DialogTitle>Edit Profile for {profileUser?.name}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="admin-profile-first-name">First Name</Label>
-                <Input id="admin-profile-first-name" value={profileFirstName} onChange={(e) => setProfileFirstName(e.target.value)} required />
-              </div>
-              <div>
-                <Label htmlFor="admin-profile-last-name">Last Name</Label>
-                <Input id="admin-profile-last-name" value={profileLastName} onChange={(e) => setProfileLastName(e.target.value)} required />
-              </div>
+            <div>
+              <Label htmlFor="admin-profile-name">Full Name</Label>
+              <Input id="admin-profile-name" value={profileName} onChange={(e) => setProfileName(e.target.value)} required />
             </div>
             <div>
               <Label htmlFor="admin-profile-street">Street Address</Label>
@@ -913,7 +895,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setProfileDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={loading || !profileFirstName.trim() || !profileLastName.trim()}>
+              <Button type="submit" disabled={loading || !profileName.trim()}>
                 {loading ? 'Saving...' : 'Save Profile'}
               </Button>
             </div>

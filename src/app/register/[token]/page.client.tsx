@@ -22,8 +22,7 @@ interface RegisterClientProps {
 export default function RegisterClient({ token, validation }: RegisterClientProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -49,7 +48,7 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
     setLoading(true);
 
     try {
-      await registerWithInviteAction({ token, firstName, lastName, email, password });
+      await registerWithInviteAction({ token, name, email, password });
       router.push('/onboarding/profile');
     } catch (error: any) {
       console.error('Register error:', error);
@@ -70,27 +69,15 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="register-first-name">First Name</Label>
-              <Input
-                id="register-first-name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                placeholder="First name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="register-last-name">Last Name</Label>
-              <Input
-                id="register-last-name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                placeholder="Last name"
-              />
-            </div>
+          <div>
+            <Label htmlFor="register-name">Full Name</Label>
+            <Input
+              id="register-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="Full name"
+            />
           </div>
           <div>
             <Label htmlFor="register-email">Email</Label>

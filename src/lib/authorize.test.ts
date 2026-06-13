@@ -24,7 +24,6 @@ function createDeps(overrides: Partial<AuthorizeDeps> = {}): AuthorizeDeps {
   return {
     requireUser: async () => regularUser,
     getUserRolesInProject: async () => [],
-    isUserArchived: async () => false,
     ...overrides,
   };
 }
@@ -44,18 +43,6 @@ describe('authorize', () => {
         requireUser: async () => { throw new Error('Unauthorized'); },
       }));
       await assert.rejects(() => authorize('authenticated'), { message: 'Unauthorized' });
-    });
-  });
-
-  describe('archived user', () => {
-    it('rejects archived user regardless of permission', async () => {
-      const authorize = createAuthorize(createDeps({
-        requireUser: async () => adminUser,
-        isUserArchived: async () => true,
-      }));
-      await assert.rejects(() => authorize('authenticated'), {
-        message: 'Your account has been archived. Please contact an administrator.',
-      });
     });
   });
 

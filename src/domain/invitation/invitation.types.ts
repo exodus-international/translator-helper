@@ -8,8 +8,7 @@ export const createInvitationSchema = z.object({
 
 export const registerWithInviteSchema = z.object({
   token: z.string().min(1),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
+  name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
 });

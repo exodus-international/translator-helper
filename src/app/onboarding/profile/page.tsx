@@ -15,5 +15,5 @@ export default async function OnboardingProfilePage() {
     redirect('/dashboard');
   }
 
-  return <OnboardingProfileClient userFirstName={user.name.split(' ')[0]} userLastName={user.name.split(' ').slice(1).join(' ')} />;
+  return <OnboardingProfileClient userName={user.name} />;
 }

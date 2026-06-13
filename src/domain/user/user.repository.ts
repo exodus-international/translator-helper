@@ -2,8 +2,7 @@ import prisma from '@/lib/db';
 import { Role, TShirtSize } from '@prisma/client';
 
 interface ProfileData {
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   streetAddress?: string | null;
   city?: string | null;
   state?: string | null;
@@ -13,16 +12,6 @@ interface ProfileData {
   exodus90AppId?: string | null;
 }
 
-function withDerivedName(data: ProfileData) {
-  const result: ProfileData & { name?: string } = { ...data };
-  if (data.firstName !== undefined || data.lastName !== undefined) {
-    const first = data.firstName ?? '';
-    const last = data.lastName ?? '';
-    result.name = `${first} ${last}`.trim();
-  }
-  return result;
-}
-
 export async function getUserById(id: string) {
   return prisma.user.findUnique({
     where: { id },
@@ -30,11 +19,8 @@ export async function getUserById(id: string) {
       id: true,
       email: true,
       name: true,
-      firstName: true,
-      lastName: true,
       role: true,
       image: true,
-      archivedAt: true,
       streetAddress: true,
       city: true,
       state: true,
@@ -56,8 +42,6 @@ export async function getUserProfile(id: string) {
       id: true,
       email: true,
       name: true,
-      firstName: true,
-      lastName: true,
       role: true,
       image: true,
       streetAddress: true,
@@ -80,11 +64,9 @@ export async function getUserProfile(id: string) {
 export async function updateUserProfile(userId: string, data: ProfileData) {
   return prisma.user.update({
     where: { id: userId },
-    data: withDerivedName(data),
+    data,
     select: {
       id: true,
-      firstName: true,
-      lastName: true,
       name: true,
       streetAddress: true,
       city: true,
@@ -101,7 +83,7 @@ export async function updateUserProfile(userId: string, data: ProfileData) {
 export async function completeOnboarding(userId: string, data: ProfileData) {
   return prisma.user.update({
     where: { id: userId },
-    data: { ...withDerivedName(data), onboarded: true },
+    data: { ...data, onboarded: true },
     select: { id: true, onboarded: true },
   });
 }
@@ -126,22 +108,6 @@ export async function listUsers() {
     orderBy: {
       createdAt: 'desc',
     },
-  });
-}
-
-export async function archiveUser(userId: string) {
-  return prisma.user.update({
-    where: { id: userId },
-    data: { archivedAt: new Date() },
-    select: { id: true, archivedAt: true },
-  });
-}
-
-export async function unarchiveUser(userId: string) {
-  return prisma.user.update({
-    where: { id: userId },
-    data: { archivedAt: null },
-    select: { id: true, archivedAt: true },
   });
 }
 

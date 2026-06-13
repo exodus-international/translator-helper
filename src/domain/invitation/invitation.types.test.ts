@@ -44,8 +44,7 @@ describe('createInvitationSchema', () => {
 describe('registerWithInviteSchema', () => {
   const validInput = {
     token: 'abc-123',
-    firstName: 'Test',
-    lastName: 'User',
+    name: 'Test User',
     email: 'test@example.com',
     password: 'securepassword',
   };
@@ -60,12 +59,8 @@ describe('registerWithInviteSchema', () => {
     assert.throws(() => registerWithInviteSchema.parse({ ...validInput, token: '' }));
   });
 
-  it('rejects empty first name', () => {
-    assert.throws(() => registerWithInviteSchema.parse({ ...validInput, firstName: '' }));
-  });
-
-  it('rejects empty last name', () => {
-    assert.throws(() => registerWithInviteSchema.parse({ ...validInput, lastName: '' }));
+  it('rejects empty name', () => {
+    assert.throws(() => registerWithInviteSchema.parse({ ...validInput, name: '' }));
   });
 
   it('rejects invalid email', () => {

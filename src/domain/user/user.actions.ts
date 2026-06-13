@@ -8,8 +8,6 @@ import {
   updateUserProfile,
   completeOnboarding,
   isUserOnboarded,
-  archiveUser,
-  unarchiveUser,
 } from './user.repository';
 import { Role } from '@prisma/client';
 import {
@@ -61,12 +59,3 @@ export async function adminUpdateUserProfileAction(userId: string, input: unknow
   return await updateUserProfile(userId, validated);
 }
 
-export async function archiveUserAction(userId: string) {
-  await authorize('admin');
-  return await archiveUser(userId);
-}
-
-export async function unarchiveUserAction(userId: string) {
-  await authorize('admin');
-  return await unarchiveUser(userId);
-}
