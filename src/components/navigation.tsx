@@ -66,15 +66,17 @@ export function Navigation({ user }: NavigationProps) {
                 </Link>
               </Button>
             )}
-            <Avatar size="sm" name={user.name || undefined}>
-              <AvatarFallback name={user.name || undefined}>
-                {user.name
-                  .split(' ')
-                  .map((name) => name.charAt(0))
-                  .join('')}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm text-gray-600">{user.name}</span>
+            <Link href="/profile" className="flex items-center gap-2 hover:opacity-80">
+              <Avatar size="sm" name={user.name || undefined}>
+                <AvatarFallback name={user.name || undefined}>
+                  {user.name
+                    .split(' ')
+                    .map((name) => name.charAt(0))
+                    .join('')}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm text-gray-600">{user.name}</span>
+            </Link>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
             </Button>

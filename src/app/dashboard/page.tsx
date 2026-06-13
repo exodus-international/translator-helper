@@ -7,7 +7,7 @@ import {
   getVersionsTranslatingByUserAction,
 } from '@/domain/document-version/document-version.actions';
 import { getSourceProjectsForUserAction } from '@/domain/source-project/source-project.actions';
-import { getUserLanguagesCountAction } from '@/domain/user-language/user-language.actions';
+import { isUserOnboardedAction } from '@/domain/user/user.actions';
 import { getCurrentUser } from '@/lib/session';
 import { redirect } from 'next/navigation';
 import DashboardClient from './page.client';
@@ -19,9 +19,9 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  const languagesCount = await getUserLanguagesCountAction();
-  if (languagesCount === 0) {
-    redirect('/onboarding/languages');
+  const onboarded = await isUserOnboardedAction();
+  if (!onboarded) {
+    redirect('/onboarding/profile');
   }
 
   const [projects, assignments, approvedVersions, reviewAssignments, translatingVersions] = await Promise.all([

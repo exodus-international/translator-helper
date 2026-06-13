@@ -1,7 +1,6 @@
 import { ProjectRole, Role } from '@prisma/client';
 import { requireUser, type SessionUser } from './session';
 import { getUserRolesInProject } from '@/domain/project-member/project-member.repository';
-
 // ─── Types ───────────────────────────────────────────────────
 
 type ProjectPermissionRole = 'manager' | 'reviewer' | 'editor' | 'translator' | 'member';

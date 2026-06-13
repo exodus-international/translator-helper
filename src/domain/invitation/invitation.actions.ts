@@ -11,6 +11,7 @@ import {
   revokeInvitation,
   rollbackInvitationUse,
 } from './invitation.repository';
+import { setUserLanguages } from '@/domain/user-language/user-language.repository';
 import { createInvitationSchema, registerWithInviteSchema } from './invitation.types';
 import { validateInvitationToken } from './invitation.validation';
 
@@ -23,7 +24,7 @@ export async function createInvitationAction(input: unknown) {
   const token = crypto.randomUUID();
   const expiresAt = parsed.expiresAt ?? new Date(Date.now() + DEFAULT_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-  const invitation = await createInvitation(token, parsed.maxUses ?? null, expiresAt, user.id);
+  const invitation = await createInvitation(token, parsed.maxUses ?? null, expiresAt, user.id, parsed.languageIds);
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const inviteUrl = `${baseUrl}/register/${invitation.token}`;
@@ -86,6 +87,12 @@ export async function registerWithInviteAction(input: unknown) {
 
     if (!signUpResult?.user) {
       throw new Error('Failed to create account');
+    }
+
+    // 4. Auto-assign languages from invitation
+    const languageIds = invitation!.languages.map((il) => il.language.id);
+    if (languageIds.length > 0) {
+      await setUserLanguages(signUpResult.user.id, languageIds);
     }
   } catch (error) {
     await rollbackInvitationUse(invitation!.id);

@@ -6,15 +6,28 @@ export async function createInvitation(
   maxUses: number | null,
   expiresAt: Date,
   createdById: string,
+  languageIds?: string[],
 ) {
   return prisma.invitation.create({
-    data: { token, maxUses, expiresAt, createdById },
+    data: {
+      token,
+      maxUses,
+      expiresAt,
+      createdById,
+      languages:
+        languageIds && languageIds.length > 0
+          ? { create: languageIds.map((languageId) => ({ languageId })) }
+          : undefined,
+    },
     select: {
       id: true,
       token: true,
       maxUses: true,
       expiresAt: true,
       createdAt: true,
+      languages: {
+        include: { language: { select: { id: true, name: true, code: true } } },
+      },
     },
   });
 }
@@ -24,6 +37,9 @@ export async function listInvitations() {
     include: {
       createdBy: {
         select: { id: true, name: true, email: true },
+      },
+      languages: {
+        include: { language: { select: { id: true, name: true, code: true } } },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -44,6 +60,9 @@ export async function findInvitationByToken(token: string) {
     include: {
       createdBy: {
         select: { id: true, name: true, email: true },
+      },
+      languages: {
+        include: { language: { select: { id: true, name: true, code: true } } },
       },
     },
   });

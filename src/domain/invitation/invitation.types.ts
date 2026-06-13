@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const createInvitationSchema = z.object({
   maxUses: z.number().int().min(1).nullable().optional().default(null),
   expiresAt: z.coerce.date().optional(),
+  languageIds: z.array(z.string().uuid()).optional(),
 });
 
 export const registerWithInviteSchema = z.object({

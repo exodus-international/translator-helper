@@ -2,7 +2,7 @@ import { getSessionCookie } from 'better-auth/cookies';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Paths that require authentication
-const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding'];
+const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding', '/profile'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -26,8 +26,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If accessing public auth pages with session cookie, redirect to dashboard
-  if ((pathname === '/login' || pathname.startsWith('/register')) && sessionCookie) {
+  // If accessing register page with session cookie, redirect to dashboard
+  // Login page handles its own redirect via server component (validates session properly)
+  if (pathname.startsWith('/register') && sessionCookie) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

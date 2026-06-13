@@ -1,7 +1,26 @@
 import prisma from '@/lib/db';
-import { Role } from '@prisma/client';
+import { Role, TShirtSize } from '@prisma/client';
 
-export async function getUserById(id: string) {
+interface ProfileData {
+  name?: string;
+  streetAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  tShirtSize?: TShirtSize | null;
+  exodus90AppId?: string | null;
+}
+
+export async function userExistsById(id: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  return user !== null;
+}
+
+export async function getUserProfile(id: string) {
   return prisma.user.findUnique({
     where: { id },
     select: {
@@ -10,13 +29,56 @@ export async function getUserById(id: string) {
       name: true,
       role: true,
       image: true,
-      banned: true,
-      banReason: true,
-      banExpires: true,
+      streetAddress: true,
+      city: true,
+      state: true,
+      zipCode: true,
+      country: true,
+      tShirtSize: true,
+      exodus90AppId: true,
+      onboarded: true,
       createdAt: true,
-      updatedAt: true,
+      languages: {
+        include: { language: true },
+        orderBy: { language: { name: 'asc' } },
+      },
     },
   });
+}
+
+export async function updateUserProfile(userId: string, data: ProfileData) {
+  return prisma.user.update({
+    where: { id: userId },
+    data,
+    select: {
+      id: true,
+      name: true,
+      streetAddress: true,
+      city: true,
+      state: true,
+      zipCode: true,
+      country: true,
+      tShirtSize: true,
+      exodus90AppId: true,
+      onboarded: true,
+    },
+  });
+}
+
+export async function completeOnboarding(userId: string, data: ProfileData) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { ...data, onboarded: true },
+    select: { id: true, onboarded: true },
+  });
+}
+
+export async function isUserOnboarded(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { onboarded: true },
+  });
+  return user?.onboarded ?? false;
 }
 
 export async function listUsers() {

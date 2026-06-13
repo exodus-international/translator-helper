@@ -49,7 +49,7 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
 
     try {
       await registerWithInviteAction({ token, name, email, password });
-      router.push('/onboarding/languages');
+      router.push('/onboarding/profile');
     } catch (error: any) {
       console.error('Register error:', error);
       toast.error(error.message || 'Failed to register');
@@ -70,13 +70,13 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div>
-            <Label htmlFor="register-name">Name</Label>
+            <Label htmlFor="register-name">Full Name</Label>
             <Input
               id="register-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              placeholder="Your name"
+              placeholder="Full name"
             />
           </div>
           <div>
