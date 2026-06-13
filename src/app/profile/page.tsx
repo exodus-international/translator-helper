@@ -12,9 +12,5 @@ export default async function ProfilePage() {
 
   const profile = await getUserProfileAction();
 
-  if (!profile) {
-    redirect('/login');
-  }
-
-  return <ProfileClient profile={profile} />;
+  return <ProfileClient profile={profile!} />;
 }
