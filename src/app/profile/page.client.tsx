@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { updateUserProfileAction } from '@/domain/user/user.actions';
 import { authClient } from '@/lib/auth-client';
-import type { TShirtSize } from '@prisma/client';
+import { TShirtSize } from '@prisma/client';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-const T_SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
+const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
 
 interface UserProfile {

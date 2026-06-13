@@ -12,27 +12,12 @@ interface ProfileData {
   exodus90AppId?: string | null;
 }
 
-export async function getUserById(id: string) {
-  return prisma.user.findUnique({
+export async function userExistsById(id: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
     where: { id },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      image: true,
-      streetAddress: true,
-      city: true,
-      state: true,
-      zipCode: true,
-      country: true,
-      tShirtSize: true,
-      exodus90AppId: true,
-      onboarded: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: { id: true },
   });
+  return user !== null;
 }
 
 export async function getUserProfile(id: string) {

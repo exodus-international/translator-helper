@@ -35,7 +35,7 @@ import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, 
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-const T_SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
+const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
 
 // ─── Types ──────────────────────────────────────────────────

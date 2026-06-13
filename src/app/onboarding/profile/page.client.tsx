@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { completeOnboardingAction } from '@/domain/user/user.actions';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { TShirtSize } from '@prisma/client';
 import { toast } from 'sonner';
 
-const T_SHIRT_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const;
+const T_SHIRT_SIZES = Object.values(TShirtSize);
 
 interface OnboardingProfileClientProps {
   userName: string;

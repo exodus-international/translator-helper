@@ -1,6 +1,6 @@
 'use server';
 
-import { getUserById } from '@/domain/user/user.repository';
+import { userExistsById } from '@/domain/user/user.repository';
 import { authorize } from '@/lib/authorize';
 import {
   createProjectMember,
@@ -22,9 +22,7 @@ export async function createProjectMemberAction(input: unknown) {
 
   await authorize({ project: validated.translationProjectId, role: 'manager' });
 
-  // Check if user exists in database
-  const targetUser = await getUserById(validated.userId);
-  if (!targetUser) {
+  if (!(await userExistsById(validated.userId))) {
     throw new Error('User not found in database');
   }
 
