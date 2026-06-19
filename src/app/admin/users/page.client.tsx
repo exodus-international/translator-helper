@@ -35,6 +35,12 @@ import { Role, InvitationStatus, TShirtSize } from '@prisma/client';
 import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, Pencil, Plus, Shield, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import type { ColumnDef } from '@tanstack/react-table';
+import { useQueryState, parseAsStringLiteral } from 'nuqs';
+import { DataTable } from '@/components/data-table/data-table';
+import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
+import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
+import { useDataTable } from '@/hooks/use-data-table';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
@@ -113,7 +119,10 @@ type InvitationFilter = 'active' | 'inactive';
 export default function UsersClient({ users: initialUsers, invitations: initialInvitations, languages: availableLanguages }: UsersClientProps) {
   // Users state
   const [users, setUsers] = useState(initialUsers);
-  const [userFilter, setUserFilter] = useState<'active' | 'banned'>('active');
+  const [userFilter, setUserFilter] = useQueryState(
+    'status',
+    parseAsStringLiteral(['active', 'banned'] as const).withDefault('active'),
+  );
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
@@ -441,6 +450,137 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
+  // ─── Users table ────────────────────────────────────────
+
+  const columns = useMemo<ColumnDef<User>[]>(
+    () => [
+      {
+        id: 'name',
+        accessorKey: 'name',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
+        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+        meta: { label: 'Name' },
+      },
+      {
+        id: 'email',
+        accessorKey: 'email',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Email" />,
+        cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.email}</span>,
+        meta: { label: 'Email' },
+      },
+      {
+        id: 'role',
+        accessorKey: 'role',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Role" />,
+        cell: ({ row }) => (
+          <Badge variant={row.original.role === Role.ADMIN ? 'primary' : 'secondary'} size="sm">
+            {row.original.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
+            {row.original.role}
+          </Badge>
+        ),
+        meta: { label: 'Role' },
+      },
+      {
+        id: 'createdAt',
+        accessorKey: 'createdAt',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Joined" />,
+        cell: ({ row }) => (
+          <span className="text-sm text-gray-600">
+            {new Date(row.original.createdAt).toLocaleDateString()}
+          </span>
+        ),
+        meta: { label: 'Joined' },
+      },
+      {
+        id: 'actions',
+        header: () => null,
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+          const user = row.original;
+          return (
+            <div className="flex flex-wrap justify-end gap-2">
+              {!user.banned && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => openProfileDialog(user)} disabled={loading}>
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Profile
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => openLanguageDialog(user)} disabled={loading}>
+                    <Globe className="h-4 w-4 mr-1" />
+                    Languages
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => openPasswordDialog(user)} disabled={loading}>
+                    <Key className="h-4 w-4 mr-1" />
+                    Password
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
+                    Change Role
+                  </Button>
+                </>
+              )}
+              {user.banned ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={loading}>
+                      Unban
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Unban User</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to unban {user.name}? They will be able to log in and access the system again.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleUnbanUser(user.id)}>Unban</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={loading}>
+                      <Ban className="h-4 w-4 mr-1" />
+                      Ban
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Ban User</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to ban {user.name}? They will be signed out and unable to access the system.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleBanUser(user.id)}>Ban</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loading, users],
+  );
+
+  const { table } = useDataTable({
+    data: filteredUsers,
+    columns,
+    pageCount: Math.max(1, Math.ceil(filteredUsers.length / 25)),
+    initialState: {
+      pagination: { pageIndex: 0, pageSize: 25 },
+      sorting: [{ id: 'createdAt', desc: true }],
+    },
+    getRowId: (row) => row.id,
+  });
+
   // ─── Render ─────────────────────────────────────────────
 
   return (
@@ -478,106 +618,9 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
               </Button>
             </div>
 
-            {filteredUsers.length === 0 ? (
-              <Card className="p-6 text-center text-gray-500">
-                {userFilter === 'active' ? 'No active users.' : 'No banned users.'}
-              </Card>
-            ) : (
-              <div className="grid gap-4">
-                {filteredUsers.map((user) => (
-                  <Card key={user.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-semibold text-lg">{user.name}</h3>
-                          <Badge variant={user.role === Role.ADMIN ? 'primary' : 'secondary'}>
-                            {user.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
-                            {user.role}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">{user.email}</p>
-                        {user.languages.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {user.languages.map((ul) => (
-                              <Badge key={ul.language.id} variant="outline" size="xs">
-                                {ul.language.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                        {user.banned && (
-                          <Badge variant="destructive" size="sm">Banned</Badge>
-                        )}
-                        <p className="text-xs text-gray-400 mt-1">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {!user.banned && (
-                          <>
-                            <Button variant="outline" size="sm" onClick={() => openProfileDialog(user)} disabled={loading}>
-                              <Pencil className="h-4 w-4 mr-1" />
-                              Profile
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => openLanguageDialog(user)} disabled={loading}>
-                              <Globe className="h-4 w-4 mr-1" />
-                              Languages
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => openPasswordDialog(user)} disabled={loading}>
-                              <Key className="h-4 w-4 mr-1" />
-                              Password
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
-                              Change Role
-                            </Button>
-                          </>
-                        )}
-                        {user.banned ? (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" disabled={loading}>
-                                Unban
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Unban User</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to unban {user.name}? They will be able to log in and access the system again.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleUnbanUser(user.id)}>Unban</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        ) : (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" disabled={loading}>
-                                <Ban className="h-4 w-4 mr-1" />
-                                Ban
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Ban User</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to ban {user.name}? They will be signed out and unable to access the system.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleBanUser(user.id)}>Ban</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
+            <DataTable table={table}>
+              <DataTableToolbar table={table} />
+            </DataTable>
           </TabsContent>
 
           {/* ── Invitations Tab ────────────────────────────── */}
