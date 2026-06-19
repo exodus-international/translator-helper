@@ -48,6 +48,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { matchesLanguageFilter, compareByLanguageThenName, matchesSearch } from '@/domain/user/user-table';
 import { buildUserCsv } from '@/domain/user/user-csv';
 
@@ -737,10 +738,20 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
             <DataTable table={table}>
               <DataTableToolbar table={table}>
-                <Button variant="outline" size="sm" className="h-8" onClick={handleExportCsv}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8" onClick={handleExportCsv}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Export CSV
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Exports what you see - the current filters, search, and visible columns. <br />
+                      Adjust them or toggle columns in “View” to change the export.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </DataTableToolbar>
             </DataTable>
           </TabsContent>
