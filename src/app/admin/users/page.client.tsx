@@ -556,6 +556,44 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         meta: { label: 'Joined' },
       },
       {
+        id: 'address',
+        accessorFn: (row) =>
+          [row.streetAddress, row.city, row.state, row.zipCode, row.country].filter(Boolean).join(', '),
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Address" />,
+        cell: ({ getValue }) => {
+          const address = getValue<string>();
+          return <span className="text-sm text-gray-600">{address || '—'}</span>;
+        },
+        meta: { label: 'Address' },
+      },
+      {
+        id: 'tShirtSize',
+        accessorKey: 'tShirtSize',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="T-Shirt" />,
+        cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.tShirtSize ?? '—'}</span>,
+        meta: { label: 'T-Shirt' },
+      },
+      {
+        id: 'exodus90AppId',
+        accessorKey: 'exodus90AppId',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Exodus90" />,
+        cell: ({ row }) => (
+          <span className="text-sm text-gray-600">{row.original.exodus90AppId ?? '—'}</span>
+        ),
+        meta: { label: 'Exodus90 App ID' },
+      },
+      {
+        id: 'onboarded',
+        accessorKey: 'onboarded',
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Onboarded" />,
+        cell: ({ row }) => (
+          <Badge variant={row.original.onboarded ? 'success' : 'secondary'} size="xs">
+            {row.original.onboarded ? 'Yes' : 'No'}
+          </Badge>
+        ),
+        meta: { label: 'Onboarded' },
+      },
+      {
         id: 'actions',
         header: () => null,
         enableSorting: false,
@@ -619,6 +657,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     initialState: {
       pagination: { pageIndex: 0, pageSize: 25 },
       sorting: [{ id: 'languages', desc: false }],
+      columnVisibility: { address: false, tShirtSize: false, exodus90AppId: false, onboarded: false },
     },
     getRowId: (row) => row.id,
   });
