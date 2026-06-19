@@ -32,7 +32,7 @@ import {
 import { authClient } from '@/lib/auth-client';
 import { capture } from '@/lib/analytics';
 import { Role, InvitationStatus, TShirtSize } from '@prisma/client';
-import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, MoreHorizontal, Pencil, Plus, Shield, X } from 'lucide-react';
+import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Download, Globe, Key, Link2, MoreHorizontal, Pencil, Plus, Shield, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -49,6 +49,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { matchesLanguageFilter, compareByLanguageThenName, matchesSearch } from '@/domain/user/user-table';
+import { buildUserCsv } from '@/domain/user/user-csv';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
@@ -662,6 +663,33 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     getRowId: (row) => row.id,
   });
 
+  const handleExportCsv = () => {
+    const exportColumns = table
+      .getVisibleLeafColumns()
+      .filter((column) => column.id !== 'actions')
+      .map((column) => ({
+        id: column.id,
+        label: (column.columnDef.meta?.label as string | undefined) ?? column.id,
+      }));
+    const rows = table.getSortedRowModel().rows.map((row) => row.original);
+
+    if (rows.length === 0) {
+      toast.error('No users to export for the current view.');
+      return;
+    }
+
+    const csv = buildUserCsv(exportColumns, rows);
+    // Prepend a UTF-8 BOM so Excel renders diacritics (e.g. Czech names) correctly.
+    const blob = new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `users-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} user${rows.length === 1 ? '' : 's'}`);
+  };
+
   // ─── Render ─────────────────────────────────────────────
 
   return (
@@ -708,7 +736,12 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
             </div>
 
             <DataTable table={table}>
-              <DataTableToolbar table={table} />
+              <DataTableToolbar table={table}>
+                <Button variant="outline" size="sm" className="h-8" onClick={handleExportCsv}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+              </DataTableToolbar>
             </DataTable>
           </TabsContent>
 
