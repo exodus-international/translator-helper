@@ -732,7 +732,7 @@ export default function UsersClient({
 
       <div className="container mx-auto px-4 py-4">
         <Tabs defaultValue="users">
-          <TabsList>
+          <TabsList variant="line">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="invitations">Invitations</TabsTrigger>
           </TabsList>
