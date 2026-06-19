@@ -1,9 +1,8 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DataTable } from '@/components/data-table/data-table';
+import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
+import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,32 +14,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { updateUserRoleAction, adminUpdateUserProfileAction } from '@/domain/user/user.actions';
-import {
-  createInvitationAction,
-  revokeInvitationAction,
-} from '@/domain/invitation/invitation.actions';
-import { adminSetUserLanguagesAction } from '@/domain/user-language/user-language.actions';
-import {
-  getInvitationDisplayStatus,
-  type InvitationDisplayStatus,
-} from '@/domain/invitation/invitation.display-status';
-import { authClient } from '@/lib/auth-client';
-import { capture } from '@/lib/analytics';
-import { Role, InvitationStatus, TShirtSize } from '@prisma/client';
-import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Download, Globe, Key, Link2, MoreHorizontal, Pencil, Plus, Shield, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import type { ColumnDef } from '@tanstack/react-table';
-import { useQueryState, parseAsStringLiteral, parseAsString } from 'nuqs';
-import { DataTable } from '@/components/data-table/data-table';
-import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
-import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
-import { useDataTable } from '@/hooks/use-data-table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,9 +25,44 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { matchesLanguageFilter, compareByLanguageThenName, matchesSearch } from '@/domain/user/user-table';
+import { createInvitationAction, revokeInvitationAction } from '@/domain/invitation/invitation.actions';
+import {
+  getInvitationDisplayStatus,
+  type InvitationDisplayStatus,
+} from '@/domain/invitation/invitation.display-status';
+import { adminSetUserLanguagesAction } from '@/domain/user-language/user-language.actions';
 import { buildUserCsv } from '@/domain/user/user-csv';
+import { compareByLanguageThenName, matchesLanguageFilter, matchesSearch } from '@/domain/user/user-table';
+import { adminUpdateUserProfileAction, updateUserRoleAction } from '@/domain/user/user.actions';
+import { useDataTable } from '@/hooks/use-data-table';
+import { authClient } from '@/lib/auth-client';
+import { InvitationStatus, Role, TShirtSize } from '@prisma/client';
+import type { ColumnDef } from '@tanstack/react-table';
+import {
+  Ban,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Copy,
+  Download,
+  Globe,
+  Key,
+  Link2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Shield,
+  X,
+} from 'lucide-react';
+import { parseAsString, parseAsStringLiteral, useQueryState } from 'nuqs';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
@@ -106,13 +118,33 @@ interface UsersClientProps {
 function invitationStatusBadge(status: InvitationDisplayStatus) {
   switch (status) {
     case 'active':
-      return <Badge variant="success"><Clock className="h-3 w-3 mr-1" />Active</Badge>;
+      return (
+        <Badge variant="success">
+          <Clock className="h-3 w-3 mr-1" />
+          Active
+        </Badge>
+      );
     case 'revoked':
-      return <Badge variant="destructive"><X className="h-3 w-3 mr-1" />Revoked</Badge>;
+      return (
+        <Badge variant="destructive">
+          <X className="h-3 w-3 mr-1" />
+          Revoked
+        </Badge>
+      );
     case 'expired':
-      return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Expired</Badge>;
+      return (
+        <Badge variant="secondary">
+          <Clock className="h-3 w-3 mr-1" />
+          Expired
+        </Badge>
+      );
     case 'exhausted':
-      return <Badge variant="secondary"><Check className="h-3 w-3 mr-1" />Fully Used</Badge>;
+      return (
+        <Badge variant="secondary">
+          <Check className="h-3 w-3 mr-1" />
+          Fully Used
+        </Badge>
+      );
   }
 }
 
@@ -126,7 +158,11 @@ type InvitationFilter = 'active' | 'inactive';
 
 // ─── Component ──────────────────────────────────────────────
 
-export default function UsersClient({ users: initialUsers, invitations: initialInvitations, languages: availableLanguages }: UsersClientProps) {
+export default function UsersClient({
+  users: initialUsers,
+  invitations: initialInvitations,
+  languages: availableLanguages,
+}: UsersClientProps) {
   // Users state
   const [users, setUsers] = useState(initialUsers);
   const [userFilter, setUserFilter] = useQueryState(
@@ -199,15 +235,10 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
   // ─── Filtered users ─────────────────────────────────────
 
   const filteredUsers = useMemo(() => {
-    return users.filter((u) =>
-      userFilter === 'active' ? !u.banned : !!u.banned,
-    );
+    return users.filter((u) => (userFilter === 'active' ? !u.banned : !!u.banned));
   }, [users, userFilter]);
 
-  const searchedUsers = useMemo(
-    () => filteredUsers.filter((u) => matchesSearch(u, search)),
-    [filteredUsers, search],
-  );
+  const searchedUsers = useMemo(() => filteredUsers.filter((u) => matchesSearch(u, search)), [filteredUsers, search]);
 
   // ─── User actions ───────────────────────────────────────
 
@@ -230,7 +261,6 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     try {
       await authClient.admin.banUser({ userId });
       setUsers(users.map((u) => (u.id === userId ? { ...u, banned: true } : u)));
-      capture('user_banned');
       toast.success('User banned');
     } catch (error: any) {
       toast.error(error.message || 'Failed to ban user');
@@ -244,7 +274,6 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     try {
       await authClient.admin.unbanUser({ userId });
       setUsers(users.map((u) => (u.id === userId ? { ...u, banned: false } : u)));
-      capture('user_unbanned');
       toast.success('User unbanned');
     } catch (error: any) {
       toast.error(error.message || 'Failed to unban user');
@@ -270,7 +299,6 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     setLoading(true);
     try {
       await handleRoleChange(editingUser.id, selectedRole);
-      capture('user_role_changed', { role: selectedRole });
       setRoleDialogOpen(false);
       setEditingUser(null);
       setSelectedRole('');
@@ -300,7 +328,6 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         newPassword,
       });
       if (result.error) throw new Error(result.error.message);
-      capture('admin_user_password_reset');
       toast.success(`Password reset for ${passwordUser.name}`);
       setPasswordDialogOpen(false);
       setPasswordUser(null);
@@ -326,12 +353,18 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     setLoading(true);
     try {
       await adminSetUserLanguagesAction(languageUser.id, selectedLanguageIds);
-      setUsers(users.map((u) =>
-        u.id === languageUser.id
-          ? { ...u, languages: selectedLanguageIds.map((id) => ({ language: availableLanguages.find((l) => l.id === id)! })) }
-          : u,
-      ));
-      capture('admin_user_languages_updated', { language_count: selectedLanguageIds.length });
+      setUsers(
+        users.map((u) =>
+          u.id === languageUser.id
+            ? {
+                ...u,
+                languages: selectedLanguageIds.map((id) => ({
+                  language: availableLanguages.find((l) => l.id === id)!,
+                })),
+              }
+            : u,
+        ),
+      );
       toast.success(`Languages updated for ${languageUser.name}`);
       setLanguageDialogOpen(false);
       setLanguageUser(null);
@@ -378,22 +411,23 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         tShirtSize: profileTShirtSize || null,
         exodus90AppId: profileExodus90.trim() || null,
       });
-      setUsers(users.map((u) =>
-        u.id === profileUser.id
-          ? {
-              ...u,
-              name: profileName.trim(),
-              streetAddress: profileStreet.trim() || null,
-              city: profileCity.trim() || null,
-              state: profileState.trim() || null,
-              zipCode: profileZip.trim() || null,
-              country: profileCountry.trim() || null,
-              tShirtSize: (profileTShirtSize || null) as TShirtSize | null,
-              exodus90AppId: profileExodus90.trim() || null,
-            }
-          : u,
-      ));
-      capture('admin_user_profile_updated');
+      setUsers(
+        users.map((u) =>
+          u.id === profileUser.id
+            ? {
+                ...u,
+                name: profileName.trim(),
+                streetAddress: profileStreet.trim() || null,
+                city: profileCity.trim() || null,
+                state: profileState.trim() || null,
+                zipCode: profileZip.trim() || null,
+                country: profileCountry.trim() || null,
+                tShirtSize: (profileTShirtSize || null) as TShirtSize | null,
+                exodus90AppId: profileExodus90.trim() || null,
+              }
+            : u,
+        ),
+      );
       toast.success(`Profile updated for ${profileName.trim()}`);
       setProfileDialogOpen(false);
       setProfileUser(null);
@@ -410,9 +444,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     e.preventDefault();
     setLoading(true);
     try {
-      const expiresAt = expiresInDays
-        ? new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000)
-        : undefined;
+      const expiresAt = expiresInDays ? new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000) : undefined;
       const result = await createInvitationAction({
         maxUses: maxUses ? Number(maxUses) : null,
         expiresAt,
@@ -428,7 +460,6 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         },
         ...invitations,
       ]);
-      capture('invitation_created');
       toast.success('Invitation created');
     } catch (error: any) {
       console.error('Error creating invitation:', error);
@@ -440,7 +471,6 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
   const handleCopyUrl = async (url: string) => {
     await navigator.clipboard.writeText(url);
-    capture('invitation_link_copied');
     toast.success('Invite link copied to clipboard');
   };
 
@@ -448,8 +478,9 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     setLoading(true);
     try {
       await revokeInvitationAction(id);
-      setInvitations(invitations.map((inv) => (inv.id === id ? { ...inv, status: 'REVOKED' as InvitationStatus } : inv)));
-      capture('invitation_revoked');
+      setInvitations(
+        invitations.map((inv) => (inv.id === id ? { ...inv, status: 'REVOKED' as InvitationStatus } : inv)),
+      );
       toast.success('Invitation revoked');
     } catch (error: any) {
       console.error('Error revoking invitation:', error);
@@ -551,9 +582,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         accessorKey: 'createdAt',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Joined" />,
         cell: ({ row }) => (
-          <span className="text-sm text-gray-600">
-            {new Date(row.original.createdAt).toLocaleDateString()}
-          </span>
+          <span className="text-sm text-gray-600">{new Date(row.original.createdAt).toLocaleDateString()}</span>
         ),
         meta: { label: 'Joined' },
       },
@@ -579,9 +608,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         id: 'exodus90AppId',
         accessorKey: 'exodus90AppId',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Exodus90" />,
-        cell: ({ row }) => (
-          <span className="text-sm text-gray-600">{row.original.exodus90AppId ?? '—'}</span>
-        ),
+        cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.exodus90AppId ?? '—'}</span>,
         meta: { label: 'Exodus90 App ID' },
       },
       {
@@ -600,6 +627,9 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         header: () => null,
         enableSorting: false,
         enableHiding: false,
+        // DataTable renders each cell with an inline `width: column.getSize()`,
+        // so size the actions column explicitly rather than via a class.
+        size: 0,
         cell: ({ row }) => {
           const user = row.original;
           return (
@@ -637,9 +667,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                       </DropdownMenuItem>
                     </>
                   ) : (
-                    <DropdownMenuItem onClick={() => openBanDialog(user)}>
-                      Unban
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openBanDialog(user)}>Unban</DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -694,7 +722,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
   // ─── Render ─────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <div className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
           <h1 className="text-2xl font-bold">User Management</h1>
@@ -806,12 +834,8 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                               <span>
                                 Uses: {inv.usedCount}/{inv.maxUses ?? '\u221e'}
                               </span>
-                              <span>
-                                Expires: {new Date(inv.expiresAt).toLocaleDateString()}
-                              </span>
-                              <span>
-                                By: {inv.createdBy.name}
-                              </span>
+                              <span>Expires: {new Date(inv.expiresAt).toLocaleDateString()}</span>
+                              <span>By: {inv.createdBy.name}</span>
                             </div>
                             {inv.languages.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-2">
@@ -845,7 +869,8 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Revoke Invitation</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        This will permanently invalidate this invitation link. Anyone with the link will no longer be able to register.
+                                        This will permanently invalidate this invitation link. Anyone with the link will
+                                        no longer be able to register.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -943,7 +968,10 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         open={passwordDialogOpen}
         onOpenChange={(open) => {
           setPasswordDialogOpen(open);
-          if (!open) { setPasswordUser(null); setNewPassword(''); }
+          if (!open) {
+            setPasswordUser(null);
+            setNewPassword('');
+          }
         }}
       >
         <DialogContent>
@@ -964,7 +992,9 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={loading || newPassword.length < 8}>
                 {loading ? 'Resetting...' : 'Reset Password'}
               </Button>
@@ -978,7 +1008,10 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         open={languageDialogOpen}
         onOpenChange={(open) => {
           setLanguageDialogOpen(open);
-          if (!open) { setLanguageUser(null); setSelectedLanguageIds([]); }
+          if (!open) {
+            setLanguageUser(null);
+            setSelectedLanguageIds([]);
+          }
         }}
       >
         <DialogContent>
@@ -1001,7 +1034,9 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
               ))}
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setLanguageDialogOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setLanguageDialogOpen(false)}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={loading}>
                 {loading ? 'Saving...' : 'Save Languages'}
               </Button>
@@ -1025,7 +1060,12 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
               <Label htmlFor="admin-profile-name">Full Name</Label>
-              <Input id="admin-profile-name" value={profileName} onChange={(e) => setProfileName(e.target.value)} required />
+              <Input
+                id="admin-profile-name"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                required
+              />
             </div>
             <div>
               <Label htmlFor="admin-profile-street">Street Address</Label>
@@ -1039,33 +1079,58 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="admin-profile-city">City</Label>
-                <Input id="admin-profile-city" value={profileCity} onChange={(e) => setProfileCity(e.target.value)} placeholder="City" />
+                <Input
+                  id="admin-profile-city"
+                  value={profileCity}
+                  onChange={(e) => setProfileCity(e.target.value)}
+                  placeholder="City"
+                />
               </div>
               <div>
                 <Label htmlFor="admin-profile-state">State / Province</Label>
-                <Input id="admin-profile-state" value={profileState} onChange={(e) => setProfileState(e.target.value)} placeholder="State or province" />
+                <Input
+                  id="admin-profile-state"
+                  value={profileState}
+                  onChange={(e) => setProfileState(e.target.value)}
+                  placeholder="State or province"
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="admin-profile-zip">Zip / Postal Code</Label>
-                <Input id="admin-profile-zip" value={profileZip} onChange={(e) => setProfileZip(e.target.value)} placeholder="Zip code" />
+                <Input
+                  id="admin-profile-zip"
+                  value={profileZip}
+                  onChange={(e) => setProfileZip(e.target.value)}
+                  placeholder="Zip code"
+                />
               </div>
               <div>
                 <Label htmlFor="admin-profile-country">Country</Label>
-                <Input id="admin-profile-country" value={profileCountry} onChange={(e) => setProfileCountry(e.target.value)} placeholder="Country" />
+                <Input
+                  id="admin-profile-country"
+                  value={profileCountry}
+                  onChange={(e) => setProfileCountry(e.target.value)}
+                  placeholder="Country"
+                />
               </div>
             </div>
             <div>
               <Label htmlFor="admin-profile-tshirt">T-Shirt Size</Label>
-              <Select value={profileTShirtSize || NONE_VALUE} onValueChange={(v) => setProfileTShirtSize(v === NONE_VALUE ? '' : v)}>
+              <Select
+                value={profileTShirtSize || NONE_VALUE}
+                onValueChange={(v) => setProfileTShirtSize(v === NONE_VALUE ? '' : v)}
+              >
                 <SelectTrigger id="admin-profile-tshirt">
                   <SelectValue placeholder="Select size" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE_VALUE}>Not set</SelectItem>
                   {T_SHIRT_SIZES.map((size) => (
-                    <SelectItem key={size} value={size}>{size}</SelectItem>
+                    <SelectItem key={size} value={size}>
+                      {size}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1080,7 +1145,9 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setProfileDialogOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setProfileDialogOpen(false)}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={loading || !profileName.trim()}>
                 {loading ? 'Saving...' : 'Save Profile'}
               </Button>
@@ -1126,27 +1193,24 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
       </AlertDialog>
 
       {/* ── Create Invitation Dialog ──────────────────────── */}
-      <Dialog open={createDialogOpen} onOpenChange={(open) => { if (!open) resetCreateDialog(); else setCreateDialogOpen(true); }}>
+      <Dialog
+        open={createDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) resetCreateDialog();
+          else setCreateDialogOpen(true);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {createdInviteUrl ? 'Invitation Created' : 'Create Invitation'}
-            </DialogTitle>
+            <DialogTitle>{createdInviteUrl ? 'Invitation Created' : 'Create Invitation'}</DialogTitle>
           </DialogHeader>
 
           {createdInviteUrl ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Share this link with the person you want to invite:
-              </p>
+              <p className="text-sm text-gray-600">Share this link with the person you want to invite:</p>
               <div className="flex items-center gap-2">
                 <Input value={createdInviteUrl} readOnly className="font-mono text-sm" />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleCopyUrl(createdInviteUrl)}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => handleCopyUrl(createdInviteUrl)}>
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
@@ -1188,7 +1252,10 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                   <Label>Languages (assigned on registration)</Label>
                   <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-1 mt-1">
                     {availableLanguages.map((lang) => (
-                      <label key={lang.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                      <label
+                        key={lang.id}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                      >
                         <input
                           type="checkbox"
                           checked={inviteLanguageIds.includes(lang.id)}
@@ -1200,7 +1267,9 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
                       </label>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Users registering with this link will be assigned these languages.</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Users registering with this link will be assigned these languages.
+                  </p>
                 </div>
               )}
               <div className="flex justify-end gap-2">

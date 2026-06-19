@@ -15,6 +15,8 @@ declare module "@tanstack/react-table" {
     range?: [number, number];
     unit?: string;
     icon?: React.ComponentType<React.ComponentProps<"svg">>;
+    /** Extra class names applied to this column's header and body cells. */
+    className?: string;
   }
 }
 
