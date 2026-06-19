@@ -27,9 +27,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { createInvitationAction, revokeInvitationAction } from '@/domain/invitation/invitation.actions';
 import {
@@ -734,7 +734,7 @@ export default function UsersClient({
   };
 
   const passwordResetMessage = passwordResetInfo
-    ? `Hey ${passwordResetInfo.name}, your new password is "${passwordResetInfo.password}" for your email ${passwordResetInfo.email}`
+    ? `Hey ${passwordResetInfo.name}, your new password is "${passwordResetInfo.password}" for your email ${passwordResetInfo.email}. Please change your password after logging in.`
     : '';
 
   // ─── Render ─────────────────────────────────────────────
@@ -795,10 +795,7 @@ export default function UsersClient({
           {/* ── Invitations Tab ────────────────────────────── */}
           <TabsContent value="invitations">
             <div className="flex items-center justify-between mb-4">
-              <Tabs
-                value={invitationFilter}
-                onValueChange={(v) => handleFilterChange(v as InvitationFilter)}
-              >
+              <Tabs value={invitationFilter} onValueChange={(v) => handleFilterChange(v as InvitationFilter)}>
                 <TabsList>
                   <TabsTrigger value="active">Active</TabsTrigger>
                   <TabsTrigger value="inactive">Inactive</TabsTrigger>
@@ -986,10 +983,8 @@ export default function UsersClient({
 
           {passwordResetInfo ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Password updated. Copy this message and send it to the user:
-              </p>
-              <Textarea readOnly value={passwordResetMessage} rows={3} className="text-sm" />
+              <p className="text-sm text-gray-600">Password updated. Copy this message and send it to the user:</p>
+              <Textarea readOnly value={passwordResetMessage} rows={3} className="text-sm bg-gray-100" />
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -1040,10 +1035,7 @@ export default function UsersClient({
                 <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={loading || newPassword.length < 8 || newPassword !== confirmPassword}
-                >
+                <Button type="submit" disabled={loading || newPassword.length < 8 || newPassword !== confirmPassword}>
                   {loading ? 'Resetting...' : 'Reset Password'}
                 </Button>
               </div>
