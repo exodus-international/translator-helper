@@ -32,7 +32,7 @@ import {
 import { authClient } from '@/lib/auth-client';
 import { capture } from '@/lib/analytics';
 import { Role, InvitationStatus, TShirtSize } from '@prisma/client';
-import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, Pencil, Plus, Shield, X } from 'lucide-react';
+import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, MoreHorizontal, Pencil, Plus, Shield, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -41,6 +41,13 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { useDataTable } from '@/hooks/use-data-table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { matchesLanguageFilter, compareByLanguageThenName, matchesSearch } from '@/domain/user/user-table';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
@@ -152,6 +159,10 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
   const [profileTShirtSize, setProfileTShirtSize] = useState('');
   const [profileExodus90, setProfileExodus90] = useState('');
 
+  // Ban / unban confirmation state
+  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  const [banTarget, setBanTarget] = useState<User | null>(null);
+
   // Invitations state
   const [invitations, setInvitations] = useState(initialInvitations);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -238,6 +249,11 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     } finally {
       setLoading(false);
     }
+  };
+
+  const openBanDialog = (user: User) => {
+    setBanTarget(user);
+    setBanDialogOpen(true);
   };
 
   const openRoleDialog = (user: User) => {
@@ -547,68 +563,46 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         cell: ({ row }) => {
           const user = row.original;
           return (
-            <div className="flex flex-wrap justify-end gap-2">
-              {!user.banned && (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => openProfileDialog(user)} disabled={loading}>
-                    <Pencil className="h-4 w-4 mr-1" />
-                    Profile
+            <div className="flex justify-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={loading}>
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Open actions menu</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => openLanguageDialog(user)} disabled={loading}>
-                    <Globe className="h-4 w-4 mr-1" />
-                    Languages
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => openPasswordDialog(user)} disabled={loading}>
-                    <Key className="h-4 w-4 mr-1" />
-                    Password
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => openRoleDialog(user)} disabled={loading}>
-                    Change Role
-                  </Button>
-                </>
-              )}
-              {user.banned ? (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={loading}>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {!user.banned ? (
+                    <>
+                      <DropdownMenuItem onClick={() => openProfileDialog(user)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openLanguageDialog(user)}>
+                        <Globe className="h-4 w-4 mr-2" />
+                        Edit Languages
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openPasswordDialog(user)}>
+                        <Key className="h-4 w-4 mr-2" />
+                        Reset Password
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openRoleDialog(user)}>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Change Role
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem variant="destructive" onClick={() => openBanDialog(user)}>
+                        <Ban className="h-4 w-4 mr-2" />
+                        Ban
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <DropdownMenuItem onClick={() => openBanDialog(user)}>
                       Unban
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Unban User</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to unban {user.name}? They will be able to log in and access the system again.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleUnbanUser(user.id)}>Unban</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              ) : (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={loading}>
-                      <Ban className="h-4 w-4 mr-1" />
-                      Ban
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Ban User</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to ban {user.name}? They will be signed out and unable to access the system.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleBanUser(user.id)}>Ban</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           );
         },
@@ -1011,6 +1005,42 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ── Ban / Unban Confirmation ─────────────────────── */}
+      <AlertDialog
+        open={banDialogOpen}
+        onOpenChange={(open) => {
+          setBanDialogOpen(open);
+          if (!open) setBanTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{banTarget?.banned ? 'Unban User' : 'Ban User'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {banTarget?.banned
+                ? `Are you sure you want to unban ${banTarget?.name}? They will be able to log in and access the system again.`
+                : `Are you sure you want to ban ${banTarget?.name}? They will be signed out and unable to access the system.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!banTarget) return;
+                if (banTarget.banned) {
+                  handleUnbanUser(banTarget.id);
+                } else {
+                  handleBanUser(banTarget.id);
+                }
+                setBanDialogOpen(false);
+              }}
+            >
+              {banTarget?.banned ? 'Unban' : 'Ban'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Create Invitation Dialog ──────────────────────── */}
       <Dialog open={createDialogOpen} onOpenChange={(open) => { if (!open) resetCreateDialog(); else setCreateDialogOpen(true); }}>
