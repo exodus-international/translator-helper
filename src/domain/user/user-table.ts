@@ -1,6 +1,6 @@
-// Pure logic for the admin users data table: language filtering and the
-// "language-then-name" ordering. Kept free of React/Prisma so it can be unit
-// tested in isolation (see user-table.test.ts).
+// Pure logic for the admin users data table: language filtering, global search,
+// and the "language-then-name" ordering. Kept free of React/Prisma so it can be
+// unit tested in isolation (see user-table.test.ts).
 
 export interface UserLanguageRef {
   language: { id: string; name: string };
@@ -9,6 +9,24 @@ export interface UserLanguageRef {
 export interface UserTableRow {
   name: string;
   languages: UserLanguageRef[];
+}
+
+export interface UserSearchRow {
+  name: string;
+  email: string;
+  languages: UserLanguageRef[];
+}
+
+/**
+ * Global search: case-insensitive substring over the user's name, email, and
+ * language names. A blank query matches everyone (no search applied).
+ */
+export function matchesSearch(user: UserSearchRow, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (q === '') return true;
+  if (user.name.toLowerCase().includes(q)) return true;
+  if (user.email.toLowerCase().includes(q)) return true;
+  return user.languages.some((ul) => ul.language.name.toLowerCase().includes(q));
 }
 
 /**

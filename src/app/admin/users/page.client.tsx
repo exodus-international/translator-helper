@@ -36,12 +36,12 @@ import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Globe, Key, Link2, 
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
-import { useQueryState, parseAsStringLiteral } from 'nuqs';
+import { useQueryState, parseAsStringLiteral, parseAsString } from 'nuqs';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { useDataTable } from '@/hooks/use-data-table';
-import { matchesLanguageFilter, compareByLanguageThenName } from '@/domain/user/user-table';
+import { matchesLanguageFilter, compareByLanguageThenName, matchesSearch } from '@/domain/user/user-table';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
@@ -124,6 +124,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     'status',
     parseAsStringLiteral(['active', 'banned'] as const).withDefault('active'),
   );
+  const [search, setSearch] = useQueryState('search', parseAsString.withDefault(''));
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
@@ -189,6 +190,11 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
       userFilter === 'active' ? !u.banned : !!u.banned,
     );
   }, [users, userFilter]);
+
+  const searchedUsers = useMemo(
+    () => filteredUsers.filter((u) => matchesSearch(u, search)),
+    [filteredUsers, search],
+  );
 
   // ─── User actions ───────────────────────────────────────
 
@@ -458,6 +464,14 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     [availableLanguages],
   );
 
+  const roleOptions = useMemo(
+    () => [
+      { label: 'Admin', value: Role.ADMIN },
+      { label: 'User', value: Role.USER },
+    ],
+    [],
+  );
+
   const columns = useMemo<ColumnDef<User>[]>(
     () => [
       {
@@ -509,7 +523,10 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
             {row.original.role}
           </Badge>
         ),
-        meta: { label: 'Role' },
+        filterFn: (row, columnId, value: string[]) =>
+          value.length === 0 || value.includes(row.getValue(columnId) as string),
+        enableColumnFilter: true,
+        meta: { label: 'Role', variant: 'multiSelect', options: roleOptions },
       },
       {
         id: 'createdAt',
@@ -598,13 +615,13 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, users, languageOptions],
+    [loading, users, languageOptions, roleOptions],
   );
 
   const { table } = useDataTable({
-    data: filteredUsers,
+    data: searchedUsers,
     columns,
-    pageCount: Math.max(1, Math.ceil(filteredUsers.length / 25)),
+    pageCount: Math.max(1, Math.ceil(searchedUsers.length / 25)),
     initialState: {
       pagination: { pageIndex: 0, pageSize: 25 },
       sorting: [{ id: 'languages', desc: false }],
@@ -632,21 +649,29 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
           {/* ── Users Tab ──────────────────────────────────── */}
           <TabsContent value="users">
-            <div className="flex items-center gap-2 mb-4">
-              <Button
-                variant={userFilter === 'active' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setUserFilter('active')}
-              >
-                Active
-              </Button>
-              <Button
-                variant={userFilter === 'banned' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setUserFilter('banned')}
-              >
-                Banned
-              </Button>
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={userFilter === 'active' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setUserFilter('active')}
+                >
+                  Active
+                </Button>
+                <Button
+                  variant={userFilter === 'banned' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setUserFilter('banned')}
+                >
+                  Banned
+                </Button>
+              </div>
+              <Input
+                placeholder="Search name, email, language…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value || null)}
+                className="h-9 w-72"
+              />
             </div>
 
             <DataTable table={table}>

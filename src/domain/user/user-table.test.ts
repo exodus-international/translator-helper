@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   matchesLanguageFilter,
   compareByLanguageThenName,
+  matchesSearch,
   type UserTableRow,
+  type UserSearchRow,
 } from './user-table';
 
 function lang(id: string, name: string): { language: { id: string; name: string } } {
@@ -12,6 +14,14 @@ function lang(id: string, name: string): { language: { id: string; name: string 
 
 function user(name: string, languages: Array<[string, string]> = []): UserTableRow {
   return { name, languages: languages.map(([id, n]) => lang(id, n)) };
+}
+
+function searchUser(
+  name: string,
+  email: string,
+  languages: Array<[string, string]> = [],
+): UserSearchRow {
+  return { name, email, languages: languages.map(([id, n]) => lang(id, n)) };
 }
 
 describe('matchesLanguageFilter', () => {
@@ -81,5 +91,36 @@ describe('compareByLanguageThenName', () => {
   it('orders two no-language users by name', () => {
     const result = [user('Zoe'), user('Adam')].sort(compareByLanguageThenName);
     assert.deepEqual(result.map((u) => u.name), ['Adam', 'Zoe']);
+  });
+});
+
+describe('matchesSearch', () => {
+  const anna = searchUser('Anna Horak', 'anna@example.org', [['cs', 'Czech']]);
+
+  it('matches everyone for a blank or whitespace-only query', () => {
+    assert.equal(matchesSearch(anna, ''), true);
+    assert.equal(matchesSearch(anna, '   '), true);
+  });
+
+  it('matches on a name substring', () => {
+    assert.equal(matchesSearch(anna, 'hor'), true);
+  });
+
+  it('matches on an email substring', () => {
+    assert.equal(matchesSearch(anna, '@example'), true);
+  });
+
+  it('matches on a language name substring', () => {
+    assert.equal(matchesSearch(anna, 'czech'), true);
+  });
+
+  it('is case-insensitive', () => {
+    assert.equal(matchesSearch(anna, 'ANNA'), true);
+    assert.equal(matchesSearch(anna, 'CZECH'), true);
+  });
+
+  it('does not match an unrelated query', () => {
+    assert.equal(matchesSearch(anna, 'german'), false);
+    assert.equal(matchesSearch(anna, 'zzz'), false);
   });
 });
