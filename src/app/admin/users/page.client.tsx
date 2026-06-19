@@ -740,22 +740,12 @@ export default function UsersClient({
           {/* ── Users Tab ──────────────────────────────────── */}
           <TabsContent value="users">
             <div className="flex items-center justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={userFilter === 'active' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setUserFilter('active')}
-                >
-                  Active
-                </Button>
-                <Button
-                  variant={userFilter === 'banned' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setUserFilter('banned')}
-                >
-                  Banned
-                </Button>
-              </div>
+              <Tabs value={userFilter} onValueChange={(v) => setUserFilter(v as 'active' | 'banned')}>
+                <TabsList>
+                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="banned">Banned</TabsTrigger>
+                </TabsList>
+              </Tabs>
               <Input
                 placeholder="Search name, email, language…"
                 value={search}
@@ -787,22 +777,15 @@ export default function UsersClient({
           {/* ── Invitations Tab ────────────────────────────── */}
           <TabsContent value="invitations">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={invitationFilter === 'active' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => handleFilterChange('active')}
-                >
-                  Active
-                </Button>
-                <Button
-                  variant={invitationFilter === 'inactive' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => handleFilterChange('inactive')}
-                >
-                  Inactive
-                </Button>
-              </div>
+              <Tabs
+                value={invitationFilter}
+                onValueChange={(v) => handleFilterChange(v as InvitationFilter)}
+              >
+                <TabsList>
+                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="inactive">Inactive</TabsTrigger>
+                </TabsList>
+              </Tabs>
               <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Invitation
