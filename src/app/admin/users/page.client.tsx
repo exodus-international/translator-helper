@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -179,6 +180,12 @@ export default function UsersClient({
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordResetInfo, setPasswordResetInfo] = useState<{
+    name: string;
+    email: string;
+    password: string;
+  } | null>(null);
 
   // Language edit state
   const [languageDialogOpen, setLanguageDialogOpen] = useState(false);
@@ -315,12 +322,14 @@ export default function UsersClient({
   const openPasswordDialog = (user: User) => {
     setPasswordUser(user);
     setNewPassword('');
+    setConfirmPassword('');
+    setPasswordResetInfo(null);
     setPasswordDialogOpen(true);
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!passwordUser || newPassword.length < 8) return;
+    if (!passwordUser || newPassword.length < 8 || newPassword !== confirmPassword) return;
     setLoading(true);
     try {
       const result = await authClient.admin.setUserPassword({
@@ -328,10 +337,15 @@ export default function UsersClient({
         newPassword,
       });
       if (result.error) throw new Error(result.error.message);
+      // Keep the dialog open and surface a ready-to-send message for the admin.
+      setPasswordResetInfo({
+        name: passwordUser.name,
+        email: passwordUser.email,
+        password: newPassword,
+      });
       toast.success(`Password reset for ${passwordUser.name}`);
-      setPasswordDialogOpen(false);
-      setPasswordUser(null);
       setNewPassword('');
+      setConfirmPassword('');
     } catch (error: any) {
       toast.error(error.message || 'Failed to reset password');
     } finally {
@@ -719,6 +733,10 @@ export default function UsersClient({
     toast.success(`Exported ${rows.length} user${rows.length === 1 ? '' : 's'}`);
   };
 
+  const passwordResetMessage = passwordResetInfo
+    ? `Hey ${passwordResetInfo.name}, your new password is "${passwordResetInfo.password}" for your email ${passwordResetInfo.email}`
+    : '';
+
   // ─── Render ─────────────────────────────────────────────
 
   return (
@@ -954,35 +972,83 @@ export default function UsersClient({
           if (!open) {
             setPasswordUser(null);
             setNewPassword('');
+            setConfirmPassword('');
+            setPasswordResetInfo(null);
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reset Password for {passwordUser?.name}</DialogTitle>
+            <DialogTitle>
+              {passwordResetInfo ? 'Password Reset' : `Reset Password for ${passwordUser?.name ?? ''}`}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <div>
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                minLength={8}
-                placeholder="Minimum 8 characters"
-              />
+
+          {passwordResetInfo ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Password updated. Copy this message and send it to the user:
+              </p>
+              <Textarea readOnly value={passwordResetMessage} rows={3} className="text-sm" />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(passwordResetMessage);
+                    toast.success('Message copied to clipboard');
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy message
+                </Button>
+                <Button type="button" onClick={() => setPasswordDialogOpen(false)}>
+                  Done
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading || newPassword.length < 8}>
-                {loading ? 'Resetting...' : 'Reset Password'}
-              </Button>
-            </div>
-          </form>
+          ) : (
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="Minimum 8 characters"
+                />
+              </div>
+              <div>
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="Re-enter the password"
+                />
+                {confirmPassword.length > 0 && confirmPassword !== newPassword && (
+                  <p className="mt-1 text-xs text-destructive">Passwords do not match.</p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading || newPassword.length < 8 || newPassword !== confirmPassword}
+                >
+                  {loading ? 'Resetting...' : 'Reset Password'}
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 
