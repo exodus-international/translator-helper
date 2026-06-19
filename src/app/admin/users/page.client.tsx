@@ -41,6 +41,7 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { useDataTable } from '@/hooks/use-data-table';
+import { matchesLanguageFilter, compareByLanguageThenName } from '@/domain/user/user-table';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
@@ -452,6 +453,11 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
   // ─── Users table ────────────────────────────────────────
 
+  const languageOptions = useMemo(
+    () => availableLanguages.map((l) => ({ label: l.name, value: l.id })),
+    [availableLanguages],
+  );
+
   const columns = useMemo<ColumnDef<User>[]>(
     () => [
       {
@@ -467,6 +473,31 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         header: ({ column }) => <DataTableColumnHeader column={column} label="Email" />,
         cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.email}</span>,
         meta: { label: 'Email' },
+      },
+      {
+        id: 'languages',
+        accessorFn: (row) => row.languages.map((ul) => ul.language.id),
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Languages" />,
+        cell: ({ row }) =>
+          row.original.languages.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {row.original.languages.map((ul) => (
+                <Badge key={ul.language.id} variant="outline" size="xs">
+                  {ul.language.name}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">—</span>
+          ),
+        filterFn: (row, _columnId, value: string[]) => matchesLanguageFilter(row.original, value),
+        sortingFn: (rowA, rowB) => compareByLanguageThenName(rowA.original, rowB.original),
+        enableColumnFilter: true,
+        meta: {
+          label: 'Languages',
+          variant: 'multiSelect',
+          options: languageOptions,
+        },
       },
       {
         id: 'role',
@@ -567,7 +598,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, users],
+    [loading, users, languageOptions],
   );
 
   const { table } = useDataTable({
@@ -576,7 +607,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     pageCount: Math.max(1, Math.ceil(filteredUsers.length / 25)),
     initialState: {
       pagination: { pageIndex: 0, pageSize: 25 },
-      sorting: [{ id: 'createdAt', desc: true }],
+      sorting: [{ id: 'languages', desc: false }],
     },
     getRowId: (row) => row.id,
   });
