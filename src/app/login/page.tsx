@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { capture } from '@/lib/analytics';
 import { signIn } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -25,8 +26,10 @@ export default function LoginPage() {
         password,
       });
       if (result.data) {
+        capture('user_signed_in', { method: 'email' });
         router.push('/dashboard');
       } else {
+        capture('user_sign_in_failed');
         toast.error(result.error.message || 'Failed to login');
       }
     } catch (error: any) {

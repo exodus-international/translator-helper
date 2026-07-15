@@ -7,6 +7,8 @@ import { DocumentEditor, DocumentEditorHeader } from '@/components/document-edit
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { toggleDocumentLabelAction } from '@/domain/document/document.actions';
 import { editSuggestionAction } from '@/domain/suggestion/suggestion.actions';
+import { capture } from '@/lib/analytics';
+import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useEditorStore } from '@/lib/stores/editor-provider';
@@ -20,6 +22,7 @@ interface ReviewClientProps {
   document: any;
   sourceVersion: any;
   targetVersion: any;
+  targetLanguage?: { code: string; name: string } | null;
   user: SessionUser;
   initialSuggestions?: any[];
 }
@@ -35,9 +38,13 @@ export default function ReviewClient({
   document,
   sourceVersion,
   targetVersion: initialTargetVersion,
+  targetLanguage,
   user,
   initialSuggestions = [],
 }: ReviewClientProps) {
+  useAnalyticsProjectGroup(document?.sourceProject?.id, document?.sourceProject?.name);
+  useActiveLanguage(targetLanguage?.code, targetLanguage?.name);
+
   const assignmentForLanguage = document.assignments?.find(
     (a: any) => a.translationProject?.language?.id === initialTargetVersion.languageId,
   );
@@ -63,6 +70,7 @@ export default function ReviewClient({
       onEditSuggestion={async (suggestionId, data) => {
         try {
           await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
+          capture('suggestion_edited');
           toast.success('Suggestion updated!');
         } catch (error: any) {
           toast.error(error.message || 'Failed to edit suggestion');
@@ -111,6 +119,7 @@ function ReviewToolbar({ document, sourceVersion, user }: { document: any; sourc
       a.download = getDownloadFilename(document);
       a.click();
       URL.revokeObjectURL(url);
+      capture('document_downloaded', { status: targetVersion?.status });
       toast.success('Document downloaded as ' + getDownloadFilename(document));
     } catch {
       toast.error('Failed to download document');
@@ -123,6 +132,7 @@ function ReviewToolbar({ document, sourceVersion, user }: { document: any; sourc
       const updated = await toggleDocumentLabelAction(document.id, 'Waiting for final label');
       const isOn = updated.labels.includes('Waiting for final label');
       setWaitingForFinalLabel(isOn);
+      capture('document_label_toggled', { label: 'waiting_for_final' });
       toast.success(isOn ? 'Waiting for final approve label added' : 'Waiting for final approve label removed');
       router.refresh();
     } catch (error: any) {
@@ -200,6 +210,7 @@ function ReviewEditActions({ exitEditMode }: { exitEditMode: () => void }) {
     try {
       const updated = await updateDocumentVersionAction(targetVersion.id, { content });
       setTargetVersion(updated);
+      capture('translation_saved', { context: 'review_edit' });
       toast.success('Changes saved successfully!');
       exitEditMode();
     } catch (error: any) {

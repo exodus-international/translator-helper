@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { capture } from '@/lib/analytics';
 import { setUserLanguagesAction } from '@/domain/user-language/user-language.actions';
 import { Language } from '@prisma/client';
 import { useRouter } from 'next/navigation';
@@ -37,6 +38,9 @@ export default function OnboardingLanguagesClient({ languages }: OnboardingLangu
     setLoading(true);
     try {
       await setUserLanguagesAction({ languageIds: selectedLanguageIds });
+      capture('onboarding_languages_submitted', {
+        language_count: selectedLanguageIds.length,
+      });
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Error setting languages:', error);

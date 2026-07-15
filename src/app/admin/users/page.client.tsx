@@ -29,6 +29,7 @@ import {
   type InvitationDisplayStatus,
 } from '@/domain/invitation/invitation.display-status';
 import { authClient } from '@/lib/auth-client';
+import { capture } from '@/lib/analytics';
 import { Role, InvitationStatus } from '@prisma/client';
 import { Ban, Check, ChevronLeft, ChevronRight, Clock, Copy, Link2, Plus, Shield, Unlock, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -161,6 +162,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
             : u,
         ),
       );
+      capture('user_banned');
       toast.success('User banned successfully');
     } catch (error: any) {
       console.error('Error banning user:', error);
@@ -176,6 +178,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
       const result = await authClient.admin.unbanUser({ userId });
       if (result.error) throw new Error(result.error.message);
       setUsers(users.map((u) => (u.id === userId ? { ...u, banned: false, banReason: null, banExpires: null } : u)));
+      capture('user_unbanned');
       toast.success('User unbanned successfully');
     } catch (error: any) {
       console.error('Error unbanning user:', error);
@@ -197,6 +200,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     setLoading(true);
     try {
       await handleRoleChange(editingUser.id, selectedRole);
+      capture('user_role_changed', { role: selectedRole });
       setRoleDialogOpen(false);
       setEditingUser(null);
       setSelectedRole('');
@@ -231,6 +235,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
         },
         ...invitations,
       ]);
+      capture('invitation_created');
       toast.success('Invitation created');
     } catch (error: any) {
       console.error('Error creating invitation:', error);
@@ -242,6 +247,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
 
   const handleCopyUrl = async (url: string) => {
     await navigator.clipboard.writeText(url);
+    capture('invitation_link_copied');
     toast.success('Invite link copied to clipboard');
   };
 
@@ -250,6 +256,7 @@ export default function UsersClient({ users: initialUsers, invitations: initialI
     try {
       await revokeInvitationAction(id);
       setInvitations(invitations.map((inv) => (inv.id === id ? { ...inv, status: 'REVOKED' as InvitationStatus } : inv)));
+      capture('invitation_revoked');
       toast.success('Invitation revoked');
     } catch (error: any) {
       console.error('Error revoking invitation:', error);

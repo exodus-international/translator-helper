@@ -27,6 +27,8 @@ import {
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
 import { DocumentSearchInput } from '@/components/document-search-input';
+import { useActiveLanguage } from '@/components/analytics-project-group';
+import { capture } from '@/lib/analytics';
 import { getCanonicalEditorPath } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -210,6 +212,10 @@ export default function ProjectKanbanBoard({
 
   const isAdmin = isAdminClient(user);
 
+  // Register the active language as a PostHog super property (selectedLanguage prop is a language id)
+  const selectedLang = languages.find((lang) => lang.id === selectedLanguage);
+  useActiveLanguage(selectedLang?.code, selectedLang?.name);
+
   useEffect(() => {
     loadDocuments();
   }, [selectedLanguage, sourceProjectId]);
@@ -254,6 +260,7 @@ export default function ProjectKanbanBoard({
     setAssignReviewerId(params.currentReviewerId ?? '');
     setAssignDeadline('');
     setAssignDialogOpen(true);
+    capture('dialog_opened', { dialog: 'kanban_assign' });
   }
 
   async function handleAssign() {
@@ -296,6 +303,13 @@ export default function ProjectKanbanBoard({
         await assignReviewerToVersionAction(assignVersionId, reviewerId);
         toast.success(wantsUnassignReviewer ? 'Reviewer unassigned' : 'Reviewer assigned!');
       }
+
+      capture('document_assigned', {
+        context: 'kanban',
+        has_translator: Boolean(translatorId),
+        has_reviewer: Boolean(reviewerId),
+        has_deadline: Boolean(assignDeadline),
+      });
 
       setAssignDialogOpen(false);
       await loadDocuments();
@@ -432,6 +446,11 @@ export default function ProjectKanbanBoard({
         if (newStatus && versionId) {
           try {
             await updateDocumentVersionStatusAction(versionId, newStatus);
+            capture('document_status_changed', {
+              from: getStatusForColumn(oldCard.column),
+              to: newStatus,
+              via: 'kanban_dnd',
+            });
             await loadDocuments();
           } catch (error) {
             console.error('Error updating document status:', error);

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { GitBranch, ExternalLink, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { getGitHubCommitsForVersionAction } from '@/domain/github/github.actions';
 import { deployToGitHubAction } from '@/domain/github/github.actions';
+import { capture } from '@/lib/analytics';
 import { toast } from 'sonner';
 
 interface GitHubStatusProps {
@@ -61,6 +62,7 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
     setRetrying(true);
     try {
       await deployToGitHubAction(documentVersionId);
+      capture('github_deploy_retried');
       toast.success('GitHub deploy successful!');
       await loadCommits();
     } catch (error: any) {

@@ -50,11 +50,15 @@ export default async function ReviewPage({
   // Load suggestions for the target version
   const suggestions = await getSuggestionsByDocumentVersion(version.id);
 
+  // Readable target language (for analytics segmentation by language team)
+  const targetLanguage = version.language;
+
   return (
     <ReviewClient
       document={document}
       sourceVersion={sourceVersion}
       targetVersion={version}
+      targetLanguage={targetLanguage ? { code: targetLanguage.code, name: targetLanguage.name } : null}
       user={user}
       initialSuggestions={suggestions}
     />

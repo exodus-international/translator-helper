@@ -13,6 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import { useActiveLanguage } from '@/components/analytics-project-group';
+import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@prisma/client';
@@ -266,6 +268,12 @@ export default function DashboardClient({
   const handleDeployLanguageFilterChange = (value: string) => {
     setDeployLanguageFilter(value);
     localStorage.setItem('dashboard:deployLanguageFilter', value);
+    if (value !== 'all') {
+      const lang = deployLanguages.find((l) => l.id === value);
+      if (lang) {
+        capture('language_switched', { language: lang.code });
+      }
+    }
   };
   const workItems = useMemo(
     () => buildWorkItems(translatingVersions, reviewAssignments, assignments),
@@ -273,14 +281,19 @@ export default function DashboardClient({
   );
 
   const deployLanguages = useMemo(() => {
-    const langMap = new Map<string, string>();
+    const langMap = new Map<string, { name: string; code: string }>();
     for (const v of approvedVersions) {
-      langMap.set(v.language.id, v.language.name);
+      langMap.set(v.language.id, { name: v.language.name, code: v.language.code });
     }
     return Array.from(langMap.entries())
-      .map(([id, name]) => ({ id, name }))
+      .map(([id, { name, code }]) => ({ id, name, code }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [approvedVersions]);
+
+  // Register the active deploy-filter language as a PostHog super property (value is a language id)
+  const selectedDeployLanguage =
+    deployLanguageFilter === 'all' ? undefined : deployLanguages.find((l) => l.id === deployLanguageFilter);
+  useActiveLanguage(selectedDeployLanguage?.code, selectedDeployLanguage?.name);
 
   const filteredApprovedVersions = useMemo(() => {
     if (deployLanguageFilter === 'all') return approvedVersions;
@@ -303,6 +316,7 @@ export default function DashboardClient({
         description: newProjectDescription || null,
         identifier: newProjectIdentifier || null,
       });
+      capture('source_project_created', { location: 'dashboard' });
       toast.success('Project created');
       setCreateDialogOpen(false);
       setNewProjectName('');
@@ -373,6 +387,9 @@ export default function DashboardClient({
                 open={createDialogOpen}
                 onOpenChange={(open) => {
                   setCreateDialogOpen(open);
+                  if (open) {
+                    capture('dialog_opened', { dialog: 'create_source_project' });
+                  }
                   if (!open) {
                     setNewProjectName('');
                     setNewProjectDescription('');
