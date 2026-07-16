@@ -8,7 +8,6 @@ export interface SessionUser {
   name: string;
   role: Role;
   image?: string | null;
-  banned?: boolean;
 }
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
@@ -27,7 +26,6 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       name: session.user.name,
       role: (session.user.role as Role) || Role.USER,
       image: session.user.image,
-      banned: (session.user as any).banned || false,
     };
   } catch (error) {
     console.error('Error getting current user:', error);

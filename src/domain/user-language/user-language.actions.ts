@@ -1,20 +1,9 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
-import {
-  setUserLanguages,
-  getUserLanguagesCount,
-} from './user-language.repository';
-import { setUserLanguagesSchema } from './user-language.types';
+import { setUserLanguages } from './user-language.repository';
 
-export async function setUserLanguagesAction(input: unknown) {
-  const { user } = await authorize('authenticated');
-  const validated = setUserLanguagesSchema.parse(input);
-
-  return await setUserLanguages(user.id, validated.languageIds);
-}
-
-export async function getUserLanguagesCountAction(): Promise<number> {
-  const { user } = await authorize('authenticated');
-  return await getUserLanguagesCount(user.id);
+export async function adminSetUserLanguagesAction(userId: string, languageIds: string[]) {
+  await authorize('admin');
+  return await setUserLanguages(userId, languageIds);
 }
