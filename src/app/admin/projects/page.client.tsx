@@ -12,6 +12,7 @@ import {
   deleteSourceProjectAction,
   updateSourceProjectAction,
 } from '@/domain/source-project/source-project.actions';
+import { capture } from '@/lib/analytics';
 import { SourceProject } from '@prisma/client';
 import { CheckCircle2, Edit, FolderOpen, Languages } from 'lucide-react';
 import Link from 'next/link';
@@ -78,6 +79,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
           identifier: identifier || null,
         });
         replaceProjectPreservingCount(updated);
+        capture('source_project_updated');
       } else {
         // Create source project (this will also create translation projects for all languages)
         await createSourceProjectAction({
@@ -85,6 +87,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
           description: description || undefined,
           identifier: identifier || undefined,
         });
+        capture('source_project_created', { location: 'admin' });
         // Refresh the page to get updated counts including translation projects
         router.refresh();
       }
@@ -113,6 +116,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     try {
       const updated = await updateSourceProjectAction(project.id, { status: newStatus });
       replaceProjectPreservingCount(updated);
+      capture('source_project_status_toggled', { status: newStatus });
     } catch (error: any) {
       console.error('Error updating project status:', error);
       toast.error(error.message || 'Failed to update project status');
@@ -128,6 +132,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     try {
       await deleteSourceProjectAction(id);
       setSourceProjects(sourceProjects.filter((p) => p.id !== id));
+      capture('source_project_deleted');
       toast.success('Source project deleted successfully');
     } catch (error: any) {
       console.error('Error deleting source project:', error);

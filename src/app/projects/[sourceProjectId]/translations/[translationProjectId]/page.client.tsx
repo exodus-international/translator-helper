@@ -27,6 +27,7 @@ import {
   deleteProjectMemberAction,
   deleteProjectMembersByUserAction,
 } from '@/domain/project-member/project-member.actions';
+import { capture } from '@/lib/analytics';
 import { Prisma, ProjectRole } from '@prisma/client';
 import { ArrowLeft, Calendar, FileText, Plus, Trash2, User, Users, X } from 'lucide-react';
 import Link from 'next/link';
@@ -155,6 +156,7 @@ export default function TranslationProjectClient({
       // Strip translationProject field to match the members state type
       const membersToAdd = createdMembers.map(({ translationProject: _, ...member }) => member) as typeof members;
       setMembers([...members, ...membersToAdd]);
+      capture('project_member_added', { role_count: selectedRoles.length });
       setMemberDialogOpen(false);
       resetMemberForm();
       router.refresh();
@@ -218,6 +220,7 @@ export default function TranslationProjectClient({
     try {
       await deleteProjectMembersByUserAction(userId, translationProject.id);
       setMembers(members.filter((m) => m.userId !== userId));
+      capture('project_member_removed');
       router.refresh();
       toast.success('User removed from project successfully');
     } catch (error: any) {
@@ -240,6 +243,7 @@ export default function TranslationProjectClient({
         deadline: deadline ? new Date(deadline) : null,
       });
       setAssignments([...assignments, created as (typeof assignments)[0]]);
+      capture('document_assigned', { context: 'translation_project' });
       setAssignmentDialogOpen(false);
       resetAssignmentForm();
       router.refresh();
@@ -257,6 +261,7 @@ export default function TranslationProjectClient({
     try {
       await deleteDocumentAssignmentAction(assignmentId);
       setAssignments(assignments.filter((a) => a.id !== assignmentId));
+      capture('document_assignment_removed');
       router.refresh();
       toast.success('Assignment removed successfully');
     } catch (error: any) {

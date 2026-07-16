@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { updateUserProfileAction } from '@/domain/user/user.actions';
+import { capture } from '@/lib/analytics';
 import { authClient } from '@/lib/auth-client';
 import { TShirtSize } from '@prisma/client';
 import { useState } from 'react';
@@ -87,6 +88,7 @@ function ProfileInfoSection({ profile }: { profile: UserProfile }) {
         tShirtSize: tShirtSize || null,
         exodus90AppId: exodus90AppId.trim() || null,
       });
+      capture('profile_updated');
       toast.success('Profile updated');
     } catch (error: any) {
       toast.error(error.message || 'Failed to update profile');
@@ -269,6 +271,7 @@ function ChangePasswordSection() {
         return;
       }
 
+      capture('password_changed', { revoked_other_sessions: revokeOtherSessions });
       toast.success('Password changed successfully');
       setCurrentPassword('');
       setNewPassword('');

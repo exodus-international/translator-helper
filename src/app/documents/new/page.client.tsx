@@ -14,6 +14,7 @@ import { getContentFormat } from '@/components/document-form/content-format';
 import { validateFilename } from '@/domain/document/validate-filename';
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import { capture } from '@/lib/analytics';
 import matter from 'gray-matter';
 import { FileText, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -92,12 +93,14 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   }, []);
 
   const acceptFile = useCallback(
-    (file: File | undefined) => {
+    (file: File | undefined, method: 'drag_drop' | 'browse') => {
       if (!file) return;
       if (!/\.(md|ya?ml)$/i.test(file.name)) {
+        capture('document_upload_rejected', { reason: 'invalid_type' });
         toast.error(`"${file.name}" is not supported. Upload a .md, .yml or .yaml file.`);
         return;
       }
+      capture('document_upload_started', { method });
       processFile(file);
     },
     [processFile],
@@ -117,13 +120,13 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      acceptFile(e.dataTransfer.files[0]);
+      acceptFile(e.dataTransfer.files[0], 'drag_drop');
     },
     [acceptFile],
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    acceptFile(e.target.files?.[0]);
+    acceptFile(e.target.files?.[0], 'browse');
   };
 
   const handleTitleChange = (value: string) => {
@@ -149,6 +152,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       setSourceProjectId(project.id);
       setShowNewProjectInput(false);
       setNewProjectName('');
+      capture('source_project_created', { location: 'document_new' });
     } catch (error: any) {
       console.error('Error creating project:', error);
       toast.error(error.message || 'Failed to create project');
@@ -178,6 +182,8 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
         originalFilename: originalFilename || undefined,
         type: documentType || undefined,
       });
+
+      capture('document_created', { content_source: originalFilename ? 'upload' : 'manual' });
 
       router.push('/dashboard');
     } catch (error: any) {

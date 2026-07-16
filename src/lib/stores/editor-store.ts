@@ -21,6 +21,7 @@ import { getProjectReviewersAction, listProjectMembersAction } from '@/domain/pr
 import { deleteDocumentAction } from '@/domain/document/document.actions';
 import { DocumentStatus, SuggestionType } from '@prisma/client';
 import { toast } from 'sonner';
+import { capture } from '@/lib/analytics';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ interface EditorActions {
   handleStatusChange: (status: DocumentStatus) => void;
 
   // Save
-  saveContent: () => Promise<void>;
+  saveContent: (trigger?: 'manual' | 'auto') => Promise<void>;
   saveSource: (sourceVersionId: string) => Promise<void>;
   deleteSource: () => Promise<void>;
 
@@ -188,7 +189,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     // ─── Save ──────────────────────────────────────────
-    saveContent: async () => {
+    saveContent: async (trigger = 'manual') => {
       const { targetVersion, content } = get();
       if (!targetVersion) return;
 
@@ -200,6 +201,11 @@ export function createEditorStore(config: EditorStoreConfig) {
           savedContent: content,
           ...removeLoading(get(), 'save'),
         });
+        // Only track explicit user saves; the 3s-debounced auto-save would
+        // otherwise flood analytics with background events.
+        if (trigger === 'manual') {
+          capture('translation_saved', { documentVersionId: targetVersion.id });
+        }
         toast.success('Translation saved successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'save'));
@@ -214,6 +220,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       try {
         await updateDocumentVersionAction(sourceVersionId, { content: sourceEditContent });
         set(removeLoading(get(), 'sourceSave'));
+        capture('source_saved', { documentVersionId: sourceVersionId });
         toast.success('Source document saved successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'sourceSave'));
@@ -227,6 +234,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       try {
         await deleteDocumentAction(documentId);
         set(removeLoading(get(), 'deleteSource'));
+        capture('document_deleted', { location: 'editor' });
         toast.success('Document deleted successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'deleteSource'));
@@ -256,6 +264,7 @@ export function createEditorStore(config: EditorStoreConfig) {
           savedContent: updatedVersion.content,
           ...removeLoading(get(), 'applySuggestion'),
         });
+        capture('suggestion_applied', { suggestionId });
         toast.success('Suggestion applied!');
         await get().reloadSuggestions();
       } catch (error: any) {
@@ -269,6 +278,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       try {
         await dismissSuggestionAction({ suggestionId, dismissedReason: reason });
         set(removeLoading(get(), 'dismissSuggestion'));
+        capture('suggestion_dismissed', { suggestionId });
         toast.success('Suggestion dismissed!');
         await get().reloadSuggestions();
       } catch (error: any) {
@@ -289,6 +299,7 @@ export function createEditorStore(config: EditorStoreConfig) {
           });
         }
         set(removeLoading(get(), 'reopenSuggestion'));
+        capture('suggestion_reopened', { suggestionId });
         toast.success('Suggestion reopened!');
         await get().reloadSuggestions();
       } catch (error: any) {
@@ -312,6 +323,7 @@ export function createEditorStore(config: EditorStoreConfig) {
           proposedText: data.proposedText,
           version: data.version,
         });
+        capture('suggestion_created', { type: data.type });
         toast.success('Suggestion created!');
         await get().reloadSuggestions();
       } catch (error: any) {
@@ -333,6 +345,7 @@ export function createEditorStore(config: EditorStoreConfig) {
           comment,
           version: targetVersion.version ?? 1,
         });
+        capture('general_thread_created');
         toast.success('Comment added!');
         await get().reloadSuggestions();
       } catch (error: any) {
@@ -343,6 +356,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     replySuggestion: async (suggestionId, content) => {
       try {
         await createSuggestionReplyAction({ suggestionId, content });
+        capture('suggestion_replied', { suggestionId });
         await get().reloadSuggestions();
       } catch (error: any) {
         toast.error(error.message || 'Failed to post reply');
@@ -358,6 +372,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       try {
         const members = await getProjectReviewersAction(translationProjectId);
         set({ dialog: { type: 'submitReview', reviewers: members } });
+        capture('dialog_opened', { dialog: 'submit_review' });
       } catch (error) {
         toast.error('Failed to load reviewers');
       }
@@ -378,6 +393,7 @@ export function createEditorStore(config: EditorStoreConfig) {
           targetVersion: { ...targetVersion, status: DocumentStatus.PENDING_REVIEW },
           ...removeLoading(get(), 'submitForReview'),
         });
+        capture('submitted_for_review', { has_reviewer: Boolean(reviewerId) });
         toast.success('Submitted for review!');
       } catch (error: any) {
         set(removeLoading(get(), 'submitForReview'));
@@ -395,6 +411,7 @@ export function createEditorStore(config: EditorStoreConfig) {
           if (!seen.has(m.user.id)) seen.set(m.user.id, m);
         }
         set({ dialog: { type: 'assignTranslator', members: Array.from(seen.values()) } });
+        capture('dialog_opened', { dialog: 'assign_translator' });
       } catch (error) {
         toast.error('Failed to load team members');
       }
@@ -430,6 +447,7 @@ export function createEditorStore(config: EditorStoreConfig) {
         }
 
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignTranslator') });
+        capture('translator_assigned');
         toast.success('Translator assigned!');
       } catch (error: any) {
         set(removeLoading(get(), 'assignTranslator'));
@@ -453,6 +471,7 @@ export function createEditorStore(config: EditorStoreConfig) {
         if (targetVersion) {
           set({ targetVersion: { ...targetVersion, user: null } });
         }
+        capture('translator_unassigned');
         toast.success('Translator unassigned');
       } catch (error: any) {
         toast.error(error.message || 'Failed to unassign translator');
@@ -465,6 +484,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       try {
         const members = await getProjectReviewersAction(translationProjectId);
         set({ dialog: { type: 'assignReviewer', candidates: members } });
+        capture('dialog_opened', { dialog: 'assign_reviewer' });
       } catch (error) {
         toast.error('Failed to load reviewers');
       }
@@ -484,6 +504,7 @@ export function createEditorStore(config: EditorStoreConfig) {
           }
         }
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignReviewer') });
+        capture('reviewer_assigned');
         toast.success('Reviewer assigned!');
       } catch (error: any) {
         set(removeLoading(get(), 'assignReviewer'));
@@ -497,6 +518,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       try {
         await assignReviewerToVersionAction(targetVersion.id, null);
         set({ targetVersion: { ...targetVersion, reviewer: null } });
+        capture('reviewer_unassigned');
         toast.success('Reviewer unassigned');
       } catch (error: any) {
         toast.error(error.message || 'Failed to unassign reviewer');

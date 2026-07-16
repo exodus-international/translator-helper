@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DocumentSearchInput } from '@/components/document-search-input';
 import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
+import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { Document, DocumentStatus, Language } from '@prisma/client';
@@ -289,7 +290,12 @@ export default function DocumentsClient({
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteDocument(doc.id)}>
+                                    <AlertDialogAction
+                                      onClick={async () => {
+                                        await handleDeleteDocument(doc.id);
+                                        capture('document_deleted', { location: 'list', document_id: doc.id });
+                                      }}
+                                    >
                                       Delete
                                     </AlertDialogAction>
                                   </AlertDialogFooter>

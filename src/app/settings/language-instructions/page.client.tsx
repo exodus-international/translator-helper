@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { updateLanguageInstructionsAction } from '@/domain/language/language.actions';
 import { TRANSLATION_INSTRUCTIONS_MAX_LENGTH } from '@/domain/language/language.types';
+import { capture } from '@/lib/analytics';
 import { toast } from 'sonner';
 
 interface LanguageInstructionsClientProps {
@@ -41,6 +42,7 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
         ...prev,
         [languageId]: 'Saved just now',
       }));
+      capture('language_instructions_saved', { language: languageId });
       toast.success('Instructions saved');
     } catch (error: any) {
       console.error('Failed to save instructions', error);

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { completeOnboardingAction } from '@/domain/user/user.actions';
+import { capture } from '@/lib/analytics';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { TShirtSize } from '@prisma/client';
@@ -48,6 +49,11 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
         country: country.trim() || null,
         tShirtSize: tShirtSize || null,
         exodus90AppId: exodus90AppId.trim() || null,
+      });
+      capture('onboarding_completed', {
+        has_address: Boolean(streetAddress.trim() || city.trim() || country.trim()),
+        has_tshirt_size: Boolean(tShirtSize),
+        has_exodus90_id: Boolean(exodus90AppId.trim()),
       });
       router.push('/dashboard');
     } catch (error: any) {

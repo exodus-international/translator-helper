@@ -1,5 +1,6 @@
 'use client';
 
+import { capture } from '@/lib/analytics';
 import { Bug, LifeBuoy } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -15,6 +16,7 @@ export function FeedbackButton() {
         href="https://exodus90.atlassian.net/servicedesk/customer/portal/1"
         target="_blank"
         title="Support"
+        onClick={() => capture('support_link_clicked')}
         className="flex h-9 w-9 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <LifeBuoy className="h-4 w-4" aria-label="Support" />
@@ -23,6 +25,7 @@ export function FeedbackButton() {
         href={bugReportHref}
         target="_blank"
         title="Report a bug"
+        onClick={() => capture('bug_report_clicked', { path: pathname })}
         className="flex h-9 w-9 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <Bug className="h-4 w-4" aria-label="Report a bug" />

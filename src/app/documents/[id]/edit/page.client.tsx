@@ -13,6 +13,7 @@ import { getContentFormat } from '@/components/document-form/content-format';
 import { validateFilename } from '@/domain/document/validate-filename';
 import { updateDocumentAction } from '@/domain/document/document.actions';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
+import { capture } from '@/lib/analytics';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -74,6 +75,8 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
           content,
         });
       }
+
+      capture('document_updated', { document_id: document.id });
 
       toast.success('Document updated successfully');
       router.push('/documents');

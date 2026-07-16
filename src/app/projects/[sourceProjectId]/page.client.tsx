@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { updateSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import { capture } from '@/lib/analytics';
+import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { Language } from '@prisma/client';
@@ -65,6 +67,7 @@ export default function ProjectDetailClient({
   translationProjects,
 }: ProjectDetailClientProps) {
   const router = useRouter();
+  useAnalyticsProjectGroup(sourceProject.id, sourceProject.name);
   const LANGUAGE_STORAGE_KEY = `project:${sourceProject.id}:selectedLanguage`;
 
   // Settings form state
@@ -74,6 +77,18 @@ export default function ProjectDetailClient({
   const [settingsSaving, setSettingsSaving] = useState(false);
 
   const [selectedLanguage, setSelectedLanguage] = useState<string>(languages[0]?.id || '');
+
+  // Register the active language as a PostHog super property (value is a language id)
+  const selectedLang = languages.find((lang) => lang.id === selectedLanguage);
+  useActiveLanguage(selectedLang?.code, selectedLang?.name);
+
+  const handleLanguageChange = (value: string) => {
+    setSelectedLanguage(value);
+    const lang = languages.find((l) => l.id === value);
+    if (lang) {
+      capture('language_switched', { language: lang.code });
+    }
+  };
 
   // Load persisted language selection
   useEffect(() => {
@@ -103,6 +118,7 @@ export default function ProjectDetailClient({
         description: settingsDescription || null,
         identifier: settingsIdentifier || null,
       });
+      capture('project_settings_saved');
       toast.success('Project settings saved');
       router.refresh();
     } catch (error: any) {
@@ -117,6 +133,7 @@ export default function ProjectDetailClient({
     const newStatus = sourceProject.status === 'ACTIVE' ? 'COMPLETE' : 'ACTIVE';
     try {
       await updateSourceProjectAction(sourceProject.id, { status: newStatus });
+      capture('source_project_status_toggled', { status: newStatus === 'COMPLETE' ? 'complete' : 'active' });
       toast.success(newStatus === 'COMPLETE' ? 'Project marked as complete' : 'Project marked as active');
       router.refresh();
     } catch (error: any) {
@@ -138,7 +155,7 @@ export default function ProjectDetailClient({
               {sourceProject.description && <p className="text-sm text-gray-500 mt-0.5">{sourceProject.description}</p>}
             </div>
             <div>
-              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+              <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
                 <SelectTrigger className="min-w-[180px]">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>

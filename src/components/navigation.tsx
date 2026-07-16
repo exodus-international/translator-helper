@@ -2,6 +2,7 @@
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { capture } from '@/lib/analytics';
 import { signOut } from '@/lib/auth-client';
 import { SessionUser } from '@/lib/session';
 import { FilePlus, LogOut } from 'lucide-react';
@@ -16,6 +17,7 @@ export function Navigation({ user }: NavigationProps) {
   const router = useRouter();
 
   const handleSignOut = async () => {
+    capture('user_signed_out');
     await signOut();
     router.push('/login');
   };

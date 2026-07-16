@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { createTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
+import { capture } from '@/lib/analytics';
 import { Language, Prisma } from '@prisma/client';
 import { ArrowLeft, ExternalLink, Languages, Plus, Users } from 'lucide-react';
 import Link from 'next/link';
@@ -75,6 +76,7 @@ export default function TranslationsClient({
         sourceProjectId: sourceProject.id,
         languageId: selectedLanguageId,
       });
+      capture('translation_project_created');
       setDialogOpen(false);
       resetForm();
       router.refresh();
