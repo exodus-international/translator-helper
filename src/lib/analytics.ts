@@ -18,7 +18,10 @@ export type AnalyticsEvent =
   | 'user_registered'
   | 'user_signed_out'
   // ── Onboarding ───────────────────────────────────────────────────────
-  | 'onboarding_languages_submitted'
+  | 'onboarding_completed'
+  // ── Profile / account ────────────────────────────────────────────────
+  | 'profile_updated'
+  | 'password_changed'
   // ── Feedback / support ───────────────────────────────────────────────
   | 'support_link_clicked'
   | 'bug_report_clicked'
@@ -70,6 +73,9 @@ export type AnalyticsEvent =
   | 'user_role_changed'
   | 'user_banned'
   | 'user_unbanned'
+  | 'admin_user_password_reset'
+  | 'admin_user_languages_updated'
+  | 'admin_user_profile_updated'
   | 'invitation_created'
   | 'invitation_link_copied'
   | 'invitation_revoked'
