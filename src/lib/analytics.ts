@@ -3,6 +3,16 @@
 import posthog from 'posthog-js';
 
 /**
+ * Whether PostHog is configured for this build. We gate on the presence of the
+ * (build-time inlined) key rather than posthog's internal `__loaded` flag: that
+ * flag can still read falsy in a click handler when init is async, which would
+ * silently drop custom events even though pageviews (sent by posthog-js
+ * internally) work fine. posthog-js safely buffers events fired before init.
+ */
+const POSTHOG_ENABLED =
+  typeof window !== 'undefined' && Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY);
+
+/**
  * Central catalog of product-analytics event names.
  *
  * Every tracked interaction must use a name from this union so that:
@@ -100,8 +110,7 @@ export function capture(
   event: AnalyticsEvent,
   properties?: AnalyticsProperties,
 ): void {
-  if (typeof window === 'undefined') return;
-  if (!posthog.__loaded) return;
+  if (!POSTHOG_ENABLED) return;
   posthog.capture(event, properties);
 }
 
@@ -118,8 +127,7 @@ export function setProjectGroup(
   projectId: string,
   properties?: AnalyticsProperties,
 ): void {
-  if (typeof window === 'undefined') return;
-  if (!posthog.__loaded) return;
+  if (!POSTHOG_ENABLED) return;
   posthog.group('project', projectId, properties);
 }
 
@@ -134,8 +142,7 @@ export function setProjectGroup(
  * breakdowns.
  */
 export function setActiveLanguage(code: string, name?: string): void {
-  if (typeof window === 'undefined') return;
-  if (!posthog.__loaded) return;
+  if (!POSTHOG_ENABLED) return;
   if (!code) return;
   posthog.register({ language: code, ...(name ? { language_name: name } : {}) });
 }
@@ -148,7 +155,6 @@ export function captureException(
   error: unknown,
   properties?: AnalyticsProperties,
 ): void {
-  if (typeof window === 'undefined') return;
-  if (!posthog.__loaded) return;
+  if (!POSTHOG_ENABLED) return;
   posthog.captureException(error, properties);
 }
