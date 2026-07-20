@@ -39,7 +39,7 @@ export function useAutoSave(opts?: { delayMs?: number; enabled?: boolean }) {
       if (!isMountedRef.current || savingRef.current) return;
       savingRef.current = true;
       try {
-        await saveContent();
+        await saveContent('auto');
       } catch {
         // Error already toasted by store
       } finally {

@@ -14,6 +14,7 @@ import {
   updateLanguageBranchNameAction,
   deleteLanguageAction,
 } from '@/domain/language/language.actions';
+import { capture } from '@/lib/analytics';
 import { toast } from 'sonner';
 
 interface LanguagesClientProps {
@@ -50,9 +51,11 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
           });
         }
         setLanguages(languages.map((l) => (l.id === updated.id ? { ...updated, branchName: branchName || null } : l)));
+        capture('language_updated', { code: updated.code });
       } else {
         const created = await createLanguageAction({ code, name, branchName: branchName || undefined });
         setLanguages([...languages, created]);
+        capture('language_created', { code: created.code });
       }
 
       setDialogOpen(false);
@@ -77,6 +80,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
     try {
       await deleteLanguageAction(id);
       setLanguages(languages.filter((l) => l.id !== id));
+      capture('language_deleted');
       toast.success('Language deleted successfully');
     } catch (error: any) {
       console.error('Error deleting language:', error);

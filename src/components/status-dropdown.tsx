@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
+import { capture } from '@/lib/analytics';
 import { getCanonicalEditorPath } from '@/lib/document-status';
 import { canDeployClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -156,6 +157,11 @@ export function StatusDropdown({
         }
       } else if (deployToastId) {
         toast.dismiss(deployToastId);
+      }
+
+      capture('document_status_changed', { from: displayedStatus, to: newStatus, via: 'dropdown' });
+      if (newStatus === DocumentStatus.DEPLOYED) {
+        capture('document_deployed');
       }
 
       // Update displayed status immediately for optimistic UI update

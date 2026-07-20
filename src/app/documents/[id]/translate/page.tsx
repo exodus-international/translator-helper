@@ -4,7 +4,7 @@ import {
   getDocumentVersionById,
 } from '@/domain/document-version/document-version.repository';
 import { getDocumentById } from '@/domain/document/document.repository';
-import { getLanguageByCode } from '@/domain/language/language.repository';
+import { getLanguageByCode, getLanguageById } from '@/domain/language/language.repository';
 import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.repository';
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
 import { getCanonicalEditorPath } from '@/lib/document-status';
@@ -80,12 +80,17 @@ export default async function TranslatePage({
   // Fetch suggestions for the target version
   const initialSuggestions = targetVersion ? await getSuggestionsByDocumentVersion(targetVersion.id) : [];
 
+  // Readable target language (for analytics segmentation by language team)
+  const targetLanguageRecordId = lang || targetVersion?.languageId;
+  const targetLanguage = targetLanguageRecordId ? await getLanguageById(targetLanguageRecordId) : null;
+
   return (
     <TranslateClient
       document={document}
       sourceVersion={sourceVersion}
       targetVersion={targetVersion}
       targetLanguageId={lang || ''}
+      targetLanguage={targetLanguage ? { code: targetLanguage.code, name: targetLanguage.name } : null}
       translationProject={translationProject}
       assignment={assignment}
       user={user}

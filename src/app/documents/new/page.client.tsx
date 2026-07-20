@@ -14,6 +14,7 @@ import { getContentFormat } from '@/components/document-form/content-format';
 import { validateFilename } from '@/domain/document/validate-filename';
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import { capture } from '@/lib/analytics';
 import matter from 'gray-matter';
 import { FileText, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -70,22 +71,40 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
   const processFile = useCallback((file: File) => {
     setOriginalFilename(file.name);
+    const isYaml = getContentFormat(file.name) === 'YAML';
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const { data: frontmatter } = matter(text);
+      // YAML documents often start with a `---` line, which gray-matter would
+      // misread as frontmatter and strip from the content — so skip it for YAML.
+      const { data: frontmatter } = isYaml ? { data: {} as Record<string, unknown> } : matter(text);
 
       setContent(text);
 
-      const extractedTitle = frontmatter.title || file.name.replace('.md', '');
-      setTitle(extractedTitle);
-      setSlug(generateSlug(extractedTitle));
+      const extractedTitle = frontmatter.title || file.name.replace(/\.(md|ya?ml)$/i, '');
+      setTitle(String(extractedTitle));
+      setSlug(generateSlug(String(extractedTitle)));
       setLabels(extractLabelsFromFrontmatter(frontmatter));
+      if (isYaml) setDocumentType('ROOT_FILE');
       setMode('create');
     };
     reader.readAsText(file);
   }, []);
+
+  const acceptFile = useCallback(
+    (file: File | undefined, method: 'drag_drop' | 'browse') => {
+      if (!file) return;
+      if (!/\.(md|ya?ml)$/i.test(file.name)) {
+        capture('document_upload_rejected', { reason: 'invalid_type' });
+        toast.error(`"${file.name}" is not supported. Upload a .md, .yml or .yaml file.`);
+        return;
+      }
+      capture('document_upload_started', { method });
+      processFile(file);
+    },
+    [processFile],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -101,15 +120,13 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      const file = e.dataTransfer.files[0];
-      if (file && file.name.endsWith('.md')) processFile(file);
+      acceptFile(e.dataTransfer.files[0], 'drag_drop');
     },
-    [processFile],
+    [acceptFile],
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.name.endsWith('.md')) processFile(file);
+    acceptFile(e.target.files?.[0], 'browse');
   };
 
   const handleTitleChange = (value: string) => {
@@ -135,6 +152,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       setSourceProjectId(project.id);
       setShowNewProjectInput(false);
       setNewProjectName('');
+      capture('source_project_created', { location: 'document_new' });
     } catch (error: any) {
       console.error('Error creating project:', error);
       toast.error(error.message || 'Failed to create project');
@@ -165,6 +183,8 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
         type: documentType || undefined,
       });
 
+      capture('document_created', { content_source: originalFilename ? 'upload' : 'manual' });
+
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Error creating document:', error);
@@ -179,7 +199,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       <div className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
           <h1 className="text-2xl font-bold">New Document</h1>
-          <p className="text-gray-600">Upload a markdown file or create a new document</p>
+          <p className="text-gray-600">Upload a markdown or YAML file, or create a new document</p>
         </div>
       </div>
 
@@ -211,15 +231,15 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                   `}
                 >
                   <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium mb-2">Drag and drop your markdown file here</p>
+                  <p className="text-lg font-medium mb-2">Drag and drop your markdown or YAML file here</p>
                   <p className="text-gray-600 mb-4">or</p>
                   <label>
-                    <input type="file" accept=".md" onChange={handleFileSelect} className="hidden" />
+                    <input type="file" accept=".md,.yml,.yaml" onChange={handleFileSelect} className="hidden" />
                     <Button type="button" variant="outline" asChild>
                       <span>Browse Files</span>
                     </Button>
                   </label>
-                  <p className="text-xs text-gray-500 mt-4">Only .md files are supported</p>
+                  <p className="text-xs text-gray-500 mt-4">Supported files: .md, .yml, .yaml</p>
                 </div>
               </div>
             </TabsContent>

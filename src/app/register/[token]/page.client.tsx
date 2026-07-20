@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { capture } from '@/lib/analytics';
 import { registerWithInviteAction } from '@/domain/invitation/invitation.actions';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -49,7 +50,8 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
 
     try {
       await registerWithInviteAction({ token, name, email, password });
-      router.push('/onboarding/languages');
+      capture('user_registered', { via: 'invite' });
+      router.push('/onboarding/profile');
     } catch (error: any) {
       console.error('Register error:', error);
       toast.error(error.message || 'Failed to register');
@@ -70,13 +72,13 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div>
-            <Label htmlFor="register-name">Name</Label>
+            <Label htmlFor="register-name">Full Name</Label>
             <Input
               id="register-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              placeholder="Your name"
+              placeholder="Full name"
             />
           </div>
           <div>

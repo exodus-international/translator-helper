@@ -21,6 +21,8 @@ import {
   deleteDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
 import { translateDocumentAction } from '@/domain/translation/translation.actions';
+import { capture } from '@/lib/analytics';
+import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useEditorStore } from '@/lib/stores/editor-provider';
@@ -47,6 +49,7 @@ interface TranslateClientProps {
   sourceVersion: any;
   targetVersion: any | null;
   targetLanguageId: string;
+  targetLanguage?: { code: string; name: string } | null;
   translationProject?: any | null;
   assignment?: any | null;
   user: SessionUser;
@@ -58,6 +61,7 @@ export default function TranslateClient({
   sourceVersion,
   targetVersion: initialTargetVersion,
   targetLanguageId,
+  targetLanguage,
   translationProject,
   assignment,
   user,
@@ -66,12 +70,19 @@ export default function TranslateClient({
   const [zenMode, setZenMode] = useState(false);
   const viewerRef = useRef<SourceTranslationViewerHandle>(null);
 
+  useAnalyticsProjectGroup(document?.sourceProject?.id, document?.sourceProject?.name);
+  useActiveLanguage(targetLanguage?.code, targetLanguage?.name);
+
   // Keyboard shortcut for zen mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F11') {
         e.preventDefault();
-        setZenMode((z) => !z);
+        setZenMode((z) => {
+          const next = !z;
+          capture('zen_mode_toggled', { enabled: next });
+          return next;
+        });
       } else if (e.key === 'Escape') {
         setZenMode(false);
       }
@@ -203,6 +214,7 @@ function TranslateToolbar({
           content,
         });
         setTargetVersion(created);
+        capture('translation_saved');
       }
       setLastSavedAt(new Date());
     } catch (error: any) {
@@ -228,6 +240,7 @@ function TranslateToolbar({
       });
       setTargetVersion(version);
       setContent(version.content || '');
+      capture('translation_started');
     } catch (error: any) {
       toast.error(error.message || 'Failed to start translation');
     } finally {
@@ -240,6 +253,7 @@ function TranslateToolbar({
     setLoading(true);
     try {
       await deleteDocumentVersionAction(targetVersion.id);
+      capture('translation_deleted');
       toast.success('Translation version deleted successfully!');
       setTargetVersion(null);
       setContent('');
@@ -256,6 +270,7 @@ function TranslateToolbar({
       toast.warning('Select a target language before requesting an AI translation.');
       return;
     }
+    const overwrite = content.trim().length > 0;
     setTranslating(true);
     try {
       const result = await translateDocumentAction({
@@ -266,6 +281,7 @@ function TranslateToolbar({
         currentTranslation: content || undefined,
         originalFilename: document.originalFilename ?? undefined,
       });
+      capture('ai_translate_triggered', { overwrite });
       setContent(result.translatedContent);
       viewerRef.current?.enterTranslationEditMode();
       toast.success('AI translation generated successfully!');
@@ -380,7 +396,14 @@ function TranslateToolbar({
                 Please select a target language from the documents page to start translating.
               </span>
             )}
-            <Button variant="outline" size="sm" onClick={() => setZenMode(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                capture('zen_mode_toggled', { enabled: false });
+                setZenMode(false);
+              }}
+            >
               <Minimize2 className="h-4 w-4 mr-2" />
               Exit Zen (Esc)
             </Button>
@@ -399,7 +422,14 @@ function TranslateToolbar({
             <Sparkles className="h-4 w-4 mr-1" />
             {translating ? 'Translating...' : 'AI Translate'}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setZenMode(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              capture('zen_mode_toggled', { enabled: true });
+              setZenMode(true);
+            }}
+          >
             <Maximize2 className="h-4 w-4" />
           </Button>
           <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />

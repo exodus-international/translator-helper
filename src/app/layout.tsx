@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/session';
 import { Navigation } from '@/components/navigation';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackButton } from '@/components/feedback-button';
+import { PostHogProvider } from '@/components/posthog-provider';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,10 +32,12 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Navigation user={user} />
-        {children}
-        <FeedbackButton />
-        <Toaster />
+        <PostHogProvider user={user}>
+          <Navigation user={user} />
+          {children}
+          <FeedbackButton />
+          <Toaster />
+        </PostHogProvider>
       </body>
     </html>
   );
