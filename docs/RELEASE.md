@@ -106,7 +106,9 @@ Once production is confirmed healthy:
 pnpm release:tag vX.Y.Z
 ```
 
-This (`scripts/release-tag.sh`) tags the production commit `vX.Y.Z`, pushes the tag, and — if the `gh` CLI is available — creates a GitHub Release with that version's changelog section. Tags give you a clean "what shipped when" history and an anchor for rollbacks.
+This (`scripts/release-tag.sh`) tags the released commit `vX.Y.Z`, pushes the tag, and — if the `gh` CLI is available — creates a GitHub Release with that version's changelog section. Tags give you a clean "what shipped when" history and an anchor for rollbacks.
+
+The tag lands on the **develop-side parent** of the promote merge (identical content) rather than the production-only merge commit: `conventional-changelog` looks for the previous release tag from `develop`, so the tag must be reachable from there — otherwise the next release's changelog section silently balloons to the entire project history. If a release is prepared but never promoted (hotfixed away, like v1.1.0/v1.1.1), it never gets a tag, and its changes simply appear in the next tagged release.
 
 ## Database migrations (read this)
 
