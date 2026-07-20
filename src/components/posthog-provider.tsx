@@ -19,6 +19,13 @@ export function PostHogProvider({
   // Initialize the client once on mount. Autocapture and history-based
   // pageviews/pageleaves for the App Router are enabled via `defaults`.
   useEffect(() => {
+    // The npm package doesn't attach a global like the snippet does; expose
+    // it in dev so `posthog.debug()` etc. work from the browser console.
+    if (process.env.NODE_ENV === 'development') {
+      (window as typeof window & { posthog?: typeof posthog }).posthog =
+        posthog;
+    }
+
     if (!POSTHOG_KEY || posthog.__loaded) return;
 
     posthog.init(POSTHOG_KEY, {

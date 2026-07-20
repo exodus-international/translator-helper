@@ -20,6 +20,9 @@ export function Navigation({ user }: NavigationProps) {
     capture('user_signed_out');
     await signOut();
     router.push('/login');
+    // Re-render the root layout with the cleared session so PostHogProvider
+    // calls reset() and the next visitor doesn't inherit this identity.
+    router.refresh();
   };
 
   if (!user) {

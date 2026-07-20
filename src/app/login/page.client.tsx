@@ -28,6 +28,9 @@ export default function LoginClient() {
       if (result.data) {
         capture('user_signed_in', { method: 'email' });
         router.push('/dashboard');
+        // Re-render the root layout with the new session so PostHogProvider
+        // receives the user and calls identify() without a full page load.
+        router.refresh();
       } else {
         capture('user_sign_in_failed');
         toast.error(result.error.message || 'Failed to login');
