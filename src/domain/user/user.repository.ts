@@ -82,18 +82,41 @@ export async function isUserOnboarded(userId: string): Promise<boolean> {
 }
 
 export async function listUsers() {
-  return prisma.user.findMany({
-    include: {
-      languages: {
-        include: {
-          language: true,
+  const [users, lastSessions, lastDocumentEdits] = await Promise.all([
+    prisma.user.findMany({
+      include: {
+        languages: {
+          include: {
+            language: true,
+          },
         },
       },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
+      orderBy: {
+        createdAt: 'desc',
+      },
+    }),
+    // Sessions are refreshed while a user is active, so max(updatedAt) is the
+    // closest thing to "last seen". Logout deletes the session row, so this
+    // can under-report users who explicitly sign out.
+    prisma.session.groupBy({
+      by: ['userId'],
+      _max: { updatedAt: true },
+    }),
+    prisma.activityLog.groupBy({
+      by: ['userId'],
+      where: { action: 'edited' },
+      _max: { createdAt: true },
+    }),
+  ]);
+
+  const lastSeenByUser = new Map(lastSessions.map((s) => [s.userId, s._max.updatedAt]));
+  const lastEditByUser = new Map(lastDocumentEdits.map((a) => [a.userId, a._max.createdAt]));
+
+  return users.map((user) => ({
+    ...user,
+    lastSeenAt: lastSeenByUser.get(user.id) ?? null,
+    lastDocumentEditAt: lastEditByUser.get(user.id) ?? null,
+  }));
 }
 
 export async function updateUserRole(userId: string, role: Role) {

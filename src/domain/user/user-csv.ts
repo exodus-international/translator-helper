@@ -16,6 +16,8 @@ export interface UserCsvRow {
   tShirtSize?: string | null;
   exodus90AppId?: string | null;
   onboarded?: boolean;
+  lastSeenAt?: string | Date | null;
+  lastDocumentEditAt?: string | Date | null;
   languages: { language: { id: string; name: string } }[];
 }
 
@@ -51,6 +53,10 @@ export function userCsvValue(user: UserCsvRow, columnId: string): string {
       return user.exodus90AppId ?? '';
     case 'onboarded':
       return user.onboarded ? 'Yes' : 'No';
+    case 'lastSeenAt':
+      return user.lastSeenAt ? new Date(user.lastSeenAt).toISOString().slice(0, 10) : '';
+    case 'lastDocumentEditAt':
+      return user.lastDocumentEditAt ? new Date(user.lastDocumentEditAt).toISOString().slice(0, 10) : '';
     default:
       return '';
   }

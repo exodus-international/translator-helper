@@ -39,7 +39,7 @@ import {
 } from '@/domain/invitation/invitation.display-status';
 import { adminSetUserLanguagesAction } from '@/domain/user-language/user-language.actions';
 import { buildUserCsv } from '@/domain/user/user-csv';
-import { compareByLanguageThenName, matchesLanguageFilter, matchesSearch } from '@/domain/user/user-table';
+import { compareByLanguageThenName, formatLastActive, matchesLanguageFilter, matchesSearch } from '@/domain/user/user-table';
 import { adminUpdateUserProfileAction, updateUserRoleAction } from '@/domain/user/user.actions';
 import { useDataTable } from '@/hooks/use-data-table';
 import { authClient } from '@/lib/auth-client';
@@ -94,6 +94,8 @@ interface User {
   onboarded?: boolean;
   createdAt: Date;
   updatedAt: Date;
+  lastSeenAt?: Date | null;
+  lastDocumentEditAt?: Date | null;
   languages: Array<{ language: LanguageInfo }>;
 }
 
@@ -609,6 +611,38 @@ export default function UsersClient({
           <span className="text-sm text-gray-600">{new Date(row.original.createdAt).toLocaleDateString()}</span>
         ),
         meta: { label: 'Joined' },
+      },
+      {
+        id: 'lastSeenAt',
+        accessorFn: (row) => (row.lastSeenAt ? new Date(row.lastSeenAt).getTime() : 0),
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Last seen" />,
+        cell: ({ row }) => (
+          <span
+            className="text-sm text-gray-600"
+            title={row.original.lastSeenAt ? new Date(row.original.lastSeenAt).toLocaleString() : undefined}
+          >
+            {formatLastActive(row.original.lastSeenAt)}
+          </span>
+        ),
+        meta: { label: 'Last seen' },
+      },
+      {
+        id: 'lastDocumentEditAt',
+        accessorFn: (row) => (row.lastDocumentEditAt ? new Date(row.lastDocumentEditAt).getTime() : 0),
+        header: ({ column }) => <DataTableColumnHeader column={column} label="Last doc edit" />,
+        cell: ({ row }) => (
+          <span
+            className="text-sm text-gray-600"
+            title={
+              row.original.lastDocumentEditAt
+                ? new Date(row.original.lastDocumentEditAt).toLocaleString()
+                : undefined
+            }
+          >
+            {formatLastActive(row.original.lastDocumentEditAt)}
+          </span>
+        ),
+        meta: { label: 'Last doc edit' },
       },
       {
         id: 'address',

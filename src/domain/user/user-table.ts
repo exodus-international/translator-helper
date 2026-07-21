@@ -72,3 +72,25 @@ export function compareByLanguageThenName(a: UserTableRow, b: UserTableRow): num
 
   return a.name.localeCompare(b.name);
 }
+
+/**
+ * Formats a "last activity" timestamp for the users table: relative for the
+ * recent past ("today", "yesterday", "N days ago"), a plain locale date beyond
+ * 30 days, and an em dash when there is no activity at all.
+ */
+export function formatLastActive(
+  value: Date | string | null | undefined,
+  now: Date = new Date(),
+): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  const days = Math.floor(
+    (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) -
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())) /
+      86_400_000,
+  );
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days <= 30) return `${days} days ago`;
+  return date.toLocaleDateString();
+}
