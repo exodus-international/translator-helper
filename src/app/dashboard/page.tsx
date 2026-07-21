@@ -1,5 +1,7 @@
 'use server';
 
+import { AnnouncementBanner } from '@/components/announcement-banner';
+import { getVisibleAnnouncementsAction } from '@/domain/announcement/announcement.actions';
 import { getAssignedDocumentsForUserAction } from '@/domain/document-assignment/document-assignment.actions';
 import {
   getApprovedVersionsAction,
@@ -24,22 +26,27 @@ export default async function DashboardPage() {
     redirect('/onboarding/profile');
   }
 
-  const [projects, assignments, approvedVersions, reviewAssignments, translatingVersions] = await Promise.all([
-    getSourceProjectsForUserAction(),
-    getAssignedDocumentsForUserAction(),
-    getApprovedVersionsAction(),
-    getVersionsForReviewByUserAction(),
-    getVersionsTranslatingByUserAction(),
-  ]);
+  const [projects, assignments, approvedVersions, reviewAssignments, translatingVersions, announcements] =
+    await Promise.all([
+      getSourceProjectsForUserAction(),
+      getAssignedDocumentsForUserAction(),
+      getApprovedVersionsAction(),
+      getVersionsForReviewByUserAction(),
+      getVersionsTranslatingByUserAction(),
+      getVisibleAnnouncementsAction(),
+    ]);
 
   return (
-    <DashboardClient
-      user={user}
-      projects={projects}
-      assignments={assignments}
-      approvedVersions={approvedVersions}
-      reviewAssignments={reviewAssignments}
-      translatingVersions={translatingVersions}
-    />
+    <>
+      {announcements.banner && <AnnouncementBanner announcement={announcements.banner} />}
+      <DashboardClient
+        user={user}
+        projects={projects}
+        assignments={assignments}
+        approvedVersions={approvedVersions}
+        reviewAssignments={reviewAssignments}
+        translatingVersions={translatingVersions}
+      />
+    </>
   );
 }
