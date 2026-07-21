@@ -39,7 +39,13 @@ import {
 } from '@/domain/invitation/invitation.display-status';
 import { adminSetUserLanguagesAction } from '@/domain/user-language/user-language.actions';
 import { buildUserCsv } from '@/domain/user/user-csv';
-import { compareByLanguageThenName, formatLastActive, matchesLanguageFilter, matchesSearch } from '@/domain/user/user-table';
+import {
+  compareByLanguageThenName,
+  formatLastActive,
+  formatUnambiguousDate,
+  matchesLanguageFilter,
+  matchesSearch,
+} from '@/domain/user/user-table';
 import { adminUpdateUserProfileAction, updateUserRoleAction } from '@/domain/user/user.actions';
 import { useDataTable } from '@/hooks/use-data-table';
 import { authClient } from '@/lib/auth-client';
@@ -608,7 +614,7 @@ export default function UsersClient({
         accessorKey: 'createdAt',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Joined" />,
         cell: ({ row }) => (
-          <span className="text-sm text-gray-600">{new Date(row.original.createdAt).toLocaleDateString()}</span>
+          <span className="text-sm text-gray-600">{formatUnambiguousDate(row.original.createdAt)}</span>
         ),
         meta: { label: 'Joined' },
       },
@@ -619,7 +625,17 @@ export default function UsersClient({
         cell: ({ row }) => (
           <span
             className="text-sm text-gray-600"
-            title={row.original.lastSeenAt ? new Date(row.original.lastSeenAt).toLocaleString() : undefined}
+            title={
+              row.original.lastSeenAt
+                ? new Date(row.original.lastSeenAt).toLocaleString(undefined, {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : undefined
+            }
           >
             {formatLastActive(row.original.lastSeenAt)}
           </span>
@@ -635,7 +651,13 @@ export default function UsersClient({
             className="text-sm text-gray-600"
             title={
               row.original.lastDocumentEditAt
-                ? new Date(row.original.lastDocumentEditAt).toLocaleString()
+                ? new Date(row.original.lastDocumentEditAt).toLocaleString(undefined, {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
                 : undefined
             }
           >
@@ -876,7 +898,7 @@ export default function UsersClient({
                               <span>
                                 Uses: {inv.usedCount}/{inv.maxUses ?? '\u221e'}
                               </span>
-                              <span>Expires: {new Date(inv.expiresAt).toLocaleDateString()}</span>
+                              <span>Expires: {formatUnambiguousDate(inv.expiresAt)}</span>
                               <span>By: {inv.createdBy.name}</span>
                             </div>
                             {inv.languages.length > 0 && (

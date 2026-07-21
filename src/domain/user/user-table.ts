@@ -74,8 +74,21 @@ export function compareByLanguageThenName(a: UserTableRow, b: UserTableRow): num
 }
 
 /**
+ * Formats a date with a spelled-out month ("12 Jun 2026") in the viewer's
+ * locale, so day and month can never be confused regardless of whether the
+ * browser is set to en-US, cs-CZ, or anything else.
+ */
+export function formatUnambiguousDate(value: Date | string): string {
+  return new Date(value).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/**
  * Formats a "last activity" timestamp for the users table: relative for the
- * recent past ("today", "yesterday", "N days ago"), a plain locale date beyond
+ * recent past ("today", "yesterday", "N days ago"), an unambiguous date beyond
  * 30 days, and an em dash when there is no activity at all.
  */
 export function formatLastActive(
@@ -92,5 +105,5 @@ export function formatLastActive(
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days <= 30) return `${days} days ago`;
-  return date.toLocaleDateString();
+  return formatUnambiguousDate(date);
 }

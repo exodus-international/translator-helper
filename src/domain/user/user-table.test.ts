@@ -5,6 +5,7 @@ import {
   compareByLanguageThenName,
   matchesSearch,
   formatLastActive,
+  formatUnambiguousDate,
   type UserTableRow,
   type UserSearchRow,
 } from './user-table';
@@ -141,9 +142,9 @@ describe('formatLastActive', () => {
     assert.equal(formatLastActive(new Date('2026-06-21T09:00:00Z'), now), '30 days ago');
   });
 
-  it('falls back to a locale date beyond 30 days', () => {
+  it('falls back to an unambiguous month-name date beyond 30 days', () => {
     const old = new Date('2026-06-01T09:00:00Z');
-    assert.equal(formatLastActive(old, now), old.toLocaleDateString());
+    assert.equal(formatLastActive(old, now), formatUnambiguousDate(old));
   });
 
   it('accepts ISO strings', () => {
