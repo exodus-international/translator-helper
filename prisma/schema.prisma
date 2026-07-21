@@ -129,6 +129,8 @@ model Session {
   impersonatedBy String?
 
   @@unique([token])
+  // Supports the per-user last-seen aggregate on the admin users page.
+  @@index([userId, updatedAt])
   @@map("session")
 }
 
@@ -318,6 +320,9 @@ model ActivityLog {
   details           Json? // Additional details about the action
   createdAt         DateTime        @default(now())
 
+  // Supports the per-user last-document-edit aggregate on the admin users page
+  // (grows unboundedly, so the aggregate must not full-scan).
+  @@index([action, userId, createdAt])
   @@map("activity_log")
 }
 

@@ -39,13 +39,9 @@ import {
 } from '@/domain/invitation/invitation.display-status';
 import { adminSetUserLanguagesAction } from '@/domain/user-language/user-language.actions';
 import { buildUserCsv } from '@/domain/user/user-csv';
-import {
-  compareByLanguageThenName,
-  formatLastActive,
-  formatUnambiguousDate,
-  matchesLanguageFilter,
-  matchesSearch,
-} from '@/domain/user/user-table';
+import { compareByLanguageThenName, matchesSearch } from '@/domain/user/user-table';
+import { formatExactDateTime, formatLastActive, formatUnambiguousDate } from '@/lib/format';
+import { downloadCsv } from '@/lib/download';
 import { adminUpdateUserProfileAction, updateUserRoleAction } from '@/domain/user/user.actions';
 import { useDataTable } from '@/hooks/use-data-table';
 import { authClient } from '@/lib/auth-client';
@@ -69,7 +65,7 @@ import {
   X,
 } from 'lucide-react';
 import { parseAsString, parseAsStringLiteral, useQueryState } from 'nuqs';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
@@ -164,6 +160,31 @@ function truncateToken(token: string) {
 
 const INVITATIONS_PER_PAGE = 10;
 
+const ROLE_OPTIONS = [
+  { label: 'Admin', value: Role.ADMIN },
+  { label: 'User', value: Role.USER },
+];
+
+function lastActivityColumn(
+  id: 'lastSeenAt' | 'lastDocumentEditAt',
+  label: string,
+): ColumnDef<User> {
+  return {
+    id,
+    accessorFn: (row) => (row[id] ? new Date(row[id]).getTime() : 0),
+    header: ({ column }) => <DataTableColumnHeader column={column} label={label} />,
+    cell: ({ row }) => {
+      const value = row.original[id];
+      return (
+        <span className="text-sm text-gray-600" title={value ? formatExactDateTime(value) : undefined}>
+          {formatLastActive(value)}
+        </span>
+      );
+    },
+    meta: { label },
+  };
+}
+
 type InvitationFilter = 'active' | 'inactive';
 
 // ─── Component ──────────────────────────────────────────────
@@ -179,7 +200,12 @@ export default function UsersClient({
     'status',
     parseAsStringLiteral(['active', 'banned'] as const).withDefault('active'),
   );
-  const [search, setSearch] = useQueryState('search', parseAsString.withDefault(''));
+  // The input stays responsive (nuqs updates its state immediately); only the
+  // URL writes are throttled.
+  const [search, setSearch] = useQueryState(
+    'search',
+    parseAsString.withDefault('').withOptions({ throttleMs: 300 }),
+  );
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
@@ -213,8 +239,7 @@ export default function UsersClient({
   const [profileTShirtSize, setProfileTShirtSize] = useState('');
   const [profileExodus90, setProfileExodus90] = useState('');
 
-  // Ban / unban confirmation state
-  const [banDialogOpen, setBanDialogOpen] = useState(false);
+  // Ban / unban confirmation state; the dialog is open exactly when a target is set.
   const [banTarget, setBanTarget] = useState<User | null>(null);
 
   // Invitations state
@@ -302,7 +327,6 @@ export default function UsersClient({
 
   const openBanDialog = (user: User) => {
     setBanTarget(user);
-    setBanDialogOpen(true);
   };
 
   const openRoleDialog = (user: User) => {
@@ -545,14 +569,6 @@ export default function UsersClient({
     [availableLanguages],
   );
 
-  const roleOptions = useMemo(
-    () => [
-      { label: 'Admin', value: Role.ADMIN },
-      { label: 'User', value: Role.USER },
-    ],
-    [],
-  );
-
   const columns = useMemo<ColumnDef<User>[]>(
     () => [
       {
@@ -585,7 +601,7 @@ export default function UsersClient({
           ) : (
             <span className="text-xs text-gray-400">—</span>
           ),
-        filterFn: (row, _columnId, value: string[]) => matchesLanguageFilter(row.original, value),
+        filterFn: 'arrIncludesSome',
         sortingFn: (rowA, rowB) => compareByLanguageThenName(rowA.original, rowB.original),
         enableColumnFilter: true,
         meta: {
@@ -607,7 +623,7 @@ export default function UsersClient({
         filterFn: (row, columnId, value: string[]) =>
           value.length === 0 || value.includes(row.getValue(columnId) as string),
         enableColumnFilter: true,
-        meta: { label: 'Role', variant: 'multiSelect', options: roleOptions },
+        meta: { label: 'Role', variant: 'multiSelect', options: ROLE_OPTIONS },
       },
       {
         id: 'createdAt',
@@ -618,54 +634,8 @@ export default function UsersClient({
         ),
         meta: { label: 'Joined' },
       },
-      {
-        id: 'lastSeenAt',
-        accessorFn: (row) => (row.lastSeenAt ? new Date(row.lastSeenAt).getTime() : 0),
-        header: ({ column }) => <DataTableColumnHeader column={column} label="Last seen" />,
-        cell: ({ row }) => (
-          <span
-            className="text-sm text-gray-600"
-            title={
-              row.original.lastSeenAt
-                ? new Date(row.original.lastSeenAt).toLocaleString(undefined, {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : undefined
-            }
-          >
-            {formatLastActive(row.original.lastSeenAt)}
-          </span>
-        ),
-        meta: { label: 'Last seen' },
-      },
-      {
-        id: 'lastDocumentEditAt',
-        accessorFn: (row) => (row.lastDocumentEditAt ? new Date(row.lastDocumentEditAt).getTime() : 0),
-        header: ({ column }) => <DataTableColumnHeader column={column} label="Last doc edit" />,
-        cell: ({ row }) => (
-          <span
-            className="text-sm text-gray-600"
-            title={
-              row.original.lastDocumentEditAt
-                ? new Date(row.original.lastDocumentEditAt).toLocaleString(undefined, {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : undefined
-            }
-          >
-            {formatLastActive(row.original.lastDocumentEditAt)}
-          </span>
-        ),
-        meta: { label: 'Last doc edit' },
-      },
+      lastActivityColumn('lastSeenAt', 'Last seen'),
+      lastActivityColumn('lastDocumentEditAt', 'Last doc edit'),
       {
         id: 'address',
         accessorFn: (row) =>
@@ -707,16 +677,13 @@ export default function UsersClient({
         header: () => null,
         enableSorting: false,
         enableHiding: false,
-        // DataTable renders each cell with an inline `width: column.getSize()`,
-        // so size the actions column explicitly rather than via a class.
-        size: 0,
         cell: ({ row }) => {
           const user = row.original;
           return (
             <div className="flex justify-end">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={loading}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                     <MoreHorizontal className="h-4 w-4" />
                     <span className="sr-only">Open actions menu</span>
                   </Button>
@@ -756,14 +723,15 @@ export default function UsersClient({
         },
       },
     ],
+    // The dialog-open handlers only call state setters, so stale closures are
+    // harmless — the memo only needs to react to the filter option lists.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loading, users, languageOptions, roleOptions],
+    [languageOptions],
   );
 
   const { table } = useDataTable({
     data: searchedUsers,
     columns,
-    pageCount: Math.max(1, Math.ceil(searchedUsers.length / 25)),
     initialState: {
       pagination: { pageIndex: 0, pageSize: 25 },
       sorting: [{ id: 'languages', desc: false }],
@@ -771,6 +739,19 @@ export default function UsersClient({
     },
     getRowId: (row) => row.id,
   });
+
+  // Search and the active/banned toggle filter the data OUTSIDE the table's
+  // filter pipeline, so the table doesn't reset pagination for them the way it
+  // does for column filters — do it here (skipping mount so deep links keep
+  // their page).
+  const skipPageReset = useRef(true);
+  useEffect(() => {
+    if (skipPageReset.current) {
+      skipPageReset.current = false;
+      return;
+    }
+    table.setPageIndex(0);
+  }, [search, userFilter, table]);
 
   const handleExportCsv = () => {
     const exportColumns = table
@@ -788,14 +769,7 @@ export default function UsersClient({
     }
 
     const csv = buildUserCsv(exportColumns, rows);
-    // Prepend a UTF-8 BOM so Excel renders diacritics (e.g. Czech names) correctly.
-    const blob = new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `users-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`users-${new Date().toISOString().slice(0, 10)}.csv`, csv);
     toast.success(`Exported ${rows.length} user${rows.length === 1 ? '' : 's'}`);
   };
 
@@ -1265,9 +1239,8 @@ export default function UsersClient({
 
       {/* ── Ban / Unban Confirmation ─────────────────────── */}
       <AlertDialog
-        open={banDialogOpen}
+        open={banTarget !== null}
         onOpenChange={(open) => {
-          setBanDialogOpen(open);
           if (!open) setBanTarget(null);
         }}
       >
@@ -1290,7 +1263,7 @@ export default function UsersClient({
                 } else {
                   handleBanUser(banTarget.id);
                 }
-                setBanDialogOpen(false);
+                setBanTarget(null);
               }}
             >
               {banTarget?.banned ? 'Unban' : 'Ban'}
