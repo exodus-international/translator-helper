@@ -1,7 +1,12 @@
 'use server';
 
+import { z } from 'zod';
 import { authorize } from '@/lib/authorize';
-import { listActiveAnnouncements, listDismissedAnnouncementIds } from './announcement.repository';
+import {
+  dismissAnnouncement,
+  listActiveAnnouncements,
+  listDismissedAnnouncementIds,
+} from './announcement.repository';
 import { selectVisibleAnnouncements } from './announcement.visibility';
 
 export async function getVisibleAnnouncementsAction() {
@@ -13,4 +18,11 @@ export async function getVisibleAnnouncementsAction() {
   ]);
 
   return selectVisibleAnnouncements(announcements, new Set(dismissedIds), new Date());
+}
+
+export async function dismissAnnouncementAction(announcementId: unknown) {
+  const { user } = await authorize('authenticated');
+  const parsed = z.string().uuid().parse(announcementId);
+  await dismissAnnouncement(user.id, parsed);
+  return { success: true };
 }
