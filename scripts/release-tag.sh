@@ -31,6 +31,16 @@ git fetch origin "$PROD_BRANCH" --quiet
 
 target_sha="$(git rev-parse "origin/$PROD_BRANCH")"
 
+# If the promote was a plain merge, tag its develop-side parent instead: the
+# trees are identical, and only a tag reachable from develop lets
+# conventional-changelog find "the previous release" on the next
+# release:prepare run — a tag on the production-only merge commit is invisible
+# there, and the generated section silently balloons to the whole history.
+if dev_parent="$(git rev-parse --verify --quiet "$target_sha^2")" &&
+  [[ "$(git rev-parse "$target_sha^{tree}")" == "$(git rev-parse "$dev_parent^{tree}")" ]]; then
+  target_sha="$dev_parent"
+fi
+
 if git rev-parse "$VERSION" >/dev/null 2>&1; then
   echo "✗ Tag $VERSION already exists." >&2
   exit 1
@@ -45,13 +55,16 @@ git push origin "$VERSION"
 if command -v gh >/dev/null 2>&1; then
   notes_file="$(mktemp)"
   # Extract the "## [X.Y.Z]" (or "## X.Y.Z") section from CHANGELOG.md.
+  # Stop at the next "## " version heading only — "###" subsection headings
+  # (e.g. "### Bug Fixes") are part of the section and must not end capture.
   awk -v ver="${VERSION#v}" '
-    $0 ~ "^##+ \\[?" ver "\\]?" {capture=1; next}
-    capture && /^##+ / {exit}
+    $0 ~ "^## \\[?" ver "\\]?" {capture=1; next}
+    capture && /^## / {exit}
     capture {print}
   ' CHANGELOG.md > "$notes_file" || true
 
-  if [[ -s "$notes_file" ]]; then
+  # -s alone passes on whitespace-only extractions; require actual content.
+  if grep -q '[^[:space:]]' "$notes_file"; then
     gh release create "$VERSION" --target "$target_sha" --title "$VERSION" --notes-file "$notes_file"
   else
     gh release create "$VERSION" --target "$target_sha" --title "$VERSION" --generate-notes
