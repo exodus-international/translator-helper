@@ -83,9 +83,9 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
 
       setDialogOpen(false);
       resetForm();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving announcement:', error);
-      toast.error(error.message || 'Failed to save announcement');
+      toast.error(error instanceof Error ? error.message : 'Failed to save announcement');
     } finally {
       setLoading(false);
     }
@@ -109,9 +109,9 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
         announcements.map((a) => (a.id === updated.id ? { ...updated, _count: a._count } : a)),
       );
       toast.success(updated.isActive ? 'Announcement activated' : 'Announcement deactivated');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error toggling announcement:', error);
-      toast.error(error.message || 'Failed to update announcement');
+      toast.error(error instanceof Error ? error.message : 'Failed to update announcement');
     }
   };
 
@@ -120,9 +120,9 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
       await deleteAnnouncementAction(id);
       setAnnouncements(announcements.filter((a) => a.id !== id));
       toast.success('Announcement deleted');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting announcement:', error);
-      toast.error(error.message || 'Failed to delete announcement');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete announcement');
     }
   };
 

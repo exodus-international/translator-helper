@@ -36,8 +36,9 @@ describe('announcementInputSchema', () => {
   });
 
   it('rejects a missing title', () => {
-    const { title: _title, ...rest } = validInput();
-    assert.throws(() => announcementInputSchema.parse(rest));
+    assert.throws(() =>
+      announcementInputSchema.parse({ body: 'We shipped something.', type: 'BANNER' }),
+    );
   });
 
   it('rejects an empty body', () => {
