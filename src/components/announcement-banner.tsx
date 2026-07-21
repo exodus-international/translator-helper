@@ -1,7 +1,9 @@
 'use client';
 
 import { dismissAnnouncementAction } from '@/domain/announcement/announcement.actions';
-import { Megaphone, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ExternalLink, Megaphone, X } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -10,6 +12,8 @@ export interface AnnouncementBannerData {
   id: string;
   title: string;
   body: string;
+  ctaLabel: string | null;
+  ctaUrl: string | null;
 }
 
 interface AnnouncementBannerProps {
@@ -39,6 +43,14 @@ export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{announcement.body}</ReactMarkdown>
             </div>
           </div>
+          {announcement.ctaLabel && announcement.ctaUrl && (
+            <Button asChild size="sm" className="shrink-0 self-center">
+              <Link href={announcement.ctaUrl} target="_blank">
+                {announcement.ctaLabel}
+                <ExternalLink className="ml-2 h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          )}
           <button
             type="button"
             onClick={handleDismiss}
