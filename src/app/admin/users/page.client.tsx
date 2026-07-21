@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { capture } from '@/lib/analytics';
 import { createInvitationAction, revokeInvitationAction } from '@/domain/invitation/invitation.actions';
 import {
   getInvitationDisplayStatus,
@@ -268,6 +269,7 @@ export default function UsersClient({
     try {
       await authClient.admin.banUser({ userId });
       setUsers(users.map((u) => (u.id === userId ? { ...u, banned: true } : u)));
+      capture('user_banned');
       toast.success('User banned');
     } catch (error: any) {
       toast.error(error.message || 'Failed to ban user');
@@ -281,6 +283,7 @@ export default function UsersClient({
     try {
       await authClient.admin.unbanUser({ userId });
       setUsers(users.map((u) => (u.id === userId ? { ...u, banned: false } : u)));
+      capture('user_unbanned');
       toast.success('User unbanned');
     } catch (error: any) {
       toast.error(error.message || 'Failed to unban user');
@@ -306,6 +309,7 @@ export default function UsersClient({
     setLoading(true);
     try {
       await handleRoleChange(editingUser.id, selectedRole);
+      capture('user_role_changed', { role: selectedRole });
       setRoleDialogOpen(false);
       setEditingUser(null);
       setSelectedRole('');
@@ -337,6 +341,7 @@ export default function UsersClient({
         newPassword,
       });
       if (result.error) throw new Error(result.error.message);
+      capture('admin_user_password_reset');
       // Keep the dialog open and surface a ready-to-send message for the admin.
       setPasswordResetInfo({
         name: passwordUser.name,
@@ -379,6 +384,7 @@ export default function UsersClient({
             : u,
         ),
       );
+      capture('admin_user_languages_updated', { language_count: selectedLanguageIds.length });
       toast.success(`Languages updated for ${languageUser.name}`);
       setLanguageDialogOpen(false);
       setLanguageUser(null);
@@ -442,6 +448,7 @@ export default function UsersClient({
             : u,
         ),
       );
+      capture('admin_user_profile_updated');
       toast.success(`Profile updated for ${profileName.trim()}`);
       setProfileDialogOpen(false);
       setProfileUser(null);
@@ -474,6 +481,7 @@ export default function UsersClient({
         },
         ...invitations,
       ]);
+      capture('invitation_created');
       toast.success('Invitation created');
     } catch (error: any) {
       console.error('Error creating invitation:', error);
@@ -485,6 +493,7 @@ export default function UsersClient({
 
   const handleCopyUrl = async (url: string) => {
     await navigator.clipboard.writeText(url);
+    capture('invitation_link_copied');
     toast.success('Invite link copied to clipboard');
   };
 
@@ -495,6 +504,7 @@ export default function UsersClient({
       setInvitations(
         invitations.map((inv) => (inv.id === id ? { ...inv, status: 'REVOKED' as InvitationStatus } : inv)),
       );
+      capture('invitation_revoked');
       toast.success('Invitation revoked');
     } catch (error: any) {
       console.error('Error revoking invitation:', error);
