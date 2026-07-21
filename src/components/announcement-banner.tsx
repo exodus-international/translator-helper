@@ -2,9 +2,10 @@
 
 import { dismissAnnouncementAction } from '@/domain/announcement/announcement.actions';
 import { Button } from '@/components/ui/button';
+import { capture } from '@/lib/analytics';
 import { ExternalLink, Megaphone, X } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -23,12 +24,25 @@ interface AnnouncementBannerProps {
 export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
   const [dismissed, setDismissed] = useState(false);
 
+  useEffect(() => {
+    capture('announcement_shown', {
+      announcement_id: announcement.id,
+      announcement_title: announcement.title,
+      display: 'banner',
+    });
+  }, [announcement.id, announcement.title]);
+
   if (dismissed) {
     return null;
   }
 
   const handleDismiss = () => {
     setDismissed(true);
+    capture('announcement_dismissed', {
+      announcement_id: announcement.id,
+      announcement_title: announcement.title,
+      display: 'banner',
+    });
     void dismissAnnouncementAction(announcement.id);
   };
 
@@ -45,7 +59,17 @@ export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
           </div>
           {announcement.ctaLabel && announcement.ctaUrl && (
             <Button asChild size="sm" className="shrink-0 self-center">
-              <Link href={announcement.ctaUrl} target="_blank">
+              <Link
+                href={announcement.ctaUrl}
+                target="_blank"
+                onClick={() =>
+                  capture('announcement_cta_clicked', {
+                    announcement_id: announcement.id,
+                    announcement_title: announcement.title,
+                    display: 'banner',
+                  })
+                }
+              >
                 {announcement.ctaLabel}
                 <ExternalLink className="ml-2 h-3.5 w-3.5" />
               </Link>
