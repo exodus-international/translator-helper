@@ -146,13 +146,13 @@ export function DataTableFacetedFilter<TData, TValue>({
                   >
                     <div
                       className={cn(
-                        "flex size-4 items-center justify-center rounded-sm border border-primary",
+                        "flex size-4 items-center justify-center rounded-sm border",
                         isSelected
-                          ? "bg-primary text-primary-foreground"
-                          : "opacity-50 [&_svg]:invisible",
+                          ? "border-primary text-primary"
+                          : "border-input opacity-50 [&_svg]:invisible",
                       )}
                     >
-                      <Check />
+                      <Check className="size-3" strokeWidth={3} />
                     </div>
                     {option.icon && <option.icon />}
                     <span className="truncate">{option.label}</span>
