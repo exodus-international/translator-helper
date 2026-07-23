@@ -164,6 +164,9 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
               rows={5}
               required
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Shown in modals only — banners are one-liners displaying just the title
+            </p>
           </div>
           <div>
             <Label htmlFor="type">Display as *</Label>
@@ -172,8 +175,8 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="BANNER">Banner (top of dashboard)</SelectItem>
-                <SelectItem value="MODAL">Modal (dialog on dashboard load)</SelectItem>
+                <SelectItem value="BANNER">Banner (one-line bar, title only)</SelectItem>
+                <SelectItem value="MODAL">Modal (dialog with full body)</SelectItem>
               </SelectContent>
             </Select>
           </div>
