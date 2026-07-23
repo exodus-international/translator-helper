@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { AnnouncementType, type Announcement } from '@prisma/client';
+import { DeleteConfirmDialog } from '@/components/admin-list-page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,14 +8,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Edit, EyeOff, Megaphone, MessageSquare, Plus } from 'lucide-react';
-import { DeleteConfirmDialog } from '@/components/admin-list-page';
 import {
   createAnnouncementAction,
   deleteAnnouncementAction,
   toggleAnnouncementActiveAction,
   updateAnnouncementAction,
 } from '@/domain/announcement/announcement.actions';
+import { AnnouncementType, type Announcement } from '@prisma/client';
+import { ArrowLeft, Edit, EyeOff, Megaphone, MessageSquare, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 type AnnouncementWithCount = Announcement & { _count: { dismissals: number } };
@@ -96,9 +96,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
     try {
       if (editing) {
         const updated = await updateAnnouncementAction(editing.id, input);
-        setAnnouncements(
-          announcements.map((a) => (a.id === updated.id ? { ...updated, _count: a._count } : a)),
-        );
+        setAnnouncements(announcements.map((a) => (a.id === updated.id ? { ...updated, _count: a._count } : a)));
         toast.success('Announcement updated');
       } else {
         const created = await createAnnouncementAction(input);
@@ -119,9 +117,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
   const handleToggleActive = async (announcement: AnnouncementWithCount) => {
     try {
       const updated = await toggleAnnouncementActiveAction(announcement.id, !announcement.isActive);
-      setAnnouncements(
-        announcements.map((a) => (a.id === updated.id ? { ...updated, _count: a._count } : a)),
-      );
+      setAnnouncements(announcements.map((a) => (a.id === updated.id ? { ...updated, _count: a._count } : a)));
       toast.success(updated.isActive ? 'Announcement activated' : 'Announcement deactivated');
     } catch (error) {
       console.error('Error toggling announcement:', error);
@@ -222,9 +218,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                   }
                   required
                 />
-                {type === 'BANNER' && (
-                  <p className="text-xs text-gray-500 mt-1">Banners show only this one line</p>
-                )}
+                {type === 'BANNER' && <p className="text-xs text-gray-500 mt-1">Banners show only this one line</p>}
               </div>
               {type === 'MODAL' && (
                 <div>
@@ -310,43 +304,49 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                 <div className="grid gap-4">
                   {items.map((announcement) => (
                     <Card key={announcement.id} className="p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-lg">{announcement.title}</h3>
-                    <Badge variant="outline">
-                      {announcement.type === 'BANNER' ? (
-                        <Megaphone className="h-3 w-3 mr-1" />
-                      ) : (
-                        <MessageSquare className="h-3 w-3 mr-1" />
-                      )}
-                      {announcement.type === 'BANNER' ? 'Banner' : 'Modal'}
-                    </Badge>
-                    {announcement.isActive && isExpired(announcement) && (
-                      <Badge variant="secondary">Expired</Badge>
-                    )}
-                  </div>
-                  {announcement.body && (
-                    <p className="text-sm text-gray-600 mt-1 line-clamp-2 whitespace-pre-line">{announcement.body}</p>
-                  )}
-                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-2">
-                    {announcement.ctaLabel && announcement.ctaUrl && <span>CTA: {announcement.ctaLabel}</span>}
-                    {announcement.expiresAt && (
-                      <span>Expires: {new Date(announcement.expiresAt).toLocaleString()}</span>
-                    )}
-                    <span>
-                      <EyeOff className="inline h-3 w-3 mr-0.5" aria-hidden="true" />
-                      {announcement._count.dismissals} dismissed
-                    </span>
-                  </div>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleToggleActive(announcement)}>
-                    {announcement.isActive ? 'Deactivate' : 'Activate'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(announcement)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-lg">{announcement.title}</h3>
+                            <Badge variant="outline">
+                              {announcement.type === 'BANNER' ? (
+                                <Megaphone className="h-3 w-3 mr-1" />
+                              ) : (
+                                <MessageSquare className="h-3 w-3 mr-1" />
+                              )}
+                              {announcement.type === 'BANNER' ? 'Banner' : 'Modal'}
+                            </Badge>
+                            {announcement.isActive && isExpired(announcement) && (
+                              <Badge variant="secondary">Expired</Badge>
+                            )}
+                          </div>
+                          {announcement.body && (
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-2 whitespace-pre-line">
+                              {announcement.body}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-2">
+                            {announcement.ctaLabel && announcement.ctaUrl && <span>CTA: {announcement.ctaLabel}</span>}
+                            {announcement.expiresAt && (
+                              <span>Expires: {new Date(announcement.expiresAt).toLocaleString()}</span>
+                            )}
+                            <span>
+                              <EyeOff className="inline h-3 w-3 mr-0.5" aria-hidden="true" />
+                              {announcement._count.dismissals} dismissed
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button
+                            variant={announcement.isActive ? 'outline' : 'default'}
+                            size="sm"
+                            onClick={() => handleToggleActive(announcement)}
+                          >
+                            {announcement.isActive ? 'Deactivate' : 'Activate'}
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(announcement)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
                           <DeleteConfirmDialog
                             title="Delete Announcement"
                             description={`Are you sure you want to delete "${announcement.title}"? This action cannot be undone.`}
