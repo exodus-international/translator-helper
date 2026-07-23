@@ -46,13 +46,13 @@ export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
   };
 
   return (
-    <div className="border-b bg-white">
+    <div className="border-b border-primary/20 bg-primary/5">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-start gap-3">
-          <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
+          <Megaphone className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-900">{announcement.title}</p>
-            <div className="text-gray-600">
+            <p className="text-sm font-semibold text-foreground">{announcement.title}</p>
+            <div className="text-muted-foreground">
               <AnnouncementMarkdown>{announcement.body}</AnnouncementMarkdown>
             </div>
           </div>
@@ -78,7 +78,7 @@ export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
             type="button"
             onClick={handleDismiss}
             aria-label="Dismiss announcement"
-            className="rounded-md p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
