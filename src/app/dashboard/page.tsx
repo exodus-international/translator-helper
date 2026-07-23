@@ -1,7 +1,5 @@
 'use server';
 
-import { AnnouncementBanner } from '@/components/announcement-banner';
-import { AnnouncementModal } from '@/components/announcement-modal';
 import { getVisibleAnnouncementsAction } from '@/domain/announcement/announcement.actions';
 import { getAssignedDocumentsForUserAction } from '@/domain/document-assignment/document-assignment.actions';
 import {
@@ -38,17 +36,14 @@ export default async function DashboardPage() {
     ]);
 
   return (
-    <>
-      {announcements.banner && <AnnouncementBanner announcement={announcements.banner} />}
-      {announcements.modal && <AnnouncementModal announcement={announcements.modal} />}
-      <DashboardClient
-        user={user}
-        projects={projects}
-        assignments={assignments}
-        approvedVersions={approvedVersions}
-        reviewAssignments={reviewAssignments}
-        translatingVersions={translatingVersions}
-      />
-    </>
+    <DashboardClient
+      user={user}
+      projects={projects}
+      assignments={assignments}
+      approvedVersions={approvedVersions}
+      reviewAssignments={reviewAssignments}
+      translatingVersions={translatingVersions}
+      announcements={announcements}
+    />
   );
 }
