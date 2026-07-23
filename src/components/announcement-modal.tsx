@@ -1,14 +1,13 @@
 'use client';
 
 import { dismissAnnouncementAction } from '@/domain/announcement/announcement.actions';
+import { AnnouncementMarkdown } from '@/components/announcement-markdown';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { capture } from '@/lib/analytics';
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
 export interface AnnouncementModalData {
   id: string;
@@ -53,9 +52,7 @@ export function AnnouncementModal({ announcement }: AnnouncementModalProps) {
         <DialogHeader>
           <DialogTitle>{announcement.title}</DialogTitle>
         </DialogHeader>
-        <div className="prose prose-sm max-w-none text-sm">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{announcement.body}</ReactMarkdown>
-        </div>
+        <AnnouncementMarkdown>{announcement.body}</AnnouncementMarkdown>
         {announcement.ctaLabel && announcement.ctaUrl && (
           <DialogFooter>
             <Button asChild>
