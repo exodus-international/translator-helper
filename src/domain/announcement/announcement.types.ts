@@ -16,7 +16,8 @@ const nullableTrimmedString = z.preprocess(
 export const announcementInputSchema = z
   .object({
     title: z.string().min(1, 'Title is required'),
-    body: z.string().min(1, 'Body is required'),
+    // Banners are one-liners showing just the title; only modals render a body.
+    body: nullableTrimmedString,
     type: z.enum(['BANNER', 'MODAL']),
     ctaLabel: nullableTrimmedString,
     ctaUrl: z.preprocess(
@@ -29,6 +30,10 @@ export const announcementInputSchema = z
   .refine((data) => (data.ctaLabel === null) === (data.ctaUrl === null), {
     message: 'CTA label and URL must be provided together',
     path: ['ctaLabel'],
+  })
+  .refine((data) => data.type !== 'MODAL' || data.body !== null, {
+    message: 'Body is required for modal announcements',
+    path: ['body'],
   });
 
 export type AnnouncementInput = z.infer<typeof announcementInputSchema>;

@@ -5,12 +5,12 @@ import { AnnouncementType, type Announcement } from '@prisma/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Edit, EyeOff, Megaphone, MessageSquare } from 'lucide-react';
-import { AdminListPage, DeleteConfirmDialog } from '@/components/admin-list-page';
+import { ArrowLeft, Edit, EyeOff, Megaphone, MessageSquare, Plus } from 'lucide-react';
+import { DeleteConfirmDialog } from '@/components/admin-list-page';
 import {
   createAnnouncementAction,
   deleteAnnouncementAction,
@@ -35,6 +35,7 @@ function toDatetimeLocalValue(date: Date | null): string {
 export default function AnnouncementsClient({ announcements: initialAnnouncements }: AnnouncementsClientProps) {
   const [announcements, setAnnouncements] = useState(initialAnnouncements);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [step, setStep] = useState<'type' | 'form'>('type');
   const [editing, setEditing] = useState<AnnouncementWithCount | null>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -45,6 +46,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
   const [loading, setLoading] = useState(false);
 
   const resetForm = () => {
+    setStep('type');
     setEditing(null);
     setTitle('');
     setBody('');
@@ -54,13 +56,35 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
     setExpiresAt('');
   };
 
+  const openCreate = () => {
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (announcement: AnnouncementWithCount) => {
+    setEditing(announcement);
+    setTitle(announcement.title);
+    setBody(announcement.body || '');
+    setType(announcement.type);
+    setCtaLabel(announcement.ctaLabel || '');
+    setCtaUrl(announcement.ctaUrl || '');
+    setExpiresAt(toDatetimeLocalValue(announcement.expiresAt));
+    setStep('form');
+    setDialogOpen(true);
+  };
+
+  const chooseType = (chosen: AnnouncementType) => {
+    setType(chosen);
+    setStep('form');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     const input = {
       title,
-      body,
+      body: type === 'MODAL' ? body : null,
       type,
       ctaLabel: ctaLabel || null,
       ctaUrl: ctaUrl || null,
@@ -91,17 +115,6 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
     }
   };
 
-  const handleEdit = (announcement: AnnouncementWithCount) => {
-    setEditing(announcement);
-    setTitle(announcement.title);
-    setBody(announcement.body);
-    setType(announcement.type);
-    setCtaLabel(announcement.ctaLabel || '');
-    setCtaUrl(announcement.ctaUrl || '');
-    setExpiresAt(toDatetimeLocalValue(announcement.expiresAt));
-    setDialogOpen(true);
-  };
-
   const handleToggleActive = async (announcement: AnnouncementWithCount) => {
     try {
       const updated = await toggleAnnouncementActiveAction(announcement.id, !announcement.isActive);
@@ -129,139 +142,213 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
   const isExpired = (announcement: AnnouncementWithCount) =>
     announcement.expiresAt !== null && new Date(announcement.expiresAt).getTime() <= Date.now();
 
+  const dialogTitle = editing
+    ? `Edit ${type === 'BANNER' ? 'Banner' : 'Modal'}`
+    : step === 'type'
+      ? 'New Announcement'
+      : `New ${type === 'BANNER' ? 'Banner' : 'Modal'}`;
+
   return (
-    <AdminListPage
-      title="Announcements"
-      description="Notify users about new functionality or ask for their input"
-      addLabel="Add Announcement"
-      dialogOpen={dialogOpen}
-      onDialogOpenChange={(open) => {
-        setDialogOpen(open);
-        if (!open) resetForm();
-      }}
-      dialogTitle={editing ? 'Edit Announcement' : 'Add Announcement'}
-      onSubmit={handleSubmit}
-      loading={loading}
-      formFields={
-        <>
-          <div>
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., New review workflow is live"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="body">Body (markdown) *</Label>
-            <Textarea
-              id="body"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder={'We shipped **something new**…'}
-              rows={5}
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Shown in modals only — banners are one-liners displaying just the title
-            </p>
-          </div>
-          <div>
-            <Label htmlFor="type">Display as *</Label>
-            <Select value={type} onValueChange={(value) => setType(value as AnnouncementType)}>
-              <SelectTrigger id="type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="BANNER">Banner (one-line bar, title only)</SelectItem>
-                <SelectItem value="MODAL">Modal (dialog with full body)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+    <div className="min-h-screen bg-gray-50">
+      <div className="border-b bg-white">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <div>
-              <Label htmlFor="ctaLabel">CTA Label</Label>
-              <Input
-                id="ctaLabel"
-                value={ctaLabel}
-                onChange={(e) => setCtaLabel(e.target.value)}
-                placeholder="e.g., Fill out survey"
-              />
+              <h1 className="text-2xl font-bold">Announcements</h1>
+              <p className="text-gray-600">Notify users about new functionality or ask for their input</p>
             </div>
-            <div>
-              <Label htmlFor="ctaUrl">CTA URL</Label>
-              <Input
-                id="ctaUrl"
-                value={ctaUrl}
-                onChange={(e) => setCtaUrl(e.target.value)}
-                placeholder="https://forms.google.com/…"
-              />
-            </div>
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Announcement
+            </Button>
           </div>
-          <div>
-            <Label htmlFor="expiresAt">Expires At</Label>
-            <Input
-              id="expiresAt"
-              type="datetime-local"
-              value={expiresAt}
-              onChange={(e) => setExpiresAt(e.target.value)}
-            />
-            <p className="text-xs text-gray-500 mt-1">Optional — stops showing automatically after this time</p>
-          </div>
-        </>
-      }
-    >
-      {announcements.length === 0 && (
-        <p className="text-sm text-gray-500">No announcements yet. Create one to notify users.</p>
-      )}
-      {announcements.map((announcement) => (
-        <Card key={announcement.id} className="p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-semibold text-lg">{announcement.title}</h3>
-                <Badge variant="outline">
-                  {announcement.type === 'BANNER' ? (
-                    <Megaphone className="h-3 w-3 mr-1" />
-                  ) : (
-                    <MessageSquare className="h-3 w-3 mr-1" />
-                  )}
-                  {announcement.type === 'BANNER' ? 'Banner' : 'Modal'}
-                </Badge>
-                {announcement.isActive && !isExpired(announcement) && <Badge>Active</Badge>}
-                {announcement.isActive && isExpired(announcement) && <Badge variant="secondary">Expired</Badge>}
-                {!announcement.isActive && <Badge variant="secondary">Inactive</Badge>}
-              </div>
-              <p className="text-sm text-gray-600 mt-1 line-clamp-2 whitespace-pre-line">{announcement.body}</p>
-              <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-2">
-                {announcement.ctaLabel && announcement.ctaUrl && <span>CTA: {announcement.ctaLabel}</span>}
-                {announcement.expiresAt && (
-                  <span>Expires: {new Date(announcement.expiresAt).toLocaleString()}</span>
-                )}
+        </div>
+      </div>
+
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+          </DialogHeader>
+
+          {step === 'type' ? (
+            <div className="grid gap-3">
+              <button
+                type="button"
+                onClick={() => chooseType('BANNER')}
+                className="flex items-start gap-3 rounded-lg border p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                 <span>
-                  <EyeOff className="inline h-3 w-3 mr-0.5" aria-hidden="true" />
-                  {announcement._count.dismissals} dismissed
+                  <span className="block font-semibold">Banner</span>
+                  <span className="block text-sm text-gray-600">
+                    One-line bar at the top of the dashboard. Shows just the title — good for short nudges.
+                  </span>
                 </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseType('MODAL')}
+                className="flex items-start gap-3 rounded-lg border p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                <span>
+                  <span className="block font-semibold">Modal</span>
+                  <span className="block text-sm text-gray-600">
+                    Dialog on dashboard load with a full markdown body — for bigger news that needs explanation.
+                  </span>
+                </span>
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={
+                    type === 'BANNER'
+                      ? 'e.g., New review workflow is live — check it out!'
+                      : 'e.g., New review workflow'
+                  }
+                  required
+                />
+                {type === 'BANNER' && (
+                  <p className="text-xs text-gray-500 mt-1">Banners show only this one line</p>
+                )}
               </div>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleToggleActive(announcement)}>
-                {announcement.isActive ? 'Deactivate' : 'Activate'}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => handleEdit(announcement)}>
-                <Edit className="h-4 w-4" />
-              </Button>
-              <DeleteConfirmDialog
-                title="Delete Announcement"
-                description={`Are you sure you want to delete "${announcement.title}"? This action cannot be undone.`}
-                onConfirm={() => handleDelete(announcement.id)}
-              />
-            </div>
-          </div>
-        </Card>
-      ))}
-    </AdminListPage>
+              {type === 'MODAL' && (
+                <div>
+                  <Label htmlFor="body">Body (markdown) *</Label>
+                  <Textarea
+                    id="body"
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    placeholder={'We shipped **something new**…'}
+                    rows={5}
+                    required
+                  />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="ctaLabel">CTA Label</Label>
+                  <Input
+                    id="ctaLabel"
+                    value={ctaLabel}
+                    onChange={(e) => setCtaLabel(e.target.value)}
+                    placeholder="e.g., Fill out survey"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="ctaUrl">CTA URL</Label>
+                  <Input
+                    id="ctaUrl"
+                    value={ctaUrl}
+                    onChange={(e) => setCtaUrl(e.target.value)}
+                    placeholder="https://forms.google.com/…"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="expiresAt">Expires At</Label>
+                <Input
+                  id="expiresAt"
+                  type="datetime-local"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">Optional — stops showing automatically after this time</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setStep('type')}>
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Change type
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      resetForm();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <div className="container mx-auto px-4 py-4">
+        <div className="grid gap-4">
+          {announcements.length === 0 && (
+            <p className="text-sm text-gray-500">No announcements yet. Create one to notify users.</p>
+          )}
+          {announcements.map((announcement) => (
+            <Card key={announcement.id} className="p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-lg">{announcement.title}</h3>
+                    <Badge variant="outline">
+                      {announcement.type === 'BANNER' ? (
+                        <Megaphone className="h-3 w-3 mr-1" />
+                      ) : (
+                        <MessageSquare className="h-3 w-3 mr-1" />
+                      )}
+                      {announcement.type === 'BANNER' ? 'Banner' : 'Modal'}
+                    </Badge>
+                    {announcement.isActive && !isExpired(announcement) && <Badge>Active</Badge>}
+                    {announcement.isActive && isExpired(announcement) && <Badge variant="secondary">Expired</Badge>}
+                    {!announcement.isActive && <Badge variant="secondary">Inactive</Badge>}
+                  </div>
+                  {announcement.body && (
+                    <p className="text-sm text-gray-600 mt-1 line-clamp-2 whitespace-pre-line">{announcement.body}</p>
+                  )}
+                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-2">
+                    {announcement.ctaLabel && announcement.ctaUrl && <span>CTA: {announcement.ctaLabel}</span>}
+                    {announcement.expiresAt && (
+                      <span>Expires: {new Date(announcement.expiresAt).toLocaleString()}</span>
+                    )}
+                    <span>
+                      <EyeOff className="inline h-3 w-3 mr-0.5" aria-hidden="true" />
+                      {announcement._count.dismissals} dismissed
+                    </span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleToggleActive(announcement)}>
+                    {announcement.isActive ? 'Deactivate' : 'Activate'}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleEdit(announcement)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <DeleteConfirmDialog
+                    title="Delete Announcement"
+                    description={`Are you sure you want to delete "${announcement.title}"? This action cannot be undone.`}
+                    onConfirm={() => handleDelete(announcement.id)}
+                  />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

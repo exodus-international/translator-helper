@@ -423,7 +423,7 @@ model Invitation {
 model Announcement {
   id         String                  @id @default(uuid())
   title      String
-  body       String                  @db.Text // Markdown content
+  body       String?                 @db.Text // Markdown content; modal-only (banners show just the title)
   type       AnnouncementType
   ctaLabel   String?
   ctaUrl     String?

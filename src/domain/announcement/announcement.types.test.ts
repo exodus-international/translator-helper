@@ -26,9 +26,27 @@ describe('announcementInputSchema', () => {
     assert.strictEqual(parsed.expiresAt, null);
   });
 
-  it('accepts MODAL type', () => {
+  it('accepts MODAL type with a body', () => {
     const parsed = announcementInputSchema.parse(validInput({ type: 'MODAL' }));
     assert.strictEqual(parsed.type, 'MODAL');
+  });
+
+  it('accepts a BANNER without a body (one-liner)', () => {
+    const parsed = announcementInputSchema.parse(validInput({ body: null }));
+    assert.strictEqual(parsed.body, null);
+  });
+
+  it('treats an empty-string body as absent', () => {
+    const parsed = announcementInputSchema.parse(validInput({ body: '' }));
+    assert.strictEqual(parsed.body, null);
+  });
+
+  it('rejects a MODAL without a body', () => {
+    assert.throws(() => announcementInputSchema.parse(validInput({ type: 'MODAL', body: null })));
+  });
+
+  it('rejects a MODAL with an empty body', () => {
+    assert.throws(() => announcementInputSchema.parse(validInput({ type: 'MODAL', body: '' })));
   });
 
   it('rejects an unknown type', () => {
@@ -41,9 +59,6 @@ describe('announcementInputSchema', () => {
     );
   });
 
-  it('rejects an empty body', () => {
-    assert.throws(() => announcementInputSchema.parse(validInput({ body: '' })));
-  });
 
   it('accepts CTA label and URL together', () => {
     const parsed = announcementInputSchema.parse(

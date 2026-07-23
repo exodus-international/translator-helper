@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 export interface AnnouncementModalData {
   id: string;
   title: string;
-  body: string;
+  body: string | null;
   ctaLabel: string | null;
   ctaUrl: string | null;
 }
@@ -52,7 +52,7 @@ export function AnnouncementModal({ announcement }: AnnouncementModalProps) {
         <DialogHeader>
           <DialogTitle>{announcement.title}</DialogTitle>
         </DialogHeader>
-        <AnnouncementMarkdown>{announcement.body}</AnnouncementMarkdown>
+        {announcement.body && <AnnouncementMarkdown>{announcement.body}</AnnouncementMarkdown>}
         {announcement.ctaLabel && announcement.ctaUrl && (
           <DialogFooter>
             <Button asChild>
