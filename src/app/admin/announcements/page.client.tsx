@@ -89,7 +89,8 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
       ctaLabel: ctaLabel || null,
       ctaUrl: ctaUrl || null,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
-      isActive: editing?.isActive ?? false,
+      // New announcements go live immediately; edits keep the current state.
+      isActive: editing?.isActive ?? true,
     };
 
     try {
@@ -102,7 +103,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
       } else {
         const created = await createAnnouncementAction(input);
         setAnnouncements([{ ...created, _count: { dismissals: 0 } }, ...announcements]);
-        toast.success('Announcement created (inactive — activate it to publish)');
+        toast.success('Announcement created and live');
       }
 
       setDialogOpen(false);
@@ -294,13 +295,21 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
         </DialogContent>
       </Dialog>
 
-      <div className="container mx-auto px-4 py-4">
-        <div className="grid gap-4">
-          {announcements.length === 0 && (
-            <p className="text-sm text-gray-500">No announcements yet. Create one to notify users.</p>
-          )}
-          {announcements.map((announcement) => (
-            <Card key={announcement.id} className="p-4">
+      <div className="container mx-auto px-4 py-4 space-y-6">
+        {announcements.length === 0 && (
+          <p className="text-sm text-gray-500">No announcements yet. Create one to notify users.</p>
+        )}
+        {[
+          { heading: 'Active', items: announcements.filter((a) => a.isActive) },
+          { heading: 'Deactivated', items: announcements.filter((a) => !a.isActive) },
+        ].map(
+          ({ heading, items }) =>
+            items.length > 0 && (
+              <section key={heading}>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-2">{heading}</h2>
+                <div className="grid gap-4">
+                  {items.map((announcement) => (
+                    <Card key={announcement.id} className="p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -313,9 +322,9 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                       )}
                       {announcement.type === 'BANNER' ? 'Banner' : 'Modal'}
                     </Badge>
-                    {announcement.isActive && !isExpired(announcement) && <Badge>Active</Badge>}
-                    {announcement.isActive && isExpired(announcement) && <Badge variant="secondary">Expired</Badge>}
-                    {!announcement.isActive && <Badge variant="secondary">Inactive</Badge>}
+                    {announcement.isActive && isExpired(announcement) && (
+                      <Badge variant="secondary">Expired</Badge>
+                    )}
                   </div>
                   {announcement.body && (
                     <p className="text-sm text-gray-600 mt-1 line-clamp-2 whitespace-pre-line">{announcement.body}</p>
@@ -338,16 +347,19 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                   <Button variant="outline" size="sm" onClick={() => handleEdit(announcement)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <DeleteConfirmDialog
-                    title="Delete Announcement"
-                    description={`Are you sure you want to delete "${announcement.title}"? This action cannot be undone.`}
-                    onConfirm={() => handleDelete(announcement.id)}
-                  />
+                          <DeleteConfirmDialog
+                            title="Delete Announcement"
+                            description={`Are you sure you want to delete "${announcement.title}"? This action cannot be undone.`}
+                            onConfirm={() => handleDelete(announcement.id)}
+                          />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </section>
+            ),
+        )}
       </div>
     </div>
   );
