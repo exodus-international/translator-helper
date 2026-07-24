@@ -1,5 +1,8 @@
 'use client';
 
+import { useActiveLanguage } from '@/components/analytics-project-group';
+import { AnnouncementBanner, AnnouncementBannerData } from '@/components/announcement-banner';
+import { AnnouncementModal, AnnouncementModalData } from '@/components/announcement-modal';
 import ProjectCard from '@/components/project-card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +16,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
-import { useActiveLanguage } from '@/components/analytics-project-group';
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -117,6 +119,10 @@ interface DashboardClientProps {
   approvedVersions: VersionWithDetails[];
   reviewAssignments: VersionWithDetails[];
   translatingVersions: VersionWithDetails[];
+  announcements: {
+    banner: AnnouncementBannerData | null;
+    modal: AnnouncementModalData | null;
+  };
 }
 
 function getDocumentUrl(assignment: DashboardClientProps['assignments'][number]): string {
@@ -255,6 +261,7 @@ export default function DashboardClient({
   approvedVersions,
   reviewAssignments,
   translatingVersions,
+  announcements,
 }: DashboardClientProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -341,281 +348,203 @@ export default function DashboardClient({
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div>
-                <h1 className="text-2xl font-bold">Dashboard</h1>
-                <div className="flex items-center gap-2 mt-1">
-                  <Avatar size="sm" name={user.name || undefined}>
-                    <AvatarFallback name={user.name || undefined}>
-                      {user.name
-                        .split(' ')
-                        .map((name) => name.charAt(0))
-                        .join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <p className="text-gray-600">Welcome back, {user.name}</p>
+    <>
+      {announcements.banner && <AnnouncementBanner announcement={announcements.banner} />}
+      {announcements.modal && <AnnouncementModal announcement={announcements.modal} />}
+      <div className="min-h-screen bg-gray-50">
+        <div className="border-b bg-white">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div>
+                  <h1 className="text-2xl font-bold">Dashboard</h1>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Avatar size="sm" name={user.name || undefined}>
+                      <AvatarFallback name={user.name || undefined}>
+                        {user.name
+                          .split(' ')
+                          .map((name) => name.charAt(0))
+                          .join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <p className="text-gray-600">Welcome back, {user.name}</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="mt-4">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search projects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+            <div className="mt-4">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search projects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-8">
-        {/* Projects section */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">My Projects</h2>
-            {isAdminClient(user) && (
-              <Dialog
-                open={createDialogOpen}
-                onOpenChange={(open) => {
-                  setCreateDialogOpen(open);
-                  if (open) {
-                    capture('dialog_opened', { dialog: 'create_source_project' });
-                  }
-                  if (!open) {
-                    setNewProjectName('');
-                    setNewProjectDescription('');
-                    setNewProjectIdentifier('');
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    New Project
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create New Project</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateProject} className="space-y-4">
-                    <div>
-                      <Label htmlFor="new-project-name">Project Name *</Label>
-                      <Input
-                        id="new-project-name"
-                        value={newProjectName}
-                        onChange={(e) => setNewProjectName(e.target.value)}
-                        placeholder="e.g., Exodus90, Daily Readings"
-                        required
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="new-project-description">Description</Label>
-                      <Textarea
-                        id="new-project-description"
-                        value={newProjectDescription}
-                        onChange={(e) => setNewProjectDescription(e.target.value)}
-                        placeholder="Optional description of the project"
-                        rows={3}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="new-project-identifier">Repository Identifier</Label>
-                      <Input
-                        id="new-project-identifier"
-                        value={newProjectIdentifier}
-                        onChange={(e) => setNewProjectIdentifier(e.target.value)}
-                        placeholder="e.g., exodus90, lent2026"
-                        className="mt-1"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        GITHUB: Folder name in the content repository
-                      </p>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={createLoading || !newProjectName.trim()}>
-                        {createLoading ? 'Creating...' : 'Create Project'}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )}
-          </div>
-          {filteredProjects.length === 0 ? (
-            <div className="text-center py-12">
-              <FolderOpen className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">{searchQuery ? 'No projects match your search' : 'No projects available'}</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredProjects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Waiting for Deploy section - deployers only */}
-        {isAdminClient(user) && approvedVersions.length > 0 && (
+        <div className="container mx-auto px-4 py-6 space-y-8">
+          {/* Projects section */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">
-                Waiting for Deploy
-                <Badge variant="secondary" size="sm" className="ml-2">
-                  {filteredApprovedVersions.length}
-                </Badge>
-              </h2>
-              {deployLanguages.length > 1 && (
-                <Select value={deployLanguageFilter} onValueChange={handleDeployLanguageFilterChange}>
-                  <SelectTrigger className="w-[180px] h-8 text-sm">
-                    <SelectValue placeholder="All languages" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All languages</SelectItem>
-                    {deployLanguages.map((lang) => (
-                      <SelectItem key={lang.id} value={lang.id}>
-                        {lang.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <h2 className="text-lg font-semibold">My Projects</h2>
+              {isAdminClient(user) && (
+                <Dialog
+                  open={createDialogOpen}
+                  onOpenChange={(open) => {
+                    setCreateDialogOpen(open);
+                    if (open) {
+                      capture('dialog_opened', { dialog: 'create_source_project' });
+                    }
+                    if (!open) {
+                      setNewProjectName('');
+                      setNewProjectDescription('');
+                      setNewProjectIdentifier('');
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      New Project
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create New Project</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateProject} className="space-y-4">
+                      <div>
+                        <Label htmlFor="new-project-name">Project Name *</Label>
+                        <Input
+                          id="new-project-name"
+                          value={newProjectName}
+                          onChange={(e) => setNewProjectName(e.target.value)}
+                          placeholder="e.g., Exodus90, Daily Readings"
+                          required
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-project-description">Description</Label>
+                        <Textarea
+                          id="new-project-description"
+                          value={newProjectDescription}
+                          onChange={(e) => setNewProjectDescription(e.target.value)}
+                          placeholder="Optional description of the project"
+                          rows={3}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="new-project-identifier">Repository Identifier</Label>
+                        <Input
+                          id="new-project-identifier"
+                          value={newProjectIdentifier}
+                          onChange={(e) => setNewProjectIdentifier(e.target.value)}
+                          placeholder="e.g., exodus90, lent2026"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          GITHUB: Folder name in the content repository
+                        </p>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={createLoading || !newProjectName.trim()}>
+                          {createLoading ? 'Creating...' : 'Create Project'}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               )}
             </div>
-            <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className={headClass}>Document</TableHead>
-                    <TableHead className={headClass}>Project</TableHead>
-                    <TableHead className={headClass}>Language</TableHead>
-                    <TableHead className={headClass}>Translator</TableHead>
-                    <TableHead className={headClass}>Reviewer</TableHead>
-                    <TableHead className={headClass}>Status</TableHead>
-                    <TableHead className="w-[60px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredApprovedVersions.map((version) => {
-                    const url = `/documents/${version.document.id}/review?version=${version.id}`;
-                    const statusConfig = DOCUMENT_STATUS_CONFIGS[version.status];
-                    return (
-                      <TableRow key={version.id} className="group cursor-pointer" onClick={() => router.push(url)}>
-                        <TableCell>
-                          <span className="font-medium text-sm">{version.document.title}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {version.document.sourceProject?.name ?? '\u2014'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm font-medium">{version.language.name}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">{version.user?.name ?? '\u2014'}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">{version.reviewer?.name ?? '\u2014'}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
-                          >
-                            <span
-                              className="h-1.5 w-1.5 rounded-full"
-                              style={{ backgroundColor: statusConfig.color.hex }}
-                            />
-                            {statusConfig.name}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Link href={url} onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <ArrowRight className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </Card>
-          </section>
-        )}
-
-        {/* My Work section - unified view of translations, reviews, and assignments */}
-        <section>
-          <h2 className="text-lg font-semibold mb-4">
-            My Work
-            {workItems.length > 0 && (
-              <Badge variant="secondary" size="sm" className="ml-2">
-                {workItems.length}
-              </Badge>
+            {filteredProjects.length === 0 ? (
+              <div className="text-center py-12">
+                <FolderOpen className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">
+                  {searchQuery ? 'No projects match your search' : 'No projects available'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredProjects.map((project) => (
+                  <ProjectCard key={project.id} project={project} />
+                ))}
+              </div>
             )}
-          </h2>
-          {workItems.length === 0 ? (
-            <div className="text-center py-12">
-              <ClipboardList className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500">No active work assigned to you</p>
-            </div>
-          ) : (
-            <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className={headClass}>Document</TableHead>
-                    <TableHead className={headClass}>Project</TableHead>
-                    <TableHead className={headClass}>Language</TableHead>
-                    <TableHead className={headClass}>Translator</TableHead>
-                    <TableHead className={headClass}>Reviewer</TableHead>
-                    <TableHead className={headClass}>Status</TableHead>
-                    <TableHead className={headClass}>Deadline</TableHead>
-                    <TableHead className="w-[60px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {workItems.map((item) => {
-                    const statusConfig = item.status ? DOCUMENT_STATUS_CONFIGS[item.status] : null;
+          </section>
 
-                    return (
-                      <TableRow key={item.key} className="group cursor-pointer" onClick={() => router.push(item.url)}>
-                        <TableCell>
-                          <span className="font-medium text-sm">{item.documentTitle}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">{item.projectName ?? '\u2014'}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm font-medium">{item.languageName}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">{item.translatorName ?? '\u2014'}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">{item.reviewerName ?? '\u2014'}</span>
-                        </TableCell>
-                        <TableCell>
-                          {statusConfig ? (
+          {/* Waiting for Deploy section - deployers only */}
+          {isAdminClient(user) && approvedVersions.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">
+                  Waiting for Deploy
+                  <Badge variant="secondary" size="sm" className="ml-2">
+                    {filteredApprovedVersions.length}
+                  </Badge>
+                </h2>
+                {deployLanguages.length > 1 && (
+                  <Select value={deployLanguageFilter} onValueChange={handleDeployLanguageFilterChange}>
+                    <SelectTrigger className="w-[180px] h-8 text-sm">
+                      <SelectValue placeholder="All languages" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All languages</SelectItem>
+                      {deployLanguages.map((lang) => (
+                        <SelectItem key={lang.id} value={lang.id}>
+                          {lang.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={headClass}>Document</TableHead>
+                      <TableHead className={headClass}>Project</TableHead>
+                      <TableHead className={headClass}>Language</TableHead>
+                      <TableHead className={headClass}>Translator</TableHead>
+                      <TableHead className={headClass}>Reviewer</TableHead>
+                      <TableHead className={headClass}>Status</TableHead>
+                      <TableHead className="w-[60px]" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredApprovedVersions.map((version) => {
+                      const url = `/documents/${version.document.id}/review?version=${version.id}`;
+                      const statusConfig = DOCUMENT_STATUS_CONFIGS[version.status];
+                      return (
+                        <TableRow key={version.id} className="group cursor-pointer" onClick={() => router.push(url)}>
+                          <TableCell>
+                            <span className="font-medium text-sm">{version.document.title}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {version.document.sourceProject?.name ?? '\u2014'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-medium">{version.language.name}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{version.user?.name ?? '\u2014'}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{version.reviewer?.name ?? '\u2014'}</span>
+                          </TableCell>
+                          <TableCell>
                             <span
                               className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
                             >
@@ -625,45 +554,129 @@ export default function DashboardClient({
                               />
                               {statusConfig.name}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border border-gray-200 bg-gray-50 text-gray-500">
-                              Not started
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {item.deadline ? (
-                            <span className="text-sm text-muted-foreground">
-                              {shortDateFormatter.format(new Date(item.deadline))}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">{'\u2014'}</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Link href={item.url} onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              {item.role === 'Reviewer' ? (
-                                <Eye className="h-4 w-4" />
-                              ) : (
+                          </TableCell>
+                          <TableCell>
+                            <Link href={url} onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
                                 <ArrowRight className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </Card>
+                              </Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            </section>
           )}
-        </section>
+
+          {/* My Work section - unified view of translations, reviews, and assignments */}
+          <section>
+            <h2 className="text-lg font-semibold mb-4">
+              My Work
+              {workItems.length > 0 && (
+                <Badge variant="secondary" size="sm" className="ml-2">
+                  {workItems.length}
+                </Badge>
+              )}
+            </h2>
+            {workItems.length === 0 ? (
+              <div className="text-center py-12">
+                <ClipboardList className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500">No active work assigned to you</p>
+              </div>
+            ) : (
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={headClass}>Document</TableHead>
+                      <TableHead className={headClass}>Project</TableHead>
+                      <TableHead className={headClass}>Language</TableHead>
+                      <TableHead className={headClass}>Translator</TableHead>
+                      <TableHead className={headClass}>Reviewer</TableHead>
+                      <TableHead className={headClass}>Status</TableHead>
+                      <TableHead className={headClass}>Deadline</TableHead>
+                      <TableHead className="w-[60px]" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {workItems.map((item) => {
+                      const statusConfig = item.status ? DOCUMENT_STATUS_CONFIGS[item.status] : null;
+
+                      return (
+                        <TableRow key={item.key} className="group cursor-pointer" onClick={() => router.push(item.url)}>
+                          <TableCell>
+                            <span className="font-medium text-sm">{item.documentTitle}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{item.projectName ?? '\u2014'}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-medium">{item.languageName}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{item.translatorName ?? '\u2014'}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">{item.reviewerName ?? '\u2014'}</span>
+                          </TableCell>
+                          <TableCell>
+                            {statusConfig ? (
+                              <span
+                                className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
+                              >
+                                <span
+                                  className="h-1.5 w-1.5 rounded-full"
+                                  style={{ backgroundColor: statusConfig.color.hex }}
+                                />
+                                {statusConfig.name}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border border-gray-200 bg-gray-50 text-gray-500">
+                                Not started
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {item.deadline ? (
+                              <span className="text-sm text-muted-foreground">
+                                {shortDateFormatter.format(new Date(item.deadline))}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{'\u2014'}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Link href={item.url} onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                {item.role === 'Reviewer' ? (
+                                  <Eye className="h-4 w-4" />
+                                ) : (
+                                  <ArrowRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+          </section>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
