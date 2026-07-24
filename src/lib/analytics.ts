@@ -35,6 +35,10 @@ export type AnalyticsEvent =
   // ── Feedback / support ───────────────────────────────────────────────
   | 'support_link_clicked'
   | 'bug_report_clicked'
+  // ── Announcements ────────────────────────────────────────────────────
+  | 'announcement_shown'
+  | 'announcement_dismissed'
+  | 'announcement_cta_clicked'
   // ── Documents ────────────────────────────────────────────────────────
   | 'document_upload_started'
   | 'document_upload_rejected'
