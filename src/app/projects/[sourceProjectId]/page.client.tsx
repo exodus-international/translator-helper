@@ -58,6 +58,8 @@ interface ProjectDetailClientProps {
       documentAssignments: number;
     };
   }[];
+  /** Resolved server-side from the user's assigned languages and this project's translation projects. */
+  initialLanguageId: string;
 }
 
 export default function ProjectDetailClient({
@@ -65,6 +67,7 @@ export default function ProjectDetailClient({
   sourceProject,
   languages,
   translationProjects,
+  initialLanguageId,
 }: ProjectDetailClientProps) {
   const router = useRouter();
   useAnalyticsProjectGroup(sourceProject.id, sourceProject.name);
@@ -76,7 +79,7 @@ export default function ProjectDetailClient({
   const [settingsIdentifier, setSettingsIdentifier] = useState(sourceProject.identifier || '');
   const [settingsSaving, setSettingsSaving] = useState(false);
 
-  const [selectedLanguage, setSelectedLanguage] = useState<string>(languages[0]?.id || '');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(initialLanguageId);
 
   // Register the active language as a PostHog super property (value is a language id)
   const selectedLang = languages.find((lang) => lang.id === selectedLanguage);

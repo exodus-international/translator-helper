@@ -1,6 +1,6 @@
 import prisma from '@/lib/db';
 
-async function getUserLanguages(userId: string) {
+export async function getUserLanguages(userId: string) {
   return prisma.userLanguage.findMany({
     where: {
       userId,
