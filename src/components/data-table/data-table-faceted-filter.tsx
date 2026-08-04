@@ -40,8 +40,11 @@ export function DataTableFacetedFilter<TData, TValue>({
   const [open, setOpen] = React.useState(false);
 
   const columnFilterValue = column?.getFilterValue();
-  const selectedValues = new Set(
-    Array.isArray(columnFilterValue) ? columnFilterValue : [],
+  // Memoized so the identity is stable: onItemSelect/onReset depend on it, and a
+  // fresh Set on every render would rebuild those callbacks each time.
+  const selectedValues = React.useMemo(
+    () => new Set(Array.isArray(columnFilterValue) ? columnFilterValue : []),
+    [columnFilterValue],
   );
 
   const onItemSelect = React.useCallback(

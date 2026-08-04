@@ -244,6 +244,10 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
     [debouncedSetFilterValues, filterableColumns],
   );
 
+  // React Compiler cannot memoize around useReactTable: TanStack returns
+  // functions whose identity it cannot prove stable, so it skips compiling this
+  // hook. That is inherent to the library and not something we can restructure.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     ...tableProps,
     columns,
