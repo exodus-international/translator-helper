@@ -70,9 +70,12 @@ export const FOLDERS = ['Exodus90 - 2026', 'Advent 2025'];
 // Users
 // ---------------------------------------------------------------------------
 
+// English is the source language, not a target: nobody is assigned it. The admin
+// UI only ever offers target languages, so an `en` assignment is a state the app
+// cannot produce or manage — seeding one made the users table crash on save.
 export const USERS = [
-  { key: 'admin1', email: 'admin@example.org', name: 'Fr. Thomas More', role: Role.ADMIN, langCodes: ['en', 'cs', 'sk'] },
-  { key: 'admin2', email: 'admin2@example.org', name: 'Sarah Mitchell', role: Role.ADMIN, langCodes: ['en', 'de', 'fr'] },
+  { key: 'admin1', email: 'admin@example.org', name: 'Fr. Thomas More', role: Role.ADMIN, langCodes: ['cs', 'sk'] },
+  { key: 'admin2', email: 'admin2@example.org', name: 'Sarah Mitchell', role: Role.ADMIN, langCodes: ['de', 'fr'] },
   { key: 'translator1', email: 'translator@example.org', name: 'Jan Novak', role: Role.USER, langCodes: ['cs', 'sk'] },
   { key: 'translator2', email: 'translator2@example.org', name: 'Maria Schmidt', role: Role.USER, langCodes: ['de'] },
   { key: 'reviewer1', email: 'reviewer@example.org', name: 'Ivan Horvat', role: Role.USER, langCodes: ['hr', 'sk'] },

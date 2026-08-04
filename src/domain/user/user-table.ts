@@ -2,8 +2,36 @@
 // "language-then-name" ordering. Kept free of React/Prisma so it can be unit
 // tested in isolation (see user-table.test.ts).
 
+export interface LanguageRef {
+  id: string;
+  name: string;
+}
+
 export interface UserLanguageRef {
-  language: { id: string; name: string };
+  language: LanguageRef;
+}
+
+/**
+ * Rebuilds a user's language list from the ids an admin selected, resolving each
+ * id against the languages we know about.
+ *
+ * `knownLanguages` must include both the assignable languages and the user's
+ * current ones: the selectable list excludes English (`listTargetLanguages`),
+ * while a user may already be assigned English, so resolving against the
+ * selectable list alone leaves holes. Unresolvable ids are dropped rather than
+ * asserted away — a `{ language: undefined }` entry crashes every consumer that
+ * reads `language.id` or `language.name`.
+ */
+export function resolveSelectedLanguages<T extends LanguageRef>(
+  selectedLanguageIds: string[],
+  knownLanguages: T[],
+): { language: T }[] {
+  const byId = new Map(knownLanguages.map((language) => [language.id, language]));
+
+  return selectedLanguageIds
+    .map((id) => byId.get(id))
+    .filter((language): language is T => language !== undefined)
+    .map((language) => ({ language }));
 }
 
 export interface UserTableRow {

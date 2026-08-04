@@ -39,7 +39,7 @@ import {
 } from '@/domain/invitation/invitation.display-status';
 import { adminSetUserLanguagesAction } from '@/domain/user-language/user-language.actions';
 import { buildUserCsv } from '@/domain/user/user-csv';
-import { compareByLanguageThenName, matchesSearch } from '@/domain/user/user-table';
+import { compareByLanguageThenName, matchesSearch, resolveSelectedLanguages } from '@/domain/user/user-table';
 import { formatExactDateTime, formatLastActive, formatUnambiguousDate } from '@/lib/format';
 import { downloadCsv } from '@/lib/download';
 import { adminUpdateUserProfileAction, updateUserRoleAction } from '@/domain/user/user.actions';
@@ -404,15 +404,13 @@ export default function UsersClient({
     setLoading(true);
     try {
       await adminSetUserLanguagesAction(languageUser.id, selectedLanguageIds);
+      // Resolve against the user's current languages too: the dialog only offers
+      // target languages, so an already-assigned English would not resolve.
+      const knownLanguages = [...availableLanguages, ...languageUser.languages.map((ul) => ul.language)];
       setUsers(
         users.map((u) =>
           u.id === languageUser.id
-            ? {
-                ...u,
-                languages: selectedLanguageIds.map((id) => ({
-                  language: availableLanguages.find((l) => l.id === id)!,
-                })),
-              }
+            ? { ...u, languages: resolveSelectedLanguages(selectedLanguageIds, knownLanguages) }
             : u,
         ),
       );
