@@ -1,3 +1,16 @@
+# [1.2.0](https://github.com/exodus-international/translator-helper/compare/v1.1.2...v1.2.0) (2026-08-04)
+
+
+### Bug Fixes
+
+* crash when saving user languages in the admin users table ([#102](https://github.com/exodus-international/translator-helper/issues/102)) ([9e2fa69](https://github.com/exodus-international/translator-helper/commit/9e2fa69221c46bf3c40c18c4363c058ff6d1eb6a))
+* open projects in the user's assigned language ([#101](https://github.com/exodus-international/translator-helper/issues/101)) ([7a89b7e](https://github.com/exodus-international/translator-helper/commit/7a89b7e0a4a8144439d3f94fd4af81332e44f355))
+
+
+### Features
+
+* admin users data table with activity columns ([#90](https://github.com/exodus-international/translator-helper/issues/90)) ([ebcfb61](https://github.com/exodus-international/translator-helper/commit/ebcfb616c80f9a51b71cc2c1adaf146e45ec9d46)), closes [#75](https://github.com/exodus-international/translator-helper/issues/75) [#74](https://github.com/exodus-international/translator-helper/issues/74) [#76](https://github.com/exodus-international/translator-helper/issues/76) [#74](https://github.com/exodus-international/translator-helper/issues/74) [#77](https://github.com/exodus-international/translator-helper/issues/77) [#74](https://github.com/exodus-international/translator-helper/issues/74) [#78](https://github.com/exodus-international/translator-helper/issues/78) [#74](https://github.com/exodus-international/translator-helper/issues/74) [#79](https://github.com/exodus-international/translator-helper/issues/79) [#74](https://github.com/exodus-international/translator-helper/issues/74) [#79](https://github.com/exodus-international/translator-helper/issues/79) [#81](https://github.com/exodus-international/translator-helper/issues/81)
+* in-app announcements (banner/modal with CTA) ([#99](https://github.com/exodus-international/translator-helper/issues/99)) ([6e9c3f2](https://github.com/exodus-international/translator-helper/commit/6e9c3f286fcace1f5b7f430a027fd52e5a173b5c)), closes [#92](https://github.com/exodus-international/translator-helper/issues/92) [#92](https://github.com/exodus-international/translator-helper/issues/92) [#93](https://github.com/exodus-international/translator-helper/issues/93) [#93](https://github.com/exodus-international/translator-helper/issues/93) [#94](https://github.com/exodus-international/translator-helper/issues/94) [#94](https://github.com/exodus-international/translator-helper/issues/94) [#95](https://github.com/exodus-international/translator-helper/issues/95) [#95](https://github.com/exodus-international/translator-helper/issues/95) [#96](https://github.com/exodus-international/translator-helper/issues/96) [#96](https://github.com/exodus-international/translator-helper/issues/96) [#97](https://github.com/exodus-international/translator-helper/issues/97) [#97](https://github.com/exodus-international/translator-helper/issues/97)
 ## 1.1.2 (2026-07-20)
 
 
