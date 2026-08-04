@@ -6,6 +6,7 @@ import { Navigation } from '@/components/navigation';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackButton } from '@/components/feedback-button';
 import { PostHogProvider } from '@/components/posthog-provider';
+import { NuqsAdapter } from 'nuqs/adapters/next/app';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -33,10 +34,12 @@ export default async function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <PostHogProvider user={user}>
-          <Navigation user={user} />
-          {children}
-          <FeedbackButton />
-          <Toaster />
+          <NuqsAdapter>
+            <Navigation user={user} />
+            {children}
+            <FeedbackButton />
+            <Toaster />
+          </NuqsAdapter>
         </PostHogProvider>
       </body>
     </html>

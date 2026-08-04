@@ -56,6 +56,9 @@ export function Navigation({ user }: NavigationProps) {
                   <Link href="/admin/users" className="text-sm text-gray-600 hover:text-gray-900">
                     Users
                   </Link>
+                  <Link href="/admin/announcements" className="text-sm text-gray-600 hover:text-gray-900">
+                    Announcements
+                  </Link>
                   <Link href="/settings/language-instructions" className="text-sm text-gray-600 hover:text-gray-900">
                     Language Instructions
                   </Link>

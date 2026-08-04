@@ -79,6 +79,11 @@ enum GitHubPRStatus {
   CLOSED
 }
 
+enum AnnouncementType {
+  BANNER
+  MODAL
+}
+
 model User {
   id                  String               @id @default(uuid())
   email               String               @unique
@@ -112,6 +117,7 @@ model User {
   suggestions         Suggestion[]
   suggestionReplies   SuggestionReply[]
   invitationsCreated  Invitation[]     @relation("InvitationsCreated")
+  announcementDismissals AnnouncementDismissal[]
 
   @@map("user")
 }
@@ -129,6 +135,8 @@ model Session {
   impersonatedBy String?
 
   @@unique([token])
+  // Supports the per-user last-seen aggregate on the admin users page.
+  @@index([userId, updatedAt])
   @@map("session")
 }
 
@@ -318,6 +326,9 @@ model ActivityLog {
   details           Json? // Additional details about the action
   createdAt         DateTime        @default(now())
 
+  // Supports the per-user last-document-edit aggregate on the admin users page
+  // (grows unboundedly, so the aggregate must not full-scan).
+  @@index([action, userId, createdAt])
   @@map("activity_log")
 }
 
@@ -412,6 +423,34 @@ model Invitation {
   updatedAt   DateTime             @updatedAt
 
   @@map("invitation")
+}
+
+model Announcement {
+  id         String                  @id @default(uuid())
+  title      String
+  body       String?                 @db.Text // Markdown content; modal-only (banners show just the title)
+  type       AnnouncementType
+  ctaLabel   String?
+  ctaUrl     String?
+  isActive   Boolean                 @default(false)
+  expiresAt  DateTime?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+  dismissals AnnouncementDismissal[]
+
+  @@map("announcement")
+}
+
+model AnnouncementDismissal {
+  id             String       @id @default(uuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+  @@map("announcement_dismissal")
 }
 
 model InvitationLanguage {
