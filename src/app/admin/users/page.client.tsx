@@ -723,7 +723,6 @@ export default function UsersClient({
     ],
     // The dialog-open handlers only call state setters, so stale closures are
     // harmless — the memo only needs to react to the filter option lists.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [languageOptions],
   );
 
