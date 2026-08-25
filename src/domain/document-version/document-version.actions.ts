@@ -5,6 +5,7 @@ import { authorize } from '@/lib/authorize';
 import { type SessionUser } from '@/lib/session';
 import { DocumentStatus, ProjectRole, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import type { AudioGenerationOutcome } from '../audio/audio.types';
 
 /**
  * Load a version + its language and assert the caller may edit/delete a source
@@ -201,6 +202,7 @@ export async function updateDocumentVersionStatusAction(
 ): Promise<{
   version: Awaited<ReturnType<typeof updateDocumentVersionStatus>>;
   github?: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string };
+  audio?: AudioGenerationOutcome;
 }> {
   const { user } = await authorize('authenticated');
 
@@ -270,7 +272,21 @@ export async function updateDocumentVersionStatusAction(
     }
   }
 
-  return { version, github };
+  // If transitioning to APPROVED, start audio generation. Same shape as the
+  // GitHub deploy above: never throws, the outcome is reported to the caller.
+  let audio: AudioGenerationOutcome | undefined;
+  if (status === DocumentStatus.APPROVED) {
+    try {
+      const { startGeneration } = await import('../audio/audio.service');
+      audio = await startGeneration(version.id, user.id);
+      revalidatePath(`/documents/${version.documentId}/review`);
+    } catch (error: unknown) {
+      console.error('[Audio] Generation failed:', error);
+      audio = { status: 'failed', error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  return { version, github, audio };
 }
 
 export async function assignDocumentVersionAction(input: unknown) {

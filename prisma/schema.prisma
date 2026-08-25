@@ -79,6 +79,17 @@ enum GitHubPRStatus {
   CLOSED
 }
 
+enum AudioProvider {
+  AZURE_SPEECH
+}
+
+enum AudioStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
 enum AnnouncementType {
   BANNER
   MODAL
@@ -115,6 +126,7 @@ model User {
   assignedByDocuments DocumentAssignment[] @relation("AssignedBy")
   languages           UserLanguage[]
   suggestions         Suggestion[]
+  triggeredAudioFiles AudioFile[]
   suggestionReplies   SuggestionReply[]
   invitationsCreated  Invitation[]     @relation("InvitationsCreated")
   announcementDismissals AnnouncementDismissal[]
@@ -176,6 +188,8 @@ model Language {
   name                    String // e.g., "English", "Czech", "German"
   translationInstructions String?              @db.Text
   branchName              String?
+  audioProvider           AudioProvider?
+  audioVoice              String? // provider voice id, e.g. "cs-CZ-AntoninNeural"
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   documentVersions        DocumentVersion[]
@@ -202,6 +216,7 @@ model SourceProject {
   description         String?              @db.Text
   identifier          String?
   status              SourceProjectStatus  @default(ACTIVE)
+  audioDocumentTypes  DocumentType[]       @default([DAY, DAILY_CONTENT])
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   documents           Document[]
@@ -298,6 +313,7 @@ model DocumentVersion {
   activityLogs  ActivityLog[]
   suggestions   Suggestion[]
   githubCommits GitHubCommit[]
+  audioFiles    AudioFile[]
 
   @@unique([documentId, languageId])
   @@map("document_version")
@@ -407,6 +423,34 @@ model GitHubCommit {
   updatedAt         DateTime        @updatedAt
 
   @@map("github_commit")
+}
+
+/// One row per audio generation attempt. Never overwritten: a regeneration
+/// creates a new row and a new object, so a copied URL keeps pointing at the
+/// file it pointed at when it was copied.
+model AudioFile {
+  id                String          @id @default(uuid())
+  documentVersionId String
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  status            AudioStatus     @default(PENDING)
+  provider          AudioProvider
+  voice             String
+  sourceVersion     Int // DocumentVersion.version the audio was generated from
+  providerJobId     String?
+  objectKey         String?
+  url               String?
+  durationMs        Int?
+  sizeBytes         Int?
+  billedCharacters  Int?
+  errorMessage      String?         @db.Text
+  triggeredByUserId String?
+  triggeredBy       User?           @relation(fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([documentVersionId, createdAt])
+  @@index([status, updatedAt])
+  @@map("audio_file")
 }
 
 model Invitation {

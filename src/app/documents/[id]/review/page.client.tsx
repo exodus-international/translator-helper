@@ -1,5 +1,6 @@
 'use client';
 
+import { AudioStatus } from '@/components/audio-status';
 import { GitHubStatus } from '@/components/github-status';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Button } from '@/components/ui/button';
@@ -78,10 +79,13 @@ export default function ReviewClient({
       }}
       activityLogs={initialTargetVersion.activityLogs ?? []}
       extraDetails={
-        <GitHubStatus
-          documentVersionId={initialTargetVersion.id}
-          isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-        />
+        <>
+          <AudioStatus documentVersionId={initialTargetVersion.id} />
+          <GitHubStatus
+            documentVersionId={initialTargetVersion.id}
+            isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+          />
+        </>
       }
     />
   );
