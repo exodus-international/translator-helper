@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 const azureSpeechConfigSchema = z.object({
-  resource: z.string({ error: 'AZURE_SPEECH_RESOURCE is required' }).min(1, 'AZURE_SPEECH_RESOURCE is required'),
+  /** Host from the resource's "Keys and Endpoint" page; either `{name}.cognitiveservices.azure.com` or `{region}.api.cognitive.microsoft.com` works. */
+  endpoint: z.string({ error: 'AZURE_SPEECH_ENDPOINT must be a URL' }).url('AZURE_SPEECH_ENDPOINT must be a URL'),
   key: z.string({ error: 'AZURE_SPEECH_KEY is required' }).min(1, 'AZURE_SPEECH_KEY is required'),
 });
 
@@ -13,7 +14,7 @@ export function getAzureSpeechConfig(): AzureSpeechConfig {
   if (cachedConfig) return cachedConfig;
 
   const result = azureSpeechConfigSchema.safeParse({
-    resource: process.env.AZURE_SPEECH_RESOURCE,
+    endpoint: process.env.AZURE_SPEECH_ENDPOINT?.replace(/\/+$/, ''),
     key: process.env.AZURE_SPEECH_KEY,
   });
 

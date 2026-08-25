@@ -27,7 +27,7 @@ interface BatchJob {
 }
 
 function baseUrl() {
-  return `https://${getAzureSpeechConfig().resource}.cognitiveservices.azure.com/texttospeech/batchsyntheses`;
+  return `${getAzureSpeechConfig().endpoint}/texttospeech/batchsyntheses`;
 }
 
 function authHeaders(): Record<string, string> {

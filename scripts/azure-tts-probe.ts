@@ -10,7 +10,7 @@
  *   pnpm tsx scripts/azure-tts-probe.ts --file path/to/day.md [--voice cs-CZ-AntoninNeural] [--locale cs-CZ] [--out out.mp3]
  *
  * Env (read from .env.local if present):
- *   AZURE_SPEECH_RESOURCE  resource name, i.e. the host is {resource}.cognitiveservices.azure.com
+ *   AZURE_SPEECH_ENDPOINT  endpoint URL from the resource's "Keys and Endpoint" page
  *   AZURE_SPEECH_KEY       subscription key
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -32,11 +32,11 @@ const voice = args.voice ?? 'cs-CZ-AntoninNeural';
 const locale = args.locale ?? voice.split('-').slice(0, 2).join('-');
 const out = args.out ?? file.replace(/\.md$/i, '') + '.mp3';
 
-const resource = process.env.AZURE_SPEECH_RESOURCE;
+const endpoint = process.env.AZURE_SPEECH_ENDPOINT?.replace(/\/+$/, '');
 const key = process.env.AZURE_SPEECH_KEY;
-if (!resource || !key) fail('Set AZURE_SPEECH_RESOURCE and AZURE_SPEECH_KEY');
+if (!endpoint || !key) fail('Set AZURE_SPEECH_ENDPOINT and AZURE_SPEECH_KEY');
 
-const base = `https://${resource}.cognitiveservices.azure.com/texttospeech/batchsyntheses`;
+const base = `${endpoint}/texttospeech/batchsyntheses`;
 const headers = { 'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'application/json' };
 
 async function main() {
