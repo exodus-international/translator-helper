@@ -419,7 +419,7 @@ export function DocumentEditor({
   hideDetails,
   autoSaveDelayMs,
 }: DocumentEditorProps) {
-  const outer = outerClassName ?? (fullscreen ? 'fixed inset-0 bg-white z-50' : 'min-h-screen bg-gray-50');
+  const outer = outerClassName ?? (fullscreen ? 'fixed inset-0 bg-white z-50' : 'bg-gray-50');
   const viewerHeight = fullscreen ? 'h-full' : 'h-[calc(100vh-7.5rem)]';
   const viewerWrapper = fullscreen ? 'h-[calc(100vh-3.5rem)] p-4' : 'border-0';
   const contentLanguage = getEditorLanguage(document.originalFilename ?? '');
