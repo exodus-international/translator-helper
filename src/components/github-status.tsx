@@ -137,7 +137,7 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false, f
       {!loading && commits.length > 0 && (
         <div className="space-y-4">
           {commits.map((commit) => (
-            <div key={commit.id} className="border rounded p-3 space-y-1.5">
+            <div key={commit.id} className={frame === 'section' ? 'space-y-1.5 min-w-0' : 'border rounded p-3 space-y-1.5 min-w-0'}>
               {commit.errorMessage ? (
                 <div className="flex items-start gap-2 text-red-600">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
@@ -157,14 +157,14 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false, f
                     <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">{commit.commitSha.substring(0, 7)}</code>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-500">Branch:</span>
-                    <span>{commit.branchName}</span>
+                  <div className="flex items-start gap-2 text-sm min-w-0">
+                    <span className="text-gray-500 shrink-0">Branch:</span>
+                    <span className="break-all">{commit.branchName}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-500">File:</span>
-                    <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">{commit.filePath}</code>
+                  <div className="flex items-start gap-2 text-sm min-w-0">
+                    <span className="text-gray-500 shrink-0">File:</span>
+                    <code className="bg-gray-100 px-2 py-0.5 rounded text-xs break-all">{commit.filePath}</code>
                   </div>
 
                   {commit.prNumber && (
