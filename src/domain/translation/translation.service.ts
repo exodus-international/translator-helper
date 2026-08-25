@@ -33,6 +33,7 @@ Core principles:
   - code blocks, inline code, and any backticks
   - frontmatter (if present)
   - variables/placeholders (e.g., {{var}}, {var}, %s) exactly as written
+  - HTML comments (<!-- ... -->) reproduced verbatim, untranslated, in the same position
 - Markdown must remain equivalent to the source.
 
 3. Theological fidelity to the Catholic Church
