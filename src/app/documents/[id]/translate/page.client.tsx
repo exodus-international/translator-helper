@@ -1,6 +1,9 @@
 'use client';
 
+import { ActivityLog } from '@/components/activity-log';
+import { AudioStatus } from '@/components/audio-status';
 import { DocumentEditor, DocumentEditorHeader } from '@/components/document-editor';
+import { GitHubStatus } from '@/components/github-status';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +28,7 @@ import { capture } from '@/lib/analytics';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
+import { DocumentStatus } from '@prisma/client';
 import { useEditorStore } from '@/lib/stores/editor-provider';
 import {
   AlertCircle,
@@ -118,9 +122,45 @@ export default function TranslateClient({
       canEditSource={isAdminClient(user)}
       translationPlaceholder="Enter your translation here..."
       translationPreviewEmptyText="*No content yet...*"
-      hideDetails={zenMode}
+      hideDetails
       autoSaveDelayMs={3000}
-      extraDetails={assignment ? <AssignmentInfoBlock assignment={assignment} /> : undefined}
+      sidebarSummary={
+        initialTargetVersion ? (
+          <>
+            <AudioStatus
+              documentVersionId={initialTargetVersion.id}
+              currentVersion={initialTargetVersion.version}
+              status={initialTargetVersion.status}
+              compact
+            />
+            <GitHubStatus
+              documentVersionId={initialTargetVersion.id}
+              isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+              compact
+            />
+          </>
+        ) : undefined
+      }
+      sidebarDetails={
+        initialTargetVersion ? (
+          <>
+            {assignment && <AssignmentInfoBlock assignment={assignment} />}
+            <AudioStatus
+              documentVersionId={initialTargetVersion.id}
+              currentVersion={initialTargetVersion.version}
+              status={initialTargetVersion.status}
+            />
+            <GitHubStatus
+              documentVersionId={initialTargetVersion.id}
+              isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+            />
+            {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
+              <ActivityLog entries={initialTargetVersion.activityLogs} />
+            )}
+          </>
+        ) : undefined
+      }
+      sidebarDetailsDefaultOpen={initialTargetVersion?.status === DocumentStatus.DEPLOYED}
     />
   );
 }

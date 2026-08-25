@@ -1,0 +1,4 @@
+[    1748ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:3000/login?from=%2Fdocuments%2F314e153d-38c6-4d5c-889a-c385ae43a2d5%2Freview:0
+[    4901ms] [LOG] [Client Instrumentation Hook] Slow execution detected: 2057ms (Note: Code download overhead is not included in this measurement) @ http://localhost:3000/_next/static/chunks/7d71f_%40sentry_core_build_esm_0660345d._.js:9751
+[    5774ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/7d71f_%40sentry_core_build_esm_0660345d._.js:9751
+[    9754ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/7d71f_%40sentry_core_build_esm_0660345d._.js:9751

@@ -1,0 +1,27 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Translation Helper" [level=1] [ref=e5]
+      - paragraph [ref=e6]: Manage your translations efficiently
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]: Email
+        - textbox "Email" [ref=e10]:
+          - /placeholder: your@email.com
+          - text: admin@example.org
+      - generic [ref=e11]:
+        - generic [ref=e12]: Password
+        - textbox "Password" [ref=e13]:
+          - /placeholder: ••••••••
+          - text: Hello123456
+      - button "Login" [ref=e14]
+  - generic [ref=e15]:
+    - link [ref=e16] [cursor=pointer]:
+      - /url: https://exodus90.atlassian.net/servicedesk/customer/portal/1
+      - img "Support" [ref=e17]
+    - link [ref=e24] [cursor=pointer]:
+      - /url: https://exodus90.atlassian.net/servicedesk/customer/portal/1/group/1/create/10009?customfield_10043=https://exodus-translations.ff0000.cz//login
+      - img "Report a bug" [ref=e25]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e39] [cursor=pointer]
+  - alert [ref=e43]
