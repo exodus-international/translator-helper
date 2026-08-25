@@ -134,7 +134,7 @@ async function complete(
     languageCode: string;
   },
 ): Promise<AudioFile> {
-  const objectKey = resolveAudioObjectKey({
+  const relativeKey = resolveAudioObjectKey({
     documentType: ctx.document.type!,
     languageCode: ctx.languageCode,
     identifier: ctx.document.sourceProject?.identifier ?? 'unknown',
@@ -142,7 +142,11 @@ async function complete(
     slug: ctx.document.slug,
     audioFileId: audioFile.id,
   });
-  const { url } = await putObject({ key: objectKey, body: result.audio, contentType: AUDIO_CONTENT_TYPE });
+  const { key: objectKey, url } = await putObject({
+    key: relativeKey,
+    body: result.audio,
+    contentType: AUDIO_CONTENT_TYPE,
+  });
 
   const updated = await markAudioFileReady(audioFile.id, {
     objectKey,

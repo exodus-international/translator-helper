@@ -21,22 +21,28 @@ function getClient(): S3Client {
   return client;
 }
 
+/**
+ * Writes `body` under `{AUDIO_S3_KEY_PREFIX}/{key}` and returns the full key
+ * and its public URL. Callers pass environment-agnostic keys; the prefix is
+ * what keeps staging and production apart in a shared bucket.
+ */
 export async function putObject(params: {
   key: string;
   body: Uint8Array;
   contentType: string;
-}): Promise<{ url: string }> {
+}): Promise<{ key: string; url: string }> {
   const config = getAudioStorageConfig();
+  const key = `${config.keyPrefix}/${params.key.replace(/^\/+/, '')}`;
   await getClient().send(
     new PutObjectCommand({
       Bucket: config.bucket,
-      Key: params.key,
+      Key: key,
       Body: params.body,
       ContentType: params.contentType,
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   );
-  return { url: publicUrlFor(params.key) };
+  return { key, url: publicUrlFor(key) };
 }
 
 export function publicUrlFor(key: string): string {

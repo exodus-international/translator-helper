@@ -6,6 +6,14 @@ const audioStorageConfigSchema = z.object({
   bucket: z.string({ error: 'AUDIO_S3_BUCKET is required' }).min(1, 'AUDIO_S3_BUCKET is required'),
   accessKeyId: z.string({ error: 'AUDIO_S3_ACCESS_KEY_ID is required' }).min(1, 'AUDIO_S3_ACCESS_KEY_ID is required'),
   secretAccessKey: z.string({ error: 'AUDIO_S3_SECRET_ACCESS_KEY is required' }).min(1, 'AUDIO_S3_SECRET_ACCESS_KEY is required'),
+  /**
+   * Folder that separates environments sharing one bucket, e.g. `production`,
+   * `staging`, `local`. Required, so an environment that forgets it skips audio
+   * instead of writing next to production files.
+   */
+  keyPrefix: z
+    .string({ error: 'AUDIO_S3_KEY_PREFIX is required (e.g. production, staging, local)' })
+    .regex(/^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/, 'AUDIO_S3_KEY_PREFIX must be a plain folder name like "staging"'),
   /** Base URL the bucket is publicly readable from; object keys are appended to it. */
   publicBaseUrl: z.string({ error: 'AUDIO_S3_PUBLIC_BASE_URL must be a URL' }).url('AUDIO_S3_PUBLIC_BASE_URL must be a URL'),
   /** Path-style addressing (`endpoint/bucket/key`) is what MinIO and most self-hosted S3 clones expect. */
@@ -25,6 +33,7 @@ export function getAudioStorageConfig(): AudioStorageConfig {
     bucket: process.env.AUDIO_S3_BUCKET,
     accessKeyId: process.env.AUDIO_S3_ACCESS_KEY_ID,
     secretAccessKey: process.env.AUDIO_S3_SECRET_ACCESS_KEY,
+    keyPrefix: process.env.AUDIO_S3_KEY_PREFIX?.replace(/^\/+|\/+$/g, ''),
     publicBaseUrl: process.env.AUDIO_S3_PUBLIC_BASE_URL,
     forcePathStyle: process.env.AUDIO_S3_FORCE_PATH_STYLE !== 'false',
   });
