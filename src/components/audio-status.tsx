@@ -177,7 +177,7 @@ export function AudioStatus({
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <div className="min-w-0">
             <p className="font-medium">{errorTitle(error.kind)}</p>
-            <p className="text-sm break-words">{error.message}</p>
+            <p className="text-sm break-all">{error.message}</p>
             {error.kind === 'configuration' && (
               <p className="text-xs text-gray-500 mt-1">Retrying will not help until the configuration is fixed.</p>
             )}

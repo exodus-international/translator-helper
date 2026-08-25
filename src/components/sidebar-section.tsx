@@ -25,7 +25,7 @@ export function SidebarSection({
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</span>
         {action}
       </div>
-      <div className={cn('px-3 py-3', contentClassName)}>{children}</div>
+      <div className={cn('px-3 py-3 min-w-0 overflow-hidden', contentClassName)}>{children}</div>
     </section>
   );
 }
