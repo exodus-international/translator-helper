@@ -14,7 +14,7 @@ import {
   setAudioFileJob,
 } from './audio.repository';
 import { markdownToSpeechScript } from './audio.script';
-import { speechScriptToSsml } from './audio.ssml';
+import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioSkipReason } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
@@ -67,6 +67,7 @@ export async function startGeneration(documentVersionId: string, userId: string)
       voice,
       locale: localeFromVoice(voice),
       maxBreakMs: provider.maxBreakMs,
+      ...DEFAULT_PROSODY,
     });
 
     const outcome = await provider.submit({ jobId: jobIdFor(audioFile.id), ssml });

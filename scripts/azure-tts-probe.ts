@@ -17,7 +17,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { unzipSync } from 'fflate';
 import { markdownToSpeechScript } from '../src/domain/audio/audio.script';
-import { speechScriptToSsml } from '../src/domain/audio/audio.ssml';
+import { DEFAULT_PROSODY, speechScriptToSsml } from '../src/domain/audio/audio.ssml';
 
 const API_VERSION = '2024-04-01';
 const OUTPUT_FORMAT = 'audio-24khz-96kbitrate-mono-mp3';
@@ -42,7 +42,7 @@ const headers = { 'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'application
 async function main() {
   const markdown = readFileSync(file!, 'utf8');
   const script = markdownToSpeechScript(markdown);
-  const ssml = speechScriptToSsml(script, { voice, locale, maxBreakMs: MAX_BREAK_MS });
+  const ssml = speechScriptToSsml(script, { voice, locale, maxBreakMs: MAX_BREAK_MS, ...DEFAULT_PROSODY });
 
   const pauses = script.segments.filter((s) => s.kind === 'pause');
   const spoken = script.segments

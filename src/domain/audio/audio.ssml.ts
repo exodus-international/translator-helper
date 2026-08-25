@@ -15,7 +15,18 @@ export interface SsmlOptions {
   locale: string;
   /** Longest single <break> the provider honours, in milliseconds. */
   maxBreakMs: number;
+  /** Speaking rate as a factor (`0.8` = 20% slower) or a percentage (`-20%`). Omit for the voice default. */
+  rate?: string;
+  /** Pitch as a percentage (`-6%`). Omit for the voice default. */
+  pitch?: string;
 }
+
+/**
+ * Chosen by ear on real Czech content (Antonín, 2026-08-25): the untuned voice
+ * reads too briskly for a reflection. Rate 0.8 with a slightly lower pitch was
+ * the pick; volume is left alone so listeners control it on their device.
+ */
+export const DEFAULT_PROSODY = { rate: '0.8', pitch: '-6%' } as const;
 
 export function speechScriptToSsml(script: SpeechScript, options: SsmlOptions): string {
   if (!(options.maxBreakMs > 0)) {
@@ -28,9 +39,14 @@ export function speechScriptToSsml(script: SpeechScript, options: SsmlOptions): 
 
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${escapeXml(options.locale)}">` +
-    `<voice name="${escapeXml(options.voice)}">${body}</voice>` +
+    `<voice name="${escapeXml(options.voice)}">${wrapProsody(body, options)}</voice>` +
     `</speak>`
   );
+}
+
+function wrapProsody(body: string, { rate, pitch }: SsmlOptions): string {
+  const attrs = [rate ? ` rate="${escapeXml(rate)}"` : '', pitch ? ` pitch="${escapeXml(pitch)}"` : ''].join('');
+  return attrs ? `<prosody${attrs}>${body}</prosody>` : body;
 }
 
 /** Splits a pause into as many <break> elements as the ceiling requires. */
