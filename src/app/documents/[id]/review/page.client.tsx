@@ -78,7 +78,22 @@ export default function ReviewClient({
         }
       }}
       activityLogs={initialTargetVersion.activityLogs ?? []}
-      extraDetails={
+      sidebarSummary={
+        <>
+          <AudioStatus
+            documentVersionId={initialTargetVersion.id}
+            currentVersion={initialTargetVersion.version}
+            status={initialTargetVersion.status}
+            compact
+          />
+          <GitHubStatus
+            documentVersionId={initialTargetVersion.id}
+            isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+            compact
+          />
+        </>
+      }
+      sidebarDetails={
         <>
           <AudioStatus
             documentVersionId={initialTargetVersion.id}

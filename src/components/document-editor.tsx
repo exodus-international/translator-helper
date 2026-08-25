@@ -101,6 +101,8 @@ interface ViewerConfig {
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
+  sidebarSummary?: ReactNode;
+  sidebarDetails?: ReactNode;
   contentLanguage?: 'markdown' | 'yaml';
 }
 
@@ -121,6 +123,8 @@ function EditorViewer({
   translationPlaceholder,
   translationPreviewEmptyText,
   onEditSuggestion,
+  sidebarSummary,
+  sidebarDetails,
   contentLanguage,
 }: ViewerConfig) {
   const router = useRouter();
@@ -212,6 +216,8 @@ function EditorViewer({
       onReply={replySuggestion}
       onCreateGeneralThread={createGeneralThread}
       disableReopen={resolvedDisableReopen}
+      sidebarSummary={sidebarSummary}
+      sidebarDetails={sidebarDetails}
       sidebarHeader={
         <DocumentInfoCard
           status={targetVersion?.status}
@@ -367,6 +373,10 @@ interface DocumentEditorProps {
   // Suggestion handler (review-only edit)
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
 
+  // Sidebar summary + details (audio, deploy)
+  sidebarSummary?: ReactNode;
+  sidebarDetails?: ReactNode;
+
   // Details panel
   extraDetails?: ReactNode;
   activityLogs?: any[];
@@ -397,6 +407,8 @@ export function DocumentEditor({
   disableReopen,
   reviewConfig,
   onEditSuggestion,
+  sidebarSummary,
+  sidebarDetails,
   extraDetails,
   activityLogs,
   hideDetails,
@@ -438,6 +450,8 @@ export function DocumentEditor({
               translationPlaceholder={translationPlaceholder}
               translationPreviewEmptyText={translationPreviewEmptyText}
               onEditSuggestion={onEditSuggestion}
+              sidebarSummary={sidebarSummary}
+              sidebarDetails={sidebarDetails}
               contentLanguage={contentLanguage}
             />
           </div>

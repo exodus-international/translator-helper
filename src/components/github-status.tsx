@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 interface GitHubStatusProps {
   documentVersionId: string;
   isDeployed: boolean;
+  /** One-line summary row for the sidebar instead of the full card. */
+  compact?: boolean;
 }
 
 interface GitHubCommitData {
@@ -33,7 +35,7 @@ const PR_STATUS_COLORS: Record<string, string> = {
   CLOSED: 'bg-red-100 text-red-800',
 };
 
-export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProps) {
+export function GitHubStatus({ documentVersionId, isDeployed, compact = false }: GitHubStatusProps) {
   const [commits, setCommits] = useState<GitHubCommitData[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
@@ -74,6 +76,40 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
   };
 
   if (!isDeployed) return null;
+
+  if (compact) {
+    const latest = commits[0];
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <GitBranch className="h-3.5 w-3.5" />
+          GitHub
+        </span>
+        <span className="flex items-center gap-1.5 text-xs font-medium">
+          {loading && <Loader2 className="h-3 w-3 animate-spin" />}
+          {!loading && !latest && <span className="text-muted-foreground">Not deployed</span>}
+          {!loading && latest?.errorMessage && <span className="text-red-600">Deploy failed</span>}
+          {!loading && latest && !latest.errorMessage && latest.prNumber && (
+            <>
+              {latest.prUrl ? (
+                <a href={latest.prUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  PR #{latest.prNumber}
+                </a>
+              ) : (
+                <span>PR #{latest.prNumber}</span>
+              )}
+              {latest.prStatus && (
+                <Badge className={`${PR_STATUS_COLORS[latest.prStatus] || ''} px-1.5 py-0 text-[10px]`}>{latest.prStatus}</Badge>
+              )}
+            </>
+          )}
+          {!loading && latest && !latest.errorMessage && !latest.prNumber && (
+            <code className="text-[10px]">{latest.commitSha.substring(0, 7)}</code>
+          )}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <Card className="mt-4 p-4">
