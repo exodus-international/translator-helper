@@ -78,7 +78,7 @@ export default function ReviewClient({
           toast.error(error.message || 'Failed to edit suggestion');
         }
       }}
-      activityLogs={[]}
+      hideDetails
       sidebarSummary={
         <>
           <AudioStatus
