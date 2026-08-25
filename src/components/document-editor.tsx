@@ -103,6 +103,7 @@ interface ViewerConfig {
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
   sidebarSummary?: ReactNode;
   sidebarDetails?: ReactNode;
+  sidebarDetailsDefaultOpen?: boolean;
   contentLanguage?: 'markdown' | 'yaml';
 }
 
@@ -125,6 +126,7 @@ function EditorViewer({
   onEditSuggestion,
   sidebarSummary,
   sidebarDetails,
+  sidebarDetailsDefaultOpen,
   contentLanguage,
 }: ViewerConfig) {
   const router = useRouter();
@@ -218,6 +220,7 @@ function EditorViewer({
       disableReopen={resolvedDisableReopen}
       sidebarSummary={sidebarSummary}
       sidebarDetails={sidebarDetails}
+      sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
       sidebarHeader={
         <DocumentInfoCard
           status={targetVersion?.status}
@@ -376,6 +379,7 @@ interface DocumentEditorProps {
   // Sidebar summary + details (audio, deploy)
   sidebarSummary?: ReactNode;
   sidebarDetails?: ReactNode;
+  sidebarDetailsDefaultOpen?: boolean;
 
   // Details panel
   extraDetails?: ReactNode;
@@ -409,6 +413,7 @@ export function DocumentEditor({
   onEditSuggestion,
   sidebarSummary,
   sidebarDetails,
+  sidebarDetailsDefaultOpen,
   extraDetails,
   activityLogs,
   hideDetails,
@@ -452,6 +457,7 @@ export function DocumentEditor({
               onEditSuggestion={onEditSuggestion}
               sidebarSummary={sidebarSummary}
               sidebarDetails={sidebarDetails}
+              sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
               contentLanguage={contentLanguage}
             />
           </div>

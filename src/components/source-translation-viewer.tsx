@@ -95,6 +95,8 @@ interface SourceTranslationViewerProps {
   sidebarSummary?: ReactNode;
   /** Full panels shown in place of the feedback list when the user opens details. */
   sidebarDetails?: ReactNode;
+  /** Start with the details panels open instead of the feedback list. */
+  sidebarDetailsDefaultOpen?: boolean;
   /** Monaco language for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
 }
@@ -155,11 +157,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       sidebarHeader,
       sidebarSummary,
       sidebarDetails,
+      sidebarDetailsDefaultOpen = false,
       contentLanguage = 'markdown',
     },
     ref,
   ) {
-    const [sidebarView, setSidebarView] = useState<'threads' | 'details'>('threads');
+    const [sidebarView, setSidebarView] = useState<'threads' | 'details'>(
+      sidebarDetailsDefaultOpen ? 'details' : 'threads',
+    );
     const isZen = layout === 'zen';
     const isYaml = contentLanguage === 'yaml';
     const { open: sidebarOpen, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
