@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AudioProvider } from '@prisma/client';
 
 export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
 
@@ -19,3 +20,22 @@ export const updateLanguageInstructionsSchema = z.object({
 export const updateLanguageBranchNameSchema = z.object({
   branchName: z.string().nullable(),
 });
+
+export const updateLanguageAudioSchema = z
+  .object({
+    audioProvider: z.enum(AudioProvider).nullable(),
+    audioVoice: z.string().trim().max(100).nullable(),
+  })
+  .transform((v) => ({
+    audioProvider: v.audioProvider,
+    audioVoice: v.audioVoice || null,
+  }))
+  .refine((v) => !v.audioProvider || !!v.audioVoice, { message: 'A voice is required when a provider is selected' });
+
+/** Team policy: always the male voice per locale. Used as defaults when a provider is first selected. */
+export const DEFAULT_AUDIO_VOICES: Record<string, string> = {
+  cs: 'cs-CZ-AntoninNeural',
+  sk: 'sk-SK-LukasNeural',
+  pl: 'pl-PL-MarekNeural',
+  en: 'en-US-AndrewNeural',
+};

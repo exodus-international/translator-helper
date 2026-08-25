@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DocumentType } from '@prisma/client';
 
 export const createSourceProjectSchema = z.object({
   name: z.string().min(2),
@@ -11,5 +12,6 @@ export const updateSourceProjectSchema = z.object({
   description: z.string().optional().nullable(),
   identifier: z.string().optional().nullable(),
   status: z.enum(['ACTIVE', 'COMPLETE']).optional(),
+  audioDocumentTypes: z.array(z.enum(DocumentType)).optional(),
 });
 

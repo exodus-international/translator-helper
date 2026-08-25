@@ -7,16 +7,18 @@ import { resolveAudioObjectKey } from './audio.paths';
 import {
   claimAudioFileForProcessing,
   createAudioFile,
+  findStalledAudioFiles,
   getAudioFileById,
+  getLatestAudioFileForVersion,
   markAudioFileFailed,
   markAudioFileReady,
   releaseAudioFileToPending,
   setAudioFileJob,
 } from './audio.repository';
-import { audioSkipReason, formatAudioError, type AudioErrorKind } from './audio.rules';
+import { audioSkipReason, formatAudioError, isAudioStale, type AudioErrorKind } from './audio.rules';
 import { markdownToSpeechScript } from './audio.script';
 import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
-import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome } from './audio.types';
+import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
 
@@ -145,6 +147,78 @@ export async function advanceJob(audioFileId: string): Promise<AudioFile | null>
     console.error(`${LOG_PREFIX} advancing ${audioFileId} failed:`, message);
     return fail(audioFile, formatAudioError('provider', message));
   }
+}
+
+/**
+ * Whether a version's audio is fit to ship. `not_applicable` when the
+ * language or project is not set up for audio, so deploys are not nagged
+ * about audio nobody asked for.
+ */
+export async function getAudioReadiness(documentVersionId: string): Promise<AudioReadiness> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    include: { document: { include: { sourceProject: true } }, language: true },
+  });
+  if (!version) return { state: 'not_applicable' };
+
+  const skip = audioSkipReason({
+    language: version.language,
+    document: version.document,
+    storageConfigured: isAudioStorageConfigured(),
+    providerConfigured: (provider) => getSpeechProvider(provider).isConfigured(),
+  });
+  if (skip) return { state: 'not_applicable' };
+
+  const audio = await getLatestAudioFileForVersion(documentVersionId);
+  if (!audio) return { state: 'missing' };
+  if (audio.status === AudioStatus.PENDING || audio.status === AudioStatus.PROCESSING) return { state: 'pending' };
+  if (audio.status === AudioStatus.FAILED) return { state: 'failed' };
+  if (isAudioStale(audio, version)) return { state: 'stale', url: audio.url ?? undefined };
+  return { state: 'ready', url: audio.url ?? undefined };
+}
+
+const SWEEP_MIN_AGE_MS = 60_000;
+const STALLED_PROCESSING_MS = 15 * 60_000;
+
+export interface SweepResult {
+  checked: number;
+  ready: number;
+  failed: number;
+  stillPending: number;
+}
+
+/**
+ * Moves every in-flight record forward that nobody has looked at for a
+ * minute. A record stuck in PROCESSING for a long time means a worker died
+ * mid-upload; it is failed with a clear message rather than retried forever.
+ * Safe to call from a cron at any frequency; a no-op when nothing is pending.
+ */
+export async function sweepPendingJobs(now = new Date()): Promise<SweepResult> {
+  const candidates = await findStalledAudioFiles(new Date(now.getTime() - SWEEP_MIN_AGE_MS));
+  const result: SweepResult = { checked: candidates.length, ready: 0, failed: 0, stillPending: 0 };
+
+  for (const candidate of candidates) {
+    try {
+      let outcome: AudioFile | null;
+      if (candidate.status === AudioStatus.PROCESSING && now.getTime() - candidate.updatedAt.getTime() > STALLED_PROCESSING_MS) {
+        outcome = await fail(
+          candidate,
+          formatAudioError('provider', 'Generation stalled while processing and was abandoned by the scheduled sweep'),
+        );
+      } else {
+        outcome = await advanceJob(candidate.id);
+      }
+      if (outcome?.status === AudioStatus.READY) result.ready += 1;
+      else if (outcome?.status === AudioStatus.FAILED) result.failed += 1;
+      else result.stillPending += 1;
+    } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} sweep could not advance ${candidate.id}:`, errorMessage(error));
+      result.stillPending += 1;
+    }
+  }
+
+  if (result.checked > 0) console.log(`${LOG_PREFIX} sweep:`, result);
+  return result;
 }
 
 async function complete(

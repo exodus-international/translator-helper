@@ -1,4 +1,5 @@
 import prisma from '@/lib/db';
+import type { AudioProvider } from '@prisma/client';
 
 export async function listLanguages() {
   return prisma.language.findMany({
@@ -48,6 +49,13 @@ export async function updateLanguageBranchName(id: string, branchName: string | 
     where: { id },
     data: { branchName },
   });
+}
+
+export async function updateLanguageAudio(
+  id: string,
+  data: { audioProvider: AudioProvider | null; audioVoice: string | null },
+) {
+  return prisma.language.update({ where: { id }, data });
 }
 
 export async function updateLanguage(id: string, name: string) {

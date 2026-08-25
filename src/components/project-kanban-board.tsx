@@ -28,6 +28,7 @@ import { getDashboardDocumentsAction } from '@/domain/document/document.actions'
 import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
 import { DocumentSearchInput } from '@/components/document-search-input';
 import { useActiveLanguage } from '@/components/analytics-project-group';
+import { useDeployConfirm } from '@/components/deploy-confirm';
 import { capture } from '@/lib/analytics';
 import { getCanonicalEditorPath } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
@@ -193,6 +194,7 @@ export default function ProjectKanbanBoard({
   sourceProjectId,
   translationProjectId,
 }: ProjectKanbanBoardProps) {
+  const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState('all');
   const [documents, setDocuments] = useState<any[]>([]);
@@ -444,8 +446,25 @@ export default function ProjectKanbanBoard({
         const versionId = hasVersion ? doc.versions[0].id : null;
 
         if (newStatus && versionId) {
+          if (newStatus === DocumentStatus.DEPLOYED && !(await confirmDeploy(versionId))) {
+            await loadDocuments();
+            continue;
+          }
           try {
-            await updateDocumentVersionStatusAction(versionId, newStatus);
+            const result = await updateDocumentVersionStatusAction(versionId, newStatus);
+            if (result.github?.status === 'success') {
+              toast.success(result.github.prUrl ? 'GitHub PR created successfully' : 'Deployed to GitHub successfully', {
+                action: result.github.prUrl
+                  ? { label: 'Open PR', onClick: () => window.open(result.github!.prUrl, '_blank') }
+                  : undefined,
+                duration: 8000,
+              });
+            } else if (result.github?.status === 'failed') {
+              toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
+            }
+            if (result.audio?.status === 'failed') {
+              toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
+            }
             capture('document_status_changed', {
               from: getStatusForColumn(oldCard.column),
               to: newStatus,
@@ -468,6 +487,7 @@ export default function ProjectKanbanBoard({
 
   return (
     <div>
+      {deployDialog}
       <div className="flex gap-4 items-center mb-4">
         <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
         <div className="flex gap-4 items-center text-sm text-gray-600">

@@ -119,7 +119,16 @@ async function findOrCreatePullRequest(
 
   if (existingPRs.length > 0) {
     const existing = existingPRs[0];
-    console.log(`${LOG_PREFIX} Found existing open PR: #${existing.number} — ${existing.html_url}`);
+    console.log(`${LOG_PREFIX} Found existing open PR: #${existing.number} — ${existing.html_url}, updating body`);
+    // The body carries per-deploy facts (file, audio link), so a redeploy to
+    // the same branch must refresh it rather than keep the first deploy's.
+    await octokit.rest.pulls.update({
+      owner: config.repoOwner,
+      repo: config.repoName,
+      pull_number: existing.number,
+      title,
+      body,
+    });
     return { number: existing.number, url: existing.html_url };
   }
 
@@ -220,6 +229,8 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
   });
 
   // Create PR
+  const { getAudioReadiness } = await import('../audio/audio.service');
+  const audio = await getAudioReadiness(documentVersionId);
   const prTitle = `[${language.name}] [${document.sourceProject.name}] ${document.originalFilename} - ${document.title}`;
   const prBody = [
     `## Translation Deploy`,
@@ -230,6 +241,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     `- **Source Project**: ${document.sourceProject.name}`,
     `- **Translator**: ${version.user?.name ?? 'Unassigned'}`,
     `- **Link to document**: ${process.env.NEXT_PUBLIC_APP_URL}/documents/${document.id}/review?version=${version.id}`,
+    ...(audio.state === 'ready' && audio.url ? [`- **Audio**: ${audio.url}`] : []),
   ].join('\n');
 
   const pr = await findOrCreatePullRequest(language.branchName, prTitle, prBody);

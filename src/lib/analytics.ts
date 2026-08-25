@@ -58,6 +58,12 @@ export type AnalyticsEvent =
   | 'document_status_changed'
   | 'document_deployed'
   | 'github_deploy_retried'
+  // ── Audio ────────────────────────────────────────────────────────────
+  | 'audio_generation_triggered'
+  | 'audio_regeneration_triggered'
+  | 'audio_playback_started'
+  | 'audio_url_copied'
+  | 'audio_generation_failed'
   // ── Suggestions / review threads ─────────────────────────────────────
   | 'suggestion_created'
   | 'suggestion_applied'

@@ -5,11 +5,13 @@ import {
   createLanguage,
   deleteLanguage,
   updateLanguage,
+  updateLanguageAudio,
   updateLanguageBranchName,
   updateLanguageInstructions,
 } from './language.repository';
 import {
   createLanguageSchema,
+  updateLanguageAudioSchema,
   updateLanguageBranchNameSchema,
   updateLanguageInstructionsSchema,
   updateLanguageSchema,
@@ -46,6 +48,13 @@ export async function updateLanguageBranchNameAction(id: string, input: unknown)
 
   const validated = updateLanguageBranchNameSchema.parse(input);
   return await updateLanguageBranchName(id, validated.branchName);
+}
+
+export async function updateLanguageAudioAction(id: string, input: unknown) {
+  await authorize('can:manage-languages');
+
+  const validated = updateLanguageAudioSchema.parse(input);
+  return await updateLanguageAudio(id, validated);
 }
 
 export async function deleteLanguageAction(id: string) {

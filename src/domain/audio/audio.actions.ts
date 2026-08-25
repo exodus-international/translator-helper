@@ -4,8 +4,8 @@ import { authorize } from '@/lib/authorize';
 import type { AudioFile } from '@prisma/client';
 import { assertCanEditDocumentVersion } from '../document-version/document-version.permissions';
 import { getLatestAudioFileForVersion } from './audio.repository';
-import { advanceJob, startGeneration } from './audio.service';
-import type { AudioFileView, AudioGenerationOutcome } from './audio.types';
+import { advanceJob, getAudioReadiness, startGeneration } from './audio.service';
+import type { AudioFileView, AudioGenerationOutcome, AudioReadiness } from './audio.types';
 
 export async function getLatestAudioFileAction(documentVersionId: string): Promise<AudioFileView | null> {
   await authorize('authenticated');
@@ -18,6 +18,12 @@ export async function advanceAudioJobAction(audioFileId: string): Promise<AudioF
   await authorize('authenticated');
   const audioFile = await advanceJob(audioFileId);
   return audioFile ? toView(audioFile) : null;
+}
+
+/** Used by the deploy guard to decide whether to warn before deploying. */
+export async function getAudioReadinessAction(documentVersionId: string): Promise<AudioReadiness> {
+  await authorize('authenticated');
+  return getAudioReadiness(documentVersionId);
 }
 
 /**

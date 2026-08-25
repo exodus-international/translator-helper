@@ -8,6 +8,7 @@ import { AlertCircle, Copy, Download, Loader2, RefreshCw, Volume2 } from 'lucide
 import { advanceAudioJobAction, getLatestAudioFileAction, regenerateAudioAction } from '@/domain/audio/audio.actions';
 import { isAudioStale, parseAudioError } from '@/domain/audio/audio.rules';
 import { AUDIO_SKIP_MESSAGES, type AudioFileView } from '@/domain/audio/audio.types';
+import { capture } from '@/lib/analytics';
 import { DocumentStatus } from '@prisma/client';
 import { toast } from 'sonner';
 
@@ -32,6 +33,8 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playbackTracked = useRef(false);
+  const failureTracked = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -64,10 +67,18 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
     };
   }, [audio]);
 
-  const handleRegenerate = async () => {
+  useEffect(() => {
+    if (audio?.status === 'FAILED' && failureTracked.current !== audio.id) {
+      failureTracked.current = audio.id;
+      capture('audio_generation_failed', { documentVersionId, kind: parseAudioError(audio.errorMessage).kind });
+    }
+  }, [audio, documentVersionId]);
+
+  const handleRegenerate = async (reason: 'regenerate' | 'retry' | 'generate') => {
     setRegenerating(true);
     try {
       const outcome = await regenerateAudioAction(documentVersionId);
+      capture('audio_regeneration_triggered', { documentVersionId, reason });
       if (outcome.status === 'skipped') {
         toast.warning(`Audio skipped: ${AUDIO_SKIP_MESSAGES[outcome.reason]}`);
       } else if (outcome.status === 'failed') {
@@ -87,6 +98,7 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
     if (!audio?.url) return;
     try {
       await navigator.clipboard.writeText(audio.url);
+      capture('audio_url_copied', { documentVersionId });
       toast.success('Audio URL copied');
     } catch {
       toast.error('Could not copy the URL');
@@ -117,7 +129,7 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
       {!audio && (
         <div className="text-sm text-gray-500">
           <p>No audio has been generated for this version.</p>
-          <RegenerateButton label="Generate audio" busy={regenerating} onClick={handleRegenerate} />
+          <RegenerateButton label="Generate audio" busy={regenerating} onClick={() => handleRegenerate('generate')} />
         </div>
       )}
 
@@ -137,14 +149,24 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
             {error.kind === 'configuration' && (
               <p className="text-xs text-gray-500 mt-1">Retrying will not help until the configuration is fixed.</p>
             )}
-            <RegenerateButton label="Retry" busy={regenerating} onClick={handleRegenerate} />
+            <RegenerateButton label="Retry" busy={regenerating} onClick={() => handleRegenerate('retry')} />
           </div>
         </div>
       )}
 
       {audio && audio.status === 'READY' && audio.url && (
         <div className="space-y-3">
-          <audio controls preload="none" src={audio.url} className="w-full" />
+          <audio
+            controls
+            preload="none"
+            src={audio.url}
+            className="w-full"
+            onPlay={() => {
+              if (playbackTracked.current) return;
+              playbackTracked.current = true;
+              capture('audio_playback_started', { documentVersionId, provider: audio.provider, voice: audio.voice });
+            }}
+          />
           <div className="text-xs text-gray-500">
             {audio.voice}
             {audio.durationMs ? ` · ${formatDuration(audio.durationMs)}` : ''}
@@ -165,7 +187,7 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
               <Copy className="h-3 w-3 mr-1" />
               Copy URL
             </Button>
-            <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={regenerating}>
+            <Button variant="outline" size="sm" onClick={() => handleRegenerate('regenerate')} disabled={regenerating}>
               <RefreshCw className={`h-3 w-3 mr-1 ${regenerating ? 'animate-spin' : ''}`} />
               {regenerating ? 'Starting...' : 'Regenerate'}
             </Button>
