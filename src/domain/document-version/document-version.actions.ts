@@ -31,6 +31,7 @@ async function loadVersionAndGateSourceEdits(id: string, user: SessionUser) {
 }
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
+import { assertCanEditDocumentVersion } from './document-version.permissions';
 import { validateTransition } from './document-version.transitions';
 import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
@@ -98,32 +99,7 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = updateDocumentVersionSchema.parse(input);
 
-  const { version: existingVersion, isSourceEnglish } = await loadVersionAndGateSourceEdits(id, user);
-
-  if (!isSourceEnglish) {
-    // For translation versions, use existing permission logic
-    const document = await getDocumentById(existingVersion.documentId);
-    if (!document) {
-      throw new Error('Document not found');
-    }
-    if (!document.sourceProject?.id) {
-      throw new Error(
-        'This document is not associated with a source project. Please assign a source project to the document before editing translations.',
-      );
-    }
-
-    const translationProject = await getTranslationProjectBySourceAndLanguage(
-      document.sourceProject.id,
-      existingVersion.languageId,
-    );
-
-    if (translationProject) {
-      // Only the owner of the version or users with higher permissions can edit
-      if (existingVersion.userId !== user.id) {
-        await authorize({ project: translationProject.id, role: 'translator' });
-      }
-    }
-  }
+  await assertCanEditDocumentVersion(id, user);
 
   const version = await updateDocumentVersion(id, validated.content, user.id);
 

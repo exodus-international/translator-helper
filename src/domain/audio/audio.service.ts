@@ -13,9 +13,10 @@ import {
   releaseAudioFileToPending,
   setAudioFileJob,
 } from './audio.repository';
+import { audioSkipReason, formatAudioError, type AudioErrorKind } from './audio.rules';
 import { markdownToSpeechScript } from './audio.script';
 import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
-import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioSkipReason } from './audio.types';
+import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
 
@@ -27,14 +28,23 @@ const LOG_PREFIX = '[Audio]';
  * `skipped`, everything else as `failed`, so a status transition is never
  * blocked by audio.
  */
-export async function startGeneration(documentVersionId: string, userId: string): Promise<AudioGenerationOutcome> {
+export async function startGeneration(
+  documentVersionId: string,
+  userId: string,
+  options: { trigger?: 'approval' | 'regeneration' } = {},
+): Promise<AudioGenerationOutcome> {
   const version = await prisma.documentVersion.findUnique({
     where: { id: documentVersionId },
     include: { document: { include: { sourceProject: true } }, language: true },
   });
   if (!version) return { status: 'failed', error: `Document version not found: ${documentVersionId}` };
 
-  const skip = eligibilitySkipReason(version);
+  const skip = audioSkipReason({
+    language: version.language,
+    document: version.document,
+    storageConfigured: isAudioStorageConfigured(),
+    providerConfigured: (provider) => getSpeechProvider(provider).isConfigured(),
+  });
   if (skip) {
     console.log(`${LOG_PREFIX} skipping generation for ${documentVersionId}: ${skip}`);
     return { status: 'skipped', reason: skip };
@@ -54,10 +64,14 @@ export async function startGeneration(documentVersionId: string, userId: string)
   await createActivityLog({
     documentVersionId,
     userId,
-    action: 'audio_generation_started',
+    action: options.trigger === 'regeneration' ? 'audio_regeneration_requested' : 'audio_generation_started',
     details: { audioFileId: audioFile.id, voice },
   });
 
+  // Anything thrown before the provider is asked is our problem (content or
+  // setup), anything after is the provider's. The kind is stored with the
+  // message so the card can word the two differently.
+  let phase: AudioErrorKind = 'content';
   try {
     const script = markdownToSpeechScript(version.content);
     if (!script.segments.some((s) => s.kind === 'text')) {
@@ -70,6 +84,7 @@ export async function startGeneration(documentVersionId: string, userId: string)
       ...DEFAULT_PROSODY,
     });
 
+    phase = 'provider';
     const outcome = await provider.submit({ jobId: jobIdFor(audioFile.id), ssml });
     if (outcome.kind === 'result') {
       // Synchronous provider: finish in the same call.
@@ -82,7 +97,7 @@ export async function startGeneration(documentVersionId: string, userId: string)
   } catch (error: unknown) {
     const message = errorMessage(error);
     console.error(`${LOG_PREFIX} generation failed for ${documentVersionId}:`, message);
-    await fail(audioFile, message);
+    await fail(audioFile, formatAudioError(phase, message));
     return { status: 'failed', error: message };
   }
 }
@@ -97,7 +112,7 @@ export async function advanceJob(audioFileId: string): Promise<AudioFile | null>
   if (!audioFile) return null;
   if (audioFile.status === AudioStatus.READY || audioFile.status === AudioStatus.FAILED) return audioFile;
   if (!audioFile.providerJobId) {
-    return markAudioFileFailed(audioFileId, 'No provider job was recorded for this generation');
+    return fail(audioFile, formatAudioError('configuration', 'No provider job was recorded for this generation'));
   }
 
   const claimed = await claimAudioFileForProcessing(audioFileId);
@@ -110,7 +125,7 @@ export async function advanceJob(audioFileId: string): Promise<AudioFile | null>
       return getAudioFileById(audioFileId);
     }
     if (outcome.kind === 'failed') {
-      return fail(audioFile, outcome.message);
+      return fail(audioFile, formatAudioError('provider', outcome.message));
     }
 
     const version = await prisma.documentVersion.findUnique({
@@ -118,11 +133,17 @@ export async function advanceJob(audioFileId: string): Promise<AudioFile | null>
       include: { document: { include: { sourceProject: true } }, language: true },
     });
     if (!version) throw new Error('Document version disappeared while audio was generating');
-    return complete(audioFile, outcome.result, { document: version.document, languageCode: version.language.code });
+    try {
+      return await complete(audioFile, outcome.result, { document: version.document, languageCode: version.language.code });
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      console.error(`${LOG_PREFIX} storing ${audioFileId} failed:`, message);
+      return fail(audioFile, formatAudioError('configuration', message));
+    }
   } catch (error: unknown) {
     const message = errorMessage(error);
     console.error(`${LOG_PREFIX} advancing ${audioFileId} failed:`, message);
-    return fail(audioFile, message);
+    return fail(audioFile, formatAudioError('provider', message));
   }
 }
 
@@ -178,24 +199,6 @@ async function fail(audioFile: AudioFile, message: string): Promise<AudioFile> {
     });
   }
   return updated;
-}
-
-type VersionForEligibility = {
-  language: { audioProvider: import('@prisma/client').AudioProvider | null; audioVoice: string | null };
-  document: {
-    type: import('@prisma/client').DocumentType | null;
-    sourceProject: { audioDocumentTypes: import('@prisma/client').DocumentType[] } | null;
-  };
-};
-
-function eligibilitySkipReason(version: VersionForEligibility): AudioSkipReason | null {
-  const { language, document } = version;
-  if (!language.audioProvider || !language.audioVoice) return 'no_voice_for_language';
-  if (!document.type) return 'document_type_missing';
-  if (!document.sourceProject?.audioDocumentTypes.includes(document.type)) return 'document_type_not_enabled';
-  if (!isAudioStorageConfigured()) return 'storage_not_configured';
-  if (!getSpeechProvider(language.audioProvider).isConfigured()) return 'provider_not_configured';
-  return null;
 }
 
 /** `cs-CZ-AntoninNeural` -> `cs-CZ`. Provider voice ids lead with their locale. */

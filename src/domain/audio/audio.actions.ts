@@ -2,9 +2,10 @@
 
 import { authorize } from '@/lib/authorize';
 import type { AudioFile } from '@prisma/client';
+import { assertCanEditDocumentVersion } from '../document-version/document-version.permissions';
 import { getLatestAudioFileForVersion } from './audio.repository';
-import { advanceJob } from './audio.service';
-import type { AudioFileView } from './audio.types';
+import { advanceJob, startGeneration } from './audio.service';
+import type { AudioFileView, AudioGenerationOutcome } from './audio.types';
 
 export async function getLatestAudioFileAction(documentVersionId: string): Promise<AudioFileView | null> {
   await authorize('authenticated');
@@ -17,6 +18,16 @@ export async function advanceAudioJobAction(audioFileId: string): Promise<AudioF
   await authorize('authenticated');
   const audioFile = await advanceJob(audioFileId);
   return audioFile ? toView(audioFile) : null;
+}
+
+/**
+ * Regenerate (or retry) audio for a version. Allowed for whoever may edit
+ * the version; works from any status, and always creates a new record.
+ */
+export async function regenerateAudioAction(documentVersionId: string): Promise<AudioGenerationOutcome> {
+  const { user } = await authorize('authenticated');
+  await assertCanEditDocumentVersion(documentVersionId, user);
+  return startGeneration(documentVersionId, user.id, { trigger: 'regeneration' });
 }
 
 function toView(audioFile: AudioFile): AudioFileView {
