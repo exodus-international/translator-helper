@@ -34,6 +34,7 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
   const [audio, setAudio] = useState<AudioFileView | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [fileMissing, setFileMissing] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playbackTracked = useRef(false);
   const failureTracked = useRef<string | null>(null);
@@ -50,8 +51,27 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
 
   useEffect(() => {
     setLoading(true);
+    setFileMissing(false);
     load();
   }, [load]);
+
+  // The record says READY but storage may have lost the object (a bucket
+  // lifecycle rule, a manual delete). The browser is the only one that can
+  // tell us, so ask it: try to fetch the first byte.
+  useEffect(() => {
+    if (audio?.status !== 'READY' || !audio.url) return;
+    let cancelled = false;
+    fetch(audio.url, { method: 'GET', headers: { Range: 'bytes=0-0' }, mode: 'cors' })
+      .then((res) => {
+        if (!cancelled && (res.status === 404 || res.status === 403)) setFileMissing(true);
+      })
+      .catch(() => {
+        // CORS-opaque or network failure: cannot tell, assume present and let the player report.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [audio?.status, audio?.url]);
 
   useEffect(() => {
     if (!isInFlight(audio)) return;
@@ -117,7 +137,7 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
   const error = audio?.status === 'FAILED' ? parseAudioError(audio.errorMessage) : null;
 
   if (compact) {
-    return <AudioSummaryRow audio={audio} stale={stale} documentVersionId={documentVersionId} />;
+    return <AudioSummaryRow audio={audio} stale={stale} fileMissing={fileMissing} documentVersionId={documentVersionId} />;
   }
 
   return (
@@ -160,12 +180,27 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
         </div>
       )}
 
-      {audio && audio.status === 'READY' && audio.url && (
+      {audio && audio.status === 'READY' && fileMissing && (
+        <div className="flex items-start gap-2 text-amber-700">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="font-medium">Audio file is no longer in storage</p>
+            <p className="text-sm">
+              It was generated {formatDate(audio.updatedAt)} from version {audio.sourceVersion} but the file has since been
+              removed. Regenerate to get a new one.
+            </p>
+            <RegenerateButton label="Regenerate" busy={regenerating} onClick={() => handleRegenerate('regenerate')} />
+          </div>
+        </div>
+      )}
+
+      {audio && audio.status === 'READY' && !fileMissing && audio.url && (
         <div className="space-y-3">
           <audio
             controls
             preload="none"
             src={audio.url}
+            onError={() => setFileMissing(true)}
             className="w-full"
             onPlay={() => {
               if (playbackTracked.current) return;
@@ -208,10 +243,12 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
 function AudioSummaryRow({
   audio,
   stale,
+  fileMissing,
   documentVersionId,
 }: {
   audio: AudioFileView | null;
   stale: boolean;
+  fileMissing: boolean;
   documentVersionId: string;
 }) {
   const player = useRef<HTMLAudioElement | null>(null);
@@ -239,6 +276,9 @@ function AudioSummaryRow({
   else if (audio.status === 'FAILED') {
     label = 'Failed';
     tone = 'text-red-600';
+  } else if (fileMissing) {
+    label = 'File removed';
+    tone = 'text-amber-700';
   } else {
     label = audio.durationMs ? formatDuration(audio.durationMs) : 'Ready';
     if (stale) {
@@ -256,7 +296,7 @@ function AudioSummaryRow({
       <span className={`flex items-center gap-1.5 text-xs font-medium ${tone}`}>
         {audio && isInFlight(audio) && <Loader2 className="h-3 w-3 animate-spin" />}
         {label}
-        {audio?.status === 'READY' && audio.url && (
+        {audio?.status === 'READY' && !fileMissing && audio.url && (
           <>
             <audio
               ref={player}
