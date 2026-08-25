@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { SidebarSection } from '@/components/sidebar-section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Copy, Download, Loader2, Pause, Play, RefreshCw, Volume2 } from 'lucide-react';
@@ -19,6 +20,8 @@ interface AudioStatusProps {
   status: DocumentStatus;
   /** One-line summary row for the sidebar instead of the full card. */
   compact?: boolean;
+  /** `section` renders in the flat sidebar frame; `card` is the standalone card. */
+  frame?: 'card' | 'section';
 }
 
 const POLL_INTERVAL_MS = 5000;
@@ -30,7 +33,13 @@ const isInFlight = (audio: AudioFileView | null) => audio?.status === 'PENDING' 
  * generation is in flight. Offers regenerate/retry to whoever may edit the
  * version (the server action enforces that; here the button is just shown).
  */
-export function AudioStatus({ documentVersionId, currentVersion, status, compact = false }: AudioStatusProps) {
+export function AudioStatus({
+  documentVersionId,
+  currentVersion,
+  status,
+  compact = false,
+  frame = 'card',
+}: AudioStatusProps) {
   const [audio, setAudio] = useState<AudioFileView | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -40,6 +49,8 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
   const failureTracked = useRef<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setFileMissing(false);
     try {
       setAudio(await getLatestAudioFileAction(documentVersionId));
     } catch (error) {
@@ -50,8 +61,6 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
   }, [documentVersionId]);
 
   useEffect(() => {
-    setLoading(true);
-    setFileMissing(false);
     load();
   }, [load]);
 
@@ -140,17 +149,14 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
     return <AudioSummaryRow audio={audio} stale={stale} fileMissing={fileMissing} documentVersionId={documentVersionId} />;
   }
 
-  return (
-    <Card className="mt-4 p-4">
-      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-        <Volume2 className="h-5 w-5" />
-        Audio
-        {stale && (
-          <Badge className="bg-amber-100 text-amber-800" title="The text changed after this audio was generated">
-            Stale
-          </Badge>
-        )}
-      </h3>
+  const staleBadge = stale ? (
+    <Badge className="bg-amber-100 text-amber-800" title="The text changed after this audio was generated">
+      Stale
+    </Badge>
+  ) : null;
+
+  const body = (
+    <>
 
       {!audio && (
         <div className="text-sm text-gray-500">
@@ -235,6 +241,25 @@ export function AudioStatus({ documentVersionId, currentVersion, status, compact
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (frame === 'section') {
+    return (
+      <SidebarSection title="Audio" action={staleBadge}>
+        {body}
+      </SidebarSection>
+    );
+  }
+
+  return (
+    <Card className="mt-4 p-4">
+      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+        <Volume2 className="h-5 w-5" />
+        Audio
+        {staleBadge}
+      </h3>
+      {body}
     </Card>
   );
 }

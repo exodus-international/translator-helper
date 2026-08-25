@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { SidebarSection } from '@/components/sidebar-section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GitBranch, ExternalLink, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
@@ -15,6 +16,8 @@ interface GitHubStatusProps {
   isDeployed: boolean;
   /** One-line summary row for the sidebar instead of the full card. */
   compact?: boolean;
+  /** `section` renders in the flat sidebar frame; `card` is the standalone card. */
+  frame?: 'card' | 'section';
 }
 
 interface GitHubCommitData {
@@ -35,7 +38,7 @@ const PR_STATUS_COLORS: Record<string, string> = {
   CLOSED: 'bg-red-100 text-red-800',
 };
 
-export function GitHubStatus({ documentVersionId, isDeployed, compact = false }: GitHubStatusProps) {
+export function GitHubStatus({ documentVersionId, isDeployed, compact = false, frame = 'card' }: GitHubStatusProps) {
   const [commits, setCommits] = useState<GitHubCommitData[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
@@ -111,12 +114,8 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false }:
     );
   }
 
-  return (
-    <Card className="mt-4 p-4">
-      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-        <GitBranch className="h-5 w-5" />
-        GitHub Deployment
-      </h3>
+  const body = <>
+
 
       {loading && (
         <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -195,6 +194,19 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false }:
           ))}
         </div>
       )}
+  </>;
+
+  if (frame === 'section') {
+    return <SidebarSection title="GitHub deployment">{body}</SidebarSection>;
+  }
+
+  return (
+    <Card className="mt-4 p-4">
+      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+        <GitBranch className="h-5 w-5" />
+        GitHub Deployment
+      </h3>
+      {body}
     </Card>
   );
 }

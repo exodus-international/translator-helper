@@ -106,9 +106,9 @@ export function ThreadSidebar({
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2 border-b bg-white shrink-0">
+      <div className="px-3 py-2 border-b bg-muted/60 shrink-0">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Feedback{openThreads.length > 0 ? ` (${openThreads.length} open)` : ''}
           </h3>
           <div className="flex items-center gap-1">

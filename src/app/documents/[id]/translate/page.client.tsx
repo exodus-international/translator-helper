@@ -4,6 +4,7 @@ import { ActivityLog } from '@/components/activity-log';
 import { AudioStatus } from '@/components/audio-status';
 import { DocumentEditor, DocumentEditorHeader } from '@/components/document-editor';
 import { GitHubStatus } from '@/components/github-status';
+import { SidebarSection } from '@/components/sidebar-section';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { Button } from '@/components/ui/button';
 import {
@@ -144,18 +145,24 @@ export default function TranslateClient({
       sidebarDetails={
         initialTargetVersion ? (
           <>
-            {assignment && <AssignmentInfoBlock assignment={assignment} />}
+            {assignment && (
+              <SidebarSection title="Assignment">
+                <AssignmentInfoBlock assignment={assignment} />
+              </SidebarSection>
+            )}
             <AudioStatus
               documentVersionId={initialTargetVersion.id}
               currentVersion={initialTargetVersion.version}
               status={initialTargetVersion.status}
+              frame="section"
             />
             <GitHubStatus
               documentVersionId={initialTargetVersion.id}
               isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+              frame="section"
             />
             {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
-              <ActivityLog entries={initialTargetVersion.activityLogs} />
+              <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />
             )}
           </>
         ) : undefined
@@ -522,7 +529,7 @@ function TranslateToolbar({
 
 function AssignmentInfoBlock({ assignment }: { assignment: any }) {
   return (
-    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+    <div>
       <div className="flex items-center gap-2 text-sm">
         {assignment.user ? (
           <>

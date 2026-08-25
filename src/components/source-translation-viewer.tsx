@@ -16,7 +16,7 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } f
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
-import { ChevronLeft, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -945,7 +945,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               </div>
               {sidebarHeader}
               {sidebarSummary && (
-                <div className="border-b border-l px-3 py-2 space-y-1.5">
+                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-white">
                   {sidebarSummary}
                   {sidebarDetails && (
                     <Button
@@ -956,8 +956,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     >
                       {sidebarView === 'details' ? (
                         <>
-                          <ChevronLeft className="h-3.5 w-3.5 mr-1" />
-                          Back to feedback
+                          <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                          Hide details
                         </>
                       ) : (
                         <>
@@ -970,13 +970,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 </div>
               )}
             </SidebarHeader>
-            {sidebarView === 'details' && sidebarDetails && (
-              <SidebarContent className="p-0">
-                <div className="px-3 pb-4 space-y-0 [&>*]:mt-3">{sidebarDetails}</div>
-              </SidebarContent>
-            )}
-            {sidebarView !== 'details' && hasSidebar && (
-              <SidebarContent className="p-0">
+            <SidebarContent className="p-0 gap-0">
+              {sidebarView === 'details' && sidebarDetails && <div className="shrink-0">{sidebarDetails}</div>}
+              {hasSidebar && (
+                <div className="flex-1 min-h-[16rem] flex flex-col">
                 <ThreadSidebar
                   suggestions={suggestions}
                   currentUserId={currentUserId || ''}
@@ -992,8 +989,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   activeThreadId={activeThreadId}
                   disableReopen={disableReopen}
                 />
-              </SidebarContent>
-            )}
+                </div>
+              )}
+            </SidebarContent>
           </Sidebar>
         )}
       </>
