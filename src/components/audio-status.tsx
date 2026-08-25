@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { SidebarSection } from '@/components/sidebar-section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Copy, Download, Loader2, RefreshCw, Volume2 } from 'lucide-react';
+import { AlertCircle, Copy, Download, Loader2, Pause, Play, RefreshCw, Volume2 } from 'lucide-react';
 import { advanceAudioJobAction, getLatestAudioFileAction, regenerateAudioAction } from '@/domain/audio/audio.actions';
 import { isAudioStale, parseAudioError } from '@/domain/audio/audio.rules';
 import { AUDIO_SKIP_MESSAGES, type AudioFileView } from '@/domain/audio/audio.types';
@@ -17,6 +18,10 @@ interface AudioStatusProps {
   /** DocumentVersion.version, compared with the audio's sourceVersion for staleness. */
   currentVersion: number;
   status: DocumentStatus;
+  /** One-line summary row for the sidebar instead of the full card. */
+  compact?: boolean;
+  /** `section` renders in the flat sidebar frame; `card` is the standalone card. */
+  frame?: 'card' | 'section';
 }
 
 const POLL_INTERVAL_MS = 5000;
@@ -28,15 +33,24 @@ const isInFlight = (audio: AudioFileView | null) => audio?.status === 'PENDING' 
  * generation is in flight. Offers regenerate/retry to whoever may edit the
  * version (the server action enforces that; here the button is just shown).
  */
-export function AudioStatus({ documentVersionId, currentVersion, status }: AudioStatusProps) {
+export function AudioStatus({
+  documentVersionId,
+  currentVersion,
+  status,
+  compact = false,
+  frame = 'card',
+}: AudioStatusProps) {
   const [audio, setAudio] = useState<AudioFileView | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [fileMissing, setFileMissing] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playbackTracked = useRef(false);
   const failureTracked = useRef<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setFileMissing(false);
     try {
       setAudio(await getLatestAudioFileAction(documentVersionId));
     } catch (error) {
@@ -47,9 +61,26 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
   }, [documentVersionId]);
 
   useEffect(() => {
-    setLoading(true);
     load();
   }, [load]);
+
+  // The record says READY but storage may have lost the object (a bucket
+  // lifecycle rule, a manual delete). The browser is the only one that can
+  // tell us, so ask it: try to fetch the first byte.
+  useEffect(() => {
+    if (audio?.status !== 'READY' || !audio.url) return;
+    let cancelled = false;
+    fetch(audio.url, { method: 'GET', headers: { Range: 'bytes=0-0' }, mode: 'cors' })
+      .then((res) => {
+        if (!cancelled && (res.status === 404 || res.status === 403)) setFileMissing(true);
+      })
+      .catch(() => {
+        // CORS-opaque or network failure: cannot tell, assume present and let the player report.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [audio?.status, audio?.url]);
 
   useEffect(() => {
     if (!isInFlight(audio)) return;
@@ -114,17 +145,18 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
   const stale = audio ? isAudioStale(audio, { version: currentVersion }) : false;
   const error = audio?.status === 'FAILED' ? parseAudioError(audio.errorMessage) : null;
 
-  return (
-    <Card className="mt-4 p-4">
-      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-        <Volume2 className="h-5 w-5" />
-        Audio
-        {stale && (
-          <Badge className="bg-amber-100 text-amber-800" title="The text changed after this audio was generated">
-            Stale
-          </Badge>
-        )}
-      </h3>
+  if (compact) {
+    return <AudioSummaryRow audio={audio} stale={stale} fileMissing={fileMissing} documentVersionId={documentVersionId} />;
+  }
+
+  const staleBadge = stale ? (
+    <Badge className="bg-amber-100 text-amber-800" title="The text changed after this audio was generated">
+      Stale
+    </Badge>
+  ) : null;
+
+  const body = (
+    <>
 
       {!audio && (
         <div className="text-sm text-gray-500">
@@ -154,12 +186,27 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
         </div>
       )}
 
-      {audio && audio.status === 'READY' && audio.url && (
+      {audio && audio.status === 'READY' && fileMissing && (
+        <div className="flex items-start gap-2 text-amber-700">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="font-medium">Audio file is no longer in storage</p>
+            <p className="text-sm">
+              It was generated {formatDate(audio.updatedAt)} from version {audio.sourceVersion} but the file has since been
+              removed. Regenerate to get a new one.
+            </p>
+            <RegenerateButton label="Regenerate" busy={regenerating} onClick={() => handleRegenerate('regenerate')} />
+          </div>
+        </div>
+      )}
+
+      {audio && audio.status === 'READY' && !fileMissing && audio.url && (
         <div className="space-y-3">
           <audio
             controls
             preload="none"
             src={audio.url}
+            onError={() => setFileMissing(true)}
             className="w-full"
             onPlay={() => {
               if (playbackTracked.current) return;
@@ -194,7 +241,103 @@ export function AudioStatus({ documentVersionId, currentVersion, status }: Audio
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (frame === 'section') {
+    return (
+      <SidebarSection title="Audio" action={staleBadge}>
+        {body}
+      </SidebarSection>
+    );
+  }
+
+  return (
+    <Card className="mt-4 p-4">
+      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+        <Volume2 className="h-5 w-5" />
+        Audio
+        {staleBadge}
+      </h3>
+      {body}
     </Card>
+  );
+}
+
+/** Sidebar row: state at a glance plus a play/pause toggle when there is something to hear. */
+function AudioSummaryRow({
+  audio,
+  stale,
+  fileMissing,
+  documentVersionId,
+}: {
+  audio: AudioFileView | null;
+  stale: boolean;
+  fileMissing: boolean;
+  documentVersionId: string;
+}) {
+  const player = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const tracked = useRef(false);
+
+  const toggle = () => {
+    const el = player.current;
+    if (!el) return;
+    if (el.paused) {
+      el.play();
+      if (!tracked.current && audio) {
+        tracked.current = true;
+        capture('audio_playback_started', { documentVersionId, provider: audio.provider, voice: audio.voice });
+      }
+    } else {
+      el.pause();
+    }
+  };
+
+  let label: string;
+  let tone = 'text-muted-foreground';
+  if (!audio) label = 'Not generated';
+  else if (isInFlight(audio)) label = 'Generating...';
+  else if (audio.status === 'FAILED') {
+    label = 'Failed';
+    tone = 'text-red-600';
+  } else if (fileMissing) {
+    label = 'File removed';
+    tone = 'text-amber-700';
+  } else {
+    label = audio.durationMs ? formatDuration(audio.durationMs) : 'Ready';
+    if (stale) {
+      label += ' · stale';
+      tone = 'text-amber-700';
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+        <Volume2 className="h-3.5 w-3.5" />
+        Audio
+      </span>
+      <span className={`flex items-center gap-1.5 text-xs font-medium ${tone}`}>
+        {audio && isInFlight(audio) && <Loader2 className="h-3 w-3 animate-spin" />}
+        {label}
+        {audio?.status === 'READY' && !fileMissing && audio.url && (
+          <>
+            <audio
+              ref={player}
+              preload="none"
+              src={audio.url}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={() => setPlaying(false)}
+            />
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={toggle} title={playing ? 'Pause' : 'Play'}>
+              {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            </Button>
+          </>
+        )}
+      </span>
+    </div>
   );
 }
 

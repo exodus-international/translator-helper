@@ -40,7 +40,7 @@ export function DocumentInfoCard({
   const statusConfig = getDocumentStatusConfig(status);
 
   return (
-    <Card className="rounded-none border-l border-t-0 shrink-0">
+    <Card className="rounded-none border-l-0 border-t-0 shrink-0">
       <CardContent className=" space-y-2.5">
         {/* Status */}
         <div className="flex items-center justify-between">

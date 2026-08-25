@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { SidebarSection } from '@/components/sidebar-section';
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -257,19 +258,26 @@ function CollapsedGroupRow({ group }: { group: CollapsedEntry }) {
   );
 }
 
-export function ActivityLog({ entries }: ActivityLogProps) {
+export function ActivityLog({ entries, frame = 'card' }: ActivityLogProps & { frame?: 'card' | 'section' }) {
   if (!entries || entries.length === 0) return null;
 
   const collapsed = collapseEntries(entries);
+  const rows = (
+    <div className="space-y-2">
+      {collapsed.map((group) => (
+        <CollapsedGroupRow key={group.entries[0].id} group={group} />
+      ))}
+    </div>
+  );
+
+  if (frame === 'section') {
+    return <SidebarSection title="Activity log">{rows}</SidebarSection>;
+  }
 
   return (
     <Card className="mt-4 p-4">
       <h3 className="text-sm font-semibold mb-2">Activity Log</h3>
-      <div className="space-y-2">
-        {collapsed.map((group) => (
-          <CollapsedGroupRow key={group.entries[0].id} group={group} />
-        ))}
-      </div>
+      {rows}
     </Card>
   );
 }

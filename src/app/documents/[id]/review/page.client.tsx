@@ -1,5 +1,6 @@
 'use client';
 
+import { ActivityLog } from '@/components/activity-log';
 import { AudioStatus } from '@/components/audio-status';
 import { GitHubStatus } from '@/components/github-status';
 import { StatusDropdown } from '@/components/status-dropdown';
@@ -77,20 +78,41 @@ export default function ReviewClient({
           toast.error(error.message || 'Failed to edit suggestion');
         }
       }}
-      activityLogs={initialTargetVersion.activityLogs ?? []}
-      extraDetails={
+      hideDetails
+      sidebarSummary={
         <>
           <AudioStatus
             documentVersionId={initialTargetVersion.id}
             currentVersion={initialTargetVersion.version}
             status={initialTargetVersion.status}
+            compact
           />
           <GitHubStatus
             documentVersionId={initialTargetVersion.id}
             isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+            compact
           />
         </>
       }
+      sidebarDetails={
+        <>
+          <AudioStatus
+            documentVersionId={initialTargetVersion.id}
+            currentVersion={initialTargetVersion.version}
+            status={initialTargetVersion.status}
+            frame="section"
+          />
+          <GitHubStatus
+            documentVersionId={initialTargetVersion.id}
+            isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+            frame="section"
+          />
+          {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
+            <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />
+          )}
+        </>
+      }
+      sidebarDetailsDefaultOpen={initialTargetVersion.status === DocumentStatus.DEPLOYED}
     />
   );
 }

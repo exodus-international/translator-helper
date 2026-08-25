@@ -16,7 +16,7 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } f
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
-import { Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -91,6 +91,12 @@ interface SourceTranslationViewerProps {
   onCreateGeneralThread?: (comment: string) => void;
   disableReopen?: boolean;
   sidebarHeader?: ReactNode;
+  /** Compact one-line rows shown under the header (audio, deploy). */
+  sidebarSummary?: ReactNode;
+  /** Full panels shown in place of the feedback list when the user opens details. */
+  sidebarDetails?: ReactNode;
+  /** Start with the details panels open instead of the feedback list. */
+  sidebarDetailsDefaultOpen?: boolean;
   /** Monaco language for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
 }
@@ -149,10 +155,16 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       onCreateGeneralThread,
       disableReopen = false,
       sidebarHeader,
+      sidebarSummary,
+      sidebarDetails,
+      sidebarDetailsDefaultOpen = false,
       contentLanguage = 'markdown',
     },
     ref,
   ) {
+    const [sidebarView, setSidebarView] = useState<'threads' | 'details'>(
+      sidebarDetailsDefaultOpen ? 'details' : 'threads',
+    );
     const isZen = layout === 'zen';
     const isYaml = contentLanguage === 'yaml';
     const { open: sidebarOpen, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
@@ -920,7 +932,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </AlertDialog>
         </div>
 
-        {(hasSidebar || sidebarHeader) && (
+        {(hasSidebar || sidebarHeader || sidebarSummary) && (
           <Sidebar side="right" collapsible="offcanvas">
             <SidebarHeader className="p-0 gap-0">
               <div className="px-3 py-2 flex items-center justify-between border-b">
@@ -932,9 +944,36 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 </Button>
               </div>
               {sidebarHeader}
+              {sidebarSummary && (
+                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-white">
+                  {sidebarSummary}
+                  {sidebarDetails && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-full justify-start px-1 text-xs text-muted-foreground"
+                      onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
+                    >
+                      {sidebarView === 'details' ? (
+                        <>
+                          <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                          Hide details
+                        </>
+                      ) : (
+                        <>
+                          <ChevronRight className="h-3.5 w-3.5 mr-1" />
+                          Open details
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
             </SidebarHeader>
-            {hasSidebar && (
-              <SidebarContent className="p-0">
+            <SidebarContent className="p-0 gap-0">
+              {sidebarView === 'details' && sidebarDetails && <div className="shrink-0">{sidebarDetails}</div>}
+              {hasSidebar && (
+                <div className="flex-1 min-h-[16rem] flex flex-col">
                 <ThreadSidebar
                   suggestions={suggestions}
                   currentUserId={currentUserId || ''}
@@ -950,8 +989,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   activeThreadId={activeThreadId}
                   disableReopen={disableReopen}
                 />
-              </SidebarContent>
-            )}
+                </div>
+              )}
+            </SidebarContent>
           </Sidebar>
         )}
       </>

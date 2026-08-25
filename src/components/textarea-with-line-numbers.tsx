@@ -43,6 +43,13 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
   const monacoRef = useRef<any>(null);
   const [editorMounted, setEditorMounted] = useState(false);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  // Same for the cursor callback: Monaco registers the listener once at mount,
+  // so without a ref it would keep calling the callback from the first render
+  // (whose line counts were computed from empty content).
+  const onCursorChangeRef = useRef(onCursorChange);
+  useEffect(() => {
+    onCursorChangeRef.current = onCursorChange;
+  }, [onCursorChange]);
   onSelectionChangeRef.current = onSelectionChange;
 
   // Expose editor and monaco refs to parent
@@ -122,8 +129,8 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
       if (e?.source === 'api') {
         return;
       }
-      if (onCursorChange && e.position) {
-        onCursorChange(e.position.lineNumber);
+      if (onCursorChangeRef.current && e.position) {
+        onCursorChangeRef.current(e.position.lineNumber);
       }
     });
 

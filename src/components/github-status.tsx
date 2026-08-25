@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { SidebarSection } from '@/components/sidebar-section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GitBranch, ExternalLink, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
@@ -13,6 +14,10 @@ import { toast } from 'sonner';
 interface GitHubStatusProps {
   documentVersionId: string;
   isDeployed: boolean;
+  /** One-line summary row for the sidebar instead of the full card. */
+  compact?: boolean;
+  /** `section` renders in the flat sidebar frame; `card` is the standalone card. */
+  frame?: 'card' | 'section';
 }
 
 interface GitHubCommitData {
@@ -33,7 +38,7 @@ const PR_STATUS_COLORS: Record<string, string> = {
   CLOSED: 'bg-red-100 text-red-800',
 };
 
-export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProps) {
+export function GitHubStatus({ documentVersionId, isDeployed, compact = false, frame = 'card' }: GitHubStatusProps) {
   const [commits, setCommits] = useState<GitHubCommitData[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
@@ -75,12 +80,42 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
 
   if (!isDeployed) return null;
 
-  return (
-    <Card className="mt-4 p-4">
-      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-        <GitBranch className="h-5 w-5" />
-        GitHub Deployment
-      </h3>
+  if (compact) {
+    const latest = commits[0];
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+          <GitBranch className="h-3.5 w-3.5" />
+          GitHub
+        </span>
+        <span className="flex items-center gap-1.5 text-xs font-medium">
+          {loading && <Loader2 className="h-3 w-3 animate-spin" />}
+          {!loading && !latest && <span className="text-muted-foreground">Not deployed</span>}
+          {!loading && latest?.errorMessage && <span className="text-red-600">Deploy failed</span>}
+          {!loading && latest && !latest.errorMessage && latest.prNumber && (
+            <>
+              {latest.prUrl ? (
+                <a href={latest.prUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  PR #{latest.prNumber}
+                </a>
+              ) : (
+                <span>PR #{latest.prNumber}</span>
+              )}
+              {latest.prStatus && (
+                <Badge className={`${PR_STATUS_COLORS[latest.prStatus] || ''} px-1.5 py-0 text-[10px]`}>{latest.prStatus}</Badge>
+              )}
+            </>
+          )}
+          {!loading && latest && !latest.errorMessage && !latest.prNumber && (
+            <code className="text-[10px]">{latest.commitSha.substring(0, 7)}</code>
+          )}
+        </span>
+      </div>
+    );
+  }
+
+  const body = <>
+
 
       {loading && (
         <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -159,6 +194,19 @@ export function GitHubStatus({ documentVersionId, isDeployed }: GitHubStatusProp
           ))}
         </div>
       )}
+  </>;
+
+  if (frame === 'section') {
+    return <SidebarSection title="GitHub deployment">{body}</SidebarSection>;
+  }
+
+  return (
+    <Card className="mt-4 p-4">
+      <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+        <GitBranch className="h-5 w-5" />
+        GitHub Deployment
+      </h3>
+      {body}
     </Card>
   );
 }

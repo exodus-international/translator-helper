@@ -101,6 +101,9 @@ interface ViewerConfig {
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
+  sidebarSummary?: ReactNode;
+  sidebarDetails?: ReactNode;
+  sidebarDetailsDefaultOpen?: boolean;
   contentLanguage?: 'markdown' | 'yaml';
 }
 
@@ -121,6 +124,9 @@ function EditorViewer({
   translationPlaceholder,
   translationPreviewEmptyText,
   onEditSuggestion,
+  sidebarSummary,
+  sidebarDetails,
+  sidebarDetailsDefaultOpen,
   contentLanguage,
 }: ViewerConfig) {
   const router = useRouter();
@@ -212,6 +218,9 @@ function EditorViewer({
       onReply={replySuggestion}
       onCreateGeneralThread={createGeneralThread}
       disableReopen={resolvedDisableReopen}
+      sidebarSummary={sidebarSummary}
+      sidebarDetails={sidebarDetails}
+      sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
       sidebarHeader={
         <DocumentInfoCard
           status={targetVersion?.status}
@@ -367,6 +376,11 @@ interface DocumentEditorProps {
   // Suggestion handler (review-only edit)
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
 
+  // Sidebar summary + details (audio, deploy)
+  sidebarSummary?: ReactNode;
+  sidebarDetails?: ReactNode;
+  sidebarDetailsDefaultOpen?: boolean;
+
   // Details panel
   extraDetails?: ReactNode;
   activityLogs?: any[];
@@ -397,12 +411,15 @@ export function DocumentEditor({
   disableReopen,
   reviewConfig,
   onEditSuggestion,
+  sidebarSummary,
+  sidebarDetails,
+  sidebarDetailsDefaultOpen,
   extraDetails,
   activityLogs,
   hideDetails,
   autoSaveDelayMs,
 }: DocumentEditorProps) {
-  const outer = outerClassName ?? (fullscreen ? 'fixed inset-0 bg-white z-50' : 'min-h-screen bg-gray-50');
+  const outer = outerClassName ?? (fullscreen ? 'fixed inset-0 bg-white z-50' : 'bg-gray-50');
   const viewerHeight = fullscreen ? 'h-full' : 'h-[calc(100vh-7.5rem)]';
   const viewerWrapper = fullscreen ? 'h-[calc(100vh-3.5rem)] p-4' : 'border-0';
   const contentLanguage = getEditorLanguage(document.originalFilename ?? '');
@@ -438,6 +455,9 @@ export function DocumentEditor({
               translationPlaceholder={translationPlaceholder}
               translationPreviewEmptyText={translationPreviewEmptyText}
               onEditSuggestion={onEditSuggestion}
+              sidebarSummary={sidebarSummary}
+              sidebarDetails={sidebarDetails}
+              sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
               contentLanguage={contentLanguage}
             />
           </div>

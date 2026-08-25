@@ -79,6 +79,9 @@ stillPending }`; zeros when there is nothing to do.
 
 ## Storage layout
 
-`{prefix}/audio/{lang}/{repo path without extension}/{audioFileId}.mp3`, e.g.
-`production/audio/cs/exercises/exodus90/days/2/3f1c...mp3`. Every generation
-writes a new object; a copied URL never changes content. Nothing is deleted.
+`{prefix}/audio/{lang}/{repo path without extension}/{audioFileId}/{readable name}.mp3`, e.g.
+`production/audio/cs/exercises/lent2026/days/20/3f1c.../lent2026-cs-day-20.mp3`.
+The last segment is what a browser names the download, so it carries project,
+language, document type and the document's own name. Every generation writes
+a new object (the record id folder); a copied URL never changes content.
+Nothing is deleted.
