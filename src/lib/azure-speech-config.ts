@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const azureSpeechConfigSchema = z.object({
-  /** Host from the resource's "Keys and Endpoint" page; either `{name}.cognitiveservices.azure.com` or `{region}.api.cognitive.microsoft.com` works. */
+  /** Host from the resource's "Keys and Endpoint" page; `{name}.cognitiveservices.azure.com` for a custom-domain resource, or `{region}.api.cognitive.microsoft.com` for a region key (scripts/azure-find-region.ts finds the region). Batch synthesis needs the Standard S0 tier; F0 answers 401. */
   endpoint: z.string({ error: 'AZURE_SPEECH_ENDPOINT must be a URL' }).url('AZURE_SPEECH_ENDPOINT must be a URL'),
   key: z.string({ error: 'AZURE_SPEECH_KEY is required' }).min(1, 'AZURE_SPEECH_KEY is required'),
 });
