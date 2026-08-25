@@ -80,7 +80,11 @@ export default function ReviewClient({
       activityLogs={initialTargetVersion.activityLogs ?? []}
       extraDetails={
         <>
-          <AudioStatus documentVersionId={initialTargetVersion.id} />
+          <AudioStatus
+            documentVersionId={initialTargetVersion.id}
+            currentVersion={initialTargetVersion.version}
+            status={initialTargetVersion.status}
+          />
           <GitHubStatus
             documentVersionId={initialTargetVersion.id}
             isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}

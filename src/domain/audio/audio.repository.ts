@@ -61,3 +61,12 @@ export async function markAudioFileFailed(id: string, errorMessage: string) {
     data: { status: AudioStatus.FAILED, errorMessage: errorMessage.slice(0, 2000) },
   });
 }
+
+/** In-flight records nobody has touched for a while: candidates for the scheduled sweep. */
+export async function findStalledAudioFiles(olderThan: Date, limit = 50) {
+  return prisma.audioFile.findMany({
+    where: { status: { in: [AudioStatus.PENDING, AudioStatus.PROCESSING] }, updatedAt: { lt: olderThan } },
+    orderBy: { updatedAt: 'asc' },
+    take: limit,
+  });
+}

@@ -23,6 +23,12 @@ export const AUDIO_SKIP_MESSAGES: Record<AudioSkipReason, string> = {
   document_type_missing: 'The document has no type set',
 };
 
+/** What a deployer needs to know before shipping a version. */
+export interface AudioReadiness {
+  state: 'ready' | 'stale' | 'pending' | 'failed' | 'missing' | 'not_applicable';
+  url?: string;
+}
+
 export const AUDIO_CONTENT_TYPE = 'audio/mpeg';
 export const AUDIO_FILE_EXTENSION = 'mp3';
 

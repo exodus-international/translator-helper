@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Language } from '@prisma/client';
+import { AudioProvider, Language } from '@prisma/client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +13,10 @@ import {
   createLanguageAction,
   updateLanguageAction,
   updateLanguageBranchNameAction,
+  updateLanguageAudioAction,
   deleteLanguageAction,
 } from '@/domain/language/language.actions';
+import { DEFAULT_AUDIO_VOICES } from '@/domain/language/language.types';
 import { capture } from '@/lib/analytics';
 import { toast } from 'sonner';
 
@@ -28,6 +31,8 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [branchName, setBranchName] = useState('');
+  const [audioProvider, setAudioProvider] = useState<AudioProvider | 'NONE'>('NONE');
+  const [audioVoice, setAudioVoice] = useState('');
   const [loading, setLoading] = useState(false);
 
   const resetForm = () => {
@@ -35,6 +40,16 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
     setCode('');
     setName('');
     setBranchName('');
+    setAudioProvider('NONE');
+    setAudioVoice('');
+  };
+
+  const handleProviderChange = (value: AudioProvider | 'NONE') => {
+    setAudioProvider(value);
+    // Prefill the team's default voice for this locale when a provider is first picked.
+    if (value !== 'NONE' && !audioVoice) {
+      setAudioVoice(DEFAULT_AUDIO_VOICES[editingLanguage?.code ?? code] ?? '');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,7 +65,16 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
             branchName: branchName || null,
           });
         }
-        setLanguages(languages.map((l) => (l.id === updated.id ? { ...updated, branchName: branchName || null } : l)));
+        const audio = {
+          audioProvider: audioProvider === 'NONE' ? null : audioProvider,
+          audioVoice: audioProvider === 'NONE' ? null : audioVoice || null,
+        };
+        if (audio.audioProvider !== editingLanguage.audioProvider || audio.audioVoice !== editingLanguage.audioVoice) {
+          await updateLanguageAudioAction(editingLanguage.id, audio);
+        }
+        setLanguages(
+          languages.map((l) => (l.id === updated.id ? { ...updated, branchName: branchName || null, ...audio } : l)),
+        );
         capture('language_updated', { code: updated.code });
       } else {
         const created = await createLanguageAction({ code, name, branchName: branchName || undefined });
@@ -73,6 +97,8 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
     setCode(language.code);
     setName(language.name);
     setBranchName(language.branchName || '');
+    setAudioProvider(language.audioProvider ?? 'NONE');
+    setAudioVoice(language.audioVoice || '');
     setDialogOpen(true);
   };
 
@@ -134,6 +160,36 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
             />
             <p className="text-xs text-gray-500 mt-1">Branch in the content repo for this language</p>
           </div>
+          {editingLanguage && (
+            <>
+              <div>
+                <Label htmlFor="audioProvider">Speech Provider</Label>
+                <Select value={audioProvider} onValueChange={handleProviderChange}>
+                  <SelectTrigger id="audioProvider">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">None (no audio)</SelectItem>
+                    <SelectItem value={AudioProvider.AZURE_SPEECH}>Azure Speech</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">Approved translations in this language get generated audio</p>
+              </div>
+              {audioProvider !== 'NONE' && (
+                <div>
+                  <Label htmlFor="audioVoice">Voice *</Label>
+                  <Input
+                    id="audioVoice"
+                    value={audioVoice}
+                    onChange={(e) => setAudioVoice(e.target.value)}
+                    placeholder="e.g., cs-CZ-AntoninNeural"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Provider voice id. Team policy is the male voice per locale.</p>
+                </div>
+              )}
+            </>
+          )}
         </>
       }
     >
@@ -144,6 +200,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
               <h3 className="font-semibold text-lg">{language.name}</h3>
               <p className="text-sm text-gray-600">Code: {language.code}</p>
               {language.branchName && <p className="text-xs text-gray-500">Branch: {language.branchName}</p>}
+              {language.audioVoice && <p className="text-xs text-gray-500">Voice: {language.audioVoice}</p>}
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => handleEdit(language)}>

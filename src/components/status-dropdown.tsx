@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
+import { useDeployConfirm } from '@/components/deploy-confirm';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { capture } from '@/lib/analytics';
@@ -44,6 +45,7 @@ export function StatusDropdown({
   openSuggestionsCount = 0,
 }: StatusDropdownProps) {
   const router = useRouter();
+  const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
@@ -131,6 +133,10 @@ export function StatusDropdown({
       return;
     }
 
+    if (newStatus === DocumentStatus.DEPLOYED && !(await confirmDeploy(versionId))) {
+      return;
+    }
+
     setLoading(true);
 
     // Show a loading toast for deploy (GitHub takes a few seconds)
@@ -157,6 +163,13 @@ export function StatusDropdown({
         }
       } else if (deployToastId) {
         toast.dismiss(deployToastId);
+      }
+
+      if (result.audio?.status === 'success') {
+        capture('audio_generation_triggered', { documentVersionId: versionId });
+      } else if (result.audio?.status === 'failed') {
+        capture('audio_generation_failed', { documentVersionId: versionId, kind: 'unknown' });
+        toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
       }
 
       capture('document_status_changed', { from: displayedStatus, to: newStatus, via: 'dropdown' });
@@ -217,7 +230,9 @@ export function StatusDropdown({
   }
 
   return (
-    <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
+    <>
+      {deployDialog}
+      <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
       <DropdownMenuPrimitive.Trigger asChild>
         <Button
           variant="outline"
@@ -303,5 +318,6 @@ export function StatusDropdown({
         </DropdownMenuPrimitive.Content>
       </DropdownMenuPrimitive.Portal>
     </DropdownMenuPrimitive.Root>
+    </>
   );
 }

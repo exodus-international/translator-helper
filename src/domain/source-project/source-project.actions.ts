@@ -68,8 +68,8 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
       throw new Error('Forbidden: Only deployers and project managers can manage source projects');
     }
 
-    // Project managers can only update status, not name or description
-    if (validated.name !== undefined || validated.description !== undefined) {
+    // Project managers can only update status, not name, description or audio settings
+    if (validated.name !== undefined || validated.description !== undefined || validated.audioDocumentTypes !== undefined) {
       throw new Error('Forbidden: Project managers can only update project status');
     }
   }
@@ -79,6 +79,7 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
     description: validated.description,
     identifier: validated.identifier,
     status: validated.status,
+    audioDocumentTypes: validated.audioDocumentTypes,
   });
 }
 

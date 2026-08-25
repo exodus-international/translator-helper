@@ -7,15 +7,18 @@ import { resolveAudioObjectKey } from './audio.paths';
 import {
   claimAudioFileForProcessing,
   createAudioFile,
+  findStalledAudioFiles,
   getAudioFileById,
+  getLatestAudioFileForVersion,
   markAudioFileFailed,
   markAudioFileReady,
   releaseAudioFileToPending,
   setAudioFileJob,
 } from './audio.repository';
+import { audioSkipReason, formatAudioError, isAudioStale, type AudioErrorKind } from './audio.rules';
 import { markdownToSpeechScript } from './audio.script';
 import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
-import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioSkipReason } from './audio.types';
+import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
 
@@ -27,14 +30,23 @@ const LOG_PREFIX = '[Audio]';
  * `skipped`, everything else as `failed`, so a status transition is never
  * blocked by audio.
  */
-export async function startGeneration(documentVersionId: string, userId: string): Promise<AudioGenerationOutcome> {
+export async function startGeneration(
+  documentVersionId: string,
+  userId: string,
+  options: { trigger?: 'approval' | 'regeneration' } = {},
+): Promise<AudioGenerationOutcome> {
   const version = await prisma.documentVersion.findUnique({
     where: { id: documentVersionId },
     include: { document: { include: { sourceProject: true } }, language: true },
   });
   if (!version) return { status: 'failed', error: `Document version not found: ${documentVersionId}` };
 
-  const skip = eligibilitySkipReason(version);
+  const skip = audioSkipReason({
+    language: version.language,
+    document: version.document,
+    storageConfigured: isAudioStorageConfigured(),
+    providerConfigured: (provider) => getSpeechProvider(provider).isConfigured(),
+  });
   if (skip) {
     console.log(`${LOG_PREFIX} skipping generation for ${documentVersionId}: ${skip}`);
     return { status: 'skipped', reason: skip };
@@ -54,10 +66,14 @@ export async function startGeneration(documentVersionId: string, userId: string)
   await createActivityLog({
     documentVersionId,
     userId,
-    action: 'audio_generation_started',
+    action: options.trigger === 'regeneration' ? 'audio_regeneration_requested' : 'audio_generation_started',
     details: { audioFileId: audioFile.id, voice },
   });
 
+  // Anything thrown before the provider is asked is our problem (content or
+  // setup), anything after is the provider's. The kind is stored with the
+  // message so the card can word the two differently.
+  let phase: AudioErrorKind = 'content';
   try {
     const script = markdownToSpeechScript(version.content);
     if (!script.segments.some((s) => s.kind === 'text')) {
@@ -70,6 +86,7 @@ export async function startGeneration(documentVersionId: string, userId: string)
       ...DEFAULT_PROSODY,
     });
 
+    phase = 'provider';
     const outcome = await provider.submit({ jobId: jobIdFor(audioFile.id), ssml });
     if (outcome.kind === 'result') {
       // Synchronous provider: finish in the same call.
@@ -82,7 +99,7 @@ export async function startGeneration(documentVersionId: string, userId: string)
   } catch (error: unknown) {
     const message = errorMessage(error);
     console.error(`${LOG_PREFIX} generation failed for ${documentVersionId}:`, message);
-    await fail(audioFile, message);
+    await fail(audioFile, formatAudioError(phase, message));
     return { status: 'failed', error: message };
   }
 }
@@ -97,7 +114,7 @@ export async function advanceJob(audioFileId: string): Promise<AudioFile | null>
   if (!audioFile) return null;
   if (audioFile.status === AudioStatus.READY || audioFile.status === AudioStatus.FAILED) return audioFile;
   if (!audioFile.providerJobId) {
-    return markAudioFileFailed(audioFileId, 'No provider job was recorded for this generation');
+    return fail(audioFile, formatAudioError('configuration', 'No provider job was recorded for this generation'));
   }
 
   const claimed = await claimAudioFileForProcessing(audioFileId);
@@ -110,7 +127,7 @@ export async function advanceJob(audioFileId: string): Promise<AudioFile | null>
       return getAudioFileById(audioFileId);
     }
     if (outcome.kind === 'failed') {
-      return fail(audioFile, outcome.message);
+      return fail(audioFile, formatAudioError('provider', outcome.message));
     }
 
     const version = await prisma.documentVersion.findUnique({
@@ -118,12 +135,90 @@ export async function advanceJob(audioFileId: string): Promise<AudioFile | null>
       include: { document: { include: { sourceProject: true } }, language: true },
     });
     if (!version) throw new Error('Document version disappeared while audio was generating');
-    return complete(audioFile, outcome.result, { document: version.document, languageCode: version.language.code });
+    try {
+      return await complete(audioFile, outcome.result, { document: version.document, languageCode: version.language.code });
+    } catch (error: unknown) {
+      const message = errorMessage(error);
+      console.error(`${LOG_PREFIX} storing ${audioFileId} failed:`, message);
+      return fail(audioFile, formatAudioError('configuration', message));
+    }
   } catch (error: unknown) {
     const message = errorMessage(error);
     console.error(`${LOG_PREFIX} advancing ${audioFileId} failed:`, message);
-    return fail(audioFile, message);
+    return fail(audioFile, formatAudioError('provider', message));
   }
+}
+
+/**
+ * Whether a version's audio is fit to ship. `not_applicable` when the
+ * language or project is not set up for audio, so deploys are not nagged
+ * about audio nobody asked for.
+ */
+export async function getAudioReadiness(documentVersionId: string): Promise<AudioReadiness> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    include: { document: { include: { sourceProject: true } }, language: true },
+  });
+  if (!version) return { state: 'not_applicable' };
+
+  const skip = audioSkipReason({
+    language: version.language,
+    document: version.document,
+    storageConfigured: isAudioStorageConfigured(),
+    providerConfigured: (provider) => getSpeechProvider(provider).isConfigured(),
+  });
+  if (skip) return { state: 'not_applicable' };
+
+  const audio = await getLatestAudioFileForVersion(documentVersionId);
+  if (!audio) return { state: 'missing' };
+  if (audio.status === AudioStatus.PENDING || audio.status === AudioStatus.PROCESSING) return { state: 'pending' };
+  if (audio.status === AudioStatus.FAILED) return { state: 'failed' };
+  if (isAudioStale(audio, version)) return { state: 'stale', url: audio.url ?? undefined };
+  return { state: 'ready', url: audio.url ?? undefined };
+}
+
+const SWEEP_MIN_AGE_MS = 60_000;
+const STALLED_PROCESSING_MS = 15 * 60_000;
+
+export interface SweepResult {
+  checked: number;
+  ready: number;
+  failed: number;
+  stillPending: number;
+}
+
+/**
+ * Moves every in-flight record forward that nobody has looked at for a
+ * minute. A record stuck in PROCESSING for a long time means a worker died
+ * mid-upload; it is failed with a clear message rather than retried forever.
+ * Safe to call from a cron at any frequency; a no-op when nothing is pending.
+ */
+export async function sweepPendingJobs(now = new Date()): Promise<SweepResult> {
+  const candidates = await findStalledAudioFiles(new Date(now.getTime() - SWEEP_MIN_AGE_MS));
+  const result: SweepResult = { checked: candidates.length, ready: 0, failed: 0, stillPending: 0 };
+
+  for (const candidate of candidates) {
+    try {
+      let outcome: AudioFile | null;
+      if (candidate.status === AudioStatus.PROCESSING && now.getTime() - candidate.updatedAt.getTime() > STALLED_PROCESSING_MS) {
+        outcome = await fail(
+          candidate,
+          formatAudioError('provider', 'Generation stalled while processing and was abandoned by the scheduled sweep'),
+        );
+      } else {
+        outcome = await advanceJob(candidate.id);
+      }
+      if (outcome?.status === AudioStatus.READY) result.ready += 1;
+      else if (outcome?.status === AudioStatus.FAILED) result.failed += 1;
+      else result.stillPending += 1;
+    } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} sweep could not advance ${candidate.id}:`, errorMessage(error));
+      result.stillPending += 1;
+    }
+  }
+
+  if (result.checked > 0) console.log(`${LOG_PREFIX} sweep:`, result);
+  return result;
 }
 
 async function complete(
@@ -178,24 +273,6 @@ async function fail(audioFile: AudioFile, message: string): Promise<AudioFile> {
     });
   }
   return updated;
-}
-
-type VersionForEligibility = {
-  language: { audioProvider: import('@prisma/client').AudioProvider | null; audioVoice: string | null };
-  document: {
-    type: import('@prisma/client').DocumentType | null;
-    sourceProject: { audioDocumentTypes: import('@prisma/client').DocumentType[] } | null;
-  };
-};
-
-function eligibilitySkipReason(version: VersionForEligibility): AudioSkipReason | null {
-  const { language, document } = version;
-  if (!language.audioProvider || !language.audioVoice) return 'no_voice_for_language';
-  if (!document.type) return 'document_type_missing';
-  if (!document.sourceProject?.audioDocumentTypes.includes(document.type)) return 'document_type_not_enabled';
-  if (!isAudioStorageConfigured()) return 'storage_not_configured';
-  if (!getSpeechProvider(language.audioProvider).isConfigured()) return 'provider_not_configured';
-  return null;
 }
 
 /** `cs-CZ-AntoninNeural` -> `cs-CZ`. Provider voice ids lead with their locale. */

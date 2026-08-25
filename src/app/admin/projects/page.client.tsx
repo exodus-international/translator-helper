@@ -13,7 +13,7 @@ import {
   updateSourceProjectAction,
 } from '@/domain/source-project/source-project.actions';
 import { capture } from '@/lib/analytics';
-import { SourceProject } from '@prisma/client';
+import { DocumentType, SourceProject } from '@prisma/client';
 import { CheckCircle2, Edit, FolderOpen, Languages } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -29,6 +29,16 @@ interface ProjectsClientProps {
   })[];
 }
 
+const DEFAULT_AUDIO_DOCUMENT_TYPES: DocumentType[] = [DocumentType.DAY, DocumentType.DAILY_CONTENT];
+
+const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
+  { value: DocumentType.DAY, label: 'Day' },
+  { value: DocumentType.FIELD_GUIDE, label: 'Field Guide' },
+  { value: DocumentType.DAILY_CONTENT, label: 'Daily Content' },
+  { value: DocumentType.ROOT_FILE, label: 'Root File' },
+  { value: DocumentType.MEETING, label: 'Meeting' },
+];
+
 export default function ProjectsClient({ sourceProjects: initialSourceProjects }: ProjectsClientProps) {
   const router = useRouter();
   const [sourceProjects, setSourceProjects] = useState(initialSourceProjects);
@@ -37,6 +47,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [identifier, setIdentifier] = useState('');
+  const [audioDocumentTypes, setAudioDocumentTypes] = useState<DocumentType[]>(DEFAULT_AUDIO_DOCUMENT_TYPES);
   const [loading, setLoading] = useState(false);
 
   // Sync state with props when they change (e.g., after router.refresh())
@@ -49,7 +60,13 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     setName('');
     setDescription('');
     setIdentifier('');
+    setAudioDocumentTypes(DEFAULT_AUDIO_DOCUMENT_TYPES);
   };
+
+  const toggleAudioDocumentType = (type: DocumentType) =>
+    setAudioDocumentTypes((current) =>
+      current.includes(type) ? current.filter((t) => t !== type) : [...current, type],
+    );
 
   // Replace one project in state, preserving its _count (server doesn't return _count on update)
   const replaceProjectPreservingCount = (updated: SourceProject) =>
@@ -77,6 +94,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
           name,
           description: description || null,
           identifier: identifier || null,
+          audioDocumentTypes,
         });
         replaceProjectPreservingCount(updated);
         capture('source_project_updated');
@@ -107,6 +125,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     setName(project.name);
     setDescription(project.description || '');
     setIdentifier((project as any).identifier || '');
+    setAudioDocumentTypes(project.audioDocumentTypes ?? DEFAULT_AUDIO_DOCUMENT_TYPES);
     setDialogOpen(true);
   };
 
@@ -185,6 +204,24 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
             />
             <p className="text-xs text-gray-500 mt-1">GITHUB: Folder name in the content repository</p>
           </div>
+          {editingProject && (
+            <div>
+              <Label>Generate audio for</Label>
+              <div className="mt-1 grid grid-cols-2 gap-1.5">
+                {DOCUMENT_TYPE_OPTIONS.map(({ value, label }) => (
+                  <label key={value} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={audioDocumentTypes.includes(value)}
+                      onChange={() => toggleAudioDocumentType(value)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Approved documents of these types get generated audio</p>
+            </div>
+          )}
         </>
       }
     >

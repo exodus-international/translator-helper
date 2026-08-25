@@ -107,3 +107,14 @@ Insight type: **Retention**.
 ## Event reference
 The full list of tracked events lives in the `AnalyticsEvent` union in
 `src/lib/analytics.ts` — that file is the single source of truth for event names.
+
+### Audio events
+Fired from client handlers only (the status dropdown and the audio card), never from server actions.
+
+| Event | When | Properties |
+|---|---|---|
+| `audio_generation_triggered` | Approval started an audio generation | `documentVersionId` |
+| `audio_regeneration_triggered` | Regenerate, Retry or Generate pressed on the audio card | `documentVersionId`, `reason` (`regenerate`, `retry`, `generate`) |
+| `audio_playback_started` | The inline player started playing (once per page view) | `documentVersionId`, `provider`, `voice` |
+| `audio_url_copied` | Copy URL pressed | `documentVersionId` |
+| `audio_generation_failed` | The card observed a failed generation, or approval reported one | `documentVersionId`, `kind` (`configuration`, `content`, `provider`, `unknown`) |

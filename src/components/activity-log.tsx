@@ -63,6 +63,7 @@ const ACTION_MAP: Record<string, ActionConfig> = {
   github_deployed: { label: 'Deployed to GitHub', icon: Github, colorClass: 'text-violet-500' },
   github_deploy_failed: { label: 'GitHub deploy failed', icon: AlertTriangle, colorClass: 'text-red-500' },
   audio_generation_started: { label: 'Started audio generation', icon: Volume2, colorClass: 'text-blue-500' },
+  audio_regeneration_requested: { label: 'Requested audio regeneration', icon: RotateCcw, colorClass: 'text-blue-500' },
   audio_generated: { label: 'Audio generated', icon: Volume2, colorClass: 'text-green-500' },
   audio_generation_failed: { label: 'Audio generation failed', icon: AlertTriangle, colorClass: 'text-red-500' },
   applied_suggestion: { label: 'Applied suggestion', icon: CheckCheck, colorClass: 'text-green-500' },
@@ -124,6 +125,7 @@ function getDetailText(action: string, details: Record<string, any> | null): str
     case 'assigned_translation':
       return details.language || null;
     case 'audio_generation_started':
+    case 'audio_regeneration_requested':
       return details.voice || null;
     case 'github_deploy_failed':
     case 'audio_generation_failed':

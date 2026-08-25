@@ -1,4 +1,5 @@
 import prisma from '@/lib/db';
+import type { DocumentType } from '@prisma/client';
 
 export async function listSourceProjects(options?: { includeComplete?: boolean }) {
   return prisma.sourceProject.findMany({
@@ -102,7 +103,13 @@ export async function createSourceProject(data: { name: string; description?: st
 
 export async function updateSourceProject(
   id: string,
-  data: { name?: string; description?: string | null; identifier?: string | null; status?: 'ACTIVE' | 'COMPLETE' },
+  data: {
+    name?: string;
+    description?: string | null;
+    identifier?: string | null;
+    status?: 'ACTIVE' | 'COMPLETE';
+    audioDocumentTypes?: DocumentType[];
+  },
 ) {
   return prisma.sourceProject.update({
     where: { id },
