@@ -21,6 +21,7 @@ import {
   Send,
   Trash2,
   UserPlus,
+  Volume2,
   XCircle,
 } from 'lucide-react';
 import { type LucideIcon } from 'lucide-react';
@@ -61,6 +62,9 @@ const ACTION_MAP: Record<string, ActionConfig> = {
   status_updated: { label: 'Changed status', icon: ArrowRightLeft, colorClass: 'text-gray-500' },
   github_deployed: { label: 'Deployed to GitHub', icon: Github, colorClass: 'text-violet-500' },
   github_deploy_failed: { label: 'GitHub deploy failed', icon: AlertTriangle, colorClass: 'text-red-500' },
+  audio_generation_started: { label: 'Started audio generation', icon: Volume2, colorClass: 'text-blue-500' },
+  audio_generated: { label: 'Audio generated', icon: Volume2, colorClass: 'text-green-500' },
+  audio_generation_failed: { label: 'Audio generation failed', icon: AlertTriangle, colorClass: 'text-red-500' },
   applied_suggestion: { label: 'Applied suggestion', icon: CheckCheck, colorClass: 'text-green-500' },
   reopened_suggestion: { label: 'Reopened suggestion', icon: RotateCcw, colorClass: 'text-orange-500' },
   dismissed_suggestion: { label: 'Dismissed suggestion', icon: XCircle, colorClass: 'text-gray-500' },
@@ -119,7 +123,10 @@ function getDetailText(action: string, details: Record<string, any> | null): str
     case 'created_translation':
     case 'assigned_translation':
       return details.language || null;
+    case 'audio_generation_started':
+      return details.voice || null;
     case 'github_deploy_failed':
+    case 'audio_generation_failed':
       return details.error ? (details.error.length > 60 ? details.error.slice(0, 60) + '...' : details.error) : null;
     case 'created_suggestion':
     case 'deleted_suggestion':

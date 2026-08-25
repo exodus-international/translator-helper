@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { escapeXml, renderPause, speechScriptToSsml } from './audio.ssml';
+import { DEFAULT_PROSODY, escapeXml, renderPause, speechScriptToSsml } from './audio.ssml';
 
 const opts = { voice: 'cs-CZ-AntoninNeural', locale: 'cs-CZ', maxBreakMs: 20_000 };
 
@@ -60,4 +60,26 @@ test('an empty script still produces well-formed SSML', () => {
 
 test('rejects a non-positive break ceiling', () => {
   assert.throws(() => speechScriptToSsml({ segments: [] }, { ...opts, maxBreakMs: 0 }));
+});
+
+test('rate and pitch wrap the whole body in one prosody element', () => {
+  const ssml = speechScriptToSsml(
+    { segments: [{ kind: 'text', text: 'One.' }, { kind: 'pause', seconds: 2 }, { kind: 'text', text: 'Two.' }] },
+    { ...opts, rate: '0.8', pitch: '-6%' },
+  );
+  assert.ok(ssml.includes('<voice name="cs-CZ-AntoninNeural"><prosody rate="0.8" pitch="-6%"><p>One.</p><break time="2000ms"/><p>Two.</p></prosody></voice>'));
+});
+
+test('no prosody element is emitted when neither rate nor pitch is given', () => {
+  const ssml = speechScriptToSsml({ segments: [{ kind: 'text', text: 'One.' }] }, opts);
+  assert.ok(!ssml.includes('<prosody'));
+});
+
+test('rate alone yields a prosody element with only a rate attribute', () => {
+  const ssml = speechScriptToSsml({ segments: [{ kind: 'text', text: 'One.' }] }, { ...opts, rate: '-20%' });
+  assert.ok(ssml.includes('<prosody rate="-20%"><p>One.</p></prosody>'));
+});
+
+test('default prosody is the listening-test pick', () => {
+  assert.deepEqual(DEFAULT_PROSODY, { rate: '0.8', pitch: '-6%' });
 });

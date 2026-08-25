@@ -10,7 +10,7 @@
     "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/domain/translation/translation.service.test.ts src/domain/audio/audio.script.test.ts src/domain/audio/audio.ssml.test.ts src/domain/github/github.paths.test.ts src/domain/document/validate-filename.test.ts src/domain/document/document.types.test.ts src/components/document-form/content-format.test.ts src/lib/authorize.test.ts src/domain/document-version/document-version.transitions.test.ts src/domain/invitation/invitation.validation.test.ts src/domain/invitation/invitation.types.test.ts src/domain/invitation/invitation.display-status.test.ts src/domain/user/user-table.test.ts src/domain/user/user-csv.test.ts src/lib/format.test.ts src/domain/announcement/announcement.visibility.test.ts src/domain/announcement/announcement.types.test.ts src/domain/language/resolve-initial-language.test.ts",
+    "test": "tsx --test src/domain/translation/translation.service.test.ts src/domain/audio/audio.script.test.ts src/domain/audio/audio.ssml.test.ts src/domain/audio/audio.paths.test.ts src/domain/github/github.paths.test.ts src/domain/document/validate-filename.test.ts src/domain/document/document.types.test.ts src/components/document-form/content-format.test.ts src/lib/authorize.test.ts src/domain/document-version/document-version.transitions.test.ts src/domain/invitation/invitation.validation.test.ts src/domain/invitation/invitation.types.test.ts src/domain/invitation/invitation.display-status.test.ts src/domain/user/user-table.test.ts src/domain/user/user-csv.test.ts src/lib/format.test.ts src/domain/announcement/announcement.visibility.test.ts src/domain/announcement/announcement.types.test.ts src/domain/language/resolve-initial-language.test.ts",
     "db:seed": "tsx prisma/seed.ts",
     "format": "prettier --write .",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
@@ -21,6 +21,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1117.0",
     "@base-ui/react": "^1.3.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
@@ -40,6 +41,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "fflate": "^0.8.3",
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.553.0",
     "next": "16.0.7",
