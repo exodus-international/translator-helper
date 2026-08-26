@@ -92,3 +92,12 @@ test('empty input yields an empty script', () => {
 test('runs of blank lines collapse to a single paragraph break', () => {
   assert.equal(markdownToPlainText('A\n\n\n\n\nB'), 'A\n\nB');
 });
+
+test('inline HTML keeps its text, block tags and br separate lines, script and style are dropped whole', () => {
+  const md = 'Svíce <strong>Pokoje</strong>.<br>Druhý řádek <img src="x.png" alt="obrázek"> konec.<div>Uvnitř</div><script>alert(1)</script><style>p{}</style>Amen.';
+  assert.equal(markdownToPlainText(md), 'Svíce Pokoje.\nDruhý řádek  konec.\nUvnitř\nAmen.');
+});
+
+test('literal angle brackets and ampersands in prose survive stripping (the SSML builder escapes them)', () => {
+  assert.equal(markdownToPlainText('2 < 3 a Tom & Jerry'), '2 < 3 a Tom & Jerry');
+});

@@ -61,7 +61,11 @@ function stripFrontmatter(markdown: string): string {
  * fences) and pulling in a full parser buys little here.
  */
 export function markdownToPlainText(markdown: string): string {
-  let text = markdown.replace(ANY_HTML_COMMENT, '');
+  let text = markdown
+    .replace(ANY_HTML_COMMENT, '')
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '') // never read code or CSS aloud
+    .replace(/<br\s*\/?>/gi, '\n') // line breaks stay line breaks
+    .replace(/<\/?(p|div|h[1-6]|li|ul|ol|blockquote|section|article|tr|table)\b[^>]*>/gi, '\n'); // block tags separate text
 
   // Fenced code: drop the fence lines, keep whatever is inside.
   text = text.replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n?/gm, '');
