@@ -23,6 +23,23 @@ export interface SpeechScript {
   segments: SpeechSegment[];
 }
 
+/**
+ * Invisible formatting characters: zero-width spaces and joiners, word
+ * joiners, bidi marks, soft hyphens, the BOM. Pasting from Word, Google Docs
+ * or a chat client sprinkles these through the text.
+ *
+ * They come out before anything else reads the string. A pause marker with a
+ * word joiner after the "<!--" looks perfectly correct in the editor but
+ * never matches, because JavaScript's \s covers U+2000-U+200A and not
+ * U+2060 - so the marker falls through to the any-comment rule and the pause
+ * silently disappears. A narrator gains nothing from these either.
+ *
+ * Line and paragraph separators (U+2028, U+2029) are deliberately absent:
+ * those are real breaks, not invisible noise. Spelled as escapes because a
+ * class written with the literal characters cannot be read or safely edited.
+ */
+const INVISIBLE_FORMATTING = /[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g;
+
 const PAUSE_MARKER = /<!--\s*pause-duration\s*=\s*["'“”]?(\d+)\s*s?["'“”]?\s*-->/i;
 // A pause marker or a heading line; group 1 tells the two apart.
 const SEGMENT_BREAK = new RegExp(`${PAUSE_MARKER.source}|^[ \\t]{0,3}#{1,6}[ \\t]`, 'gim');
@@ -30,8 +47,9 @@ const ANY_HTML_COMMENT = /<!--[\s\S]*?-->/g;
 const HEADING_PAUSE_SECONDS = 1;
 
 export function markdownToSpeechScript(markdown: string): SpeechScript {
-  // Unread elements go first: a pause marker inside one must not fire.
-  const body = stripUnreadElements(stripFrontmatter(markdown));
+  // Invisible characters first, so a pasted marker still matches; then
+  // unread elements, so a pause marker inside one does not fire.
+  const body = stripUnreadElements(stripFrontmatter(stripInvisibleFormatting(markdown)));
   const segments: SpeechSegment[] = [];
 
   let buffer = '';
@@ -66,6 +84,10 @@ function pushText(segments: SpeechSegment[], raw: string) {
   if (text.length > 0) segments.push({ kind: 'text', text });
 }
 
+function stripInvisibleFormatting(text: string): string {
+  return text.replace(INVISIBLE_FORMATTING, '');
+}
+
 function stripFrontmatter(markdown: string): string {
   try {
     return matter(markdown).content;
@@ -76,6 +98,19 @@ function stripFrontmatter(markdown: string): string {
 
 const UNREAD_OPEN_TAG = /<([a-zA-Z][\w-]*)\b[^>]*\bdata-read\s*=\s*["'“”]?false["'“”]?[^>]*>/i;
 const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+
+/**
+ * Tags that already separate text visually. An unread block leaves a line
+ * break behind; an unread inline element leaves a space, because a line break
+ * mid-sentence makes the narrator hitch where the prose should run on.
+ */
+const BLOCK_TAGS = new Set([
+  'address', 'article', 'aside', 'blockquote', 'dd', 'div', 'dl', 'dt', 'fieldset', 'figcaption',
+  'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main',
+  'nav', 'ol', 'p', 'pre', 'section', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul',
+]);
+
+const BLOCK_TAG_PATTERN = new RegExp(`</?(?:${[...BLOCK_TAGS].join('|')})\\b[^>]*>`, 'gi');
 
 /** Removes every element marked data-read="false", content and all. */
 export function stripUnreadElements(text: string): string {
@@ -99,8 +134,10 @@ export function stripUnreadElements(text: string): string {
         }
       }
     }
-    // A line break where the element stood, so neighbours do not concatenate.
-    text = text.slice(0, start) + '\n' + text.slice(end);
+    // Something where the element stood, so neighbours do not concatenate:
+    // a line break for a block, a space inside a sentence.
+    const filler = BLOCK_TAGS.has(tag) ? '\n' : ' ';
+    text = text.slice(0, start) + filler + text.slice(end);
   }
   return text;
 }
@@ -111,11 +148,11 @@ export function stripUnreadElements(text: string): string {
  * fences) and pulling in a full parser buys little here.
  */
 export function markdownToPlainText(markdown: string): string {
-  let text = stripUnreadElements(markdown)
+  let text = stripUnreadElements(stripInvisibleFormatting(markdown))
     .replace(ANY_HTML_COMMENT, '')
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '') // never read code or CSS aloud
     .replace(/<br\s*\/?>/gi, '\n') // line breaks stay line breaks
-    .replace(/<\/?(p|div|h[1-6]|li|ul|ol|blockquote|section|article|tr|table)\b[^>]*>/gi, '\n'); // block tags separate text
+    .replace(BLOCK_TAG_PATTERN, '\n'); // block tags separate text
 
   // Fenced code: drop the fence lines, keep whatever is inside.
   text = text.replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n?/gm, '');
@@ -142,7 +179,7 @@ export function markdownToPlainText(markdown: string): string {
   // Whitespace: trim lines, collapse runs of blank lines to one.
   return text
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
