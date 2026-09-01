@@ -105,6 +105,7 @@ export type AnalyticsEvent =
   | 'language_instructions_saved'
   // ── Generic UI ───────────────────────────────────────────────────────
   | 'dialog_opened'
+  | 'document_type_filter_changed'
   | 'language_switched';
 
 export type AnalyticsProperties = Record<string, unknown>;

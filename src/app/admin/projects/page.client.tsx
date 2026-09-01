@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AdminListPage, DeleteConfirmDialog } from '@/components/admin-list-page';
+import { DOCUMENT_TYPE_CONFIGS, DOCUMENT_TYPE_SEQUENCE } from '@/constants/document-type';
 import {
   createSourceProjectAction,
   deleteSourceProjectAction,
@@ -31,13 +32,10 @@ interface ProjectsClientProps {
 
 const DEFAULT_AUDIO_DOCUMENT_TYPES: DocumentType[] = [DocumentType.DAY, DocumentType.DAILY_CONTENT];
 
-const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
-  { value: DocumentType.DAY, label: 'Day' },
-  { value: DocumentType.FIELD_GUIDE, label: 'Field Guide' },
-  { value: DocumentType.DAILY_CONTENT, label: 'Daily Content' },
-  { value: DocumentType.ROOT_FILE, label: 'Root File' },
-  { value: DocumentType.MEETING, label: 'Meeting' },
-];
+const DOCUMENT_TYPE_OPTIONS = DOCUMENT_TYPE_SEQUENCE.map((value) => ({
+  value,
+  label: DOCUMENT_TYPE_CONFIGS[value].name,
+}));
 
 export default function ProjectsClient({ sourceProjects: initialSourceProjects }: ProjectsClientProps) {
   const router = useRouter();
