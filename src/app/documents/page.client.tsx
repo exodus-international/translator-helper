@@ -21,25 +21,27 @@ import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { Document, DocumentStatus, Language } from '@prisma/client';
+import { DocumentStatus, DocumentType, Language } from '@prisma/client';
 import { FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
-type DocumentWithVersions = Document & {
-  folder: any | null;
-  sourceProject: any | null;
+// Mirrors `documentOverviewSelect` in document.repository.ts. Keep the two in
+// step: anything added here has to be selected there, and anything the table
+// stops using should be dropped from both.
+type DocumentWithVersions = {
+  id: string;
+  slug: string;
+  title: string;
+  labels: string[];
+  type: DocumentType | null;
+  originalFilename: string | null;
+  sourceProjectId: string | null;
+  sourceProject: { id: string; name: string } | null;
   versions: Array<{
     id: string;
     languageId: string;
     status: DocumentStatus;
-    language: Language;
-    user: {
-      id: string;
-      name: string;
-      email: string;
-    } | null;
-    updatedAt: Date;
   }>;
 };
 
@@ -212,6 +214,7 @@ export default function DocumentsClient({
                           <div className="flex flex-col gap-1">
                             <Link
                               href={`/documents/${doc.id}/review?version=${doc.versions[0]?.id || ''}`}
+                              prefetch={false}
                               className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               {doc.title}
@@ -251,7 +254,7 @@ export default function DocumentsClient({
 
                           return (
                             <TableCell key={lang.id} className="text-center">
-                              <Link href={href} className="group inline-flex justify-center">
+                              <Link href={href} prefetch={false} className="group inline-flex justify-center">
                                 <div
                                   className={`${statusConfig.color.textClass} transition-transform group-hover:scale-125 cursor-pointer`}
                                   title={versionId ? statusConfig.name : 'Start translation'}
@@ -265,7 +268,7 @@ export default function DocumentsClient({
                         {isAdmin && (
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
-                              <Link href={`/documents/${doc.id}/edit`}>
+                              <Link href={`/documents/${doc.id}/edit`} prefetch={false}>
                                 <Button variant="ghost" size="sm">
                                   <Pencil className="h-4 w-4" />
                                 </Button>

@@ -130,10 +130,36 @@ export async function deleteDocument(id: string): Promise<Prisma.DocumentGetPayl
   });
 }
 
+/**
+ * The Documents Overview renders one row per document with a status dot per
+ * language. It reads nothing else, so this selects those fields and no more.
+ *
+ * Using `include` here instead pulls every version's `content` — the full
+ * markdown of every translation in every language — plus each version's user
+ * and that user's language list, and serializes the lot into the RSC payload
+ * that ships to the browser. That was megabytes in production for a table
+ * that displays a coloured circle.
+ */
+const documentOverviewSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  labels: true,
+  type: true,
+  originalFilename: true,
+  sourceProjectId: true,
+  sourceProject: { select: { id: true, name: true } },
+  versions: {
+    select: { id: true, languageId: true, status: true },
+  },
+} satisfies Prisma.DocumentSelect;
+
+export type DocumentOverview = Prisma.DocumentGetPayload<{ select: typeof documentOverviewSelect }>;
+
 // Get all versions of documents for overview (showing translation status per language)
-export async function getDocumentsWithAllVersions(): Promise<DocumentList[]> {
+export async function getDocumentsWithAllVersions(): Promise<DocumentOverview[]> {
   return prisma.document.findMany({
-    include: documentListInclude,
+    select: documentOverviewSelect,
     orderBy: { updatedAt: 'desc' },
   });
 }
