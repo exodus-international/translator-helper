@@ -69,7 +69,7 @@ export async function assignReviewerToVersionAction(versionId: string, reviewerI
     },
   });
 
-  revalidatePath(`/documents/${version.documentId}`, 'layout');
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   return version;
 }
 

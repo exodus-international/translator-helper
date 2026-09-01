@@ -21,7 +21,15 @@ export const createSourceProjectSchema = z.object({
 export const updateSourceProjectSchema = z.object({
   name: z.string().min(2).optional(),
   description: z.string().optional().nullable(),
-  identifier: sourceProjectIdentifier.optional(),
+  // Deliberately laxer than on create: identifiers predating the format rule
+  // are still valid URL segments and still name a folder in the content repo,
+  // so an admin editing an unrelated field must not be blocked by one.
+  identifier: z
+    .string()
+    .min(2)
+    .max(64)
+    .regex(/^[^\s/?#]+$/, 'No spaces, slashes, question marks or hashes')
+    .optional(),
   status: z.enum(['ACTIVE', 'COMPLETE']).optional(),
   audioDocumentTypes: z.array(z.enum(DocumentType)).optional(),
 });

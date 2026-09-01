@@ -40,9 +40,11 @@ export interface DocumentRef {
 /**
  * The canonical path for opening a document in a language.
  *
- * Falls back to the old id-based shape when the project has no identifier.
- * The schema requires one, so this is a guard against a half-migrated row
- * rather than an expected branch — a link that is ugly still beats a 404.
+ * Falls back to the id-based shape when the project has no identifier. That is
+ * reachable: Document.sourceProjectId is nullable with onDelete: SetNull, so
+ * deleting a project orphans its documents. The legacy route accepts `lang` as
+ * either an id or a code and renders the editor in place for such a document,
+ * so this path resolves rather than 404s.
  */
 export function buildDocumentPath(ref: DocumentRef): string {
   if (!ref.projectIdentifier) {

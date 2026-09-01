@@ -17,7 +17,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DocumentSearchInput } from '@/components/document-search-input';
-import { buildDocumentPath } from '@/domain/document/document-url';
+import { buildDocumentEditPath, buildDocumentPath } from '@/domain/document/document-url';
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
 import { capture } from '@/lib/analytics';
@@ -121,6 +121,27 @@ export default function DocumentsClient({
     return groups;
   }, [filteredDocuments]);
 
+  // The title opens the language this document is actually being worked in,
+  // falling back to the first target language. With no target languages at all
+  // there is no editor URL to build, so it links to the overview row's edit form.
+  const titleHref = (doc: DocumentWithVersions) => {
+    const existing = doc.versions.find((v) => languages.some((l) => l.id === v.languageId));
+    const code = languages.find((l) => l.id === existing?.languageId)?.code ?? languages[0]?.code;
+    if (!code) {
+      return buildDocumentEditPath({
+        projectIdentifier: doc.sourceProject?.identifier,
+        slug: doc.slug,
+        documentId: doc.id,
+      });
+    }
+    return buildDocumentPath({
+      projectIdentifier: doc.sourceProject?.identifier,
+      slug: doc.slug,
+      languageCode: code,
+      documentId: doc.id,
+    });
+  };
+
   const getLanguageStatus = (doc: DocumentWithVersions, languageId: string) => {
     const version = doc.versions.find((v) => v.languageId === languageId);
     return version?.status || null;
@@ -212,12 +233,7 @@ export default function DocumentsClient({
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <Link
-                              href={buildDocumentPath({
-                                projectIdentifier: doc.sourceProject?.identifier,
-                                slug: doc.slug,
-                                languageCode: languages[0]?.code ?? '',
-                                documentId: doc.id,
-                              })}
+                              href={titleHref(doc)}
                               prefetch={false}
                               className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
                             >
@@ -272,7 +288,14 @@ export default function DocumentsClient({
                         {isAdmin && (
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
-                              <Link href={`/documents/${doc.id}/edit`} prefetch={false}>
+                              <Link
+                                href={buildDocumentEditPath({
+                                  projectIdentifier: doc.sourceProject?.identifier,
+                                  slug: doc.slug,
+                                  documentId: doc.id,
+                                })}
+                                prefetch={false}
+                              >
                                 <Button variant="ghost" size="sm">
                                   <Pencil className="h-4 w-4" />
                                 </Button>

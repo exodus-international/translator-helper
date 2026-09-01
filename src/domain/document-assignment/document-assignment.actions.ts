@@ -59,7 +59,7 @@ export async function createDocumentAssignmentAction(input: unknown) {
   await syncVersionTranslator(validated.documentId, validated.translationProjectId, validated.userId ?? null);
 
   revalidatePath('/dashboard');
-  revalidatePath(`/documents/${validated.documentId}`, 'layout');
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   return result;
 }
 
@@ -88,7 +88,7 @@ export async function updateDocumentAssignmentAction(id: string, input: unknown)
   }
 
   revalidatePath('/dashboard');
-  revalidatePath(`/documents/${result.documentId}`, 'layout');
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   return result;
 }
 

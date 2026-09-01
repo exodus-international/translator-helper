@@ -140,7 +140,7 @@ export async function toggleDocumentLabelAction(documentId: string, label: strin
 
   // Revalidate paths
   revalidatePath('/dashboard');
-  revalidatePath(`/documents/${documentId}`);
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
 
   return updated;
 }
