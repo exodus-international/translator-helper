@@ -3,12 +3,12 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Translation Helper',
-    short_name: 'Translations',
+    short_name: 'Exodus90 translations',
     description: 'Manage your document translations efficiently',
     start_url: '/dashboard',
     display: 'standalone',
-    background_color: '#0E0D0B',
-    theme_color: '#E08A1E',
+    background_color: '#FFFFFF',
+    theme_color: '#FE5A25',
     icons: [
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
