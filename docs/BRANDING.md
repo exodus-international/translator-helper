@@ -1,82 +1,86 @@
 # Branding assets
 
-What the app needs to stop looking like an unconfigured Next.js scaffold, what
-is missing today, and exactly where each file goes.
+What the app ships as its identity, where each file lives, and how to redo any
+of it.
 
-Tracked by the favicon + OG image PRD.
-
-## Where we are
-
-Everything below is still the scaffold from the first commit.
-
-| Thing | Today |
-| --- | --- |
-| `src/app/favicon.ico` | Next.js default, 16 and 32 px only |
-| Tab icon on a retina display | Blurry, upscaled from 32 px |
-| iOS "Add to Home Screen" | Generic screenshot, no icon |
-| Pinned tab / installed app name | "Translation Helper" with no icon |
-| Slack, Discord, iMessage link preview | Bare title and description, no image |
-| `metadataBase` | Not set, so any relative preview URL resolves wrong |
-| `public/` | Still holds `next.svg`, `vercel.svg`, `file.svg`, `globe.svg`, `window.svg` — all unused |
-
-## What to upload
-
-Drop files at these exact paths. Next.js picks up the `src/app/` ones by
-filename, so no code change is needed once the file is there.
-
-### 1. The mark — the one that matters
-
-- [ ] **`src/app/icon.svg`** — square, viewBox `0 0 32 32`, no surrounding padding
-
-  This is the source of truth; the raster sizes below are exported from it.
-  It renders as small as 16 px in a browser tab, so it has to survive that:
-  one clear shape, no fine strokes, no text that turns to mush. It also needs
-  to read on both a light and a dark tab bar.
-
-### 2. Raster icons
-
-Exported from the mark. Any icon generator will do these from the SVG.
-
-- [ ] **`src/app/favicon.ico`** — 16, 32 and 48 px in one file (replaces the scaffold one)
-- [ ] **`src/app/apple-icon.png`** — 180 × 180, opaque background, no transparency (iOS renders alpha as black)
-- [ ] **`public/icon-192.png`** — 192 × 192
-- [ ] **`public/icon-512.png`** — 512 × 512
-- [ ] **`public/icon-maskable-512.png`** — 512 × 512 with the mark inside the middle 80%, so Android can crop it to any shape without clipping
-
-### 3. Link preview image
-
-- [ ] **`src/app/opengraph-image.png`** — 1200 × 630
-
-  The fallback card behind every link that is not a document. Keep the text
-  large: Slack renders this around 360 px wide, and anything set below roughly
-  40 px in the source is unreadable there.
-
-### 4. Colours
-
-Needed for the web manifest and the browser theme colour. Two hex values:
-
-- [ ] **Brand / theme colour** — tints the browser UI on mobile and the manifest
-- [ ] **Background colour** — the splash background behind the icon while an installed app boots
-
-Write them here when decided:
+## Colours
 
 ```
-theme:      #______
-background: #______
+theme:      #E08A1E   orange, from the gold in the preview artwork
+background: #0E0D0B   near-black, the artwork's ground
 ```
 
-## Notes for whoever makes the mark
+`theme` tints mobile browser chrome and the installed-app manifest.
+`background` is the splash colour behind the icon while an installed app boots.
 
-- The per-document preview card is generated at request time and composes the
-  mark with the document title, language and status. It is not a file you
-  upload — but the mark needs to hold up at roughly 96 px inside it.
-- A single-colour mark is the safest choice. It has to work on the light tab
-  bar, the dark tab bar, the iOS home screen, and the preview card.
-- No wordmark inside the square icon. "Translation Helper" at 16 px is a smear.
-  The wordmark belongs on the preview card, where there is room.
+## The mark
 
-## Once the files are in
+`src/app/icon.svg` is the source of truth: two overlapping cards, source over
+target, with an omega on the front one. Orange on cream, white omega.
 
-Nothing to wire by hand for the icons — Next.js reads `icon.svg`,
-`favicon.ico` and `apple-icon.png` straight out of `src/app/`. The manifest,
-`metadataBase` and the preview metadata are code, and are covered by the PRD.
+The omega is drawn as three stroked paths, not a text glyph, so it needs no
+font and cannot be re-shaped by a font substitution.
+
+## Files in place
+
+| File | Size | Notes |
+| --- | --- | --- |
+| `src/app/icon.svg` | scalable | The mark. Next.js serves it as the SVG favicon |
+| `src/app/favicon.ico` | 16, 32, 48 | See the 16px note below |
+| `src/app/apple-icon.png` | 180 | Full-bleed orange, opaque — iOS renders alpha as black |
+| `public/icon-192.png` | 192 | Manifest |
+| `public/icon-512.png` | 512 | Manifest |
+| `public/icon-maskable-512.png` | 512 | Mark inside the middle 80%, so Android can crop to any launcher shape |
+| `src/app/opengraph-image.jpg` | 1200 × 630 | The link preview card |
+| `src/app/manifest.ts` | — | Generates `manifest.webmanifest` |
+
+### The 16px slice
+
+The full mark does not survive 16 px: two cards plus a glyph collapse into
+noise. An `.ico` holds a separate image per size, so the 16px slice inside
+`favicon.ico` is a simplified variant — one orange square, omega only, no back
+card. 32 and 48 use the full mark.
+
+If you regenerate the `.ico`, keep that split. Rendering the full mark at 16 px
+and shipping it is a visible downgrade.
+
+## Redoing the preview card
+
+The card is the artwork with a bottom scrim and two lines of text over it.
+
+Source artwork is not committed — it lives wherever it was generated. To
+recompose from a new 1200 × 630-ish source:
+
+1. Crop to exactly 1200 × 630 (`-resize 1200x630^ -gravity center -extent 1200x630`).
+2. Lay a bottom-up dark gradient over the lower half so text stays readable
+   whatever the artwork does there.
+3. Set the title around 76px and the tagline around 34px, in a serif.
+4. Export JPEG, quality ~86. The current file is about 250 kB; a PNG of the
+   same image is 1.4 MB, which unfurlers are slow to fetch.
+
+Slack renders the card around 360 px wide. Anything below roughly 40 px in the
+1200 px source is unreadable there — that is why the type is as large as it is.
+
+## One deployment requirement
+
+`metadataBase` decides the origin that `og:image` resolves against. Set
+**`APP_URL`** to the public origin in each environment.
+
+It must be `APP_URL`, not `NEXT_PUBLIC_APP_URL`. `NEXT_PUBLIC_*` values are
+inlined when the image is built, so a value supplied only to the running
+container never reaches the code. `APP_URL` is read on the server at runtime
+and can be changed without a rebuild.
+
+Verified against a production build: with `APP_URL` set, `og:image` renders as
+`https://<origin>/opengraph-image.jpg`. Unset, it falls back to
+`http://localhost:3000` and every unfurl outside dev breaks silently. In `next
+dev` the tag always shows the dev origin regardless — that is dev substituting
+the request host, not a misconfiguration.
+
+## Still open
+
+Per-document preview cards — a link to a document unfurling with its title,
+language and status — are specified in the favicon + OG PRD. They need a
+crawler exemption in `src/proxy.ts`, because every route currently redirects an
+unauthenticated request to `/login`, which is what a link-preview crawler is.
+Until then every link shows the card above.

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Back card: the target-language page -->
+  <path fill="#F7E2C4" d="M15,13h25c1.104,0,2,0.896,2,2v25c0,1.104-0.896,2-2,2H26L15,13z"/>
+  <g fill="#8A5622">
+    <path d="M26.832,34.854l-0.916-1.776l0.889-0.459c0.061-0.031,6.101-3.208,9.043-9.104l0.446-0.895l1.79,0.893l-0.447,0.895c-3.241,6.496-9.645,9.85-9.916,9.989L26.832,34.854z"/>
+    <path d="M38.019,34l-0.87-0.49c-0.207-0.116-5.092-2.901-8.496-7.667l1.627-1.162c3.139,4.394,7.805,7.061,7.851,7.087L39,32.26L38.019,34z"/>
+    <rect x="26" y="22" width="14" height="2"/>
+    <rect x="32" y="20" width="2" height="4"/>
+  </g>
+
+  <!-- Front card: the source page -->
+  <path fill="#E08A1E" d="M33,35H8c-1.104,0-2-0.896-2-2V8c0-1.104,0.896-2,2-2h14L33,35z"/>
+  <polygon fill="#A85E12" points="26,42 23,35 33,35 "/>
+
+  <!-- Omega. Drawn as strokes rather than a glyph so it needs no font,
+       and sized so the ring still reads at 16px. -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="2.9" stroke-linecap="round">
+    <path d="M14.05,24.13 A4.8,4.8 0 1 1 19.55,24.13"/>
+    <path d="M10.7,26.3 H15.0"/>
+    <path d="M18.6,26.3 H22.9"/>
+  </g>
+</svg>

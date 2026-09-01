@@ -50,3 +50,6 @@ next-env.d.ts
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# Staging area for uploaded brand artwork; derived files are committed instead
+generated-images/
