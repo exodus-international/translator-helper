@@ -24,7 +24,7 @@ import { SessionUser } from '@/lib/session';
 import { Document, DocumentStatus, Language } from '@prisma/client';
 import { FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 type DocumentWithVersions = Document & {
   folder: any | null;
@@ -191,12 +191,9 @@ export default function DocumentsClient({
               </TableHeader>
               <TableBody>
                 {groupedDocuments.map((group) => (
-                  <>
+                  <Fragment key={`group-${group.projectId || 'unassigned'}`}>
                     {/* Group header row */}
-                    <TableRow
-                      key={`group-${group.projectId || 'unassigned'}`}
-                      className="bg-gray-100/60 hover:bg-gray-100/60"
-                    >
+                    <TableRow className="bg-gray-100/60 hover:bg-gray-100/60">
                       <TableCell colSpan={totalColumns} className="py-2 px-4">
                         <span className="text-sm font-semibold text-gray-700">{group.projectName}</span>
                         <span className="text-xs text-gray-500 ml-2">
@@ -306,7 +303,7 @@ export default function DocumentsClient({
                         )}
                       </TableRow>
                     ))}
-                  </>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
