@@ -48,6 +48,10 @@ marker in the source reaches every language. Azure caps a single break at 20 s;
 longer pauses are chained automatically (verified: three chained breaks give
 continuous silence).
 
+Every heading also gets an automatic 1 s pause in front of it, so section
+boundaries are audible without hand-placed markers. No pause is added before a
+heading that opens the document, or where an explicit marker already sits.
+
 ## Skipping on-screen-only content
 
 An element marked `data-read="false"` is never read aloud, its content

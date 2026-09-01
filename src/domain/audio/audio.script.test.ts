@@ -75,10 +75,34 @@ test('unknown and malformed comments are dropped without throwing', () => {
   assert.deepEqual(script.segments, [{ kind: 'text', text: 'Before  middle  after  end' }]);
 });
 
-test('a document with no markers produces a single text segment', () => {
+test('a document opening with a heading produces a single text segment, no leading pause', () => {
   const script = markdownToSpeechScript('# Title\n\nOne.\n\nTwo.');
   assert.equal(script.segments.length, 1);
   assert.equal(script.segments[0].kind, 'text');
+});
+
+test('a heading mid-document gets a one second pause in front of it', () => {
+  const script = markdownToSpeechScript('Intro.\n\n## Next part\n\nMore.');
+  assert.deepEqual(script.segments, [
+    { kind: 'text', text: 'Intro.' },
+    { kind: 'pause', seconds: 1 },
+    { kind: 'text', text: 'Next part\n\nMore.' },
+  ]);
+});
+
+test('consecutive headings each get their own pause', () => {
+  const script = markdownToSpeechScript('Intro.\n\n# One\n\n## Two');
+  assert.deepEqual(textOf(script), ['Intro.', '[pause 1]', 'One', '[pause 1]', 'Two']);
+});
+
+test('an explicit pause marker before a heading does not stack with the heading pause', () => {
+  const script = markdownToSpeechScript('Slovo.\n\n<!-- pause-duration="30s" -->\n\n# Modlitba\n\nAmen.');
+  assert.deepEqual(textOf(script), ['Slovo.', '[pause 30]', 'Modlitba\n\nAmen.']);
+});
+
+test('a hash without a following space is not a heading and gets no pause', () => {
+  const script = markdownToSpeechScript('Viz #108 a\n#hashtag na řádku.');
+  assert.equal(script.segments.length, 1);
 });
 
 test('adjacent and leading pauses are preserved in order', () => {

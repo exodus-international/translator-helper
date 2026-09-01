@@ -11,6 +11,10 @@ import matter from 'gray-matter';
  *
  * The number is whole seconds. Any other HTML comment is dropped.
  * Elements marked data-read="false" are skipped entirely, content included.
+ *
+ * Every heading also gets a short pause in front of it, so section
+ * boundaries are audible — except at the very start of the document, and
+ * except when an explicit pause marker already sits there.
  */
 
 export type SpeechSegment = { kind: 'text'; text: string } | { kind: 'pause'; seconds: number };
@@ -19,8 +23,11 @@ export interface SpeechScript {
   segments: SpeechSegment[];
 }
 
-const PAUSE_MARKER = /<!--\s*pause-duration\s*=\s*["'“”]?(\d+)\s*s?["'“”]?\s*-->/gi;
+const PAUSE_MARKER = /<!--\s*pause-duration\s*=\s*["'“”]?(\d+)\s*s?["'“”]?\s*-->/i;
+// A pause marker or a heading line; group 1 tells the two apart.
+const SEGMENT_BREAK = new RegExp(`${PAUSE_MARKER.source}|^[ \\t]{0,3}#{1,6}[ \\t]`, 'gim');
 const ANY_HTML_COMMENT = /<!--[\s\S]*?-->/g;
+const HEADING_PAUSE_SECONDS = 1;
 
 export function markdownToSpeechScript(markdown: string): SpeechScript {
   // Unread elements go first: a pause marker inside one must not fire.
@@ -29,14 +36,24 @@ export function markdownToSpeechScript(markdown: string): SpeechScript {
 
   let buffer = '';
   let lastIndex = 0;
-  for (const match of body.matchAll(PAUSE_MARKER)) {
+  for (const match of body.matchAll(SEGMENT_BREAK)) {
     buffer += body.slice(lastIndex, match.index);
     lastIndex = match.index + match[0].length;
-    const seconds = Number.parseInt(match[1], 10);
-    if (seconds > 0) {
+    if (match[1] !== undefined) {
+      const seconds = Number.parseInt(match[1], 10);
+      if (seconds > 0) {
+        pushText(segments, buffer);
+        buffer = '';
+        segments.push({ kind: 'pause', seconds });
+      }
+    } else {
+      // Heading: pause in front of it unless the document is only starting
+      // or a pause is already there; the heading text itself stays.
       pushText(segments, buffer);
-      buffer = '';
-      segments.push({ kind: 'pause', seconds });
+      buffer = match[0];
+      if (segments.at(-1)?.kind === 'text') {
+        segments.push({ kind: 'pause', seconds: HEADING_PAUSE_SECONDS });
+      }
     }
   }
   pushText(segments, buffer + body.slice(lastIndex));
