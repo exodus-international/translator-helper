@@ -20,12 +20,6 @@
  * UUID has a fixed shape.
  */
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function isUuid(value: string | null | undefined): boolean {
-  return typeof value === 'string' && UUID.test(value);
-}
-
 export interface DocumentRef {
   /** SourceProject.identifier, e.g. "exodus90" */
   projectIdentifier: string | null | undefined;

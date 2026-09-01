@@ -64,6 +64,7 @@ interface DashboardClientProps {
   user: SessionUser;
   projects: {
     id: string;
+    identifier: string;
     name: string;
     description: string | null;
     status: string;

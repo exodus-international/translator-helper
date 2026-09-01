@@ -27,6 +27,7 @@ import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import { useAutoSave } from '@/lib/stores/hooks';
+import { buildProjectPath } from '@/domain/source-project/source-project-url';
 
 function getContentWithoutFrontmatter(text: string) {
   try {
@@ -60,7 +61,7 @@ export function DocumentEditorHeader({
           {document.sourceProject && (
             <>
               <Link
-                href={`/projects/${document.sourceProject.id}`}
+                href={buildProjectPath(document.sourceProject.identifier)}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors truncate shrink-0"
               >
                 {document.sourceProject.name}

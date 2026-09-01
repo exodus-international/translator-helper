@@ -9,6 +9,7 @@ import { createSourceProjectSchema, updateSourceProjectSchema } from './source-p
 import {
   listSourceProjects,
   getSourceProjectById,
+  getSourceProjectByIdentifier,
   getSourceProjectsForUser,
   createSourceProject,
   updateSourceProject,
@@ -29,6 +30,11 @@ export async function getSourceProjectsForUserAction() {
 export async function getSourceProjectAction(id: string) {
   await authorize('authenticated');
   return await getSourceProjectById(id);
+}
+
+export async function getSourceProjectByIdentifierAction(identifier: string) {
+  await authorize('authenticated');
+  return await getSourceProjectByIdentifier(identifier);
 }
 
 export async function createSourceProjectAction(input: unknown) {

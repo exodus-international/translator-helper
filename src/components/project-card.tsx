@@ -4,10 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, Globe, Users } from 'lucide-react';
 import Link from 'next/link';
+import { buildProjectPath } from '@/domain/source-project/source-project-url';
 
 interface ProjectCardProps {
   project: {
     id: string;
+    identifier: string;
     name: string;
     description: string | null;
     status: string;
@@ -34,7 +36,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   const totalMembers = uniqueUserIds.size;
 
   return (
-    <Link href={`/projects/${project.id}`}>
+    <Link href={buildProjectPath(project.identifier)}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">

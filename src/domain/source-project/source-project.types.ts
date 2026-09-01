@@ -1,16 +1,26 @@
 import { z } from 'zod';
 import { DocumentType } from '@prisma/client';
+import { isUuid } from '@/lib/uuid';
 
 /**
- * The identifier is a URL segment (/documents/{identifier}/...) and the folder
- * name in the content repository, so it is required, unique, and restricted to
- * what is safe in both.
+ * The identifier is a URL segment (/projects/{identifier},
+ * /documents/{identifier}/...) and the folder name in the content repository,
+ * so it is required, unique, and restricted to what is safe in both.
+ *
+ * A UUID-shaped identifier is rejected even though it passes the character
+ * rule: the routes read a UUID in that position as an old id-based link and
+ * look the project up by id, so such a project would never resolve by its own
+ * identifier.
  */
+const notUuidShaped = (value: string) => !isUuid(value);
+const notUuidMessage = 'Cannot look like an id';
+
 export const sourceProjectIdentifier = z
   .string()
   .min(2)
   .max(64)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lowercase letters, numbers and single dashes only');
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lowercase letters, numbers and single dashes only')
+  .refine(notUuidShaped, notUuidMessage);
 
 export const createSourceProjectSchema = z.object({
   name: z.string().min(2),
@@ -29,6 +39,7 @@ export const updateSourceProjectSchema = z.object({
     .min(2)
     .max(64)
     .regex(/^[^\s/?#]+$/, 'No spaces, slashes, question marks or hashes')
+    .refine(notUuidShaped, notUuidMessage)
     .optional(),
   status: z.enum(['ACTIVE', 'COMPLETE']).optional(),
   audioDocumentTypes: z.array(z.enum(DocumentType)).optional(),
