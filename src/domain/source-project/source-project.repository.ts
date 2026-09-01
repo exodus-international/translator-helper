@@ -95,7 +95,7 @@ export async function getSourceProjectById(id: string) {
   });
 }
 
-export async function createSourceProject(data: { name: string; description?: string | null; identifier?: string }) {
+export async function createSourceProject(data: { name: string; description?: string | null; identifier: string }) {
   return prisma.sourceProject.create({
     data,
   });
@@ -106,7 +106,7 @@ export async function updateSourceProject(
   data: {
     name?: string;
     description?: string | null;
-    identifier?: string | null;
+    identifier?: string;
     status?: 'ACTIVE' | 'COMPLETE';
     audioDocumentTypes?: DocumentType[];
   },

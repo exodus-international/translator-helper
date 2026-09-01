@@ -38,7 +38,7 @@ import { DocumentTypeFilter } from '@/components/document-type-filter';
 import { useActiveLanguage } from '@/components/analytics-project-group';
 import { useDeployConfirm } from '@/components/deploy-confirm';
 import { capture } from '@/lib/analytics';
-import { getCanonicalEditorPath } from '@/lib/document-status';
+import { buildDocumentPath } from '@/domain/document/document-url';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { toast } from 'sonner';
@@ -591,9 +591,11 @@ export default function ProjectKanbanBoard({
                       doc.labels?.includes('Waiting for final label');
 
                     const getDocumentUrl = () =>
-                      getCanonicalEditorPath(doc.id, hasVersion ? (version?.status ?? null) : null, {
-                        versionId: hasVersion ? version?.id : undefined,
-                        lang: selectedLanguage,
+                      buildDocumentPath({
+                        projectIdentifier: doc.sourceProject?.identifier,
+                        slug: doc.slug,
+                        languageCode: language?.code ?? '',
+                        documentId: doc.id,
                       });
 
                     const cardsInColumn = kanbanData.filter((c) => c.column === column.id);

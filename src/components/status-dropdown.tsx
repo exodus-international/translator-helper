@@ -7,7 +7,6 @@ import { useDeployConfirm } from '@/components/deploy-confirm';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { capture } from '@/lib/analytics';
-import { getCanonicalEditorPath } from '@/lib/document-status';
 import { canDeployClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -24,7 +23,6 @@ interface StatusDropdownProps {
   versionId: string;
   user: SessionUser;
   documentId?: string; // For navigation after status change
-  languageId?: string; // For navigation after status change
   onStatusChange?: (newStatus: DocumentStatus) => void;
   onReviewRequested?: () => void; // Called instead of direct transition when moving to PENDING_REVIEW
   allowedStatuses?: DocumentStatus[]; // For future permission filtering
@@ -37,7 +35,6 @@ export function StatusDropdown({
   versionId,
   user,
   documentId,
-  languageId,
   onStatusChange,
   onReviewRequested,
   allowedStatuses,
@@ -183,16 +180,10 @@ export function StatusDropdown({
       onStatusChange?.(newStatus);
       setOpen(false);
 
-      // Navigate to the canonical page for the new status, or refresh if we're already there
+      // The URL does not encode which editor is showing, so a status change never
+      // moves the page — it only changes what the server renders there.
       if (documentId) {
-        const canonical = getCanonicalEditorPath(documentId, newStatus, { versionId, lang: languageId });
-        const canonicalPath = canonical.split('?')[0];
-        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-        if (currentPath !== canonicalPath) {
-          router.push(canonical);
-        } else {
-          router.refresh();
-        }
+        router.refresh();
       } else if (typeof window !== 'undefined') {
         window.location.reload();
       }

@@ -91,7 +91,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
         const updated = await updateSourceProjectAction(editingProject.id, {
           name,
           description: description || null,
-          identifier: identifier || null,
+          identifier: identifier.trim(),
           audioDocumentTypes,
         });
         replaceProjectPreservingCount(updated);
@@ -101,7 +101,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
         await createSourceProjectAction({
           name,
           description: description || undefined,
-          identifier: identifier || undefined,
+          identifier: identifier.trim(),
         });
         capture('source_project_created', { location: 'admin' });
         // Refresh the page to get updated counts including translation projects
@@ -193,7 +193,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
             />
           </div>
           <div>
-            <Label htmlFor="identifier">Repository Identifier</Label>
+            <Label htmlFor="identifier">Identifier *</Label>
             <Input
               id="identifier"
               value={identifier}

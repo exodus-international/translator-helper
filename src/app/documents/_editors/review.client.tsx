@@ -202,7 +202,6 @@ function ReviewToolbar({ document, sourceVersion, user }: { document: any; sourc
           versionId={targetVersion.id}
           user={user}
           documentId={document.id}
-          languageId={targetVersion.languageId}
           disabled={isAnyLoading}
           onStatusChange={handleStatusChange}
           onReviewRequested={openReviewDialog}

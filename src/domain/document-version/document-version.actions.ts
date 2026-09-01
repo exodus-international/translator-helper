@@ -69,7 +69,7 @@ export async function assignReviewerToVersionAction(versionId: string, reviewerI
     },
   });
 
-  revalidatePath(`/documents/${version.documentId}`, 'layout');
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   return version;
 }
 
@@ -228,7 +228,7 @@ export async function updateDocumentVersionStatusAction(
           action: 'github_deployed',
           details: {},
         });
-        revalidatePath(`/documents/${version.documentId}/review`);
+        revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
         github = { status: 'success', prUrl: result?.prUrl };
       } else {
         console.log('[GitHub] GitHub is not configured, skipping deploy');
@@ -243,7 +243,7 @@ export async function updateDocumentVersionStatusAction(
         action: 'github_deploy_failed',
         details: { error: error.message },
       });
-      revalidatePath(`/documents/${version.documentId}/review`);
+      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
       github = { status: 'failed', error: error.message };
     }
   }
@@ -255,7 +255,7 @@ export async function updateDocumentVersionStatusAction(
     try {
       const { startGeneration } = await import('../audio/audio.service');
       audio = await startGeneration(version.id, user.id);
-      revalidatePath(`/documents/${version.documentId}/review`);
+      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
     } catch (error: unknown) {
       console.error('[Audio] Generation failed:', error);
       audio = { status: 'failed', error: error instanceof Error ? error.message : String(error) };

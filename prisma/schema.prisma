@@ -214,7 +214,7 @@ model SourceProject {
   id                  String               @id @default(uuid())
   name                String               @unique
   description         String?              @db.Text
-  identifier          String?
+  identifier          String               @unique // URL segment: /documents/{identifier}/...
   status              SourceProjectStatus  @default(ACTIVE)
   audioDocumentTypes  DocumentType[]       @default([DAY, DAILY_CONTENT])
   createdAt           DateTime             @default(now())
@@ -276,7 +276,7 @@ model DocumentAssignment {
 
 model Document {
   id               String               @id @default(uuid())
-  slug             String               @unique
+  slug             String // unique within the source project, see @@unique below
   title            String
   labels           String[] // Array of labels for categorization
   deadline         DateTime? // Optional deadline for translation completion
@@ -291,6 +291,7 @@ model Document {
   versions         DocumentVersion[]
   assignments      DocumentAssignment[]
 
+  @@unique([sourceProjectId, slug])
   @@map("document")
 }
 
