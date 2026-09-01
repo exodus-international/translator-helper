@@ -80,6 +80,22 @@ export async function getDocumentById(id: string): Promise<DocumentDetail | null
   });
 }
 
+/**
+ * Resolves the URL form /documents/{project}/{slug}/... to a document.
+ *
+ * findFirst rather than findUnique: slug is unique per project, but the
+ * constraint is on sourceProjectId, and callers hold the identifier.
+ */
+export async function getDocumentByProjectAndSlug(
+  projectIdentifier: string,
+  slug: string,
+): Promise<DocumentDetail | null> {
+  return prisma.document.findFirst({
+    where: { slug, sourceProject: { identifier: projectIdentifier } },
+    include: documentDetailInclude,
+  });
+}
+
 export async function createDocument(data: {
   slug: string;
   title: string;
@@ -148,7 +164,7 @@ const documentOverviewSelect = {
   type: true,
   originalFilename: true,
   sourceProjectId: true,
-  sourceProject: { select: { id: true, name: true } },
+  sourceProject: { select: { id: true, name: true, identifier: true } },
   versions: {
     select: { id: true, languageId: true, status: true },
   },

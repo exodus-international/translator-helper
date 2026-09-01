@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DocumentSearchInput } from '@/components/document-search-input';
+import { buildDocumentPath } from '@/domain/document/document-url';
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
 import { capture } from '@/lib/analytics';
@@ -38,7 +39,7 @@ type DocumentWithVersions = {
   type: DocumentType | null;
   originalFilename: string | null;
   sourceProjectId: string | null;
-  sourceProject: { id: string; name: string } | null;
+  sourceProject: { id: string; name: string; identifier: string } | null;
   versions: Array<{
     id: string;
     languageId: string;
@@ -211,7 +212,12 @@ export default function DocumentsClient({
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <Link
-                              href={`/documents/${doc.id}/review?version=${doc.versions[0]?.id || ''}`}
+                              href={buildDocumentPath({
+                                projectIdentifier: doc.sourceProject?.identifier,
+                                slug: doc.slug,
+                                languageCode: languages[0]?.code ?? '',
+                                documentId: doc.id,
+                              })}
                               prefetch={false}
                               className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
                             >
@@ -242,11 +248,13 @@ export default function DocumentsClient({
                           const statusConfig = getDocumentStatusConfig(status);
                           const IndicatorIcon = statusConfig.icon;
 
-                          const href = versionId
-                            ? status === 'PENDING_TRANSLATION' || status === 'IN_PROGRESS'
-                              ? `/documents/${doc.id}/translate?lang=${lang.id}&version=${versionId}`
-                              : `/documents/${doc.id}/review?version=${versionId}`
-                            : `/documents/${doc.id}/translate?lang=${lang.id}`;
+                          // One URL per language; the status decides which editor opens.
+                          const href = buildDocumentPath({
+                            projectIdentifier: doc.sourceProject?.identifier,
+                            slug: doc.slug,
+                            languageCode: lang.code,
+                            documentId: doc.id,
+                          });
 
                           return (
                             <TableCell key={lang.id} className="text-center">

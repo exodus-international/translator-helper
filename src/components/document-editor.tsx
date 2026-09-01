@@ -22,7 +22,7 @@ import {
   StepperTrigger,
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
-import { getCanonicalEditorPath, getStatusStep, isStepCompleted } from '@/lib/document-status';
+import { getStatusStep, isDraftPhase, isStepCompleted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
@@ -308,28 +308,20 @@ function ReloadSuggestionsOnVersionChange() {
   return null;
 }
 
-// Route guard: when the live status drifts out of the current page's responsibility,
-// replace the URL to the canonical editor path. Server-side guards in page.tsx prevent
-// the wrong-page-on-load flash; this handles in-page status transitions.
-function RouteGuardOnStatusChange({
-  documentId,
-  variant,
-}: {
-  documentId: string;
-  variant: 'review' | 'translate';
-}) {
+// The canonical URL carries no editor verb, so a status change never invalidates
+// the address — it invalidates what the server renders at it. Refresh and let the
+// page pick the other editor.
+function RouteGuardOnStatusChange({ variant }: { variant: 'review' | 'translate' }) {
   const router = useRouter();
   const status = useEditorStore((s) => s.targetVersion?.status);
-  const versionId = useEditorStore((s) => s.targetVersion?.id);
-  const languageId = useEditorStore((s) => s.targetVersion?.languageId);
 
   useEffect(() => {
     if (!status) return;
-    const canonical = getCanonicalEditorPath(documentId, status, { versionId, lang: languageId });
-    if (!canonical.startsWith(`/documents/${documentId}/${variant}`)) {
-      router.replace(canonical);
+    const belongsHere = isDraftPhase(status) ? variant === 'translate' : variant === 'review';
+    if (!belongsHere) {
+      router.refresh();
     }
-  }, [router, documentId, variant, status, versionId, languageId]);
+  }, [router, variant, status]);
 
   return null;
 }
@@ -435,7 +427,7 @@ export function DocumentEditor({
     >
       {autoSaveDelayMs ? <AutoSaveTrigger delayMs={autoSaveDelayMs} /> : null}
       <ReloadSuggestionsOnVersionChange />
-      <RouteGuardOnStatusChange documentId={document.id} variant={variant} />
+      <RouteGuardOnStatusChange variant={variant} />
 
       <div className={outer}>
         {header}

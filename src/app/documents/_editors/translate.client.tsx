@@ -364,7 +364,6 @@ function TranslateToolbar({
                   versionId={targetVersion.id}
                   user={user}
                   documentId={document.id}
-                  languageId={targetLanguageId}
                   disabled={busy}
                   onStatusChange={handleStatusChange}
                   onReviewRequested={handleOpenReviewDialog}
@@ -491,7 +490,6 @@ function TranslateToolbar({
         versionId={targetVersion.id}
         user={user}
         documentId={document.id}
-        languageId={targetLanguageId}
         disabled={busy}
         onStatusChange={handleStatusChange}
         onReviewRequested={handleOpenReviewDialog}

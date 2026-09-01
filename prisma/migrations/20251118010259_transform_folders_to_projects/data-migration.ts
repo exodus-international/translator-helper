@@ -25,6 +25,7 @@ async function main() {
     const sourceProject = await prisma.sourceProject.create({
       data: {
         id: folder.id,
+        identifier: folder.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         name: folder.name,
         createdAt: folder.createdAt,
         updatedAt: folder.updatedAt,

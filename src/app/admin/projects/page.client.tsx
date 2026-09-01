@@ -91,7 +91,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
         const updated = await updateSourceProjectAction(editingProject.id, {
           name,
           description: description || null,
-          identifier: identifier || null,
+          identifier: identifier.trim(),
           audioDocumentTypes,
         });
         replaceProjectPreservingCount(updated);

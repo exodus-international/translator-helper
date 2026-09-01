@@ -4,6 +4,7 @@ import { useActiveLanguage } from '@/components/analytics-project-group';
 import { AnnouncementBanner, AnnouncementBannerData } from '@/components/announcement-banner';
 import { AnnouncementModal, AnnouncementModalData } from '@/components/announcement-modal';
 import { DocumentTypeBadge } from '@/components/document-type-badge';
+import { buildDocumentPath } from '@/domain/document/document-url';
 import ProjectCard from '@/components/project-card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,7 @@ type VersionWithDetails = {
     sourceProject: {
       id: string;
       name: string;
+      identifier: string;
     } | null;
   };
   language: {
@@ -94,6 +96,7 @@ interface DashboardClientProps {
       sourceProject: {
         id: string;
         name: string;
+        identifier: string;
       } | null;
       versions: {
         id: string;
@@ -116,6 +119,7 @@ interface DashboardClientProps {
       sourceProject: {
         id: string;
         name: string;
+        identifier: string;
       };
     };
   }[];
@@ -129,19 +133,12 @@ interface DashboardClientProps {
 }
 
 function getDocumentUrl(assignment: DashboardClientProps['assignments'][number]): string {
-  const doc = assignment.document;
-  const langId = assignment.translationProject.language.id;
-  const version = doc.versions.find((v) => v.languageId === langId);
-
-  if (!version) {
-    return `/documents/${doc.id}/translate?lang=${langId}`;
-  }
-
-  if (version.status === DocumentStatus.PENDING_TRANSLATION || version.status === DocumentStatus.IN_PROGRESS) {
-    return `/documents/${doc.id}/translate?lang=${langId}&version=${version.id}`;
-  }
-
-  return `/documents/${doc.id}/review?version=${version.id}`;
+  return buildDocumentPath({
+    projectIdentifier: assignment.document.sourceProject?.identifier ?? assignment.translationProject.sourceProject.identifier,
+    slug: assignment.document.slug,
+    languageCode: assignment.translationProject.language.code,
+    documentId: assignment.document.id,
+  });
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -150,10 +147,12 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
 });
 
 function getVersionUrl(version: VersionWithDetails): string {
-  if (version.status === DocumentStatus.PENDING_TRANSLATION || version.status === DocumentStatus.IN_PROGRESS) {
-    return `/documents/${version.document.id}/translate?lang=${version.language.id}&version=${version.id}`;
-  }
-  return `/documents/${version.document.id}/review?version=${version.id}`;
+  return buildDocumentPath({
+    projectIdentifier: version.document.sourceProject?.identifier,
+    slug: version.document.slug,
+    languageCode: version.language.code,
+    documentId: version.document.id,
+  });
 }
 
 type WorkItem = {
@@ -210,7 +209,7 @@ function buildWorkItems(
       role: 'Reviewer',
       status: v.status,
       deadline: null,
-      url: `/documents/${v.document.id}/review?version=${v.id}`,
+      url: getVersionUrl(v),
       translatorName: v.user?.name ?? null,
       reviewerName: v.reviewer?.name ?? null,
     });
@@ -328,7 +327,7 @@ export default function DashboardClient({
       await createSourceProjectAction({
         name: newProjectName,
         description: newProjectDescription || null,
-        identifier: newProjectIdentifier || null,
+        identifier: newProjectIdentifier.trim(),
       });
       capture('source_project_created', { location: 'dashboard' });
       toast.success('Project created');
@@ -448,23 +447,26 @@ export default function DashboardClient({
                         />
                       </div>
                       <div>
-                        <Label htmlFor="new-project-identifier">Repository Identifier</Label>
+                        <Label htmlFor="new-project-identifier">Identifier *</Label>
                         <Input
                           id="new-project-identifier"
                           value={newProjectIdentifier}
                           onChange={(e) => setNewProjectIdentifier(e.target.value)}
                           placeholder="e.g., exodus90, lent2026"
+                          required
+                          pattern="[a-z0-9]+(-[a-z0-9]+)*"
                           className="mt-1"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                          GITHUB: Folder name in the content repository
+                          Used in document URLs and as the folder name in the content repository.
+                          Lowercase letters, numbers and dashes.
                         </p>
                       </div>
                       <div className="flex justify-end gap-2">
                         <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={createLoading || !newProjectName.trim()}>
+                        <Button type="submit" disabled={createLoading || !newProjectName.trim() || !newProjectIdentifier.trim()}>
                           {createLoading ? 'Creating...' : 'Create Project'}
                         </Button>
                       </div>
@@ -531,7 +533,7 @@ export default function DashboardClient({
                   </TableHeader>
                   <TableBody>
                     {filteredApprovedVersions.map((version) => {
-                      const url = `/documents/${version.document.id}/review?version=${version.id}`;
+                      const url = getVersionUrl(version);
                       const statusConfig = DOCUMENT_STATUS_CONFIGS[version.status];
                       return (
                         <TableRow key={version.id} className="group cursor-pointer" onClick={() => router.push(url)}>

@@ -1,3 +1,4 @@
+import { buildDocumentPath } from '@/domain/document/document-url';
 import prisma from '@/lib/db';
 import { getGitHubConfig } from '@/lib/github-config';
 import { GitHubPRStatus } from '@prisma/client';
@@ -240,7 +241,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     `- **File**: \`${filePath}\``,
     `- **Source Project**: ${document.sourceProject.name}`,
     `- **Translator**: ${version.user?.name ?? 'Unassigned'}`,
-    `- **Link to document**: ${process.env.NEXT_PUBLIC_APP_URL}/documents/${document.id}/review?version=${version.id}`,
+    `- **Link to document**: ${process.env.NEXT_PUBLIC_APP_URL}${buildDocumentPath({ projectIdentifier: document.sourceProject?.identifier, slug: document.slug, languageCode: version.language.code, documentId: document.id })}`,
     ...(audio.state === 'ready' && audio.url ? [`- **Audio**: ${audio.url}`] : []),
   ].join('\n');
 

@@ -1,10 +1,14 @@
-import { getDocumentById } from '@/domain/document/document.repository';
+import { getDocumentByProjectAndSlug } from '@/domain/document/document.repository';
 import { listSourceProjectsAction } from '@/domain/source-project/source-project.actions';
 import { getCurrentUser } from '@/lib/session';
 import { notFound, redirect } from 'next/navigation';
-import EditDocumentClient from './page.client';
+import EditDocumentClient from '../../../_editors/edit.client';
 
-export default async function EditDocumentPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditDocumentPage({
+  params,
+}: {
+  params: Promise<{ project: string; slug: string }>;
+}) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -15,16 +19,14 @@ export default async function EditDocumentPage({ params }: { params: Promise<{ i
     redirect('/documents');
   }
 
-  const { id } = await params;
-  const document = await getDocumentById(id);
+  const { project, slug } = await params;
+  const document = await getDocumentByProjectAndSlug(project, slug);
 
   if (!document) {
     notFound();
   }
 
-  // Get the source (English) version
-  const sourceVersion = document.versions.find((v: any) => v.language.code === 'en');
-
+  const sourceVersion = document.versions.find((v: { language: { code: string } }) => v.language.code === 'en');
   const sourceProjects = await listSourceProjectsAction();
 
   return (
