@@ -82,20 +82,28 @@ Slack renders the card around 360 px wide. Anything below roughly 40 px in the
 
 ## One deployment requirement
 
-`metadataBase` decides the origin `og:image` resolves against. Set **`APP_URL`**
-to the public origin in each environment.
+`metadataBase` decides the origin `og:image` resolves against. Set
+**`NEXT_PUBLIC_APP_URL`** to the public origin in each environment — the same
+variable `src/lib/auth.ts` already uses for trusted origins, so there is one
+value to keep right, not two.
 
-It must be `APP_URL`, not `NEXT_PUBLIC_APP_URL`. `NEXT_PUBLIC_*` values are
-inlined when the image is built, so a value supplied only to the running
-container never reaches the code. `APP_URL` is read on the server at runtime and
-can be changed without a rebuild.
+It is read on the server at runtime, so it can be changed without a rebuild.
+(`NEXT_PUBLIC_*` is inlined at build time into the *client* bundle; server
+code, including metadata, reads `process.env` normally.)
 
-Verified against a production build: with `APP_URL` set, `og:image` renders as
-`https://<origin>/opengraph-image.jpg`. Unset, it falls back to
-`http://localhost:3000` and every unfurl outside dev breaks silently.
+Verified against a production build with the variable absent at build time and
+supplied only to the running server:
 
-In `next dev` the tag always shows the dev origin regardless. That is dev
-substituting the request host, not a misconfiguration — do not chase it.
+```
+og:image = https://<origin>/opengraph-image.jpg
+```
+
+Unset, it falls back to `http://localhost:3000` and every unfurl outside dev
+breaks silently.
+
+In `next dev` the tag always shows the dev origin regardless of what you set.
+That is dev substituting the request host, not a misconfiguration — do not
+chase it, and do not conclude from it that the variable is being ignored.
 
 ## Still open
 

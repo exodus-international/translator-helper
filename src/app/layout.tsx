@@ -23,12 +23,9 @@ const APP_DESCRIPTION = 'Manage your document translations efficiently';
 
 export const metadata: Metadata = {
   // Without this, Next.js resolves the preview image against localhost and
-  // every unfurl outside dev breaks.
-  //
-  // APP_URL first: NEXT_PUBLIC_* is inlined at build time, so a value supplied
-  // only to the running container never reaches it. This is read on the server,
-  // so a plain variable works and can be changed without a rebuild.
-  metadataBase: new URL(process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  // every unfurl outside dev breaks. Read on the server at runtime, so the
+  // deployment can change it without a rebuild. Same variable auth.ts uses.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   title: APP_NAME,
   description: APP_DESCRIPTION,
   openGraph: {
