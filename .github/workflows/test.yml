@@ -24,6 +24,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # @prisma/client ships no types until its schema is generated. The
+      # postinstall that normally does this does not re-run when pnpm restores
+      # a cached store, so generate explicitly. Needs no DATABASE_URL.
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
       - name: Typecheck
         run: pnpm exec tsc --noEmit
 
