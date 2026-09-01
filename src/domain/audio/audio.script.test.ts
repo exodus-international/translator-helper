@@ -55,7 +55,7 @@ test('blockquoted scripture keeps its text', () => {
 });
 
 test('a pause marker becomes a pause segment between text segments', () => {
-  const script = markdownToSpeechScript('Let us pray.\n\n<!-- pause: 60 -->\n\nAmen.');
+  const script = markdownToSpeechScript('Let us pray.\n\n<!-- pause-duration="60s" -->\n\nAmen.');
   assert.deepEqual(script.segments, [
     { kind: 'text', text: 'Let us pray.' },
     { kind: 'pause', seconds: 60 },
@@ -63,13 +63,15 @@ test('a pause marker becomes a pause segment between text segments', () => {
   ]);
 });
 
-test('pause markers tolerate missing whitespace and mixed case', () => {
-  const script = markdownToSpeechScript('A<!--pause:5-->B <!-- PAUSE : 7 --> C');
+test('pause markers tolerate missing whitespace, mixed case, curly quotes and a bare number', () => {
+  const script = markdownToSpeechScript('A<!--pause-duration="5s"-->B <!-- PAUSE-DURATION = “7” --> C');
   assert.deepEqual(textOf(script), ['A', '[pause 5]', 'B', '[pause 7]', 'C']);
 });
 
 test('unknown and malformed comments are dropped without throwing', () => {
-  const script = markdownToSpeechScript('Before <!-- note to self --> middle <!-- pause: abc --> after <!-- pause: 0 --> end');
+  const script = markdownToSpeechScript(
+    'Before <!-- note to self --> middle <!-- pause-duration="abc" --> after <!-- pause-duration="0s" --> end',
+  );
   assert.deepEqual(script.segments, [{ kind: 'text', text: 'Before  middle  after  end' }]);
 });
 
@@ -80,8 +82,30 @@ test('a document with no markers produces a single text segment', () => {
 });
 
 test('adjacent and leading pauses are preserved in order', () => {
-  const script = markdownToSpeechScript('<!-- pause: 3 --><!-- pause: 4 -->Then words.');
+  const script = markdownToSpeechScript('<!-- pause-duration="3s" --><!-- pause-duration="4s" -->Then words.');
   assert.deepEqual(textOf(script), ['[pause 3]', '[pause 4]', 'Then words.']);
+});
+
+test('elements marked data-read="false" are skipped, content included', () => {
+  const md = 'Čti nahlas.<div data-read="false">Jen na obrazovku.<div>vnořené</div>ještě skryté</div>A dál.';
+  assert.equal(markdownToPlainText(md), 'Čti nahlas.\nA dál.');
+});
+
+test('a pause marker inside a data-read="false" element does not fire', () => {
+  const script = markdownToSpeechScript('Slovo.<section data-read="false">skip<!-- pause-duration="60s" --></section>Konec.');
+  assert.deepEqual(script.segments, [{ kind: 'text', text: 'Slovo.\nKonec.' }]);
+});
+
+test('data-read="false" on a void or self-closing tag removes just that tag', () => {
+  assert.equal(markdownToPlainText('Před <img src="x.png" data-read="false"> po <span data-read="false" /> konec'), 'Před\npo\nkonec');
+});
+
+test('an unclosed data-read="false" element skips to the end of the input', () => {
+  assert.equal(markdownToPlainText('Slyšet.<div data-read="false">už nikdy nic'), 'Slyšet.');
+});
+
+test('data-read="true" and unquoted or curly-quoted false are handled', () => {
+  assert.equal(markdownToPlainText('<p data-read="true">Ano.</p><p data-read=false>Ne.</p><p data-read=“false”>Také ne.</p>'), 'Ano.');
 });
 
 test('empty input yields an empty script', () => {

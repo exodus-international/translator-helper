@@ -7,9 +7,10 @@ import matter from 'gray-matter';
  * A pause is written in the source as an HTML comment so it never shows in
  * rendered Markdown:
  *
- *   <!-- pause: 60 -->
+ *   <!-- pause-duration="60s" -->
  *
  * The number is whole seconds. Any other HTML comment is dropped.
+ * Elements marked data-read="false" are skipped entirely, content included.
  */
 
 export type SpeechSegment = { kind: 'text'; text: string } | { kind: 'pause'; seconds: number };
@@ -18,11 +19,12 @@ export interface SpeechScript {
   segments: SpeechSegment[];
 }
 
-const PAUSE_MARKER = /<!--\s*pause\s*:\s*(\d+)\s*-->/gi;
+const PAUSE_MARKER = /<!--\s*pause-duration\s*=\s*["'“”]?(\d+)\s*s?["'“”]?\s*-->/gi;
 const ANY_HTML_COMMENT = /<!--[\s\S]*?-->/g;
 
 export function markdownToSpeechScript(markdown: string): SpeechScript {
-  const body = stripFrontmatter(markdown);
+  // Unread elements go first: a pause marker inside one must not fire.
+  const body = stripUnreadElements(stripFrontmatter(markdown));
   const segments: SpeechSegment[] = [];
 
   let buffer = '';
@@ -55,13 +57,44 @@ function stripFrontmatter(markdown: string): string {
   }
 }
 
+const UNREAD_OPEN_TAG = /<([a-zA-Z][\w-]*)\b[^>]*\bdata-read\s*=\s*["'“”]?false["'“”]?[^>]*>/i;
+const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+
+/** Removes every element marked data-read="false", content and all. */
+export function stripUnreadElements(text: string): string {
+  let match: RegExpMatchArray | null;
+  while ((match = text.match(UNREAD_OPEN_TAG)) !== null) {
+    const start = match.index ?? 0;
+    const tag = match[1].toLowerCase();
+    let end = start + match[0].length;
+    if (!VOID_TAGS.has(tag) && !match[0].endsWith('/>')) {
+      // Scan for the matching close, counting nested same-name tags.
+      const tagPattern = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'gi');
+      tagPattern.lastIndex = end;
+      let depth = 1;
+      end = text.length; // unclosed element: skip to end of input
+      let m: RegExpExecArray | null;
+      while ((m = tagPattern.exec(text)) !== null) {
+        depth += m[1] ? -1 : 1;
+        if (depth === 0) {
+          end = m.index + m[0].length;
+          break;
+        }
+      }
+    }
+    // A line break where the element stood, so neighbours do not concatenate.
+    text = text.slice(0, start) + '\n' + text.slice(end);
+  }
+  return text;
+}
+
 /**
  * Removes Markdown syntax and keeps the words. Deliberately regex based:
  * the input is a narrow dialect (headings, emphasis, links, quotes, lists,
  * fences) and pulling in a full parser buys little here.
  */
 export function markdownToPlainText(markdown: string): string {
-  let text = markdown
+  let text = stripUnreadElements(markdown)
     .replace(ANY_HTML_COMMENT, '')
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '') // never read code or CSS aloud
     .replace(/<br\s*\/?>/gi, '\n') // line breaks stay line breaks
