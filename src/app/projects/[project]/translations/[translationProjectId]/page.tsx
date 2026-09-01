@@ -6,16 +6,18 @@ import { listUsersAction } from '@/domain/user/user.actions';
 import { authorize } from '@/lib/authorize';
 import { notFound, redirect } from 'next/navigation';
 import TranslationProjectClient from './page.client';
+import { resolveProject } from '../../resolve-project';
 
 export default async function TranslationProjectPage({
   params,
 }: {
-  params: Promise<{ sourceProjectId: string; translationProjectId: string }>;
+  params: Promise<{ project: string; translationProjectId: string }>;
 }) {
-  const { sourceProjectId, translationProjectId } = await params;
+  const { project, translationProjectId } = await params;
+  const sourceProject = await resolveProject(project, `/translations/${translationProjectId}`);
   const translationProject = await getTranslationProjectAction(translationProjectId);
 
-  if (!translationProject) {
+  if (!translationProject || translationProject.sourceProjectId !== sourceProject.id) {
     notFound();
   }
 
@@ -29,7 +31,7 @@ export default async function TranslationProjectPage({
   const [members, assignments, documents, users] = await Promise.all([
     listProjectMembersAction(translationProjectId),
     listDocumentAssignmentsAction({ translationProjectId }),
-    listDocumentsAction({ sourceProjectId: sourceProjectId }),
+    listDocumentsAction({ sourceProjectId: sourceProject.id }),
     listUsersAction(),
   ]);
 

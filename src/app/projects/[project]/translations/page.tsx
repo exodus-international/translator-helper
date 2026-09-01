@@ -1,11 +1,11 @@
-import { redirect, notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
-import { getSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import { listTranslationProjectsAction } from '@/domain/translation-project/translation-project.actions';
 import { listTargetLanguages } from '@/domain/language/language.repository';
 import TranslationsClient from './page.client';
+import { resolveProject } from '../resolve-project';
 
-export default async function TranslationsPage({ params }: { params: Promise<{ sourceProjectId: string }> }) {
+export default async function TranslationsPage({ params }: { params: Promise<{ project: string }> }) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -16,15 +16,11 @@ export default async function TranslationsPage({ params }: { params: Promise<{ s
     redirect('/dashboard');
   }
 
-  const { sourceProjectId } = await params;
-  const sourceProject = await getSourceProjectAction(sourceProjectId);
-
-  if (!sourceProject) {
-    notFound();
-  }
+  const { project } = await params;
+  const sourceProject = await resolveProject(project, '/translations');
 
   const translationProjects = await listTranslationProjectsAction({
-    sourceProjectId,
+    sourceProjectId: sourceProject.id,
   });
   const languages = await listTargetLanguages();
 

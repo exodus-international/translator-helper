@@ -34,6 +34,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { buildProjectTranslationsPath } from '@/domain/source-project/source-project-url';
 
 interface TranslationProjectClientProps {
   translationProject: Prisma.TranslationProjectGetPayload<{
@@ -331,7 +332,7 @@ export default function TranslationProjectClient({
           <div className="flex items-center justify-between">
             <div>
               <Link
-                href={`/projects/${translationProject.sourceProject.id}/translations`}
+                href={buildProjectTranslationsPath(translationProject.sourceProject.identifier)}
                 className="text-sm text-gray-600 hover:text-gray-900 mb-2 inline-flex items-center gap-1"
               >
                 <ArrowLeft className="h-4 w-4" />

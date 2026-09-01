@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { buildProjectTranslationsPath } from '@/domain/source-project/source-project-url';
 
 interface ProjectsClientProps {
   sourceProjects: (SourceProject & {
@@ -238,7 +239,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
                     </Badge>
                   )}
                   <Link
-                    href={`/projects/${project.id}/translations`}
+                    href={buildProjectTranslationsPath(project.identifier)}
                     className="text-sm text-blue-600 hover:underline flex items-center gap-1"
                   >
                     <Languages className="h-4 w-4" />

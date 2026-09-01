@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import type { DocumentType } from '@prisma/client';
+import type { DocumentType, Prisma } from '@prisma/client';
 
 export async function listSourceProjects(options?: { includeComplete?: boolean }) {
   return prisma.sourceProject.findMany({
@@ -72,26 +72,36 @@ export async function getSourceProjectsForUser(userId: string, isAdmin: boolean)
   });
 }
 
-export async function getSourceProjectById(id: string) {
-  return prisma.sourceProject.findUnique({
-    where: { id },
+const sourceProjectDetailInclude = {
+  documents: {
+    orderBy: {
+      title: 'asc',
+    },
+  },
+  translationProjects: {
     include: {
-      documents: {
-        orderBy: {
-          title: 'asc',
-        },
-      },
-      translationProjects: {
-        include: {
-          language: true,
-          _count: {
-            select: {
-              members: true,
-            },
-          },
+      language: true,
+      _count: {
+        select: {
+          members: true,
         },
       },
     },
+  },
+} satisfies Prisma.SourceProjectInclude;
+
+export async function getSourceProjectById(id: string) {
+  return prisma.sourceProject.findUnique({
+    where: { id },
+    include: sourceProjectDetailInclude,
+  });
+}
+
+/** The readable URL segment, e.g. "advent2025" in /projects/advent2025. */
+export async function getSourceProjectByIdentifier(identifier: string) {
+  return prisma.sourceProject.findUnique({
+    where: { identifier },
+    include: sourceProjectDetailInclude,
   });
 }
 

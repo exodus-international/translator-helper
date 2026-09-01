@@ -1,6 +1,7 @@
 import { getDocumentVersionById } from '@/domain/document-version/document-version.repository';
 import { getDocumentById } from '@/domain/document/document.repository';
-import { buildDocumentEditPath, buildDocumentPath, isUuid } from '@/domain/document/document-url';
+import { buildDocumentEditPath, buildDocumentPath } from '@/domain/document/document-url';
+import { isUuid } from '@/lib/uuid';
 import { getLanguageByCode, getLanguageById } from '@/domain/language/language.repository';
 import { notFound, redirect } from 'next/navigation';
 
