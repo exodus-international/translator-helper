@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DocumentSearchInput } from '@/components/document-search-input';
+import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { DOCUMENT_STATUS_SEQUENCE, NO_STATUS, getDocumentStatusConfig } from '@/constants/document-status';
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
@@ -230,9 +231,7 @@ export default function DocumentsClient({
                         <TableCell className="text-gray-600 text-sm">{doc.originalFilename || '—'}</TableCell>
                         <TableCell>
                           {doc.type ? (
-                            <Badge variant="outline" className="text-xs font-normal">
-                              {doc.type.replace('_', ' ')}
-                            </Badge>
+                            <DocumentTypeBadge type={doc.type} />
                           ) : (
                             <span className="text-gray-400 text-sm">—</span>
                           )}

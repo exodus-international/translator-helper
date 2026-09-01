@@ -3,6 +3,7 @@
 import { useActiveLanguage } from '@/components/analytics-project-group';
 import { AnnouncementBanner, AnnouncementBannerData } from '@/components/announcement-banner';
 import { AnnouncementModal, AnnouncementModalData } from '@/components/announcement-modal';
+import { DocumentTypeBadge } from '@/components/document-type-badge';
 import ProjectCard from '@/components/project-card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +20,7 @@ import { createSourceProjectAction } from '@/domain/source-project/source-projec
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus, DocumentType } from '@prisma/client';
 import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -34,6 +35,7 @@ type VersionWithDetails = {
     id: string;
     title: string;
     slug: string;
+    type: DocumentType | null;
     sourceProject: {
       id: string;
       name: string;
@@ -88,6 +90,7 @@ interface DashboardClientProps {
       id: string;
       title: string;
       slug: string;
+      type: DocumentType | null;
       sourceProject: {
         id: string;
         name: string;
@@ -157,6 +160,7 @@ type WorkItem = {
   key: string;
   documentId: string;
   documentTitle: string;
+  documentType: DocumentType | null;
   projectName: string | null;
   languageName: string;
   role: 'Translator' | 'Reviewer';
@@ -181,6 +185,7 @@ function buildWorkItems(
       key,
       documentId: v.document.id,
       documentTitle: v.document.title,
+      documentType: v.document.type,
       projectName: v.document.sourceProject?.name ?? null,
       languageName: v.language.name,
       role: 'Translator',
@@ -199,6 +204,7 @@ function buildWorkItems(
       key,
       documentId: v.document.id,
       documentTitle: v.document.title,
+      documentType: v.document.type,
       projectName: v.document.sourceProject?.name ?? null,
       languageName: v.language.name,
       role: 'Reviewer',
@@ -229,6 +235,7 @@ function buildWorkItems(
         key,
         documentId: a.document.id,
         documentTitle: a.document.title,
+        documentType: a.document.type,
         projectName: a.translationProject.sourceProject?.name ?? null,
         languageName: a.translationProject.language.name,
         role: 'Translator',
@@ -513,6 +520,7 @@ export default function DashboardClient({
                   <TableHeader>
                     <TableRow>
                       <TableHead className={headClass}>Document</TableHead>
+                      <TableHead className={headClass}>Type</TableHead>
                       <TableHead className={headClass}>Project</TableHead>
                       <TableHead className={headClass}>Language</TableHead>
                       <TableHead className={headClass}>Translator</TableHead>
@@ -529,6 +537,13 @@ export default function DashboardClient({
                         <TableRow key={version.id} className="group cursor-pointer" onClick={() => router.push(url)}>
                           <TableCell>
                             <span className="font-medium text-sm">{version.document.title}</span>
+                          </TableCell>
+                          <TableCell>
+                            {version.document.type ? (
+                              <DocumentTypeBadge type={version.document.type} />
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{'\u2014'}</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-muted-foreground">
@@ -596,6 +611,7 @@ export default function DashboardClient({
                   <TableHeader>
                     <TableRow>
                       <TableHead className={headClass}>Document</TableHead>
+                      <TableHead className={headClass}>Type</TableHead>
                       <TableHead className={headClass}>Project</TableHead>
                       <TableHead className={headClass}>Language</TableHead>
                       <TableHead className={headClass}>Translator</TableHead>
@@ -613,6 +629,13 @@ export default function DashboardClient({
                         <TableRow key={item.key} className="group cursor-pointer" onClick={() => router.push(item.url)}>
                           <TableCell>
                             <span className="font-medium text-sm">{item.documentTitle}</span>
+                          </TableCell>
+                          <TableCell>
+                            {item.documentType ? (
+                              <DocumentTypeBadge type={item.documentType} />
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{'\u2014'}</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-muted-foreground">{item.projectName ?? '\u2014'}</span>

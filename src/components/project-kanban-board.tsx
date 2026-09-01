@@ -17,6 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import {
+  DocumentTypeFilterValue,
+  matchesDocumentTypeFilter,
+  parseDocumentTypeFilter,
+  serializeDocumentTypeFilter,
+} from '@/domain/document/document-type-filter';
+import {
   createDocumentAssignmentAction,
   updateDocumentAssignmentAction,
 } from '@/domain/document-assignment/document-assignment.actions';
@@ -27,6 +33,8 @@ import {
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
 import { DocumentSearchInput } from '@/components/document-search-input';
+import { DocumentTypeBadge } from '@/components/document-type-badge';
+import { DocumentTypeFilter } from '@/components/document-type-filter';
 import { useActiveLanguage } from '@/components/analytics-project-group';
 import { useDeployConfirm } from '@/components/deploy-confirm';
 import { capture } from '@/lib/analytics';
@@ -41,6 +49,8 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 
 // Radix Select doesn't allow empty string values, so we use a sentinel for "unassign"
 const UNASSIGN_VALUE = '__none__';
+
+const TYPE_FILTER_STORAGE_KEY = 'kanban:documentTypeFilter';
 
 const getInitials = (name: string | null | undefined) =>
   (name ?? '')
@@ -197,6 +207,7 @@ export default function ProjectKanbanBoard({
   const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState('all');
+  const [selectedTypes, setSelectedTypes] = useState<DocumentTypeFilterValue[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -221,6 +232,18 @@ export default function ProjectKanbanBoard({
   useEffect(() => {
     loadDocuments();
   }, [selectedLanguage, sourceProjectId]);
+
+  // Restored after mount rather than in the initial state so server and client
+  // render the same markup.
+  useEffect(() => {
+    setSelectedTypes(parseDocumentTypeFilter(localStorage.getItem(TYPE_FILTER_STORAGE_KEY)));
+  }, []);
+
+  function handleTypeFilterChange(types: DocumentTypeFilterValue[]) {
+    setSelectedTypes(types);
+    localStorage.setItem(TYPE_FILTER_STORAGE_KEY, serializeDocumentTypeFilter(types));
+    capture('document_type_filter_changed', { context: 'kanban', types, count: types.length });
+  }
 
   async function loadDocuments() {
     setLoading(true);
@@ -352,6 +375,10 @@ export default function ProjectKanbanBoard({
   }, [documents]);
 
   const filteredDocuments = documents.filter((doc) => {
+    if (!matchesDocumentTypeFilter(doc.type, selectedTypes)) {
+      return false;
+    }
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       if (!doc.title.toLowerCase().includes(query) && !doc.slug.toLowerCase().includes(query)) {
@@ -492,6 +519,7 @@ export default function ProjectKanbanBoard({
         <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
         <div className="flex gap-4 items-center text-sm text-gray-600">
           <span>Filters:</span>
+          <DocumentTypeFilter selected={selectedTypes} onChange={handleTypeFilterChange} />
           <Select value={selectedUser} onValueChange={setSelectedUser}>
             <SelectTrigger className="min-w-[200px]">
               <div className="flex items-center gap-2">
@@ -533,6 +561,11 @@ export default function ProjectKanbanBoard({
         <div className="text-center py-12">
           <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
           <p className="text-gray-500">No documents found</p>
+          {selectedTypes.length > 0 && documents.length > 0 && (
+            <Button variant="link" size="sm" onClick={() => handleTypeFilterChange([])}>
+              Clear type filter
+            </Button>
+          )}
         </div>
       ) : (
         <div className="h-[calc(100vh-350px)]">
@@ -681,6 +714,7 @@ export default function ProjectKanbanBoard({
                                 </div>
                               </div>
                               <div className="flex flex-wrap gap-1 items-center">
+                                <DocumentTypeBadge type={doc.type} />
                                 {doc.sourceProject && (
                                   <Badge variant="secondary" size="xs">
                                     {doc.sourceProject.name}
