@@ -99,6 +99,19 @@ function stripFrontmatter(markdown: string): string {
 const UNREAD_OPEN_TAG = /<([a-zA-Z][\w-]*)\b[^>]*\bdata-read\s*=\s*["'“”]?false["'“”]?[^>]*>/i;
 const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
 
+/**
+ * Tags that already separate text visually. An unread block leaves a line
+ * break behind; an unread inline element leaves a space, because a line break
+ * mid-sentence makes the narrator hitch where the prose should run on.
+ */
+const BLOCK_TAGS = new Set([
+  'address', 'article', 'aside', 'blockquote', 'dd', 'div', 'dl', 'dt', 'fieldset', 'figcaption',
+  'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main',
+  'nav', 'ol', 'p', 'pre', 'section', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul',
+]);
+
+const BLOCK_TAG_PATTERN = new RegExp(`</?(?:${[...BLOCK_TAGS].join('|')})\\b[^>]*>`, 'gi');
+
 /** Removes every element marked data-read="false", content and all. */
 export function stripUnreadElements(text: string): string {
   let match: RegExpMatchArray | null;
@@ -121,8 +134,10 @@ export function stripUnreadElements(text: string): string {
         }
       }
     }
-    // A line break where the element stood, so neighbours do not concatenate.
-    text = text.slice(0, start) + '\n' + text.slice(end);
+    // Something where the element stood, so neighbours do not concatenate:
+    // a line break for a block, a space inside a sentence.
+    const filler = BLOCK_TAGS.has(tag) ? '\n' : ' ';
+    text = text.slice(0, start) + filler + text.slice(end);
   }
   return text;
 }
@@ -137,7 +152,7 @@ export function markdownToPlainText(markdown: string): string {
     .replace(ANY_HTML_COMMENT, '')
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '') // never read code or CSS aloud
     .replace(/<br\s*\/?>/gi, '\n') // line breaks stay line breaks
-    .replace(/<\/?(p|div|h[1-6]|li|ul|ol|blockquote|section|article|tr|table)\b[^>]*>/gi, '\n'); // block tags separate text
+    .replace(BLOCK_TAG_PATTERN, '\n'); // block tags separate text
 
   // Fenced code: drop the fence lines, keep whatever is inside.
   text = text.replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n?/gm, '');
@@ -164,7 +179,7 @@ export function markdownToPlainText(markdown: string): string {
   // Whitespace: trim lines, collapse runs of blank lines to one.
   return text
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

@@ -72,7 +72,7 @@ test('unknown and malformed comments are dropped without throwing', () => {
   const script = markdownToSpeechScript(
     'Before <!-- note to self --> middle <!-- pause-duration="abc" --> after <!-- pause-duration="0s" --> end',
   );
-  assert.deepEqual(script.segments, [{ kind: 'text', text: 'Before  middle  after  end' }]);
+  assert.deepEqual(script.segments, [{ kind: 'text', text: 'Before middle after end' }]);
 });
 
 test('a document opening with a heading produces a single text segment, no leading pause', () => {
@@ -120,8 +120,8 @@ test('a pause marker inside a data-read="false" element does not fire', () => {
   assert.deepEqual(script.segments, [{ kind: 'text', text: 'Slovo.\nKonec.' }]);
 });
 
-test('data-read="false" on a void or self-closing tag removes just that tag', () => {
-  assert.equal(markdownToPlainText('Před <img src="x.png" data-read="false"> po <span data-read="false" /> konec'), 'Před\npo\nkonec');
+test('data-read="false" on a void or self-closing tag leaves a space, not a break', () => {
+  assert.equal(markdownToPlainText('Před <img src="x.png" data-read="false"> po <span data-read="false" /> konec'), 'Před po konec');
 });
 
 test('an unclosed data-read="false" element skips to the end of the input', () => {
@@ -143,7 +143,7 @@ test('runs of blank lines collapse to a single paragraph break', () => {
 
 test('inline HTML keeps its text, block tags and br separate lines, script and style are dropped whole', () => {
   const md = 'Svíce <strong>Pokoje</strong>.<br>Druhý řádek <img src="x.png" alt="obrázek"> konec.<div>Uvnitř</div><script>alert(1)</script><style>p{}</style>Amen.';
-  assert.equal(markdownToPlainText(md), 'Svíce Pokoje.\nDruhý řádek  konec.\nUvnitř\nAmen.');
+  assert.equal(markdownToPlainText(md), 'Svíce Pokoje.\nDruhý řádek konec.\nUvnitř\nAmen.');
 });
 
 test('literal angle brackets and ampersands in prose survive stripping (the SSML builder escapes them)', () => {
@@ -168,4 +168,15 @@ test('a pause marker survives a zero-width space inside the duration', () => {
 test('invisible characters never reach the narrator', () => {
   const md = 'Sv\u00adíce' + '\ufeff' + ' Pokoje\u200d.';
   assert.equal(markdownToPlainText(md), 'Svíce Pokoje.');
+});
+
+test('an unread inline element leaves the sentence running on', () => {
+  // A line break here makes the narrator hitch mid-sentence.
+  const md = 'Dnes vstupujeme do <b data-read="false">svateho</b> postniho obdobi.';
+  assert.equal(markdownToPlainText(md), 'Dnes vstupujeme do postniho obdobi.');
+});
+
+test('an unread block element still breaks the line', () => {
+  const md = 'Prvni.<div data-read="false">skryte</div>Druhy.';
+  assert.equal(markdownToPlainText(md), 'Prvni.\nDruhy.');
 });
