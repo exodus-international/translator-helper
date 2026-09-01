@@ -1,5 +1,6 @@
 'use client';
 
+import { Logo } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -47,6 +48,7 @@ export default function LoginClient() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-4">
         <div className="text-center mb-4">
+          <Logo size={48} className="mx-auto mb-2 block" />
           <h1 className="text-2xl font-bold">Translation Helper</h1>
           <p className="text-gray-600">Manage your translations efficiently</p>
         </div>

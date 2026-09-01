@@ -1,5 +1,6 @@
 'use client';
 
+import { Logo } from '@/components/logo';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { capture } from '@/lib/analytics';
@@ -34,7 +35,11 @@ export function Navigation({ user }: NavigationProps) {
       <div className="container mx-auto px-4 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-base font-bold">
+            {/* nowrap: the admin nav is crowded enough to break "Translation
+                Helper" across two lines, which reads as broken next to a
+                single-line mark. */}
+            <Link href="/dashboard" className="flex shrink-0 items-center gap-2 whitespace-nowrap text-base font-bold">
+              <Logo size={24} />
               Translation Helper
             </Link>
             <div className="flex gap-4">
