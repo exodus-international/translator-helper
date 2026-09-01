@@ -23,6 +23,23 @@ export interface SpeechScript {
   segments: SpeechSegment[];
 }
 
+/**
+ * Invisible formatting characters: zero-width spaces and joiners, word
+ * joiners, bidi marks, soft hyphens, the BOM. Pasting from Word, Google Docs
+ * or a chat client sprinkles these through the text.
+ *
+ * They come out before anything else reads the string. A pause marker with a
+ * word joiner after the "<!--" looks perfectly correct in the editor but
+ * never matches, because JavaScript's \s covers U+2000-U+200A and not
+ * U+2060 - so the marker falls through to the any-comment rule and the pause
+ * silently disappears. A narrator gains nothing from these either.
+ *
+ * Line and paragraph separators (U+2028, U+2029) are deliberately absent:
+ * those are real breaks, not invisible noise. Spelled as escapes because a
+ * class written with the literal characters cannot be read or safely edited.
+ */
+const INVISIBLE_FORMATTING = /[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g;
+
 const PAUSE_MARKER = /<!--\s*pause-duration\s*=\s*["'“”]?(\d+)\s*s?["'“”]?\s*-->/i;
 // A pause marker or a heading line; group 1 tells the two apart.
 const SEGMENT_BREAK = new RegExp(`${PAUSE_MARKER.source}|^[ \\t]{0,3}#{1,6}[ \\t]`, 'gim');
@@ -30,8 +47,9 @@ const ANY_HTML_COMMENT = /<!--[\s\S]*?-->/g;
 const HEADING_PAUSE_SECONDS = 1;
 
 export function markdownToSpeechScript(markdown: string): SpeechScript {
-  // Unread elements go first: a pause marker inside one must not fire.
-  const body = stripUnreadElements(stripFrontmatter(markdown));
+  // Invisible characters first, so a pasted marker still matches; then
+  // unread elements, so a pause marker inside one does not fire.
+  const body = stripUnreadElements(stripFrontmatter(stripInvisibleFormatting(markdown)));
   const segments: SpeechSegment[] = [];
 
   let buffer = '';
@@ -64,6 +82,10 @@ export function markdownToSpeechScript(markdown: string): SpeechScript {
 function pushText(segments: SpeechSegment[], raw: string) {
   const text = markdownToPlainText(raw);
   if (text.length > 0) segments.push({ kind: 'text', text });
+}
+
+function stripInvisibleFormatting(text: string): string {
+  return text.replace(INVISIBLE_FORMATTING, '');
 }
 
 function stripFrontmatter(markdown: string): string {
@@ -111,7 +133,7 @@ export function stripUnreadElements(text: string): string {
  * fences) and pulling in a full parser buys little here.
  */
 export function markdownToPlainText(markdown: string): string {
-  let text = stripUnreadElements(markdown)
+  let text = stripUnreadElements(stripInvisibleFormatting(markdown))
     .replace(ANY_HTML_COMMENT, '')
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '') // never read code or CSS aloud
     .replace(/<br\s*\/?>/gi, '\n') // line breaks stay line breaks

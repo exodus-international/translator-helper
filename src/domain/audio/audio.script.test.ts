@@ -149,3 +149,23 @@ test('inline HTML keeps its text, block tags and br separate lines, script and s
 test('literal angle brackets and ampersands in prose survive stripping (the SSML builder escapes them)', () => {
   assert.equal(markdownToPlainText('2 < 3 a Tom & Jerry'), '2 < 3 a Tom & Jerry');
 });
+
+test('a pause marker survives a word joiner pasted into it', () => {
+  // U+2060 lands here when the marker is copied through Word, Docs or chat.
+  const script = markdownToSpeechScript(`A.\n\n<!-- \u2060pause-duration="10s" -->\n\nB.`);
+  assert.deepEqual(script.segments, [
+    { kind: 'text', text: 'A.' },
+    { kind: 'pause', seconds: 10 },
+    { kind: 'text', text: 'B.' },
+  ]);
+});
+
+test('a pause marker survives a zero-width space inside the duration', () => {
+  const script = markdownToSpeechScript(`A.\n\n<!-- pause-duration="1\u200b0s" -->\n\nB.`);
+  assert.equal(script.segments[1] && script.segments[1].kind === 'pause' && script.segments[1].seconds, 10);
+});
+
+test('invisible characters never reach the narrator', () => {
+  const md = 'Sv\u00adíce' + '\ufeff' + ' Pokoje\u200d.';
+  assert.equal(markdownToPlainText(md), 'Svíce Pokoje.');
+});
