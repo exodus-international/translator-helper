@@ -12,12 +12,16 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import {
+  ProjectFormFields,
+  isProjectFormComplete,
+  toCreateProjectInput,
+  useProjectForm,
+} from '@/components/project-form';
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -316,26 +320,18 @@ export default function DashboardClient({
 
   // Create project dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDescription, setNewProjectDescription] = useState('');
-  const [newProjectIdentifier, setNewProjectIdentifier] = useState('');
+  const { values: newProject, set: setNewProject, reset: resetNewProject } = useProjectForm();
   const [createLoading, setCreateLoading] = useState(false);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateLoading(true);
     try {
-      await createSourceProjectAction({
-        name: newProjectName,
-        description: newProjectDescription || undefined,
-        identifier: newProjectIdentifier.trim(),
-      });
+      await createSourceProjectAction(toCreateProjectInput(newProject));
       capture('source_project_created', { location: 'dashboard' });
       toast.success('Project created');
       setCreateDialogOpen(false);
-      setNewProjectName('');
-      setNewProjectDescription('');
-      setNewProjectIdentifier('');
+      resetNewProject();
       router.refresh();
     } catch (error: any) {
       console.error('Error creating project:', error);
@@ -407,11 +403,7 @@ export default function DashboardClient({
                     if (open) {
                       capture('dialog_opened', { dialog: 'create_source_project' });
                     }
-                    if (!open) {
-                      setNewProjectName('');
-                      setNewProjectDescription('');
-                      setNewProjectIdentifier('');
-                    }
+                    if (!open) resetNewProject();
                   }}
                 >
                   <DialogTrigger asChild>
@@ -425,49 +417,12 @@ export default function DashboardClient({
                       <DialogTitle>Create New Project</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleCreateProject} className="space-y-4">
-                      <div>
-                        <Label htmlFor="new-project-name">Project Name *</Label>
-                        <Input
-                          id="new-project-name"
-                          value={newProjectName}
-                          onChange={(e) => setNewProjectName(e.target.value)}
-                          placeholder="e.g., Exodus90, Daily Readings"
-                          required
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new-project-description">Description</Label>
-                        <Textarea
-                          id="new-project-description"
-                          value={newProjectDescription}
-                          onChange={(e) => setNewProjectDescription(e.target.value)}
-                          placeholder="Optional description of the project"
-                          rows={3}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new-project-identifier">Identifier *</Label>
-                        <Input
-                          id="new-project-identifier"
-                          value={newProjectIdentifier}
-                          onChange={(e) => setNewProjectIdentifier(e.target.value)}
-                          placeholder="e.g., exodus90, lent2026"
-                          required
-                          pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                          className="mt-1"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Used in document URLs and as the folder name in the content repository.
-                          Lowercase letters, numbers and dashes.
-                        </p>
-                      </div>
+                      <ProjectFormFields values={newProject} onChange={setNewProject} idPrefix="new-project" />
                       <div className="flex justify-end gap-2">
                         <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={createLoading || !newProjectName.trim() || !newProjectIdentifier.trim()}>
+                        <Button type="submit" disabled={createLoading || !isProjectFormComplete(newProject)}>
                           {createLoading ? 'Creating...' : 'Create Project'}
                         </Button>
                       </div>

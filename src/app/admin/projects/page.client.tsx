@@ -3,9 +3,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { AdminListPage, DeleteConfirmDialog } from '@/components/admin-list-page';
 import { DOCUMENT_TYPE_CONFIGS, DOCUMENT_TYPE_SEQUENCE } from '@/constants/document-type';
 import {
@@ -13,6 +11,12 @@ import {
   deleteSourceProjectAction,
   updateSourceProjectAction,
 } from '@/domain/source-project/source-project.actions';
+import {
+  ProjectFormFields,
+  toCreateProjectInput,
+  toUpdateProjectInput,
+  useProjectForm,
+} from '@/components/project-form';
 import { capture } from '@/lib/analytics';
 import { DocumentType, SourceProject } from '@prisma/client';
 import { CheckCircle2, Edit, FolderOpen, Languages } from 'lucide-react';
@@ -43,10 +47,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
   const [sourceProjects, setSourceProjects] = useState(initialSourceProjects);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<SourceProject | null>(null);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [identifier, setIdentifier] = useState('');
-  const [acronym, setAcronym] = useState('');
+  const { values, set, reset } = useProjectForm();
   const [audioDocumentTypes, setAudioDocumentTypes] = useState<DocumentType[]>(DEFAULT_AUDIO_DOCUMENT_TYPES);
   const [loading, setLoading] = useState(false);
 
@@ -57,10 +58,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
 
   const resetForm = () => {
     setEditingProject(null);
-    setName('');
-    setDescription('');
-    setIdentifier('');
-    setAcronym('');
+    reset();
     setAudioDocumentTypes(DEFAULT_AUDIO_DOCUMENT_TYPES);
   };
 
@@ -92,22 +90,14 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     try {
       if (editingProject) {
         const updated = await updateSourceProjectAction(editingProject.id, {
-          name,
-          description: description || null,
-          identifier: identifier.trim(),
-          acronym: acronym.trim() || null,
+          ...toUpdateProjectInput(values),
           audioDocumentTypes,
         });
         replaceProjectPreservingCount(updated);
         capture('source_project_updated');
       } else {
         // Create source project (this will also create translation projects for all languages)
-        await createSourceProjectAction({
-          name,
-          description: description || undefined,
-          identifier: identifier.trim(),
-          acronym: acronym.trim() || null,
-        });
+        await createSourceProjectAction(toCreateProjectInput(values));
         capture('source_project_created', { location: 'admin' });
         // Refresh the page to get updated counts including translation projects
         router.refresh();
@@ -125,10 +115,12 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
 
   const handleEdit = (project: SourceProject) => {
     setEditingProject(project);
-    setName(project.name);
-    setDescription(project.description || '');
-    setIdentifier((project as any).identifier || '');
-    setAcronym(project.acronym || '');
+    reset({
+      name: project.name,
+      description: project.description || '',
+      identifier: project.identifier || '',
+      acronym: project.acronym || '',
+    });
     setAudioDocumentTypes(project.audioDocumentTypes ?? DEFAULT_AUDIO_DOCUMENT_TYPES);
     setDialogOpen(true);
   };
@@ -178,49 +170,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
       loading={loading}
       formFields={
         <>
-          <div>
-            <Label htmlFor="name">Project Name *</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Exodus90, Daily Readings"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description of the project"
-              rows={3}
-            />
-          </div>
-          <div>
-            <Label htmlFor="identifier">Identifier *</Label>
-            <Input
-              id="identifier"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="e.g., exodus90, lent2026"
-            />
-            <p className="text-xs text-gray-500 mt-1">GITHUB: Folder name in the content repository</p>
-          </div>
-          <div>
-            <Label htmlFor="acronym">Acronym</Label>
-            <Input
-              id="acronym"
-              value={acronym}
-              onChange={(e) => setAcronym(e.target.value)}
-              placeholder="e.g., SML"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Prefixes the title of uploaded days, as in &quot;SML - DAY 03 - ...&quot;. Leave empty to number
-              days without a prefix, or enter a single dash to leave titles alone.
-            </p>
-          </div>
+          <ProjectFormFields values={values} onChange={set} idPrefix="admin-project" />
           {editingProject && (
             <div>
               <Label>Generate audio for</Label>
