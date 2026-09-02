@@ -22,10 +22,20 @@ export const sourceProjectIdentifier = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lowercase letters, numbers and single dashes only')
   .refine(notUuidShaped, notUuidMessage);
 
+/**
+ * Short prefix for auto-named DAY titles ("SML" in "SML - DAY 03 - ..."), so
+ * it is kept short and free of the separator the title is joined with.
+ */
+export const sourceProjectAcronym = z
+  .string()
+  .max(16)
+  .regex(/^[^\s-]+$/, 'No spaces or dashes');
+
 export const createSourceProjectSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
   identifier: sourceProjectIdentifier,
+  acronym: sourceProjectAcronym.optional().nullable(),
 });
 
 export const updateSourceProjectSchema = z.object({
@@ -43,5 +53,7 @@ export const updateSourceProjectSchema = z.object({
     .optional(),
   status: z.enum(['ACTIVE', 'COMPLETE']).optional(),
   audioDocumentTypes: z.array(z.enum(DocumentType)).optional(),
+  // Nullable so an admin can clear the acronym and go back to unprefixed titles.
+  acronym: sourceProjectAcronym.optional().nullable(),
 });
 

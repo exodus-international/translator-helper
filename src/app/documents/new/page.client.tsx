@@ -12,13 +12,15 @@ import { LabelsField } from '@/components/document-form/labels-field';
 import { OriginalFilenameField } from '@/components/document-form/original-filename-field';
 import { getContentFormat } from '@/components/document-form/content-format';
 import { validateFilename } from '@/domain/document/validate-filename';
+import { buildDefaultTitle, dayNumberFromFilename, parseDayNumber } from '@/domain/document/document-title';
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import { capture } from '@/lib/analytics';
 import matter from 'gray-matter';
 import { FileText, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import type { DocumentType } from '@prisma/client';
 import { toast } from 'sonner';
 
 interface NewDocumentClientProps {
@@ -26,6 +28,7 @@ interface NewDocumentClientProps {
     id: string;
     name: string;
     status: string;
+    acronym?: string | null;
   }>;
 }
 
@@ -59,6 +62,12 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [mode, setMode] = useState<'upload' | 'create'>('upload');
 
   const [title, setTitle] = useState('');
+  // The file's own title, kept apart from `title` because the composed default
+  // ("SML - DAY 03 - ...") is built from it and the slug stays derived from it.
+  const [baseTitle, setBaseTitle] = useState('');
+  const [dayNumber, setDayNumber] = useState<number | null>(null);
+  // Once the title has been typed in, it stops following the project and type.
+  const [titleEdited, setTitleEdited] = useState(false);
   const [slug, setSlug] = useState('');
   const [content, setContent] = useState('');
   const [sourceProjectId, setSourceProjectId] = useState('');
@@ -75,6 +84,22 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
   const filenameError = validateFilename(documentType, originalFilename);
   const contentFormat = getContentFormat(originalFilename);
+  const selectedProjectAcronym = sourceProjects.find((project) => project.id === sourceProjectId)?.acronym ?? null;
+
+  // The acronym belongs to the project and the rule only applies to days, and
+  // both of those are chosen after the file is dropped. So the default title is
+  // recomputed as they change rather than being set once when the file is read.
+  useEffect(() => {
+    if (titleEdited || !baseTitle) return;
+    setTitle(
+      buildDefaultTitle({
+        baseTitle,
+        type: (documentType || null) as DocumentType | null,
+        acronym: selectedProjectAcronym,
+        day: dayNumber,
+      }),
+    );
+  }, [baseTitle, documentType, dayNumber, selectedProjectAcronym, titleEdited]);
 
   const processFile = useCallback((file: File) => {
     setOriginalFilename(file.name);
@@ -89,9 +114,17 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
       setContent(text);
 
-      const extractedTitle = frontmatter.title || file.name.replace(/\.(md|ya?ml)$/i, '');
-      setTitle(String(extractedTitle));
-      setSlug(generateSlug(String(extractedTitle)));
+      const extractedTitle = String(frontmatter.title || file.name.replace(/\.(md|ya?ml)$/i, ''));
+      setBaseTitle(extractedTitle);
+      setTitle(extractedTitle);
+      // Deliberately from the file's own title, not the composed one: the slug
+      // is the document URL and cannot be changed after creation, so it should
+      // not carry the acronym and day prefix.
+      setSlug(generateSlug(extractedTitle));
+      // Frontmatter first, then a bare "13.md". The composed title needs the
+      // number itself, which the `day13` label throws away.
+      setDayNumber(parseDayNumber(frontmatter.day) ?? dayNumberFromFilename(file.name));
+      setTitleEdited(false);
       setLabels(extractLabelsFromFrontmatter(frontmatter));
       if (isYaml) setDocumentType('ROOT_FILE');
       setMode('create');
@@ -137,6 +170,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   };
 
   const handleTitleChange = (value: string) => {
+    setTitleEdited(true);
     setTitle(value);
     setSlug(generateSlug(value));
   };

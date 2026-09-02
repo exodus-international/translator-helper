@@ -215,6 +215,7 @@ model SourceProject {
   name                String               @unique
   description         String?              @db.Text
   identifier          String               @unique // URL segment: /documents/{identifier}/...
+  acronym             String? // Short prefix for auto-named DAY titles, e.g. "SML" in "SML - DAY 03 - ..."
   status              SourceProjectStatus  @default(ACTIVE)
   audioDocumentTypes  DocumentType[]       @default([DAY, DAILY_CONTENT])
   createdAt           DateTime             @default(now())

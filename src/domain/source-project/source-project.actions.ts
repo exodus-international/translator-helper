@@ -45,6 +45,7 @@ export async function createSourceProjectAction(input: unknown) {
     name: validated.name,
     description: validated.description,
     identifier: validated.identifier,
+    acronym: validated.acronym,
   });
 
   // Auto-create translation projects for all target languages (excluding English)
@@ -75,7 +76,12 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
     }
 
     // Project managers can only update status, not name, description or audio settings
-    if (validated.name !== undefined || validated.description !== undefined || validated.audioDocumentTypes !== undefined) {
+    if (
+      validated.name !== undefined ||
+      validated.description !== undefined ||
+      validated.audioDocumentTypes !== undefined ||
+      validated.acronym !== undefined
+    ) {
       throw new Error('Forbidden: Project managers can only update project status');
     }
   }
@@ -84,6 +90,7 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
     name: validated.name,
     description: validated.description,
     identifier: validated.identifier,
+    acronym: validated.acronym,
     status: validated.status,
     audioDocumentTypes: validated.audioDocumentTypes,
   });
