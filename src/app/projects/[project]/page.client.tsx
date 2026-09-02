@@ -38,9 +38,9 @@ interface ProjectDetailClientProps {
         id: string;
         name: string;
         code: string;
-      };
-      _count: {
-        members: number;
+        _count: {
+          users: number;
+        };
       };
     }[];
   };
@@ -53,8 +53,8 @@ interface ProjectDetailClientProps {
       id: string;
       name: string;
       code: string;
+      users: { userId: string }[];
     };
-    members: { userId: string }[];
   }[];
   /** Resolved server-side from the user's assigned languages and this project's translation projects. */
   initialLanguageId: string;

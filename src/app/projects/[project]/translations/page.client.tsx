@@ -19,10 +19,13 @@ import { buildTranslationProjectPath } from '@/domain/source-project/source-proj
 type TranslationProjectListItem = Prisma.TranslationProjectGetPayload<{
   include: {
     sourceProject: true;
-    language: true;
-    members: {
-      select: {
-        userId: true;
+    language: {
+      include: {
+        users: {
+          select: {
+            userId: true;
+          };
+        };
       };
     };
   };
@@ -36,10 +39,13 @@ type SourceProjectWithDetails = Prisma.SourceProjectGetPayload<{
     documents: true;
     translationProjects: {
       include: {
-        language: true;
-        _count: {
-          select: {
-            members: true;
+        language: {
+          include: {
+            _count: {
+              select: {
+                users: true;
+              };
+            };
           };
         };
       };
@@ -209,7 +215,7 @@ export default function TranslationsClient({
                       {tp.language.name} ({tp.language.code})
                     </p>
                     <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                      <span>{new Set(tp.members.map((m) => m.userId)).size} member(s)</span>
+                      <span>{tp.language.users.length} member(s)</span>
                       <span>{tp.documentCount} document(s)</span>
                     </div>
                   </div>

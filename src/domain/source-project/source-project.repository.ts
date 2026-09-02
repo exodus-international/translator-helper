@@ -22,6 +22,8 @@ export async function listSourceProjects(options?: { includeComplete?: boolean }
   });
 }
 
+/** Access is language-based: a source project is visible once the user is
+ * assigned to a language it is being translated into. */
 export async function getSourceProjectsForUser(userId: string, isAdmin: boolean) {
   return prisma.sourceProject.findMany({
     where: {
@@ -30,9 +32,11 @@ export async function getSourceProjectsForUser(userId: string, isAdmin: boolean)
         ? {
             translationProjects: {
               some: {
-                members: {
-                  some: {
-                    userId,
+                language: {
+                  users: {
+                    some: {
+                      userId,
+                    },
                   },
                 },
               },
@@ -59,11 +63,11 @@ export async function getSourceProjectsForUser(userId: string, isAdmin: boolean)
               id: true,
               name: true,
               code: true,
-            },
-          },
-          members: {
-            select: {
-              userId: true,
+              users: {
+                select: {
+                  userId: true,
+                },
+              },
             },
           },
         },
@@ -80,10 +84,13 @@ const sourceProjectDetailInclude = {
   },
   translationProjects: {
     include: {
-      language: true,
-      _count: {
-        select: {
-          members: true,
+      language: {
+        include: {
+          _count: {
+            select: {
+              users: true,
+            },
+          },
         },
       },
     },

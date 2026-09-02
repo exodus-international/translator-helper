@@ -29,7 +29,7 @@ import {
   updateDocumentVersionStatusAction,
 } from '@/domain/document-version/document-version.actions';
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
-import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import { listTranslationProjectMembersAction } from '@/domain/user-language/user-language.actions';
 import { DocumentSearchInput } from '@/components/document-search-input';
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { DocumentTypeFilter } from '@/components/document-type-filter';
@@ -256,15 +256,7 @@ export default function ProjectKanbanBoard({
 
   useEffect(() => {
     if (translationProjectId && isAdmin) {
-      listProjectMembersAction(translationProjectId)
-        .then((members) => {
-          const seen = new Map<string, (typeof members)[number]>();
-          for (const m of members) {
-            if (!seen.has(m.user.id)) seen.set(m.user.id, m);
-          }
-          setProjectMembers(Array.from(seen.values()));
-        })
-        .catch(console.error);
+      listTranslationProjectMembersAction(translationProjectId).then(setProjectMembers).catch(console.error);
     }
   }, [translationProjectId, isAdmin]);
 

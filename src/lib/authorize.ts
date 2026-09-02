@@ -1,6 +1,6 @@
 import { ProjectRole, Role } from '@prisma/client';
 import { requireUser, type SessionUser } from './session';
-import { getUserRolesInProject } from '@/domain/project-member/project-member.repository';
+import { getUserRolesInProject } from '@/domain/user-language/user-language.repository';
 // ─── Types ───────────────────────────────────────────────────
 
 type ProjectPermissionRole = 'manager' | 'reviewer' | 'editor' | 'translator' | 'member';
@@ -33,6 +33,7 @@ const ROLE_HIERARCHY: Record<ProjectPermissionRole, ProjectRole[]> = {
 
 export interface AuthorizeDeps {
   requireUser: () => Promise<SessionUser>;
+  /** Resolved from the user's role on the project's language. */
   getUserRolesInProject: (userId: string, projectId: string) => Promise<ProjectRole[]>;
 }
 

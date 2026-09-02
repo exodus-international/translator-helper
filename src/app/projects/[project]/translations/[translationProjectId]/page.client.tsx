@@ -19,14 +19,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { assignTranslatorToVersionAction } from '@/domain/document-version/document-version.actions';
-import {
-  createProjectMemberAction,
-  deleteProjectMemberAction,
-  deleteProjectMembersByUserAction,
-} from '@/domain/project-member/project-member.actions';
+import { removeLanguageMemberAction, setLanguageMemberRoleAction } from '@/domain/user-language/user-language.actions';
 import { capture } from '@/lib/analytics';
 import { Prisma, ProjectRole } from '@prisma/client';
-import { ArrowLeft, Calendar, FileText, Plus, Trash2, User, Users, X } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Plus, Trash2, User, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -40,7 +36,8 @@ interface TranslationProjectClientProps {
       sourceProject: true;
     };
   }>;
-  members: Prisma.ProjectMemberGetPayload<{
+  /** The language team: one role per user, shared by every project in this language. */
+  members: Prisma.UserLanguageGetPayload<{
     include: {
       user: {
         select: {
@@ -119,11 +116,37 @@ export default function TranslationProjectClient({
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [selectedRoles, setSelectedRoles] = useState<ProjectRole[]>([]);
+  const [selectedRole, setSelectedRole] = useState<ProjectRole>(ProjectRole.TRANSLATOR);
   const [selectedDocumentId, setSelectedDocumentId] = useState('');
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
   const [deadline, setDeadline] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const upsertMemberRole = async (userId: string, role: ProjectRole) => {
+    setLoading(true);
+    try {
+      const { language: _language, ...member } = await setLanguageMemberRoleAction({
+        translationProjectId: translationProject.id,
+        userId,
+        role,
+      });
+      setMembers([...members.filter((m) => m.userId !== userId), member as (typeof members)[0]]);
+      router.refresh();
+      return true;
+    } catch (error: any) {
+      console.error('Error saving member role:', error);
+      // Handle validation errors - server will check if user exists
+      if (error?.issues) {
+        const errorMessages = error.issues.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`).join('\n');
+        toast.error(`Error: ${errorMessages}`);
+      } else {
+        toast.error(error?.message || 'Failed to save role. The user may not exist.');
+      }
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,97 +154,32 @@ export default function TranslationProjectClient({
       toast.warning('Please select a user');
       return;
     }
-    if (selectedRoles.length === 0) {
-      toast.warning('Please select at least one role');
-      return;
-    }
 
-    setLoading(true);
-
-    try {
-      // Create all selected roles - server will validate user exists
-      const createdMembers = await Promise.all(
-        selectedRoles.map((role) =>
-          createProjectMemberAction({
-            translationProjectId: translationProject.id,
-            userId: selectedUserId,
-            role,
-          }),
-        ),
-      );
-      // Strip translationProject field to match the members state type
-      const membersToAdd = createdMembers.map(({ translationProject: _, ...member }) => member) as typeof members;
-      setMembers([...members, ...membersToAdd]);
-      capture('project_member_added', { role_count: selectedRoles.length });
+    if (await upsertMemberRole(selectedUserId, selectedRole)) {
+      capture('language_member_added', { role: selectedRole });
       setMemberDialogOpen(false);
       resetMemberForm();
-      router.refresh();
-    } catch (error: any) {
-      console.error('Error adding member:', error);
-      // Handle validation errors - server will check if user exists
-      if (error?.issues) {
-        const errorMessages = error.issues.map((issue: any) => `${issue.path.join('.')}: ${issue.message}`).join('\n');
-        toast.error(`Error: ${errorMessages}`);
-      } else if (error?.message) {
-        toast.error(error.message);
-      } else {
-        toast.error('Failed to add member. The user may not exist or may already have these roles.');
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleAddRole = async (userId: string, role: ProjectRole) => {
-    setLoading(true);
-    try {
-      const created = await createProjectMemberAction({
-        translationProjectId: translationProject.id,
-        userId,
-        role,
-      });
-      // Strip translationProject field to match the members state type
-      const { translationProject: _, ...memberToAdd } = created;
-      setMembers([...members, memberToAdd as (typeof members)[0]]);
-      router.refresh();
-    } catch (error: any) {
-      console.error('Error adding role:', error);
-      toast.error(error.message || 'Failed to add role');
-    } finally {
-      setLoading(false);
+  const handleChangeRole = async (userId: string, role: ProjectRole) => {
+    if (await upsertMemberRole(userId, role)) {
+      capture('language_member_role_changed', { role });
+      toast.success('Role updated successfully');
     }
   };
 
-  const handleDeleteMember = async (memberId: string) => {
+  const handleRemoveUserFromLanguage = async (userId: string) => {
     setLoading(true);
     try {
-      await deleteProjectMemberAction(memberId);
-      setMembers(members.filter((m) => m.id !== memberId));
-      router.refresh();
-      toast.success('Member removed successfully');
-    } catch (error: any) {
-      console.error('Error removing member:', error);
-      toast.error(error.message || 'Failed to remove member');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteMemberConfirm = async (memberId: string) => {
-    await handleDeleteMember(memberId);
-  };
-
-  const handleRemoveUserFromProject = async (userId: string) => {
-    setLoading(true);
-    try {
-      await deleteProjectMembersByUserAction(userId, translationProject.id);
+      await removeLanguageMemberAction(userId, translationProject.id);
       setMembers(members.filter((m) => m.userId !== userId));
-      capture('project_member_removed');
+      capture('language_member_removed');
       router.refresh();
-      toast.success('User removed from project successfully');
+      toast.success(`User removed from the ${translationProject.language.name} team`);
     } catch (error: any) {
-      console.error('Error removing user from project:', error);
-      toast.error(error.message || 'Failed to remove user from project');
+      console.error('Error removing user from language team:', error);
+      toast.error(error.message || 'Failed to remove user from the language team');
     } finally {
       setLoading(false);
     }
@@ -280,11 +238,7 @@ export default function TranslationProjectClient({
 
   const resetMemberForm = () => {
     setSelectedUserId('');
-    setSelectedRoles([]);
-  };
-
-  const toggleRole = (role: ProjectRole) => {
-    setSelectedRoles((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
+    setSelectedRole(ProjectRole.TRANSLATOR);
   };
 
   const resetAssignmentForm = () => {
@@ -297,24 +251,13 @@ export default function TranslationProjectClient({
   const versionByDocumentId = new Map(versions.map((version) => [version.documentId, version]));
   const unassignedDocuments = documents.filter((doc) => !versionByDocumentId.get(doc.id)?.userId);
 
-  // Group members by user
-  const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce(
-    (acc, member) => {
-      if (!acc[member.userId]) {
-        acc[member.userId] = {
-          user: member.user,
-          roles: [],
-        };
-      }
-      acc[member.userId].roles.push(member);
-      return acc;
-    },
-    {} as Record<string, { user: any; roles: any[] }>,
-  );
+  // One membership row per user, sorted for display
+  const sortedMembers = [...members].sort((a, b) => (a.user.name || '').localeCompare(b.user.name || ''));
+  const memberUserIds = new Set(members.map((m) => m.userId));
 
-  // Get users that are not yet members
+  // Get users that are not yet on the language team
   const availableUsers = users
-    .filter((user) => !membersByUser[user.id])
+    .filter((user) => !memberUserIds.has(user.id))
     .sort((a, b) => {
       const projectLanguageCode = translationProject.language.code;
       const aHasLanguage = a.languages.some((ul) => ul.language.code === projectLanguageCode);
@@ -360,7 +303,7 @@ export default function TranslationProjectClient({
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Project Members
+                {translationProject.language.name} Team
               </h2>
               <Dialog
                 open={memberDialogOpen}
@@ -377,7 +320,7 @@ export default function TranslationProjectClient({
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add Role to Member</DialogTitle>
+                    <DialogTitle>Add {translationProject.language.name} Team Member</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleAddMember} className="space-y-4">
                     <div>
@@ -387,8 +330,6 @@ export default function TranslationProjectClient({
                         onValueChange={(userId) => {
                           if (userId && userId.trim() !== '') {
                             setSelectedUserId(userId);
-                            // Reset selected roles when user changes
-                            setSelectedRoles([]);
                           }
                         }}
                         required
@@ -415,46 +356,29 @@ export default function TranslationProjectClient({
                       </Select>
                     </div>
                     <div>
-                      <Label>Roles *</Label>
-                      <div className="space-y-2 mt-2 border rounded-md p-3">
-                        {Object.entries(ROLE_LABELS).map(([value, label]) => {
-                          const userRoles = selectedUserId
-                            ? membersByUser[selectedUserId]?.roles.map((r: any) => r.role) || []
-                            : [];
-                          const isDisabled = userRoles.includes(value as ProjectRole);
-                          const isChecked = selectedRoles.includes(value as ProjectRole);
-                          return (
-                            <label
-                              key={value}
-                              className={`flex items-center space-x-2 cursor-pointer ${
-                                isDisabled ? 'opacity-50 cursor-not-allowed' : ''
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                disabled={isDisabled}
-                                onChange={() => !isDisabled && toggleRole(value as ProjectRole)}
-                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="text-sm">
-                                {label}
-                                {isDisabled && <span className="text-gray-400 ml-1">(already assigned)</span>}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">Select one or more roles to assign to this user</p>
+                      <Label htmlFor="role">Role *</Label>
+                      <Select value={selectedRole} onValueChange={(role) => setSelectedRole(role as ProjectRole)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Grants this role on every {translationProject.language.name} translation project.
+                      </p>
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button type="button" variant="outline" onClick={() => setMemberDialogOpen(false)}>
                         Cancel
                       </Button>
-                      <Button type="submit" disabled={loading || !selectedUserId || selectedRoles.length === 0}>
-                        {loading
-                          ? 'Adding...'
-                          : `Add ${selectedRoles.length} Role${selectedRoles.length !== 1 ? 's' : ''}`}
+                      <Button type="submit" disabled={loading || !selectedUserId}>
+                        {loading ? 'Adding...' : 'Add Member'}
                       </Button>
                     </div>
                   </form>
@@ -462,91 +386,63 @@ export default function TranslationProjectClient({
               </Dialog>
             </div>
 
+            <p className="text-sm text-gray-500 mb-2">
+              These members work on every {translationProject.language.name} translation project.
+            </p>
             <div className="space-y-2">
-              {(Object.values(membersByUser) as Array<{ user: any; roles: any[] }>).map(({ user, roles }) => {
-                const userRoles = roles.map((r: any) => r.role);
-                const availableRolesToAdd = Object.values(ProjectRole).filter((role) => !userRoles.includes(role));
-
-                return (
-                  <Card key={user.id} className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-gray-600">{user.email}</div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {roles.map((member: any) => (
-                            <Badge key={member.id} variant="secondary" className="flex items-center gap-1">
-                              {ROLE_LABELS[member.role as ProjectRole]}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <button disabled={loading} className="ml-1 hover:text-red-600">
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Remove Role</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to remove this role? This will remove the{' '}
-                                      {ROLE_LABELS[member.role as ProjectRole]} role from {user.name}.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteMemberConfirm(member.id)}>
-                                      Remove
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </Badge>
-                          ))}
-                          {availableRolesToAdd.length > 0 && (
-                            <Select
-                              onValueChange={(value) => handleAddRole(user.id, value as ProjectRole)}
-                              disabled={loading}
-                            >
-                              <SelectTrigger className="h-6 w-auto border-dashed">
-                                <SelectValue placeholder="+ Add role" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableRolesToAdd.map((role) => (
-                                  <SelectItem key={role} value={role}>
-                                    {ROLE_LABELS[role]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </div>
+              {sortedMembers.map((member) => (
+                <Card key={member.id} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium">{member.user.name}</div>
+                      <div className="text-sm text-gray-600">{member.user.email}</div>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge variant="secondary">{ROLE_LABELS[member.role]}</Badge>
+                        <Select
+                          value={member.role}
+                          onValueChange={(value) => handleChangeRole(member.userId, value as ProjectRole)}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="h-6 w-auto border-dashed">
+                            <SelectValue placeholder="Change role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm" disabled={loading} className="ml-4">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Remove User from Project</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to remove {user.name} from this project? This will remove all their
-                              roles ({userRoles.map((r: ProjectRole) => ROLE_LABELS[r]).join(', ')}).
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleRemoveUserFromProject(user.id)}>
-                              Remove from Project
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
                     </div>
-                  </Card>
-                );
-              })}
-              {Object.keys(membersByUser).length === 0 && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={loading} className="ml-4">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove from {translationProject.language.name} Team</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to remove {member.user.name} from the{' '}
+                            {translationProject.language.name} team? This removes their access to every{' '}
+                            {translationProject.language.name} translation project, not just this one.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleRemoveUserFromLanguage(member.userId)}>
+                            Remove from Team
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </Card>
+              ))}
+              {sortedMembers.length === 0 && (
                 <Card className="p-6 text-center">
                   <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-600">No members yet. Add one to get started.</p>
@@ -606,9 +502,9 @@ export default function TranslationProjectClient({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">Unassigned (visible to all)</SelectItem>
-                          {(Object.values(membersByUser) as Array<{ user: any; roles: any[] }>).map(({ user }) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.name}
+                          {sortedMembers.map((member) => (
+                            <SelectItem key={member.userId} value={member.userId}>
+                              {member.user.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

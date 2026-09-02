@@ -17,10 +17,13 @@ export async function listTranslationProjects(filters?: { sourceProjectId?: stri
     },
     include: {
       sourceProject: true,
-      language: true,
-      members: {
-        select: {
-          userId: true,
+      language: {
+        include: {
+          users: {
+            select: {
+              userId: true,
+            },
+          },
         },
       },
     },
@@ -49,17 +52,6 @@ export async function getTranslationProjectById(id: string) {
         },
       },
       language: true,
-      members: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      },
     },
   });
 }
@@ -75,17 +67,6 @@ export async function getTranslationProjectBySourceAndLanguage(sourceProjectId: 
     include: {
       sourceProject: true,
       language: true,
-      members: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      },
     },
   });
 }
