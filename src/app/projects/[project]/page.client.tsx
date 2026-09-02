@@ -29,6 +29,7 @@ interface ProjectDetailClientProps {
     name: string;
     description: string | null;
     identifier: string | null;
+    acronym: string | null;
     status: string;
     documents: any[];
     translationProjects: {
@@ -77,6 +78,7 @@ export default function ProjectDetailClient({
   const [settingsName, setSettingsName] = useState(sourceProject.name);
   const [settingsDescription, setSettingsDescription] = useState(sourceProject.description || '');
   const [settingsIdentifier, setSettingsIdentifier] = useState(sourceProject.identifier || '');
+  const [settingsAcronym, setSettingsAcronym] = useState(sourceProject.acronym || '');
   const [settingsSaving, setSettingsSaving] = useState(false);
 
   const [selectedLanguage, setSelectedLanguage] = useState<string>(initialLanguageId);
@@ -128,6 +130,7 @@ export default function ProjectDetailClient({
         name: settingsName,
         description: settingsDescription || null,
         identifier: settingsIdentifier.trim(),
+        acronym: settingsAcronym.trim() || null,
       });
       capture('project_settings_saved');
       toast.success('Project settings saved');
@@ -273,6 +276,20 @@ export default function ProjectDetailClient({
                       />
                       <p className="text-xs text-muted-foreground mt-1">
                         GITHUB: Folder name in the content repository
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="settings-acronym">Acronym</Label>
+                      <Input
+                        id="settings-acronym"
+                        value={settingsAcronym}
+                        onChange={(e) => setSettingsAcronym(e.target.value)}
+                        placeholder="e.g., SML"
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Prefixes the title of uploaded days, as in &quot;SML - DAY 03 - ...&quot;. Leave empty to
+                        number days without a prefix, or enter a single dash to leave titles alone.
                       </p>
                     </div>
                     <div className="flex justify-end">

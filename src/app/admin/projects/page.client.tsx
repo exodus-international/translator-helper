@@ -46,6 +46,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [identifier, setIdentifier] = useState('');
+  const [acronym, setAcronym] = useState('');
   const [audioDocumentTypes, setAudioDocumentTypes] = useState<DocumentType[]>(DEFAULT_AUDIO_DOCUMENT_TYPES);
   const [loading, setLoading] = useState(false);
 
@@ -59,6 +60,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     setName('');
     setDescription('');
     setIdentifier('');
+    setAcronym('');
     setAudioDocumentTypes(DEFAULT_AUDIO_DOCUMENT_TYPES);
   };
 
@@ -93,6 +95,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
           name,
           description: description || null,
           identifier: identifier.trim(),
+          acronym: acronym.trim() || null,
           audioDocumentTypes,
         });
         replaceProjectPreservingCount(updated);
@@ -103,6 +106,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
           name,
           description: description || undefined,
           identifier: identifier.trim(),
+          acronym: acronym.trim() || null,
         });
         capture('source_project_created', { location: 'admin' });
         // Refresh the page to get updated counts including translation projects
@@ -124,6 +128,7 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
     setName(project.name);
     setDescription(project.description || '');
     setIdentifier((project as any).identifier || '');
+    setAcronym(project.acronym || '');
     setAudioDocumentTypes(project.audioDocumentTypes ?? DEFAULT_AUDIO_DOCUMENT_TYPES);
     setDialogOpen(true);
   };
@@ -202,6 +207,19 @@ export default function ProjectsClient({ sourceProjects: initialSourceProjects }
               placeholder="e.g., exodus90, lent2026"
             />
             <p className="text-xs text-gray-500 mt-1">GITHUB: Folder name in the content repository</p>
+          </div>
+          <div>
+            <Label htmlFor="acronym">Acronym</Label>
+            <Input
+              id="acronym"
+              value={acronym}
+              onChange={(e) => setAcronym(e.target.value)}
+              placeholder="e.g., SML"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Prefixes the title of uploaded days, as in &quot;SML - DAY 03 - ...&quot;. Leave empty to number
+              days without a prefix, or enter a single dash to leave titles alone.
+            </p>
           </div>
           {editingProject && (
             <div>
