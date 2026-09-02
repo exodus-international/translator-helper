@@ -288,7 +288,8 @@ export default function ProjectDetailClient({
                         className="mt-1"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
-                        Prefixes the title of uploaded days, as in &quot;SML - DAY 03 - ...&quot;. Leave empty for none.
+                        Prefixes the title of uploaded days, as in &quot;SML - DAY 03 - ...&quot;. Leave empty to
+                        number days without a prefix, or enter a single dash to leave titles alone.
                       </p>
                     </div>
                     <div className="flex justify-end">
