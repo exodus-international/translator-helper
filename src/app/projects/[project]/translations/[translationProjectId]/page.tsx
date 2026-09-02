@@ -1,4 +1,4 @@
-import { listDocumentAssignmentsAction } from '@/domain/document-assignment/document-assignment.actions';
+import { listVersionsForTranslationProjectAction } from '@/domain/document-version/document-version.actions';
 import { listDocumentsAction } from '@/domain/document/document.actions';
 import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
 import { getTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
@@ -28,9 +28,9 @@ export default async function TranslationProjectPage({
     redirect('/dashboard');
   }
 
-  const [members, assignments, documents, users] = await Promise.all([
+  const [members, versions, documents, users] = await Promise.all([
     listProjectMembersAction(translationProjectId),
-    listDocumentAssignmentsAction({ translationProjectId }),
+    listVersionsForTranslationProjectAction(translationProjectId),
     listDocumentsAction({ sourceProjectId: sourceProject.id }),
     listUsersAction(),
   ]);
@@ -39,7 +39,7 @@ export default async function TranslationProjectPage({
     <TranslationProjectClient
       translationProject={translationProject}
       members={members}
-      assignments={assignments}
+      versions={versions}
       documents={documents}
       users={users}
     />

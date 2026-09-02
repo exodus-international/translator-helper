@@ -12,11 +12,11 @@ import {
   getSuggestionsByDocumentVersionAction,
   reopenSuggestionAction,
 } from '@/domain/suggestion/suggestion.actions';
+
 import {
-  createDocumentAssignmentAction,
-  updateDocumentAssignmentAction,
-} from '@/domain/document-assignment/document-assignment.actions';
-import { assignReviewerToVersionAction } from '@/domain/document-version/document-version.actions';
+  assignReviewerToVersionAction,
+  assignTranslatorToVersionAction,
+} from '@/domain/document-version/document-version.actions';
 import { getProjectReviewersAction, listProjectMembersAction } from '@/domain/project-member/project-member.actions';
 import { deleteDocumentAction } from '@/domain/document/document.actions';
 import { DocumentStatus, SuggestionType } from '@prisma/client';
@@ -56,7 +56,6 @@ export interface EditorStoreConfig {
   sourceContent: string;
   initialSuggestions: any[];
   translationProjectId: string | null;
-  assignmentId?: string | null;
 }
 
 // ─── State ───────────────────────────────────────────────────
@@ -76,7 +75,6 @@ interface EditorState {
   // Config (set once at init)
   documentId: string;
   translationProjectId: string | null;
-  assignmentId: string | null;
 }
 
 // ─── Actions ─────────────────────────────────────────────────
@@ -173,7 +171,6 @@ export function createEditorStore(config: EditorStoreConfig) {
     dialog: { type: 'closed' },
     documentId: config.documentId,
     translationProjectId: config.translationProjectId,
-    assignmentId: config.assignmentId ?? null,
 
     // ─── Content ───────────────────────────────────────
     setContent: (content) => set({ content }),
@@ -418,24 +415,17 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     assignTranslator: async (userId, deadline?) => {
-      const { assignmentId, documentId, translationProjectId, targetVersion } = get();
+      const { documentId, translationProjectId, targetVersion } = get();
       if (!translationProjectId) return;
 
       set(addLoading(get(), 'assignTranslator'));
       try {
-        if (assignmentId) {
-          await updateDocumentAssignmentAction(assignmentId, {
-            userId,
-            deadline: deadline ? new Date(deadline) : null,
-          });
-        } else {
-          await createDocumentAssignmentAction({
-            documentId,
-            translationProjectId,
-            userId,
-            deadline: deadline ? new Date(deadline) : null,
-          });
-        }
+        await assignTranslatorToVersionAction({
+          documentId,
+          translationProjectId,
+          userId,
+          deadline: deadline ? new Date(deadline) : null,
+        });
 
         // Optimistic update: find the assigned user from dialog members
         const { dialog } = get();
@@ -456,18 +446,10 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     unassignTranslator: async () => {
-      const { assignmentId, documentId, translationProjectId, targetVersion } = get();
-      if (!assignmentId && !translationProjectId) return;
+      const { documentId, translationProjectId, targetVersion } = get();
+      if (!translationProjectId) return;
       try {
-        if (assignmentId) {
-          await updateDocumentAssignmentAction(assignmentId, { userId: null });
-        } else {
-          await createDocumentAssignmentAction({
-            documentId,
-            translationProjectId: translationProjectId!,
-            userId: null,
-          });
-        }
+        await assignTranslatorToVersionAction({ documentId, translationProjectId, userId: null });
         if (targetVersion) {
           set({ targetVersion: { ...targetVersion, user: null } });
         }

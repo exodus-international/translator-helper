@@ -17,13 +17,6 @@ const versionWithUser = {
   orderBy: { updatedAt: 'desc' },
 } as const;
 
-const assignmentWithDetails = {
-  include: {
-    translationProject: { include: { language: true } },
-    user: userWithLanguages,
-  },
-} as const;
-
 const documentListInclude = {
   folder: true, // Deprecated - kept for backward compatibility
   sourceProject: true,
@@ -33,7 +26,6 @@ const documentListInclude = {
 const documentDetailInclude = {
   folder: true, // Deprecated
   sourceProject: true,
-  assignments: assignmentWithDetails,
   versions: versionWithUser,
 } satisfies Prisma.DocumentInclude;
 
@@ -187,7 +179,6 @@ export async function getDashboardDocuments(
   Prisma.DocumentGetPayload<{
     include: {
       sourceProject: true;
-      assignments: typeof assignmentWithDetails;
       versions: {
         include: {
           language: true;
@@ -197,34 +188,20 @@ export async function getDashboardDocuments(
     };
   }>[]
 > {
-  // If sourceProjectId is provided, find the translation project for that source project and language
-  let translationProjectId: string | undefined;
-  if (sourceProjectId) {
-    const translationProject = await prisma.translationProject.findUnique({
-      where: {
-        sourceProjectId_languageId: { sourceProjectId, languageId },
-      },
-      select: { id: true },
-    });
-    translationProjectId = translationProject?.id;
-  }
-
   const documents = await prisma.document.findMany({
     where: {
       ...(sourceProjectId && { sourceProjectId }),
     },
     include: {
       sourceProject: true,
-      assignments: {
-        where: translationProjectId ? { translationProjectId } : undefined,
-        include: assignmentWithDetails.include,
-      },
+      // The version carries the assignment (translator, reviewer, deadline).
       versions: {
         where: { languageId },
         include: {
           language: true,
           user: userWithLanguages,
           reviewer: userBrief,
+          assignedBy: userBrief,
           activityLogs: { orderBy: { createdAt: 'desc' } },
         },
         orderBy: { updatedAt: 'desc' },

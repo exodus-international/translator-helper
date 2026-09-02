@@ -36,6 +36,7 @@ type VersionWithDetails = {
   id: string;
   status: DocumentStatus;
   updatedAt: string | Date;
+  deadline: string | Date | null;
   document: {
     id: string;
     title: string;
@@ -89,45 +90,8 @@ interface DashboardClientProps {
       }[];
     }[];
   }[];
-  assignments: {
-    id: string;
-    documentId: string;
-    deadline: string | Date | null;
-    document: {
-      id: string;
-      title: string;
-      slug: string;
-      type: DocumentType | null;
-      sourceProject: {
-        id: string;
-        name: string;
-        identifier: string;
-      } | null;
-      versions: {
-        id: string;
-        status: DocumentStatus;
-        languageId: string;
-        language: {
-          id: string;
-          name: string;
-          code: string;
-        };
-      }[];
-    };
-    translationProject: {
-      id: string;
-      language: {
-        id: string;
-        name: string;
-        code: string;
-      };
-      sourceProject: {
-        id: string;
-        name: string;
-        identifier: string;
-      };
-    };
-  }[];
+  /** Every version assigned to the user, whatever its status. */
+  assignedVersions: VersionWithDetails[];
   approvedVersions: VersionWithDetails[];
   reviewAssignments: VersionWithDetails[];
   translatingVersions: VersionWithDetails[];
@@ -135,15 +99,6 @@ interface DashboardClientProps {
     banner: AnnouncementBannerData | null;
     modal: AnnouncementModalData | null;
   };
-}
-
-function getDocumentUrl(assignment: DashboardClientProps['assignments'][number]): string {
-  return buildDocumentPath({
-    projectIdentifier: assignment.document.sourceProject?.identifier ?? assignment.translationProject.sourceProject.identifier,
-    slug: assignment.document.slug,
-    languageCode: assignment.translationProject.language.code,
-    documentId: assignment.document.id,
-  });
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -175,80 +130,49 @@ type WorkItem = {
   reviewerName: string | null;
 };
 
+/** A version is all a work item needs now that assignment lives on it. */
+function toWorkItem(version: VersionWithDetails, role: WorkItem['role'], key: string): WorkItem {
+  return {
+    key,
+    documentId: version.document.id,
+    documentTitle: version.document.title,
+    documentType: version.document.type,
+    projectName: version.document.sourceProject?.name ?? null,
+    languageName: version.language.name,
+    role,
+    status: version.status,
+    deadline: version.deadline,
+    url: getVersionUrl(version),
+    translatorName: version.user?.name ?? null,
+    reviewerName: version.reviewer?.name ?? null,
+  };
+}
+
 function buildWorkItems(
   translatingVersions: VersionWithDetails[],
   reviewAssignments: VersionWithDetails[],
-  assignments: DashboardClientProps['assignments'],
+  assignedVersions: VersionWithDetails[],
 ): WorkItem[] {
   const itemMap = new Map<string, WorkItem>();
 
-  // 1. Add translating versions as Translator entries
+  // 1. Versions the user is actively translating
   for (const v of translatingVersions) {
     const key = `${v.document.id}:${v.language.id}`;
-    itemMap.set(key, {
-      key,
-      documentId: v.document.id,
-      documentTitle: v.document.title,
-      documentType: v.document.type,
-      projectName: v.document.sourceProject?.name ?? null,
-      languageName: v.language.name,
-      role: 'Translator',
-      status: v.status,
-      deadline: null,
-      url: getVersionUrl(v),
-      translatorName: v.user?.name ?? null,
-      reviewerName: v.reviewer?.name ?? null,
-    });
+    itemMap.set(key, toWorkItem(v, 'Translator', key));
   }
 
-  // 2. Add review assignments as Reviewer entries
+  // 2. Versions waiting on the user's review
   for (const v of reviewAssignments) {
     const key = `${v.document.id}:${v.language.id}:reviewer`;
-    itemMap.set(key, {
-      key,
-      documentId: v.document.id,
-      documentTitle: v.document.title,
-      documentType: v.document.type,
-      projectName: v.document.sourceProject?.name ?? null,
-      languageName: v.language.name,
-      role: 'Reviewer',
-      status: v.status,
-      deadline: null,
-      url: getVersionUrl(v),
-      translatorName: v.user?.name ?? null,
-      reviewerName: v.reviewer?.name ?? null,
-    });
+    itemMap.set(key, toWorkItem(v, 'Reviewer', key));
   }
 
-  // 3. Merge assignments — enrich existing or add new
-  for (const a of assignments) {
-    const langId = a.translationProject.language.id;
-    const key = `${a.document.id}:${langId}`;
-    const existing = itemMap.get(key);
-
-    if (existing) {
-      // Enrich with deadline from assignment
-      existing.deadline = a.deadline;
-    } else {
-      // Not yet present — add as new translator entry
-      const version = a.document.versions.find((v) => v.languageId === langId);
-      const status = version?.status ?? null;
-      const url = getDocumentUrl(a);
-
-      itemMap.set(key, {
-        key,
-        documentId: a.document.id,
-        documentTitle: a.document.title,
-        documentType: a.document.type,
-        projectName: a.translationProject.sourceProject?.name ?? null,
-        languageName: a.translationProject.language.name,
-        role: 'Translator',
-        status,
-        deadline: a.deadline,
-        url,
-        translatorName: null,
-        reviewerName: null,
-      });
+  // 3. Anything else assigned to the user — already-translated work it is still
+  // on the hook for, which the two status-filtered queries above do not return.
+  for (const v of assignedVersions) {
+    const key = `${v.document.id}:${v.language.id}`;
+    if (!itemMap.has(key)) {
+      itemMap.set(key, toWorkItem(v, 'Translator', key));
     }
   }
 
@@ -268,7 +192,7 @@ const headClass = 'text-[11px] uppercase tracking-wider text-muted-foreground fo
 export default function DashboardClient({
   user,
   projects,
-  assignments,
+  assignedVersions,
   approvedVersions,
   reviewAssignments,
   translatingVersions,
@@ -294,8 +218,8 @@ export default function DashboardClient({
     }
   };
   const workItems = useMemo(
-    () => buildWorkItems(translatingVersions, reviewAssignments, assignments),
-    [translatingVersions, reviewAssignments, assignments],
+    () => buildWorkItems(translatingVersions, reviewAssignments, assignedVersions),
+    [translatingVersions, reviewAssignments, assignedVersions],
   );
 
   const deployLanguages = useMemo(() => {

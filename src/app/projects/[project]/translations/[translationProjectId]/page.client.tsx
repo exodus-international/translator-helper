@@ -18,10 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  createDocumentAssignmentAction,
-  deleteDocumentAssignmentAction,
-} from '@/domain/document-assignment/document-assignment.actions';
+import { assignTranslatorToVersionAction } from '@/domain/document-version/document-version.actions';
 import {
   createProjectMemberAction,
   deleteProjectMemberAction,
@@ -54,25 +51,23 @@ interface TranslationProjectClientProps {
       };
     };
   }>[];
-  assignments: Prisma.DocumentAssignmentGetPayload<{
+  /** One version per document in this project's language; assignment lives on it. */
+  versions: Prisma.DocumentVersionGetPayload<{
     include: {
       document: {
         include: {
           sourceProject: true;
-          versions: {
-            include: {
-              language: true;
-            };
-          };
         };
       };
-      translationProject: {
-        include: {
-          sourceProject: true;
-          language: true;
-        };
-      };
+      language: true;
       user: {
+        select: {
+          id: true;
+          name: true;
+          email: true;
+        };
+      };
+      reviewer: {
         select: {
           id: true;
           name: true;
@@ -114,13 +109,13 @@ const ROLE_LABELS: Record<ProjectRole, string> = {
 export default function TranslationProjectClient({
   translationProject,
   members: initialMembers,
-  assignments: initialAssignments,
+  versions: initialVersions,
   documents,
   users,
 }: TranslationProjectClientProps) {
   const router = useRouter();
   const [members, setMembers] = useState(initialMembers);
-  const [assignments, setAssignments] = useState(initialAssignments);
+  const [versions, setVersions] = useState(initialVersions);
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -232,22 +227,30 @@ export default function TranslationProjectClient({
     }
   };
 
+  /** Sets or clears the translator on a document's version in this language. */
+  const saveAssignment = async (documentId: string, userId: string | null, versionDeadline: Date | null) => {
+    const saved = await assignTranslatorToVersionAction({
+      documentId,
+      translationProjectId: translationProject.id,
+      userId,
+      deadline: versionDeadline,
+    });
+    setVersions((current) => {
+      const next = current.filter((v) => v.documentId !== documentId);
+      return [...next, saved as (typeof current)[0]];
+    });
+    router.refresh();
+  };
+
   const handleAssignDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const created = await createDocumentAssignmentAction({
-        documentId: selectedDocumentId,
-        translationProjectId: translationProject.id,
-        userId: selectedAssigneeId || null,
-        deadline: deadline ? new Date(deadline) : null,
-      });
-      setAssignments([...assignments, created as (typeof assignments)[0]]);
+      await saveAssignment(selectedDocumentId, selectedAssigneeId || null, deadline ? new Date(deadline) : null);
       capture('document_assigned', { context: 'translation_project' });
       setAssignmentDialogOpen(false);
       resetAssignmentForm();
-      router.refresh();
       toast.success('Document assigned!');
     } catch (error: any) {
       console.error('Error assigning document:', error);
@@ -257,17 +260,19 @@ export default function TranslationProjectClient({
     }
   };
 
-  const handleDeleteAssignment = async (assignmentId: string) => {
+  /**
+   * Clears the translator and deadline. The version itself stays — it holds the
+   * translation, and every document in the language has one.
+   */
+  const handleClearAssignment = async (documentId: string) => {
     setLoading(true);
     try {
-      await deleteDocumentAssignmentAction(assignmentId);
-      setAssignments(assignments.filter((a) => a.id !== assignmentId));
+      await saveAssignment(documentId, null, null);
       capture('document_assignment_removed');
-      router.refresh();
-      toast.success('Assignment removed successfully');
+      toast.success('Assignment cleared');
     } catch (error: any) {
-      console.error('Error removing assignment:', error);
-      toast.error(error.message || 'Failed to remove assignment');
+      console.error('Error clearing assignment:', error);
+      toast.error(error.message || 'Failed to clear assignment');
     } finally {
       setLoading(false);
     }
@@ -288,8 +293,9 @@ export default function TranslationProjectClient({
     setDeadline('');
   };
 
-  // Get documents that are not yet assigned
-  const unassignedDocuments = documents.filter((doc) => !assignments.some((a) => a.documentId === doc.id));
+  // Every document can be assigned; the dialog offers those without a translator.
+  const versionByDocumentId = new Map(versions.map((version) => [version.documentId, version]));
+  const unassignedDocuments = documents.filter((doc) => !versionByDocumentId.get(doc.id)?.userId);
 
   // Group members by user
   const membersByUser: Record<string, { user: any; roles: any[] }> = members.reduce(
@@ -322,8 +328,8 @@ export default function TranslationProjectClient({
       return (a.name || '').localeCompare(b.name || '');
     });
 
-  const assignedDocuments = assignments.filter((a) => a.userId);
-  const unassignedAssignments = assignments.filter((a) => !a.userId);
+  const assignedVersions = versions.filter((version) => version.userId);
+  const unassignedVersions = versions.filter((version) => !version.userId);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -632,115 +638,83 @@ export default function TranslationProjectClient({
 
             <div className="space-y-4">
               {/* Assigned Documents */}
-              {assignedDocuments.length > 0 && (
+              {assignedVersions.length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 mb-2">Assigned Documents</h3>
                   <div className="space-y-2">
-                    {assignedDocuments.map((assignment) => {
-                      const doc = documents.find((d) => d.id === assignment.documentId);
-                      const assignee = assignment.userId
-                        ? (Object.values(membersByUser) as Array<{ user: any; roles: any[] }>).find(
-                            (mb) => mb.user.id === assignment.userId,
-                          )
-                        : null;
-                      return (
-                        <Card key={assignment.id} className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-medium">{doc?.title || 'Unknown'}</div>
-                              <div className="text-sm text-gray-600 flex items-center gap-4 mt-1">
+                    {assignedVersions.map((version) => (
+                      <Card key={version.id} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium">{version.document.title}</div>
+                            <div className="text-sm text-gray-600 flex items-center gap-4 mt-1">
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {version.user?.name || 'Unknown'}
+                              </span>
+                              {version.deadline && (
                                 <span className="flex items-center gap-1">
-                                  <User className="h-3 w-3" />
-                                  {assignee?.user.name || 'Unknown'}
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(version.deadline).toLocaleDateString()}
                                 </span>
-                                {assignment.deadline && (
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    {new Date(assignment.deadline).toLocaleDateString()}
-                                  </span>
-                                )}
-                              </div>
+                              )}
                             </div>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm" disabled={loading}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Remove Assignment</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to remove this assignment? This will remove the document from
-                                    this translation project.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteAssignment(assignment.id)}>
-                                    Remove
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
                           </div>
-                        </Card>
-                      );
-                    })}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="outline" size="sm" disabled={loading}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Clear Assignment</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Unassign {version.user?.name || 'this translator'} from {version.document.title}? The
+                                  document stays in the project, open to the whole team, and any translation already
+                                  done is kept.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleClearAssignment(version.documentId)}>
+                                  Clear
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </Card>
+                    ))}
                   </div>
                 </div>
               )}
 
               {/* Unassigned Documents */}
-              {unassignedAssignments.length > 0 && (
+              {unassignedVersions.length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 mb-2">Unassigned Documents</h3>
                   <div className="space-y-2">
-                    {unassignedAssignments.map((assignment) => {
-                      const doc = documents.find((d) => d.id === assignment.documentId);
-                      return (
-                        <Card key={assignment.id} className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-medium">{doc?.title || 'Unknown'}</div>
-                              <Badge variant="outline" className="mt-1">
-                                Unassigned
-                              </Badge>
-                            </div>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm" disabled={loading}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Remove Assignment</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to remove this assignment? This will remove the document from
-                                    this translation project.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteAssignment(assignment.id)}>
-                                    Remove
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                    {unassignedVersions.map((version) => (
+                      <Card key={version.id} className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium">{version.document.title}</div>
+                            <Badge variant="outline" className="mt-1">
+                              Unassigned
+                            </Badge>
                           </div>
-                        </Card>
-                      );
-                    })}
+                        </div>
+                      </Card>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {assignments.length === 0 && (
+              {versions.length === 0 && (
                 <Card className="p-6 text-center">
                   <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600">No document assignments yet. Assign documents to get started.</p>
+                  <p className="text-gray-600">No documents in this project yet.</p>
                 </Card>
               )}
             </div>

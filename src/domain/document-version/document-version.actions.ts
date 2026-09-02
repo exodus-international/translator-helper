@@ -33,7 +33,6 @@ import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
 import { assertCanEditDocumentVersion } from './document-version.permissions';
 import { validateTransition } from './document-version.transitions';
-import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
 import { createProjectMember } from '../project-member/project-member.repository';
@@ -43,14 +42,18 @@ import {
   getTranslationProjectBySourceAndLanguage,
 } from '../translation-project/translation-project.repository';
 import {
+  assignDocumentVersion,
   createDocumentVersion,
   deleteDocumentVersion,
+  getAssignedVersionsForUser,
   getDocumentVersionByDocumentAndLanguage,
   getDocumentVersionById,
+  listVersionsForTranslationProject,
   updateDocumentVersion,
   updateDocumentVersionStatus,
 } from './document-version.repository';
 import {
+  assignTranslatorToVersionSchema,
   createDocumentVersionSchema,
   submitForReviewSchema,
   updateDocumentVersionSchema,
@@ -71,6 +74,58 @@ export async function assignReviewerToVersionAction(versionId: string, reviewerI
 
   revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   return version;
+}
+
+/**
+ * Assigns a translator and deadline for a document in a translation project's
+ * language, creating the version if the document has none yet. Replaces the
+ * former create/update DocumentAssignment actions.
+ */
+export async function assignTranslatorToVersionAction(input: unknown) {
+  const validated = assignTranslatorToVersionSchema.parse(input);
+
+  const { user } = await authorize({ project: validated.translationProjectId, role: 'manager' });
+
+  const translationProject = await prisma.translationProject.findUnique({
+    where: { id: validated.translationProjectId },
+    select: { languageId: true },
+  });
+  if (!translationProject) {
+    throw new Error('Translation project not found');
+  }
+
+  const version = await assignDocumentVersion({
+    documentId: validated.documentId,
+    languageId: translationProject.languageId,
+    userId: validated.userId ?? null,
+    deadline: validated.deadline ?? null,
+    assignedById: user.id,
+  });
+
+  revalidatePath('/dashboard');
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
+  return version;
+}
+
+/** Everything the signed-in user is assigned to translate. */
+export async function getAssignedVersionsForUserAction() {
+  const { user } = await authorize('authenticated');
+  return await getAssignedVersionsForUser(user.id);
+}
+
+/** The versions that make up a translation project — one per document. */
+export async function listVersionsForTranslationProjectAction(translationProjectId: string) {
+  await authorize({ project: translationProjectId, role: 'member' });
+
+  const translationProject = await prisma.translationProject.findUnique({
+    where: { id: translationProjectId },
+    select: { sourceProjectId: true, languageId: true },
+  });
+  if (!translationProject) {
+    throw new Error('Translation project not found');
+  }
+
+  return await listVersionsForTranslationProject(translationProject.sourceProjectId, translationProject.languageId);
 }
 
 export async function createDocumentVersionAction(input: unknown) {
@@ -336,28 +391,21 @@ export async function assignDocumentVersionAction(input: unknown) {
 
   await authorize({ project: translationProject.id, role: 'translator' });
 
-  // Check document assignment
-  const assignment = await getDocumentAssignmentByDocumentAndProject(validated.documentId, translationProject.id);
-
-  if (assignment) {
-    // If document is assigned to a specific user, only that user can translate
-    if (assignment.userId && assignment.userId !== user.id) {
-      throw new Error('This document is assigned to another user');
-    }
-    // If unassigned (userId is null), any project member can translate
-  }
-
   // Check if version already exists
   const existingVersion = await getDocumentVersionByDocumentAndLanguage(validated.documentId, validated.languageId);
 
   if (existingVersion) {
-    // If version is already IN_PROGRESS and assigned to current user, return it
-    if (existingVersion.status === DocumentStatus.IN_PROGRESS && existingVersion.userId === user.id) {
-      return existingVersion;
+    // The version carries the assignment now: a translator set on it reserves the
+    // document, an empty one leaves it open to the whole language team.
+    if (existingVersion.userId && existingVersion.userId !== user.id) {
+      throw new Error('This document is assigned to another user');
     }
 
-    // If version is IN_PROGRESS but assigned to different user, don't reassign
-    if (existingVersion.status === DocumentStatus.IN_PROGRESS && existingVersion.userId !== user.id) {
+    if (existingVersion.status === DocumentStatus.IN_PROGRESS) {
+      // Already claimed by this user — hand back the same version.
+      if (existingVersion.userId === user.id) {
+        return existingVersion;
+      }
       throw new Error('This translation is already assigned to another user');
     }
 

@@ -55,9 +55,6 @@ interface ProjectDetailClientProps {
       code: string;
     };
     members: { userId: string }[];
-    _count: {
-      documentAssignments: number;
-    };
   }[];
   /** Resolved server-side from the user's assigned languages and this project's translation projects. */
   initialLanguageId: string;

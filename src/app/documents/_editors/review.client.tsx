@@ -25,6 +25,7 @@ interface ReviewClientProps {
   sourceVersion: any;
   targetVersion: any;
   targetLanguage?: { code: string; name: string } | null;
+  translationProjectId?: string | null;
   user: SessionUser;
   initialSuggestions?: any[];
 }
@@ -41,15 +42,12 @@ export default function ReviewClient({
   sourceVersion,
   targetVersion: initialTargetVersion,
   targetLanguage,
+  translationProjectId = null,
   user,
   initialSuggestions = [],
 }: ReviewClientProps) {
   useAnalyticsProjectGroup(document?.sourceProject?.id, document?.sourceProject?.name);
   useActiveLanguage(targetLanguage?.code, targetLanguage?.name);
-
-  const assignmentForLanguage = document.assignments?.find(
-    (a: any) => a.translationProject?.language?.id === initialTargetVersion.languageId,
-  );
 
   return (
     <DocumentEditor
@@ -57,8 +55,7 @@ export default function ReviewClient({
       sourceVersion={sourceVersion}
       targetVersion={initialTargetVersion}
       initialSuggestions={initialSuggestions}
-      translationProjectId={assignmentForLanguage?.translationProject?.id ?? null}
-      assignmentId={assignmentForLanguage?.id ?? null}
+      translationProjectId={translationProjectId}
       user={user}
       variant="review"
       header={<ReviewToolbar document={document} sourceVersion={sourceVersion} user={user} />}

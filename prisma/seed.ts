@@ -32,7 +32,6 @@ async function cleanup() {
     prisma.activityLog.deleteMany(),
     prisma.gitHubCommit.deleteMany(),
     prisma.documentVersion.deleteMany(),
-    prisma.documentAssignment.deleteMany(),
     prisma.document.deleteMany(),
     prisma.projectMember.deleteMany(),
     prisma.translationProject.deleteMany(),
@@ -294,40 +293,54 @@ async function seedDocumentVersions(
 // 10. Document Assignments
 // ---------------------------------------------------------------------------
 
+// Assignment lives on the version, so this sets the translator and deadline on
+// the version for that language, creating it if the document has none yet.
 async function seedDocumentAssignments(
   docs: Record<string, string>,
-  tps: Record<string, string>,
+  langs: Record<string, string>,
   users: Record<string, string>,
 ) {
   console.log('\n--- Document Assignments ---');
 
-  // Derive project key from doc key
-  const docToProject: Record<string, string> = {};
-  for (const key of Object.keys(docs)) {
-    if (key.startsWith('ex-')) docToProject[key] = 'exodus';
-    else if (key.startsWith('le-')) docToProject[key] = 'lent';
-    else if (key.startsWith('ad-')) docToProject[key] = 'advent';
-    else if (key.startsWith('re-')) docToProject[key] = 'retreat';
-  }
-
   let count = 0;
   for (const a of DOCUMENT_ASSIGNMENTS) {
-    const projKey = docToProject[a.docKey];
-    const tpKey = `${projKey}:${a.langCode}`;
-    if (!tps[tpKey]) continue;
+    const documentId = docs[a.docKey];
+    const languageId = langs[a.langCode];
+    if (!documentId || !languageId) continue;
 
-    await prisma.documentAssignment.create({
-      data: {
-        documentId: docs[a.docKey],
-        translationProjectId: tps[tpKey],
-        userId: a.userKey ? users[a.userKey] : null,
-        deadline: a.deadline ?? null,
-        assignedById: users.admin1,
+    const assignedUserId = a.userKey ? users[a.userKey] : null;
+    const assignment = {
+      deadline: a.deadline ?? null,
+      assignedById: users.admin1,
+      assignedAt: new Date(),
+    };
+
+    // Don't overwrite a translator the seeded version already has — same rule
+    // the consolidation migration applies.
+    const existing = await prisma.documentVersion.findUnique({
+      where: { documentId_languageId: { documentId, languageId } },
+      select: { userId: true },
+    });
+
+    await prisma.documentVersion.upsert({
+      where: { documentId_languageId: { documentId, languageId } },
+      create: {
+        documentId,
+        languageId,
+        content: '',
+        status: DocumentStatus.PENDING_TRANSLATION,
+        version: 1,
+        userId: assignedUserId,
+        ...assignment,
+      },
+      update: {
+        ...assignment,
+        ...(existing?.userId ? {} : { userId: assignedUserId }),
       },
     });
     count++;
   }
-  console.log(`Created ${count} document assignments`);
+  console.log(`Assigned ${count} document versions`);
 }
 
 // ---------------------------------------------------------------------------
@@ -471,7 +484,7 @@ async function main() {
   await seedProjectMembers(tps, users);
   const docs = await seedDocuments(projects);
   const versions = await seedDocumentVersions(docs, langs, users);
-  await seedDocumentAssignments(docs, tps, users);
+  await seedDocumentAssignments(docs, langs, users);
   await seedSuggestions(versions, users);
   await seedActivityLogs(versions, users);
   await seedComments(versions, users);
