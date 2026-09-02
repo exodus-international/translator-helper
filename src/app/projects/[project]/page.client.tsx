@@ -114,12 +114,20 @@ export default function ProjectDetailClient({
   const selectedTranslationProject = translationProjects.find((tp) => tp.languageId === selectedLanguage);
 
   const handleSaveSettings = async () => {
+    // The identifier is a URL segment and the content repo folder name, so it
+    // cannot be cleared. Caught here to say so, rather than letting the action
+    // reject a null with a type error.
+    if (!settingsIdentifier.trim()) {
+      toast.warning('Identifier is required');
+      return;
+    }
+
     setSettingsSaving(true);
     try {
       await updateSourceProjectAction(sourceProject.id, {
         name: settingsName,
         description: settingsDescription || null,
-        identifier: settingsIdentifier || null,
+        identifier: settingsIdentifier.trim(),
       });
       capture('project_settings_saved');
       toast.success('Project settings saved');
