@@ -84,22 +84,32 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
   const filenameError = validateFilename(documentType, originalFilename);
   const contentFormat = getContentFormat(originalFilename);
-  const selectedProjectAcronym = sourceProjects.find((project) => project.id === sourceProjectId)?.acronym ?? null;
+  const selectedProject = sourceProjects.find((project) => project.id === sourceProjectId) ?? null;
 
-  // The acronym belongs to the project and the rule only applies to days, and
-  // both of those are chosen after the file is dropped. So the default title is
-  // recomputed as they change rather than being set once when the file is read.
-  useEffect(() => {
-    if (titleEdited || !baseTitle) return;
-    setTitle(
-      buildDefaultTitle({
+  // What the document would be called given everything picked so far. Empty
+  // until a file has been read, since there is nothing to build a name from.
+  const composedTitle = baseTitle
+    ? buildDefaultTitle({
         baseTitle,
         type: (documentType || null) as DocumentType | null,
-        acronym: selectedProjectAcronym,
+        acronym: selectedProject?.acronym ?? null,
         day: dayNumber,
-      }),
-    );
-  }, [baseTitle, documentType, dayNumber, selectedProjectAcronym, titleEdited]);
+      })
+    : '';
+
+  // The acronym belongs to the project and the rule only applies to days, and
+  // both of those are chosen after the file is dropped. So the title follows
+  // them as they change rather than being set once when the file is read.
+  useEffect(() => {
+    if (titleEdited || !composedTitle) return;
+    setTitle(composedTitle);
+  }, [composedTitle, titleEdited]);
+
+  const applyComposedTitle = () => {
+    setTitle(composedTitle);
+    setSlug(generateSlug(baseTitle));
+    setTitleEdited(false);
+  };
 
   const processFile = useCallback((file: File) => {
     setOriginalFilename(file.name);
@@ -317,6 +327,33 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                         required
                         placeholder="Document title"
                       />
+                      {baseTitle && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {!selectedProject ? (
+                            'Pick a source project to see the final name.'
+                          ) : composedTitle !== title ? (
+                            <>
+                              Suggested name in {selectedProject.name}:{' '}
+                              <span className="font-medium text-gray-700">{composedTitle}</span>{' '}
+                              <button
+                                type="button"
+                                onClick={applyComposedTitle}
+                                className="underline underline-offset-2 hover:text-gray-700"
+                              >
+                                use this
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              Final name in {selectedProject.name}:{' '}
+                              <span className="font-medium text-gray-700">{composedTitle}</span>
+                              {documentType === 'DAY' && !dayNumber
+                                ? '. No day number in the file, so nothing is added.'
+                                : ''}
+                            </>
+                          )}
+                        </p>
+                      )}
                     </div>
                     <OriginalFilenameField
                       value={originalFilename}
