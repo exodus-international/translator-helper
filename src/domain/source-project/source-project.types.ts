@@ -25,11 +25,15 @@ export const sourceProjectIdentifier = z
 /**
  * Short prefix for auto-named DAY titles ("SML" in "SML - DAY 03 - ..."), so
  * it is kept short and free of the separator the title is joined with.
+ *
+ * The one exception is a lone dash, which turns day naming off for the project
+ * altogether. An empty field cannot mean that: it is the state every project
+ * starts in, and it already means "no acronym, but still number the days".
  */
 export const sourceProjectAcronym = z
   .string()
   .max(16)
-  .regex(/^[^\s-]+$/, 'No spaces or dashes');
+  .regex(/^(?:-|[^\s-]+)$/, 'No spaces or dashes, or a single dash to turn day naming off');
 
 export const createSourceProjectSchema = z.object({
   name: z.string().min(2),

@@ -64,6 +64,20 @@ describe('buildDefaultTitle', () => {
     assert.equal(buildDefaultTitle({ ...base, acronym: '   ', day: 3 }), 'DAY 03 - Prayer and Fasting');
   });
 
+  it('leaves the title alone when the acronym is a lone dash', () => {
+    assert.equal(buildDefaultTitle({ ...base, acronym: '-', day: 3 }), 'Prayer and Fasting');
+    assert.equal(buildDefaultTitle({ ...base, acronym: ' - ', day: 3 }), 'Prayer and Fasting');
+  });
+
+  it('tells an opted-out project apart from one that has no acronym yet', () => {
+    assert.equal(buildDefaultTitle({ ...base, acronym: '-', day: 3 }), 'Prayer and Fasting');
+    assert.equal(buildDefaultTitle({ ...base, acronym: '', day: 3 }), 'DAY 03 - Prayer and Fasting');
+  });
+
+  it('does not let the dash leak into a composed title', () => {
+    assert.ok(!buildDefaultTitle({ ...base, acronym: '-', day: 3 }).includes('DAY'));
+  });
+
   it('leaves the title alone when there is no day number', () => {
     assert.equal(buildDefaultTitle({ ...base, acronym: 'SML' }), 'Prayer and Fasting');
     assert.equal(buildDefaultTitle({ ...base, acronym: 'SML', day: null }), 'Prayer and Fasting');

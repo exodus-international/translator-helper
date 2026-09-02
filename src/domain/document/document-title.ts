@@ -12,6 +12,13 @@ import { DocumentType } from '@prisma/client';
 const DAY_FILENAME = /^(\d{1,3})\s*\.(?:md|ya?ml)$/i;
 
 /**
+ * A lone dash in a project's acronym means "leave this project's titles
+ * alone". An empty field cannot carry that meaning: it is what every project
+ * starts out with, and it already says "no acronym, but still number the days".
+ */
+export const NAMING_DISABLED = '-';
+
+/**
  * The day number is padded to two digits because both document lists sort
  * titles as plain strings. Unpadded, "Day 14" sorts before "Day 2". Days past
  * 99 keep their own width rather than being truncated; no programme is that
@@ -58,9 +65,11 @@ export interface DefaultTitleInput {
  */
 export function buildDefaultTitle({ baseTitle, type, acronym, day }: DefaultTitleInput): string {
   const base = baseTitle.trim();
+  const prefix = acronym?.trim();
+
+  if (prefix === NAMING_DISABLED) return base;
   if (type !== DocumentType.DAY || !day) return base;
 
-  const prefix = acronym?.trim();
   const parts = [prefix, `DAY ${formatDayNumber(day)}`, base].filter((part) => Boolean(part && part.length > 0));
   return parts.join(' - ');
 }
