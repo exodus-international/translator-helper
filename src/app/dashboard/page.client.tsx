@@ -327,7 +327,7 @@ export default function DashboardClient({
     try {
       await createSourceProjectAction({
         name: newProjectName,
-        description: newProjectDescription || null,
+        description: newProjectDescription || undefined,
         identifier: newProjectIdentifier.trim(),
       });
       capture('source_project_created', { location: 'dashboard' });

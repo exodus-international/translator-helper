@@ -38,6 +38,12 @@ function generateSlug(title: string): string {
   return base ? `${base}-${suffix}` : '';
 }
 
+// Mirrors `sourceProjectIdentifier` in source-project.types.ts. Checked here
+// because the Create button is not a submit, so the input's `pattern` never
+// runs, and a server action's zod error reaches production as a generic
+// failure rather than something the user can act on.
+const IDENTIFIER_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 function extractLabelsFromFrontmatter(frontmatter: Record<string, unknown>): string[] {
   const labels: string[] = [];
   if (frontmatter.day) labels.push(`day${frontmatter.day}`);
@@ -57,6 +63,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [content, setContent] = useState('');
   const [sourceProjectId, setSourceProjectId] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectIdentifier, setNewProjectIdentifier] = useState('');
   const [showNewProjectInput, setShowNewProjectInput] = useState(false);
   const [labels, setLabels] = useState<string[]>([]);
   const [deadline, setDeadline] = useState('');
@@ -139,11 +146,21 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       toast.warning('Please enter a project name');
       return;
     }
+    const identifier = newProjectIdentifier.trim();
+    if (!identifier) {
+      toast.warning('Please enter a project identifier');
+      return;
+    }
+    if (!IDENTIFIER_PATTERN.test(identifier)) {
+      toast.warning('Identifier can only contain lowercase letters, numbers and single dashes');
+      return;
+    }
 
     setCreatingProject(true);
     try {
       const project = await createSourceProjectAction({
         name: newProjectName.trim(),
+        identifier,
       });
       setSourceProjects([
         ...sourceProjects,
@@ -152,6 +169,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       setSourceProjectId(project.id);
       setShowNewProjectInput(false);
       setNewProjectName('');
+      setNewProjectIdentifier('');
       capture('source_project_created', { location: 'document_new' });
     } catch (error: any) {
       console.error('Error creating project:', error);
@@ -159,6 +177,14 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
     } finally {
       setCreatingProject(false);
     }
+  };
+
+  // These inputs sit inside the document form, so Enter would otherwise submit
+  // that instead of creating the project.
+  const handleNewProjectKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    handleCreateProject();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -294,22 +320,28 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                         </>
                       ) : (
                         <div className="space-y-2">
+                          <Input
+                            value={newProjectName}
+                            onChange={(e) => setNewProjectName(e.target.value)}
+                            placeholder="Enter project name"
+                            onKeyDown={handleNewProjectKeyDown}
+                          />
+                          <Input
+                            value={newProjectIdentifier}
+                            onChange={(e) => setNewProjectIdentifier(e.target.value)}
+                            placeholder="e.g., exodus90, lent2026"
+                            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                            onKeyDown={handleNewProjectKeyDown}
+                          />
+                          <p className="text-xs text-gray-500">
+                            The identifier is used in document URLs and as the folder name in the content repository.
+                            Lowercase letters, numbers and dashes.
+                          </p>
                           <div className="flex gap-2">
-                            <Input
-                              value={newProjectName}
-                              onChange={(e) => setNewProjectName(e.target.value)}
-                              placeholder="Enter project name"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleCreateProject();
-                                }
-                              }}
-                            />
                             <Button
                               type="button"
                               onClick={handleCreateProject}
-                              disabled={creatingProject || !newProjectName.trim()}
+                              disabled={creatingProject || !newProjectName.trim() || !newProjectIdentifier.trim()}
                             >
                               {creatingProject ? 'Creating...' : 'Create'}
                             </Button>
@@ -319,12 +351,12 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                               onClick={() => {
                                 setShowNewProjectInput(false);
                                 setNewProjectName('');
+                                setNewProjectIdentifier('');
                               }}
                             >
                               Cancel
                             </Button>
                           </div>
-                          <p className="text-xs text-gray-500">Press Enter or click Create to add the project</p>
                         </div>
                       )}
                     </div>
