@@ -11,6 +11,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import type { VersionAssignment } from '@/domain/document-version/document-version.repository';
+import type { DocumentList } from '@/domain/document/document.repository';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -49,42 +51,8 @@ interface TranslationProjectClientProps {
     };
   }>[];
   /** One version per document in this project's language; assignment lives on it. */
-  versions: Prisma.DocumentVersionGetPayload<{
-    include: {
-      document: {
-        include: {
-          sourceProject: true;
-        };
-      };
-      language: true;
-      user: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-      reviewer: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-      assignedBy: {
-        select: {
-          id: true;
-          name: true;
-          email: true;
-        };
-      };
-    };
-  }>[];
-  documents: Prisma.DocumentGetPayload<{
-    include: {
-      versions: true;
-    };
-  }>[];
+  versions: VersionAssignment[];
+  documents: DocumentList[];
   users: Prisma.UserGetPayload<{
     include: {
       languages: {
