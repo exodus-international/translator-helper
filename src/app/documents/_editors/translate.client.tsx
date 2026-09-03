@@ -56,7 +56,6 @@ interface TranslateClientProps {
   targetLanguageId: string;
   targetLanguage?: { code: string; name: string } | null;
   translationProject?: any | null;
-  assignment?: any | null;
   user: SessionUser;
   initialSuggestions?: any[];
 }
@@ -68,7 +67,6 @@ export default function TranslateClient({
   targetLanguageId,
   targetLanguage,
   translationProject,
-  assignment,
   user,
   initialSuggestions = [],
 }: TranslateClientProps) {
@@ -103,7 +101,6 @@ export default function TranslateClient({
       targetVersion={initialTargetVersion}
       initialSuggestions={initialSuggestions}
       translationProjectId={translationProject?.id ?? null}
-      assignmentId={assignment?.id ?? null}
       user={user}
       variant="translate"
       layout={zenMode ? 'zen' : 'default'}
@@ -145,11 +142,9 @@ export default function TranslateClient({
       sidebarDetails={
         initialTargetVersion ? (
           <>
-            {assignment && (
-              <SidebarSection title="Assignment">
-                <AssignmentInfoBlock assignment={assignment} />
-              </SidebarSection>
-            )}
+            <SidebarSection title="Assignment">
+              <AssignmentInfoBlock version={initialTargetVersion} />
+            </SidebarSection>
             <AudioStatus
               documentVersionId={initialTargetVersion.id}
               currentVersion={initialTargetVersion.version}
@@ -525,15 +520,15 @@ function TranslateToolbar({
 // Translate-only details extra: assignment block in collapsible
 // ──────────────────────────────────────────────────────────────────────
 
-function AssignmentInfoBlock({ assignment }: { assignment: any }) {
+function AssignmentInfoBlock({ version }: { version: any }) {
   return (
     <div>
       <div className="flex items-center gap-2 text-sm">
-        {assignment.user ? (
+        {version.user ? (
           <>
             <User className="h-4 w-4 text-blue-600" />
             <span className="text-gray-700">
-              Assigned to: <span className="font-medium">{assignment.user.name}</span>
+              Assigned to: <span className="font-medium">{version.user.name}</span>
             </span>
           </>
         ) : (
@@ -542,12 +537,12 @@ function AssignmentInfoBlock({ assignment }: { assignment: any }) {
             <span className="text-blue-700 font-medium">Unassigned (visible to all project members)</span>
           </>
         )}
-        {assignment.deadline && (
+        {version.deadline && (
           <>
             <span className="text-gray-400">•</span>
             <Calendar className="h-4 w-4 text-blue-600" />
             <span className="text-gray-700">
-              Deadline: <span className="font-medium">{new Date(assignment.deadline).toLocaleDateString()}</span>
+              Deadline: <span className="font-medium">{new Date(version.deadline).toLocaleDateString()}</span>
             </span>
           </>
         )}

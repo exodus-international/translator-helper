@@ -1,4 +1,3 @@
-import { getDocumentAssignmentByDocumentAndProject } from '@/domain/document-assignment/document-assignment.repository';
 import { getDocumentVersionByDocumentAndLanguage } from '@/domain/document-version/document-version.repository';
 import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.repository';
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
@@ -37,6 +36,10 @@ export async function DocumentEditorPage({
   const targetLanguage = { code: language.code, name: language.name };
   const initialSuggestions = targetVersion ? await getSuggestionsByDocumentVersion(targetVersion.id) : [];
 
+  const translationProject = document.sourceProject?.id
+    ? await getTranslationProjectBySourceAndLanguage(document.sourceProject.id, language.id)
+    : null;
+
   if (targetVersion && !isDraftPhase(targetVersion.status)) {
     return (
       <ReviewClient
@@ -44,19 +47,11 @@ export async function DocumentEditorPage({
         sourceVersion={sourceVersion}
         targetVersion={targetVersion}
         targetLanguage={targetLanguage}
+        translationProjectId={translationProject?.id ?? null}
         user={user}
         initialSuggestions={initialSuggestions}
       />
     );
-  }
-
-  let translationProject = null;
-  let assignment = null;
-  if (document.sourceProject?.id) {
-    translationProject = await getTranslationProjectBySourceAndLanguage(document.sourceProject.id, language.id);
-    if (translationProject) {
-      assignment = await getDocumentAssignmentByDocumentAndProject(document.id, translationProject.id);
-    }
   }
 
   return (
@@ -67,7 +62,6 @@ export async function DocumentEditorPage({
       targetLanguageId={language.id}
       targetLanguage={targetLanguage}
       translationProject={translationProject}
-      assignment={assignment}
       user={user}
       initialSuggestions={initialSuggestions}
     />

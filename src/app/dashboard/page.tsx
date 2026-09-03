@@ -1,9 +1,9 @@
 'use server';
 
 import { getVisibleAnnouncementsAction } from '@/domain/announcement/announcement.actions';
-import { getAssignedDocumentsForUserAction } from '@/domain/document-assignment/document-assignment.actions';
 import {
   getApprovedVersionsAction,
+  getAssignedVersionsForUserAction,
   getVersionsForReviewByUserAction,
   getVersionsTranslatingByUserAction,
 } from '@/domain/document-version/document-version.actions';
@@ -25,10 +25,10 @@ export default async function DashboardPage() {
     redirect('/onboarding/profile');
   }
 
-  const [projects, assignments, approvedVersions, reviewAssignments, translatingVersions, announcements] =
+  const [projects, assignedVersions, approvedVersions, reviewAssignments, translatingVersions, announcements] =
     await Promise.all([
       getSourceProjectsForUserAction(),
-      getAssignedDocumentsForUserAction(),
+      getAssignedVersionsForUserAction(),
       getApprovedVersionsAction(),
       getVersionsForReviewByUserAction(),
       getVersionsTranslatingByUserAction(),
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
     <DashboardClient
       user={user}
       projects={projects}
-      assignments={assignments}
+      assignedVersions={assignedVersions}
       approvedVersions={approvedVersions}
       reviewAssignments={reviewAssignments}
       translatingVersions={translatingVersions}

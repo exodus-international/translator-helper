@@ -338,7 +338,6 @@ interface DocumentEditorProps {
   targetVersion: any | null;
   initialSuggestions?: any[];
   translationProjectId: string | null;
-  assignmentId: string | null;
 
   // User
   user: SessionUser;
@@ -389,7 +388,6 @@ export function DocumentEditor({
   targetVersion,
   initialSuggestions = [],
   translationProjectId,
-  assignmentId,
   user,
   header,
   fullscreen,
@@ -424,7 +422,6 @@ export function DocumentEditor({
       sourceContent={sourceVersion.content}
       initialSuggestions={initialSuggestions}
       translationProjectId={translationProjectId}
-      assignmentId={assignmentId}
     >
       {autoSaveDelayMs ? <AutoSaveTrigger delayMs={autoSaveDelayMs} /> : null}
       <ReloadSuggestionsOnVersionChange />

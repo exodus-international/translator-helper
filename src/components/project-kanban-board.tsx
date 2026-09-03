@@ -22,12 +22,10 @@ import {
   parseDocumentTypeFilter,
   serializeDocumentTypeFilter,
 } from '@/domain/document/document-type-filter';
-import {
-  createDocumentAssignmentAction,
-  updateDocumentAssignmentAction,
-} from '@/domain/document-assignment/document-assignment.actions';
+
 import {
   assignReviewerToVersionAction,
+  assignTranslatorToVersionAction,
   updateDocumentVersionStatusAction,
 } from '@/domain/document-version/document-version.actions';
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
@@ -213,7 +211,6 @@ export default function ProjectKanbanBoard({
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignDocId, setAssignDocId] = useState<string | null>(null);
-  const [assignExistingId, setAssignExistingId] = useState<string | null>(null);
   const [assignVersionId, setAssignVersionId] = useState<string | null>(null);
   const [assignUserId, setAssignUserId] = useState('');
   const [assignReviewerId, setAssignReviewerId] = useState('');
@@ -273,13 +270,11 @@ export default function ProjectKanbanBoard({
 
   function openAssignDialog(params: {
     docId: string;
-    existingAssignmentId: string | null;
     versionId?: string | null;
     currentTranslatorId?: string | null;
     currentReviewerId?: string | null;
   }) {
     setAssignDocId(params.docId);
-    setAssignExistingId(params.existingAssignmentId);
     setAssignVersionId(params.versionId ?? null);
     setAssignUserId(params.currentTranslatorId ?? '');
     setAssignReviewerId(params.currentReviewerId ?? '');
@@ -297,35 +292,33 @@ export default function ProjectKanbanBoard({
       const translatorId = !wantsUnassignTranslator && assignUserId ? assignUserId : null;
       const reviewerId = !wantsUnassignReviewer && assignReviewerId ? assignReviewerId : null;
 
-      if (wantsUnassignTranslator && assignExistingId) {
-        await updateDocumentAssignmentAction(assignExistingId, { userId: null });
-        toast.success('Translator unassigned');
-      } else if (wantsUnassignTranslator && !assignExistingId) {
-        await createDocumentAssignmentAction({
+      const changesTranslator = wantsUnassignTranslator || Boolean(translatorId) || Boolean(assignDeadline);
+      const changesReviewer = wantsUnassignReviewer || Boolean(reviewerId);
+
+      // Both sides live on the version now, and assigning creates it if the
+      // document has none yet — so no separate create/update paths. A
+      // reviewer-only change still goes through here first when the document has
+      // no version, since there would otherwise be nothing to set the reviewer on.
+      let versionId = assignVersionId;
+      if (changesTranslator || !versionId) {
+        const version = await assignTranslatorToVersionAction({
           documentId: assignDocId,
           translationProjectId,
-          userId: null,
+          userId: translatorId,
+          deadline: assignDeadline ? new Date(assignDeadline) : null,
         });
-        toast.success('Translator unassigned');
-      } else if (translatorId) {
-        if (assignExistingId) {
-          await updateDocumentAssignmentAction(assignExistingId, {
-            userId: translatorId,
-            deadline: assignDeadline ? new Date(assignDeadline) : null,
-          });
-        } else {
-          await createDocumentAssignmentAction({
-            documentId: assignDocId,
-            translationProjectId,
-            userId: translatorId,
-            deadline: assignDeadline ? new Date(assignDeadline) : null,
-          });
+        versionId = version.id;
+        if (wantsUnassignTranslator) {
+          toast.success('Translator unassigned');
+        } else if (translatorId) {
+          toast.success('Translator assigned!');
+        } else if (assignDeadline) {
+          toast.success('Deadline updated');
         }
-        toast.success('Translator assigned!');
       }
 
-      if (assignVersionId && (wantsUnassignReviewer || reviewerId)) {
-        await assignReviewerToVersionAction(assignVersionId, reviewerId);
+      if (changesReviewer) {
+        await assignReviewerToVersionAction(versionId, reviewerId);
         toast.success(wantsUnassignReviewer ? 'Reviewer unassigned' : 'Reviewer assigned!');
       }
 
@@ -350,12 +343,12 @@ export default function ProjectKanbanBoard({
     const userMap = new Map<string, { id: string; name: string; email: string }>();
 
     documents.forEach((doc) => {
-      doc.assignments?.forEach((assignment: any) => {
-        if (assignment?.user) {
-          userMap.set(assignment.user.id, {
-            id: assignment.user.id,
-            name: assignment.user.name,
-            email: assignment.user.email,
+      doc.versions?.forEach((version: any) => {
+        if (version?.user) {
+          userMap.set(version.user.id, {
+            id: version.user.id,
+            name: version.user.name,
+            email: version.user.email,
           });
         }
       });
@@ -390,15 +383,8 @@ export default function ProjectKanbanBoard({
       return true;
     }
 
-    if (selectedUser === 'me') {
-      const hasAssignment = doc.assignments?.some((assignment: any) => assignment?.user?.id === user.id);
-      const hasVersion = doc.versions?.some((version: any) => version?.user?.id === user.id);
-      return hasAssignment || hasVersion;
-    }
-
-    const hasAssignment = doc.assignments?.some((assignment: any) => assignment?.user?.id === selectedUser);
-    const hasVersion = doc.versions?.some((version: any) => version?.user?.id === selectedUser);
-    return hasAssignment || hasVersion;
+    const matchUserId = selectedUser === 'me' ? user.id : selectedUser;
+    return doc.versions?.some((version: any) => version?.user?.id === matchUserId) ?? false;
   });
 
   const getDeployedTimestamp = (version: any): Date | null => {
@@ -583,9 +569,8 @@ export default function ProjectKanbanBoard({
                     const doc = card.document;
                     const hasVersion = doc.versions && doc.versions.length > 0;
                     const version = hasVersion ? doc.versions[0] : null;
-                    const assignment = doc.assignments?.[0];
                     const language = version?.language || languages.find((l) => l.id === selectedLanguage);
-                    const deadline = assignment?.deadline || doc.deadline;
+                    const deadline = version?.deadline || doc.deadline;
                     const hasWaitingForFinalLabel =
                       version?.status === DocumentStatus.PENDING_REVIEW &&
                       doc.labels?.includes('Waiting for final label');
@@ -639,9 +624,9 @@ export default function ProjectKanbanBoard({
                                 )}
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   {(() => {
-                                    // Show relevant user based on document status
-                                    // If assignment exists with userId=null, treat as unassigned
-                                    const translator = assignment ? (assignment.userId ? assignment.user : null) : version?.user;
+                                    // Show relevant user based on document status.
+                                    // A version with no translator is unassigned.
+                                    const translator = version?.user ?? null;
                                     const reviewer = version?.reviewer;
                                     const isUnassigned = !translator;
 
@@ -669,9 +654,8 @@ export default function ProjectKanbanBoard({
                                             e.stopPropagation();
                                             openAssignDialog({
                                               docId: doc.id,
-                                              existingAssignmentId: assignment?.id || null,
                                               versionId: version?.id || null,
-                                              currentTranslatorId: assignment?.userId || version?.user?.id || null,
+                                              currentTranslatorId: version?.user?.id || null,
                                               currentReviewerId: version?.reviewer?.id || null,
                                             });
                                           }}
@@ -693,9 +677,8 @@ export default function ProjectKanbanBoard({
                                             e.stopPropagation();
                                             openAssignDialog({
                                               docId: doc.id,
-                                              existingAssignmentId: assignment?.id || null,
                                               versionId: version?.id || null,
-                                              currentTranslatorId: assignment?.userId || version?.user?.id || null,
+                                              currentTranslatorId: version?.user?.id || null,
                                               currentReviewerId: version?.reviewer?.id || null,
                                             });
                                           }}
@@ -762,25 +745,23 @@ export default function ProjectKanbanBoard({
                 <SelectContent>
                   <MemberSelectItems
                     members={projectMembers}
-                    showUnassign={Boolean(assignExistingId || assignUserId)}
+                    showUnassign={Boolean(assignUserId)}
                     unassignLabel="Unassign translator"
                   />
                 </SelectContent>
               </Select>
             </div>
-            {assignVersionId && (
-              <div className="space-y-2">
-                <Label>Reviewer</Label>
-                <Select value={assignReviewerId} onValueChange={setAssignReviewerId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select reviewer..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <MemberSelectItems members={projectMembers} showUnassign unassignLabel="Unassign reviewer" />
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>Reviewer</Label>
+              <Select value={assignReviewerId} onValueChange={setAssignReviewerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select reviewer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <MemberSelectItems members={projectMembers} showUnassign unassignLabel="Unassign reviewer" />
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Deadline (optional)</Label>
               <Input type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} />
@@ -790,7 +771,10 @@ export default function ProjectKanbanBoard({
             <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAssign} disabled={(!assignUserId && !assignReviewerId) || assignSaving}>
+            <Button
+              onClick={handleAssign}
+              disabled={(!assignUserId && !assignReviewerId && !assignDeadline) || assignSaving}
+            >
               {assignSaving ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>

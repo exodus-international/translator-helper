@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import {
   createDocumentVersion,
+  createMissingDocumentVersions,
   deleteDocumentVersionsByDocumentId,
 } from '../document-version/document-version.repository';
 import {
@@ -63,6 +64,17 @@ export async function createDocumentAction(input: unknown) {
     status: DocumentStatus.APPROVED,
     userId: user.id,
   });
+
+  // Give every language already being translated a version to render, so the
+  // document shows up on their boards instead of appearing as a gap.
+  const translationProjects = await prisma.translationProject.findMany({
+    where: { sourceProjectId: validated.sourceProjectId },
+    select: { languageId: true },
+  });
+  await createMissingDocumentVersions(
+    [document.id],
+    translationProjects.map((tp) => tp.languageId),
+  );
 
   // Log the activity
   await createActivityLog({

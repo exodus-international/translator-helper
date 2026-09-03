@@ -122,8 +122,7 @@ model User {
   comments            Comment[]
   activityLogs        ActivityLog[]
   projectMembers      ProjectMember[]
-  assignedDocuments   DocumentAssignment[] @relation("AssignedTo")
-  assignedByDocuments DocumentAssignment[] @relation("AssignedBy")
+  assignedVersions    DocumentVersion[]    @relation("AssignedBy")
   languages           UserLanguage[]
   suggestions         Suggestion[]
   triggeredAudioFiles AudioFile[]
@@ -236,7 +235,6 @@ model TranslationProject {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   members             ProjectMember[]
-  documentAssignments DocumentAssignment[]
 
   @@unique([sourceProjectId, languageId])
   @@map("translation_project")
@@ -256,25 +254,6 @@ model ProjectMember {
   @@map("project_member")
 }
 
-model DocumentAssignment {
-  id                   String             @id @default(uuid())
-  documentId           String
-  document             Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  translationProjectId String
-  translationProject   TranslationProject @relation(fields: [translationProjectId], references: [id], onDelete: Cascade)
-  userId               String? // null = unassigned (visible to all project members)
-  user                 User?              @relation("AssignedTo", fields: [userId], references: [id], onDelete: SetNull)
-  deadline             DateTime?
-  assignedAt           DateTime           @default(now())
-  assignedById         String
-  assignedBy           User               @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-
-  @@unique([documentId, translationProjectId])
-  @@map("document_assignment")
-}
-
 model Document {
   id               String               @id @default(uuid())
   slug             String // unique within the source project, see @@unique below
@@ -290,7 +269,6 @@ model Document {
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   versions         DocumentVersion[]
-  assignments      DocumentAssignment[]
 
   @@unique([sourceProjectId, slug])
   @@map("document")
@@ -309,6 +287,12 @@ model DocumentVersion {
   user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   reviewerId   String?
   reviewer     User?          @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
+  // Assignment lives here rather than in a separate record, so a document's
+  // translator, reviewer, deadline and status can never drift apart.
+  deadline     DateTime?
+  assignedById String?
+  assignedBy   User?          @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt   DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   comments      Comment[]

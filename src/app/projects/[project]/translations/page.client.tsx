@@ -25,13 +25,11 @@ type TranslationProjectListItem = Prisma.TranslationProjectGetPayload<{
         userId: true;
       };
     };
-    _count: {
-      select: {
-        documentAssignments: true;
-      };
-    };
   };
-}>;
+}> & {
+  /** Derived from the versions in this project's language. */
+  documentCount: number;
+};
 
 type SourceProjectWithDetails = Prisma.SourceProjectGetPayload<{
   include: {
@@ -212,7 +210,7 @@ export default function TranslationsClient({
                     </p>
                     <div className="flex gap-4 mt-2 text-sm text-gray-600">
                       <span>{new Set(tp.members.map((m) => m.userId)).size} member(s)</span>
-                      <span>{tp._count.documentAssignments} document(s)</span>
+                      <span>{tp.documentCount} document(s)</span>
                     </div>
                   </div>
                 </div>

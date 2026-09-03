@@ -1,7 +1,13 @@
 import prisma from '@/lib/db';
+import { countVersionsByLanguage } from '../document-version/document-version.repository';
 
+/**
+ * A translation project's documents are the versions in its language, so the
+ * count is derived rather than stored — there is no relation from the project to
+ * DocumentVersion to hang a Prisma `_count` on.
+ */
 export async function listTranslationProjects(filters?: { sourceProjectId?: string; languageId?: string }) {
-  return prisma.translationProject.findMany({
+  const translationProjects = await prisma.translationProject.findMany({
     where: {
       ...(filters?.sourceProjectId && { sourceProjectId: filters.sourceProjectId }),
       ...(filters?.languageId && { languageId: filters.languageId }),
@@ -17,13 +23,20 @@ export async function listTranslationProjects(filters?: { sourceProjectId?: stri
           userId: true,
         },
       },
-      _count: {
-        select: {
-          documentAssignments: true,
-        },
-      },
     },
   });
+
+  // One grouped count per source project involved (callers scope to one today).
+  const sourceProjectIds = [...new Set(translationProjects.map((tp) => tp.sourceProjectId))];
+  const countsBySourceProject = new Map(
+    await Promise.all(sourceProjectIds.map(async (id) => [id, await countVersionsByLanguage(id)] as const)),
+  );
+
+  return translationProjects.map((translationProject) => ({
+    ...translationProject,
+    documentCount:
+      countsBySourceProject.get(translationProject.sourceProjectId)?.get(translationProject.languageId) ?? 0,
+  }));
 }
 
 export async function getTranslationProjectById(id: string) {
@@ -39,25 +52,6 @@ export async function getTranslationProjectById(id: string) {
       members: {
         include: {
           user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      },
-      documentAssignments: {
-        include: {
-          document: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          assignedBy: {
             select: {
               id: true,
               name: true,

@@ -13,9 +13,6 @@ interface ProjectStatisticsTabProps {
   selectedLanguage: string;
   translationProject: {
     id: string;
-    _count: {
-      documentAssignments: number;
-    };
     members: { userId: string }[];
   } | null;
 }
