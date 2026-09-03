@@ -1,6 +1,6 @@
 import { listVersionsForTranslationProjectAction } from '@/domain/document-version/document-version.actions';
 import { listDocumentsAction } from '@/domain/document/document.actions';
-import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import { listTranslationProjectMembersAction } from '@/domain/user-language/user-language.actions';
 import { getTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
 import { listUsersAction } from '@/domain/user/user.actions';
 import { authorize } from '@/lib/authorize';
@@ -29,7 +29,7 @@ export default async function TranslationProjectPage({
   }
 
   const [members, versions, documents, users] = await Promise.all([
-    listProjectMembersAction(translationProjectId),
+    listTranslationProjectMembersAction(translationProjectId),
     listVersionsForTranslationProjectAction(translationProjectId),
     listDocumentsAction({ sourceProjectId: sourceProject.id }),
     listUsersAction(),

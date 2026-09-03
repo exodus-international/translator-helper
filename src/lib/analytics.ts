@@ -87,8 +87,9 @@ export type AnalyticsEvent =
   | 'source_project_status_toggled'
   | 'translation_project_created'
   | 'project_settings_saved'
-  | 'project_member_added'
-  | 'project_member_removed'
+  | 'language_member_added'
+  | 'language_member_role_changed'
+  | 'language_member_removed'
   // ── Admin ────────────────────────────────────────────────────────────
   | 'user_role_changed'
   | 'user_banned'

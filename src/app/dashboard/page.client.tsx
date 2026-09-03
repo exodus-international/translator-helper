@@ -84,10 +84,10 @@ interface DashboardClientProps {
         id: string;
         name: string;
         code: string;
+        users: {
+          userId: string;
+        }[];
       };
-      members: {
-        userId: string;
-      }[];
     }[];
   }[];
   /** Every version assigned to the user, whatever its status. */

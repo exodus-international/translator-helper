@@ -121,7 +121,6 @@ model User {
   reviewedVersions    DocumentVersion[] @relation("ReviewedBy")
   comments            Comment[]
   activityLogs        ActivityLog[]
-  projectMembers      ProjectMember[]
   assignedVersions    DocumentVersion[]    @relation("AssignedBy")
   languages           UserLanguage[]
   suggestions         Suggestion[]
@@ -234,24 +233,9 @@ model TranslationProject {
   language            Language             @relation(fields: [languageId], references: [id], onDelete: Cascade)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
-  members             ProjectMember[]
 
   @@unique([sourceProjectId, languageId])
   @@map("translation_project")
-}
-
-model ProjectMember {
-  id                   String             @id @default(uuid())
-  translationProjectId String
-  translationProject   TranslationProject @relation(fields: [translationProjectId], references: [id], onDelete: Cascade)
-  userId               String
-  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role                 ProjectRole
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-
-  @@unique([translationProjectId, userId, role])
-  @@map("project_member")
 }
 
 model Document {
@@ -334,16 +318,21 @@ model ActivityLog {
   @@map("activity_log")
 }
 
+/// Grants a user access to every translation project in this language, with the
+/// given role. Replaces the former per-project ProjectMember records.
 model UserLanguage {
-  id         String   @id @default(uuid())
+  id         String      @id @default(uuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   languageId String
-  language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  language   Language    @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  role       ProjectRole @default(TRANSLATOR)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
   @@unique([userId, languageId])
+  // Supports the reviewer/manager lookups that resolve project access by language.
+  @@index([languageId, role])
   @@map("user_language")
 }
 

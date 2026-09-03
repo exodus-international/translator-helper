@@ -17,7 +17,10 @@ import {
   assignReviewerToVersionAction,
   assignTranslatorToVersionAction,
 } from '@/domain/document-version/document-version.actions';
-import { getProjectReviewersAction, listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import {
+  getProjectReviewersAction,
+  listTranslationProjectMembersAction,
+} from '@/domain/user-language/user-language.actions';
 import { deleteDocumentAction } from '@/domain/document/document.actions';
 import { DocumentStatus, SuggestionType } from '@prisma/client';
 import { toast } from 'sonner';
@@ -402,12 +405,8 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { translationProjectId } = get();
       if (!translationProjectId) return;
       try {
-        const members = await listProjectMembersAction(translationProjectId);
-        const seen = new Map<string, MemberInfo>();
-        for (const m of members) {
-          if (!seen.has(m.user.id)) seen.set(m.user.id, m);
-        }
-        set({ dialog: { type: 'assignTranslator', members: Array.from(seen.values()) } });
+        const members = await listTranslationProjectMembersAction(translationProjectId);
+        set({ dialog: { type: 'assignTranslator', members } });
         capture('dialog_opened', { dialog: 'assign_translator' });
       } catch (error) {
         toast.error('Failed to load team members');

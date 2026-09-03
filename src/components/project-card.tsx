@@ -23,16 +23,17 @@ interface ProjectCardProps {
         id: string;
         name: string;
         code: string;
+        /** The language team — everyone with access to this translation project. */
+        users: {
+          userId: string;
+        }[];
       };
-      members: {
-        userId: string;
-      }[];
     }[];
   };
 }
 
 export default function ProjectCard({ project }: ProjectCardProps) {
-  const uniqueUserIds = new Set(project.translationProjects.flatMap((tp) => tp.members.map((m) => m.userId)));
+  const uniqueUserIds = new Set(project.translationProjects.flatMap((tp) => tp.language.users.map((u) => u.userId)));
   const totalMembers = uniqueUserIds.size;
 
   return (
@@ -69,7 +70,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           {project.translationProjects.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
               {project.translationProjects.map((tp) => {
-                const uniqueMembers = new Set(tp.members.map((m) => m.userId)).size;
+                const uniqueMembers = tp.language.users.length;
                 return (
                   <Badge key={tp.id} variant="secondary" size="xs" className="gap-1">
                     {tp.language.name}

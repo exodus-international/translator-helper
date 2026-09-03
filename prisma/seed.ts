@@ -8,7 +8,6 @@ import {
   DOCUMENTS,
   FOLDERS,
   LANGUAGES,
-  PROJECT_MEMBERS,
   SOURCE_PROJECTS,
   SUGGESTIONS,
   TARGET_VERSIONS,
@@ -33,7 +32,6 @@ async function cleanup() {
     prisma.gitHubCommit.deleteMany(),
     prisma.documentVersion.deleteMany(),
     prisma.document.deleteMany(),
-    prisma.projectMember.deleteMany(),
     prisma.translationProject.deleteMany(),
     prisma.sourceProject.deleteMany(),
     prisma.userLanguage.deleteMany(),
@@ -94,10 +92,10 @@ async function seedUsers(langs: Record<string, string>) {
     users[u.key] = result.user.id;
     console.log(`User ${u.name} (${u.email}) -> ${u.key}`);
 
-    // UserLanguage records
-    for (const code of u.langCodes) {
+    // UserLanguage records — the language assignment carries the project role
+    for (const ul of u.languages) {
       await prisma.userLanguage.create({
-        data: { userId: result.user.id, languageId: langs[code] },
+        data: { userId: result.user.id, languageId: langs[ul.code], role: ul.role },
       });
     }
   }
@@ -172,25 +170,7 @@ async function seedTranslationProjects(
 }
 
 // ---------------------------------------------------------------------------
-// 7. Project Members
-// ---------------------------------------------------------------------------
-
-async function seedProjectMembers(
-  tps: Record<string, string>,
-  users: Record<string, string>,
-) {
-  console.log('\n--- Project Members ---');
-
-  for (const m of PROJECT_MEMBERS) {
-    await prisma.projectMember.create({
-      data: { translationProjectId: tps[m.tp], userId: users[m.user], role: m.role },
-    });
-  }
-  console.log(`Created ${PROJECT_MEMBERS.length} project members`);
-}
-
-// ---------------------------------------------------------------------------
-// 8. Documents
+// 7. Documents
 // ---------------------------------------------------------------------------
 
 async function seedDocuments(projects: Record<string, string>) {
@@ -216,7 +196,7 @@ async function seedDocuments(projects: Record<string, string>) {
 }
 
 // ---------------------------------------------------------------------------
-// 9. Document Versions
+// 8. Document Versions
 // ---------------------------------------------------------------------------
 
 function getTranslationContent(docKey: string, langCode: string, status: DocumentStatus): string {
@@ -290,7 +270,7 @@ async function seedDocumentVersions(
 }
 
 // ---------------------------------------------------------------------------
-// 10. Document Assignments
+// 9. Document Assignments
 // ---------------------------------------------------------------------------
 
 // Assignment lives on the version, so this sets the translator and deadline on
@@ -344,7 +324,7 @@ async function seedDocumentAssignments(
 }
 
 // ---------------------------------------------------------------------------
-// 11. Suggestions & Replies
+// 10. Suggestions & Replies
 // ---------------------------------------------------------------------------
 
 async function seedSuggestions(
@@ -394,7 +374,7 @@ async function seedSuggestions(
 }
 
 // ---------------------------------------------------------------------------
-// 12. Activity Logs
+// 11. Activity Logs
 // ---------------------------------------------------------------------------
 
 async function seedActivityLogs(
@@ -444,7 +424,7 @@ async function seedActivityLogs(
 }
 
 // ---------------------------------------------------------------------------
-// 13. Comments
+// 12. Comments
 // ---------------------------------------------------------------------------
 
 async function seedComments(
@@ -480,8 +460,7 @@ async function main() {
   await seedFolders();
   const users = await seedUsers(langs);
   const projects = await seedSourceProjects();
-  const tps = await seedTranslationProjects(projects, langs);
-  await seedProjectMembers(tps, users);
+  await seedTranslationProjects(projects, langs);
   const docs = await seedDocuments(projects);
   const versions = await seedDocumentVersions(docs, langs, users);
   await seedDocumentAssignments(docs, langs, users);

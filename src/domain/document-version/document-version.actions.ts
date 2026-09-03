@@ -3,7 +3,7 @@
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { type SessionUser } from '@/lib/session';
-import { DocumentStatus, ProjectRole, Role } from '@prisma/client';
+import { DocumentStatus, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
 
@@ -35,7 +35,7 @@ import { assertCanEditDocumentVersion } from './document-version.permissions';
 import { validateTransition } from './document-version.transitions';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
-import { createProjectMember } from '../project-member/project-member.repository';
+import { getUserRoleForLanguage } from '../user-language/user-language.repository';
 import { getSourceProjectById } from '../source-project/source-project.repository';
 import {
   createTranslationProject,
@@ -342,6 +342,12 @@ export async function assignDocumentVersionAction(input: unknown) {
   );
 
   if (!translationProject) {
+    // Creating the project must not become a way to gain access to the language:
+    // check the caller's language assignment before anything is written.
+    if (user.role !== Role.ADMIN && !(await getUserRoleForLanguage(user.id, validated.languageId))) {
+      throw new Error('You are not assigned to this language');
+    }
+
     // Auto-create the translation project if it doesn't exist
     const sourceProject = await getSourceProjectById(document.sourceProject.id);
     if (!sourceProject) {
@@ -360,24 +366,10 @@ export async function assignDocumentVersionAction(input: unknown) {
       languageId: validated.languageId,
     });
 
-    // If user is not an admin, add them as a member with TRANSLATOR role
-    // (Deployers have access to all projects automatically)
-    if (user.role !== Role.ADMIN) {
-      // Fetch the created project to get its ID
-      const createdProject = await getTranslationProjectBySourceAndLanguage(
-        document.sourceProject.id,
-        validated.languageId,
-      );
-      if (createdProject) {
-        await createProjectMember({
-          translationProjectId: createdProject.id,
-          userId: user.id,
-          role: ProjectRole.TRANSLATOR,
-        });
-      }
-    }
+    // No membership is granted here: the caller's language assignment, checked
+    // above, already carries their role on every project in this language.
 
-    // Fetch the translation project again to get the full structure with members
+    // Fetch the translation project again to get the full structure
     translationProject = await getTranslationProjectBySourceAndLanguage(
       document.sourceProject.id,
       validated.languageId,

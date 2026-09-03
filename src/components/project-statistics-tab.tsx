@@ -13,7 +13,7 @@ interface ProjectStatisticsTabProps {
   selectedLanguage: string;
   translationProject: {
     id: string;
-    members: { userId: string }[];
+    language: { users: { userId: string }[] };
   } | null;
 }
 
@@ -68,7 +68,7 @@ export default function ProjectStatisticsTab({
   const completedPercent =
     totalDocuments > 0 ? Math.round(((deployedCount + approvedCount) / totalDocuments) * 100) : 0;
 
-  const uniqueMembers = translationProject ? new Set(translationProject.members.map((m) => m.userId)).size : 0;
+  const uniqueMembers = translationProject ? translationProject.language.users.length : 0;
 
   return (
     <div className="space-y-6">
