@@ -1,5 +1,6 @@
 import { Role } from '@prisma/client';
 import { headers } from 'next/headers';
+import { cache } from 'react';
 import { auth } from './auth';
 
 export interface SessionUser {
@@ -10,7 +11,15 @@ export interface SessionUser {
   image?: string | null;
 }
 
-export async function getCurrentUser(): Promise<SessionUser | null> {
+/**
+ * The signed-in user, resolved once per request.
+ *
+ * A single render asks this question many times over — the root layout, the
+ * page, and every server action reached through `authorize()`. React's `cache`
+ * memoises it for the lifetime of the request, so the session is resolved once
+ * instead of once per call site.
+ */
+export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -31,7 +40,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     console.error('Error getting current user:', error);
     return null;
   }
-}
+});
 
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
