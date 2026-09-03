@@ -1,6 +1,28 @@
 'use client';
 
-import posthog from 'posthog-js';
+type PostHog = typeof import('posthog-js').default;
+
+/**
+ * posthog-js is 218 KB, and a static import puts it in the chunk every page
+ * downloads before it can be interactive — for a library whose whole job is to
+ * run *after* the page is usable. It is loaded on demand instead.
+ *
+ * The provider warms this on mount, so by the time a person can click anything
+ * the module is already there. Calls made before it resolves are queued rather
+ * than dropped: each one waits on the same promise, and posthog-js itself
+ * buffers events fired before `init`.
+ */
+let posthogPromise: Promise<PostHog> | null = null;
+
+export function loadPostHog(): Promise<PostHog> {
+  posthogPromise ??= import('posthog-js').then((m) => m.default);
+  return posthogPromise;
+}
+
+/** Fire-and-forget: analytics must never delay or break what the user is doing. */
+function withPostHog(use: (posthog: PostHog) => void): void {
+  void loadPostHog().then(use).catch(() => {});
+}
 
 /**
  * Whether PostHog is configured for this build. We gate on the presence of the
@@ -123,7 +145,7 @@ export function capture(
   properties?: AnalyticsProperties,
 ): void {
   if (!POSTHOG_ENABLED) return;
-  posthog.capture(event, properties);
+  withPostHog((posthog) => posthog.capture(event, properties));
 }
 
 /**
@@ -140,7 +162,7 @@ export function setProjectGroup(
   properties?: AnalyticsProperties,
 ): void {
   if (!POSTHOG_ENABLED) return;
-  posthog.group('project', projectId, properties);
+  withPostHog((posthog) => posthog.group('project', projectId, properties));
 }
 
 /**
@@ -156,7 +178,7 @@ export function setProjectGroup(
 export function setActiveLanguage(code: string, name?: string): void {
   if (!POSTHOG_ENABLED) return;
   if (!code) return;
-  posthog.register({ language: code, ...(name ? { language_name: name } : {}) });
+  withPostHog((posthog) => posthog.register({ language: code, ...(name ? { language_name: name } : {}) }));
 }
 
 /**
@@ -168,5 +190,5 @@ export function captureException(
   properties?: AnalyticsProperties,
 ): void {
   if (!POSTHOG_ENABLED) return;
-  posthog.captureException(error, properties);
+  withPostHog((posthog) => posthog.captureException(error, properties));
 }
