@@ -2,11 +2,8 @@
 
 import { Avatar, AvatarFallback, type AvatarSize } from '@/components/ui/avatar';
 import { getInitials } from '@/lib/format';
-import { gravatarUrl } from '@/lib/gravatar';
-import { useEffect, useRef, useState } from 'react';
-
-/** Rendered size of each avatar; Gravatar is asked for twice this, for retina screens. */
-const AVATAR_PIXELS: Record<AvatarSize, number> = { xs: 20, sm: 24, md: 32, lg: 40, xl: 64, '2xl': 96 };
+import { AVATAR_PIXELS, gravatarUrl } from '@/lib/gravatar';
+import { useCallback, useState } from 'react';
 
 interface UserAvatarProps {
   name: string | null | undefined;
@@ -40,17 +37,21 @@ export function UserAvatar({ name, image, email, size = 'md', className, title, 
   // Remembering *which* source failed means a new one gets its own chance
   // without an effect to reset the flag.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
 
   // Because the picture is in the server-rendered HTML, a Gravatar miss can
   // 404 before React hydrates — and an error that has already happened never
-  // reaches `onError`. An image that has finished with no width failed; one
-  // that has not picked a source yet is merely waiting to be scrolled into
-  // view, and must be left alone.
-  useEffect(() => {
-    const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth === 0 && img.currentSrc) setFailedSrc(src);
-  }, [src]);
+  // reaches `onError`. So ask the element how it went the moment we get hold of
+  // it: one that has finished with no width failed, while one that has not
+  // picked a source yet is merely waiting to be scrolled into view, and must be
+  // left alone. Any later failure arrives through `onError` as usual.
+  const checkOnAttach = useCallback(
+    (img: HTMLImageElement | null) => {
+      // `src` rather than `img.src`: the DOM resolves ours to an absolute URL,
+      // which would never match what the check below compares against.
+      if (img && img.complete && img.naturalWidth === 0 && img.currentSrc) setFailedSrc(src);
+    },
+    [src],
+  );
 
   return (
     <Avatar size={size} name={displayName} className={className} title={title ?? displayName}>
@@ -58,12 +59,16 @@ export function UserAvatar({ name, image, email, size = 'md', className, title, 
       {src && src !== failedSrc && (
         // eslint-disable-next-line @next/next/no-img-element -- see the note above; next/image can't serve arbitrary avatar hosts here
         <img
-          ref={imgRef}
+          ref={checkOnAttach}
           src={src}
-          alt={displayName ?? 'Avatar'}
+          // Empty on purpose: while the picture loads — or forever, if it never
+          // arrives — the browser paints alt text over the initials underneath.
+          // The name is already on the root as a `title` and, wherever this sits
+          // beside a person, in the text next to it.
+          alt=""
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
-          // Gravatar has no business knowing which document the reader is on.
+          // The picture's host has no business knowing which document the reader is on.
           referrerPolicy="no-referrer"
           onError={() => setFailedSrc(src)}
           className="absolute inset-0 size-full rounded-full object-cover"

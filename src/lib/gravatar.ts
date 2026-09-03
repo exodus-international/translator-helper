@@ -80,12 +80,18 @@ export function gravatarHash(email: string): string {
   return sha256Hex(email.trim().toLowerCase());
 }
 
+/** Rendered size of each avatar, in CSS pixels, keyed by `AvatarSize`. */
+export const AVATAR_PIXELS = { xs: 20, sm: 24, md: 32, lg: 40, xl: 64, '2xl': 96 } as const;
+
+/** The only sizes the proxy will fetch: twice each rendered size, for retina screens. */
+export const AVATAR_PROXY_SIZES: number[] = Object.values(AVATAR_PIXELS).map((pixels) => pixels * 2);
+
 /**
- * Where to find this address's Gravatar, or a 404 when it has none. `size` is
- * the pixel size we want back; asking for twice the CSS size keeps it sharp on
- * retina screens.
+ * Where to find this address's Gravatar, through our own origin rather than
+ * `gravatar.com` directly — see `app/api/avatar/[hash]`. `size` is the pixel
+ * size we want back and must be one of `AVATAR_PROXY_SIZES`.
  */
 export function gravatarUrl(email: string | null | undefined, size: number): string | null {
   if (!email || !email.includes('@')) return null;
-  return `https://www.gravatar.com/avatar/${gravatarHash(email)}?s=${size}&d=404`;
+  return `/api/avatar/${gravatarHash(email)}?s=${size}`;
 }

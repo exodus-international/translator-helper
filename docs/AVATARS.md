@@ -30,12 +30,22 @@ face. The superseded object is left in the bucket.
 ## Gravatar
 
 Most people already have a face attached to an email address somewhere, so
-before falling back to initials we ask Gravatar for one. Only the SHA-256 of
-the trimmed, lowercased address is sent, only while the person has not uploaded
-a picture, and the request carries `d=404` so Gravatar refuses rather than
-inventing a placeholder — the image then fails to load and the initials chip
-takes over. `referrerPolicy="no-referrer"` keeps the page a reader is on out of
-Gravatar's logs.
+before falling back to initials we ask Gravatar for one.
+
+We fetch it server-side, through `/api/avatar/{hash}`, rather than pointing the
+browser at `gravatar.com`. Going direct is the usual way to use Gravatar, but
+`gravatar.com` is on the common tracker blocklists, so for anyone running a
+content blocker or strict tracking protection the picture never arrives — the
+same reason this app already tunnels Sentry through `/monitoring`. Fetching it
+ourselves also keeps readers' IP addresses, and the pages they are on, out of
+Gravatar's logs: only the hash leaves our server.
+
+The route takes a 64-character hex hash and one of the sizes the avatars
+actually use, and talks to one upstream host. It asks for `d=404`, so Gravatar
+refuses rather than inventing a placeholder; the route passes the 404 on, the
+image fails to load, and the initials chip underneath takes over. Both hits and
+misses are cached for a day (`stale-while-revalidate` for a week), so a page
+full of people without Gravatars does not re-ask on every view.
 
 `src/lib/gravatar.ts` hashes synchronously by hand. `crypto.subtle` is async and
 `node:crypto` is not in the browser bundle, but avatars render on both sides and
@@ -50,6 +60,12 @@ after hydration — a visible flash on every page load. Rendering the `<img>`
 directly puts it in the HTML, so the browser starts fetching at parse time and a
 cached picture paints with no swap. It also lets the picture be `loading="lazy"`
 everywhere except the one avatar a page is about.
+
+Its `alt` is deliberately empty. An `alt` on an image stacked over the initials
+is painted across them while the picture loads, and stays there if it never
+arrives — the person's whole name spilling out of a 20px circle. The avatar is
+decorative: the name is on the container as a `title`, and in the text beside it
+everywhere an avatar appears next to a person.
 
 ## Environment
 
