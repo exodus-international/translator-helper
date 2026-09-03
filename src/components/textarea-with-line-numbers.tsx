@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import Editor from '@monaco-editor/react';
+import './monaco-selfhost';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { SuggestionWithUser, useMonacoSuggestions } from './monaco-suggestion-decorations';
 
