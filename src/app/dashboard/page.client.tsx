@@ -90,11 +90,9 @@ interface DashboardClientProps {
       };
     }[];
   }[];
-  /** Every version assigned to the user, whatever its status. */
-  assignedVersions: VersionWithDetails[];
+  /** The user's active work — versions they translate or review, minus terminal statuses. */
+  workVersions: VersionWithDetails[];
   approvedVersions: VersionWithDetails[];
-  reviewAssignments: VersionWithDetails[];
-  translatingVersions: VersionWithDetails[];
   announcements: {
     banner: AnnouncementBannerData | null;
     modal: AnnouncementModalData | null;
@@ -124,14 +122,31 @@ type WorkItem = {
   languageName: string;
   role: 'Translator' | 'Reviewer';
   status: DocumentStatus | null;
+  /** Whether this status is actionable by the user in their role right now. */
+  isMyTurn: boolean;
   deadline: Date | string | null;
   url: string;
   translatorName: string | null;
   reviewerName: string | null;
+  /** Whether the current user is the translator / reviewer, to flag the "you" cell. */
+  translatorIsYou: boolean;
+  reviewerIsYou: boolean;
 };
 
+/**
+ * Whether the work sits with the user right now. A translator acts while the
+ * document is being translated; a reviewer acts once it is submitted. Terminal
+ * statuses never reach here — they are filtered out server-side.
+ */
+function isActionable(role: WorkItem['role'], status: DocumentStatus): boolean {
+  if (role === 'Reviewer') {
+    return status === DocumentStatus.PENDING_REVIEW;
+  }
+  return status === DocumentStatus.PENDING_TRANSLATION || status === DocumentStatus.IN_PROGRESS;
+}
+
 /** A version is all a work item needs now that assignment lives on it. */
-function toWorkItem(version: VersionWithDetails, role: WorkItem['role'], key: string): WorkItem {
+function toWorkItem(version: VersionWithDetails, role: WorkItem['role'], key: string, userId: string): WorkItem {
   return {
     key,
     documentId: version.document.id,
@@ -141,43 +156,37 @@ function toWorkItem(version: VersionWithDetails, role: WorkItem['role'], key: st
     languageName: version.language.name,
     role,
     status: version.status,
+    isMyTurn: isActionable(role, version.status),
     deadline: version.deadline,
     url: getVersionUrl(version),
     translatorName: version.user?.name ?? null,
     reviewerName: version.reviewer?.name ?? null,
+    translatorIsYou: version.user?.id === userId,
+    reviewerIsYou: version.reviewer?.id === userId,
   };
 }
 
-function buildWorkItems(
-  translatingVersions: VersionWithDetails[],
-  reviewAssignments: VersionWithDetails[],
-  assignedVersions: VersionWithDetails[],
-): WorkItem[] {
-  const itemMap = new Map<string, WorkItem>();
+/**
+ * Turns the user's active versions into work items. A single version can be both
+ * translated and reviewed by the same person, so each role it matches becomes its
+ * own row.
+ */
+function buildWorkItems(versions: VersionWithDetails[], userId: string): WorkItem[] {
+  const items: WorkItem[] = [];
 
-  // 1. Versions the user is actively translating
-  for (const v of translatingVersions) {
-    const key = `${v.document.id}:${v.language.id}`;
-    itemMap.set(key, toWorkItem(v, 'Translator', key));
-  }
-
-  // 2. Versions waiting on the user's review
-  for (const v of reviewAssignments) {
-    const key = `${v.document.id}:${v.language.id}:reviewer`;
-    itemMap.set(key, toWorkItem(v, 'Reviewer', key));
-  }
-
-  // 3. Anything else assigned to the user — already-translated work it is still
-  // on the hook for, which the two status-filtered queries above do not return.
-  for (const v of assignedVersions) {
-    const key = `${v.document.id}:${v.language.id}`;
-    if (!itemMap.has(key)) {
-      itemMap.set(key, toWorkItem(v, 'Translator', key));
+  for (const v of versions) {
+    if (v.user?.id === userId) {
+      const key = `${v.document.id}:${v.language.id}`;
+      items.push(toWorkItem(v, 'Translator', key, userId));
+    }
+    if (v.reviewer?.id === userId) {
+      const key = `${v.document.id}:${v.language.id}:reviewer`;
+      items.push(toWorkItem(v, 'Reviewer', key, userId));
     }
   }
 
   // Sort: deadline first (earliest), then nulls last
-  return Array.from(itemMap.values()).sort((a, b) => {
+  return items.sort((a, b) => {
     if (a.deadline && b.deadline) {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     }
@@ -189,13 +198,117 @@ function buildWorkItems(
 
 const headClass = 'text-[11px] uppercase tracking-wider text-muted-foreground font-medium';
 
+/** The "My Work" table, shared by the "needs you" and "waiting on others" groups. */
+function WorkTable({ items, onNavigate }: { items: WorkItem[]; onNavigate: (url: string) => void }) {
+  return (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className={headClass}>Document</TableHead>
+            <TableHead className={headClass}>Type</TableHead>
+            <TableHead className={headClass}>Project</TableHead>
+            <TableHead className={headClass}>Language</TableHead>
+            <TableHead className={headClass}>Translator</TableHead>
+            <TableHead className={headClass}>Reviewer</TableHead>
+            <TableHead className={headClass}>Status</TableHead>
+            <TableHead className={headClass}>Deadline</TableHead>
+            <TableHead className="w-[60px]" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => {
+            const statusConfig = item.status ? DOCUMENT_STATUS_CONFIGS[item.status] : null;
+
+            return (
+              <TableRow key={item.key} className="group cursor-pointer" onClick={() => onNavigate(item.url)}>
+                <TableCell>
+                  <span className="font-medium text-sm">{item.documentTitle}</span>
+                </TableCell>
+                <TableCell>
+                  {item.documentType ? (
+                    <DocumentTypeBadge type={item.documentType} />
+                  ) : (
+                    <span className="text-sm text-muted-foreground">{'—'}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-muted-foreground">{item.projectName ?? '—'}</span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm font-medium">{item.languageName}</span>
+                </TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-sm text-muted-foreground">{item.translatorName ?? '—'}</span>
+                    {item.translatorIsYou && (
+                      <Badge variant="primary" appearance="light" size="xs">
+                        You
+                      </Badge>
+                    )}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-sm text-muted-foreground">{item.reviewerName ?? '—'}</span>
+                    {item.reviewerIsYou && (
+                      <Badge variant="primary" appearance="light" size="xs">
+                        You
+                      </Badge>
+                    )}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {statusConfig ? (
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
+                    >
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: statusConfig.color.hex }}
+                      />
+                      {statusConfig.name}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border border-gray-200 bg-gray-50 text-gray-500">
+                      Not started
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {item.deadline ? (
+                    <span className="text-sm text-muted-foreground">
+                      {shortDateFormatter.format(new Date(item.deadline))}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">{'—'}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Link href={item.url} onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {item.role === 'Reviewer' ? <Eye className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                    </Button>
+                  </Link>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
 export default function DashboardClient({
   user,
   projects,
-  assignedVersions,
+  workVersions,
   approvedVersions,
-  reviewAssignments,
-  translatingVersions,
   announcements,
 }: DashboardClientProps) {
   const router = useRouter();
@@ -217,10 +330,9 @@ export default function DashboardClient({
       }
     }
   };
-  const workItems = useMemo(
-    () => buildWorkItems(translatingVersions, reviewAssignments, assignedVersions),
-    [translatingVersions, reviewAssignments, assignedVersions],
-  );
+  const workItems = useMemo(() => buildWorkItems(workVersions, user.id), [workVersions, user.id]);
+  const needsYouItems = useMemo(() => workItems.filter((item) => item.isMyTurn), [workItems]);
+  const waitingItems = useMemo(() => workItems.filter((item) => !item.isMyTurn), [workItems]);
 
   const deployLanguages = useMemo(() => {
     const langMap = new Map<string, { name: string; code: string }>();
@@ -488,96 +600,32 @@ export default function DashboardClient({
                 <p className="text-gray-500">No active work assigned to you</p>
               </div>
             ) : (
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className={headClass}>Document</TableHead>
-                      <TableHead className={headClass}>Type</TableHead>
-                      <TableHead className={headClass}>Project</TableHead>
-                      <TableHead className={headClass}>Language</TableHead>
-                      <TableHead className={headClass}>Translator</TableHead>
-                      <TableHead className={headClass}>Reviewer</TableHead>
-                      <TableHead className={headClass}>Status</TableHead>
-                      <TableHead className={headClass}>Deadline</TableHead>
-                      <TableHead className="w-[60px]" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {workItems.map((item) => {
-                      const statusConfig = item.status ? DOCUMENT_STATUS_CONFIGS[item.status] : null;
-
-                      return (
-                        <TableRow key={item.key} className="group cursor-pointer" onClick={() => router.push(item.url)}>
-                          <TableCell>
-                            <span className="font-medium text-sm">{item.documentTitle}</span>
-                          </TableCell>
-                          <TableCell>
-                            {item.documentType ? (
-                              <DocumentTypeBadge type={item.documentType} />
-                            ) : (
-                              <span className="text-sm text-muted-foreground">{'\u2014'}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">{item.projectName ?? '\u2014'}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm font-medium">{item.languageName}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">{item.translatorName ?? '\u2014'}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">{item.reviewerName ?? '\u2014'}</span>
-                          </TableCell>
-                          <TableCell>
-                            {statusConfig ? (
-                              <span
-                                className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
-                              >
-                                <span
-                                  className="h-1.5 w-1.5 rounded-full"
-                                  style={{ backgroundColor: statusConfig.color.hex }}
-                                />
-                                {statusConfig.name}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border border-gray-200 bg-gray-50 text-gray-500">
-                                Not started
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {item.deadline ? (
-                              <span className="text-sm text-muted-foreground">
-                                {shortDateFormatter.format(new Date(item.deadline))}
-                              </span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">{'\u2014'}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Link href={item.url} onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                {item.role === 'Reviewer' ? (
-                                  <Eye className="h-4 w-4" />
-                                ) : (
-                                  <ArrowRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </Link>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </Card>
+              <div className="space-y-6">
+                {needsYouItems.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">
+                      Needs you
+                      <Badge variant="secondary" size="sm" className="ml-2">
+                        {needsYouItems.length}
+                      </Badge>
+                    </h3>
+                    <WorkTable items={needsYouItems} onNavigate={(url) => router.push(url)} />
+                  </div>
+                )}
+                {waitingItems.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                      Waiting on others
+                      <Badge variant="secondary" size="sm" className="ml-2">
+                        {waitingItems.length}
+                      </Badge>
+                    </h3>
+                    <div className="opacity-60">
+                      <WorkTable items={waitingItems} onNavigate={(url) => router.push(url)} />
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </section>
         </div>
