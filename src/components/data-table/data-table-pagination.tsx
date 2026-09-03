@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getPaginationRange } from "@/lib/list-params";
 import { cn } from "@/lib/utils";
 
 interface DataTablePaginationProps<TData> extends React.ComponentProps<"div"> {
@@ -24,10 +25,15 @@ interface DataTablePaginationProps<TData> extends React.ComponentProps<"div"> {
 
 export function DataTablePagination<TData>({
   table,
-  pageSizeOptions = [10, 20, 30, 40, 50],
+  pageSizeOptions = [10, 25, 50, 100],
   className,
   ...props
 }: DataTablePaginationProps<TData>) {
+  const { pageIndex, pageSize } = table.getState().pagination;
+  const total = table.getFilteredRowModel().rows.length;
+  // Same "Showing 1–25 of 142" line as the server-paginated lists.
+  const range = getPaginationRange(pageIndex + 1, pageSize, total);
+
   return (
     <div
       className={cn(
@@ -36,8 +42,8 @@ export function DataTablePagination<TData>({
       )}
       {...props}
     >
-      <div className="flex-1 whitespace-nowrap text-muted-foreground text-sm">
-        {table.getFilteredRowModel().rows.length} row(s)
+      <div className="flex-1 whitespace-nowrap text-muted-foreground text-sm" role="status" aria-live="polite">
+        {range.text}
       </div>
       <div className="flex flex-col-reverse items-center gap-4 sm:flex-row sm:gap-6 lg:gap-8">
         <div className="flex items-center space-x-2">

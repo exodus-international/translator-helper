@@ -3,17 +3,23 @@
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ListPagination } from '@/components/list-pagination';
+import { ListSearchInput } from '@/components/list-search-input';
+import { ListSortSelect, type SortOption } from '@/components/list-sort-select';
 import { createTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
+import type { TranslationProjectSort } from '@/domain/translation-project/translation-project.repository';
+import { buildListSearchParams, DEFAULT_PAGE_SIZE } from '@/lib/list-params';
 import { capture } from '@/lib/analytics';
 import { Language, Prisma } from '@prisma/client';
 import { ExternalLink, Languages, Plus, Users } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { buildTranslationProjectPath } from '@/domain/source-project/source-project-url';
 
@@ -57,16 +63,46 @@ type SourceProjectWithDetails = Prisma.SourceProjectGetPayload<{
 interface TranslationsClientProps {
   sourceProject: SourceProjectWithDetails;
   translationProjects: TranslationProjectListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  searchQuery: string;
+  sort: TranslationProjectSort;
+  order: 'asc' | 'desc';
   languages: Language[];
 }
+
+const SORT_OPTIONS: SortOption[] = [
+  { sort: 'name', order: 'asc', label: 'Name A–Z' },
+  { sort: 'name', order: 'desc', label: 'Name Z–A' },
+  { sort: 'createdAt', order: 'desc', label: 'Newest first' },
+  { sort: 'createdAt', order: 'asc', label: 'Oldest first' },
+];
 
 export default function TranslationsClient({
   sourceProject,
   translationProjects: initialTranslationProjects,
+  total,
+  page,
+  pageSize,
+  searchQuery,
+  sort,
+  order,
   languages,
 }: TranslationsClientProps) {
   const router = useRouter();
-  const [translationProjects] = useState(initialTranslationProjects);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [translationProjects, setTranslationProjects] = useState(initialTranslationProjects);
+
+  const navigate = (updates: Record<string, string | number | null | undefined>) => {
+    router.push(`${pathname}${buildListSearchParams(searchParams, updates)}`);
+  };
+
+  // Sync state with props when they change (e.g., after router.refresh())
+  useEffect(() => {
+    setTranslationProjects(initialTranslationProjects);
+  }, [initialTranslationProjects]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [selectedLanguageId, setSelectedLanguageId] = useState<string>('');
@@ -147,11 +183,13 @@ export default function TranslationsClient({
                       <SelectValue placeholder="Select a language" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableLanguages.map((lang) => (
-                        <SelectItem key={lang.id} value={lang.id}>
-                          {lang.name} ({lang.code})
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        {availableLanguages.map((lang) => (
+                          <SelectItem key={lang.id} value={lang.id}>
+                            {lang.name} ({lang.code})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   {availableLanguages.length === 0 && (
@@ -186,6 +224,21 @@ export default function TranslationsClient({
       </PageHeader>
 
       <div className="container mx-auto px-4 py-4">
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <ListSearchInput
+            value={searchQuery}
+            onSearch={(query) => navigate({ q: query || null })}
+            placeholder="Search translation projects..."
+          />
+          <div className="ml-auto">
+            <ListSortSelect
+              sort={sort}
+              order={order}
+              options={SORT_OPTIONS}
+              onChange={(nextSort, nextOrder) => navigate({ sort: nextSort, order: nextOrder })}
+            />
+          </div>
+        </div>
         <div className="grid gap-4">
           {translationProjects.map((tp) => (
             <Card key={tp.id} className="p-4">
@@ -216,12 +269,43 @@ export default function TranslationsClient({
             </Card>
           ))}
           {translationProjects.length === 0 && (
-            <Card className="p-6 text-center">
-              <Languages className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-600">No translation projects yet. Create one to get started.</p>
-            </Card>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Languages />
+                </EmptyMedia>
+                <EmptyTitle>{searchQuery ? 'No translation projects found' : 'No translation projects yet'}</EmptyTitle>
+                <EmptyDescription>
+                  {searchQuery
+                    ? 'No translation projects match your search. Try adjusting it.'
+                    : 'Create one to get started.'}
+                </EmptyDescription>
+              </EmptyHeader>
+              {searchQuery && (
+                <EmptyContent>
+                  <Button variant="outline" onClick={() => router.push(pathname)}>
+                    Clear search
+                  </Button>
+                </EmptyContent>
+              )}
+            </Empty>
           )}
         </div>
+
+        {total > 0 && (
+          <div className="mt-4">
+            <ListPagination
+              page={page}
+              total={total}
+              pageSize={pageSize}
+              onPageChange={(nextPage) => navigate({ page: nextPage === 1 ? null : nextPage })}
+              onPageSizeChange={(nextSize) => navigate({ pageSize: nextSize === DEFAULT_PAGE_SIZE ? null : nextSize })}
+              getPageHref={(target) =>
+                `${pathname}${buildListSearchParams(searchParams, { page: target === 1 ? null : target })}`
+              }
+            />
+          </div>
+        )}
       </div>
     </div>
   );
