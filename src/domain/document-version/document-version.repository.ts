@@ -288,9 +288,18 @@ export async function assignDocumentVersion(data: {
 }
 
 /** Every version a user is assigned to translate, soonest deadline first. */
-export async function getAssignedVersionsForUser(userId: string) {
+/**
+ * A user's active work: versions where they are the translator or the reviewer,
+ * excluding terminal statuses. APPROVED versions are surfaced separately as
+ * "Waiting for Deploy" (deployers only) and DEPLOYED work is finished, so
+ * neither belongs in "My Work".
+ */
+export async function getWorkVersionsForUser(userId: string) {
   return prisma.documentVersion.findMany({
-    where: { userId },
+    where: {
+      status: { notIn: [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED] },
+      OR: [{ userId }, { reviewerId: userId }],
+    },
     include: assignmentInclude,
     orderBy: {
       deadline: { sort: 'asc', nulls: 'last' },

@@ -45,7 +45,7 @@ import {
   assignDocumentVersion,
   createDocumentVersion,
   deleteDocumentVersion,
-  getAssignedVersionsForUser,
+  getWorkVersionsForUser,
   getDocumentVersionByDocumentAndLanguage,
   getDocumentVersionById,
   listVersionsForTranslationProject,
@@ -108,9 +108,14 @@ export async function assignTranslatorToVersionAction(input: unknown) {
 }
 
 /** Everything the signed-in user is assigned to translate. */
-export async function getAssignedVersionsForUserAction() {
+/**
+ * The current user's active work — versions they translate or review, minus
+ * terminal statuses. The dashboard splits these into "needs you" and "waiting
+ * on others" from each row's role and status.
+ */
+export async function getWorkVersionsForUserAction() {
   const { user } = await authorize('authenticated');
-  return await getAssignedVersionsForUser(user.id);
+  return await getWorkVersionsForUser(user.id);
 }
 
 /** The versions that make up a translation project — one per document. */
@@ -464,64 +469,6 @@ export async function getApprovedVersionsAction() {
     where: {
       status: DocumentStatus.APPROVED,
       language: { code: { not: 'en' } },
-    },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      language: true,
-      user: {
-        select: { id: true, name: true, email: true },
-      },
-      reviewer: {
-        select: { id: true, name: true, email: true },
-      },
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  });
-}
-
-export async function getVersionsTranslatingByUserAction() {
-  const { user } = await authorize('authenticated');
-
-  return prisma.documentVersion.findMany({
-    where: {
-      userId: user.id,
-      status: {
-        in: [DocumentStatus.PENDING_TRANSLATION, DocumentStatus.IN_PROGRESS],
-      },
-    },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      language: true,
-      user: {
-        select: { id: true, name: true, email: true },
-      },
-      reviewer: {
-        select: { id: true, name: true, email: true },
-      },
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  });
-}
-
-export async function getVersionsForReviewByUserAction() {
-  const { user } = await authorize('authenticated');
-
-  return prisma.documentVersion.findMany({
-    where: {
-      reviewerId: user.id,
-      status: DocumentStatus.PENDING_REVIEW,
     },
     include: {
       document: {
