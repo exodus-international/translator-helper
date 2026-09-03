@@ -1,3 +1,4 @@
+import { userBriefColumns } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { ProjectRole } from '@prisma/client';
 
@@ -9,11 +10,7 @@ import { ProjectRole } from '@prisma/client';
 
 const REVIEWER_ELIGIBLE_ROLES = [ProjectRole.REVIEWER, ProjectRole.EDITOR, ProjectRole.PROJECT_MANAGER];
 
-const memberUserSelect = {
-  id: true,
-  name: true,
-  email: true,
-} as const;
+const memberUserSelect = userBriefColumns;
 
 export async function getUserLanguages(userId: string) {
   return prisma.userLanguage.findMany({

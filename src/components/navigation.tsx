@@ -1,7 +1,7 @@
 'use client';
 
 import { Logo } from '@/components/logo';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserAvatar } from '@/components/user-avatar';
 import { Button } from '@/components/ui/button';
 import { capture } from '@/lib/analytics';
 import { signOut } from '@/lib/auth-client';
@@ -80,14 +80,7 @@ export function Navigation({ user }: NavigationProps) {
               </Button>
             )}
             <Link href="/profile" className="flex items-center gap-2 hover:opacity-80">
-              <Avatar size="sm" name={user.name || undefined}>
-                <AvatarFallback name={user.name || undefined}>
-                  {user.name
-                    .split(' ')
-                    .map((name) => name.charAt(0))
-                    .join('')}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
               <span className="text-sm text-gray-600">{user.name}</span>
             </Link>
             <Button variant="outline" size="sm" onClick={handleSignOut}>

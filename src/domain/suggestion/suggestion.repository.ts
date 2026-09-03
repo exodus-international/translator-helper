@@ -1,13 +1,9 @@
+import { userBriefColumns } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { SuggestionFilters } from './suggestion.types';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 
-const userSelect = {
-  id: true,
-  name: true,
-  email: true,
-  image: true,
-};
+const userSelect = userBriefColumns;
 
 const repliesInclude = {
   replies: {
@@ -117,7 +113,6 @@ export async function updateSuggestionContent(id: string, data: { comment: strin
   });
 }
 
-
 export async function createSuggestionReply(data: { suggestionId: string; userId: string; content: string }) {
   return prisma.suggestionReply.create({
     data,
@@ -135,4 +130,3 @@ export async function countOpenSuggestions(documentVersionId: string): Promise<n
     },
   });
 }
-

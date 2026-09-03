@@ -1,5 +1,6 @@
 'use client';
 
+import { UserAvatar } from '@/components/user-avatar';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
@@ -165,10 +166,7 @@ const ROLE_OPTIONS = [
   { label: 'User', value: Role.USER },
 ];
 
-function lastActivityColumn(
-  id: 'lastSeenAt' | 'lastDocumentEditAt',
-  label: string,
-): ColumnDef<User> {
+function lastActivityColumn(id: 'lastSeenAt' | 'lastDocumentEditAt', label: string): ColumnDef<User> {
   return {
     id,
     accessorFn: (row) => (row[id] ? new Date(row[id]).getTime() : 0),
@@ -202,10 +200,7 @@ export default function UsersClient({
   );
   // The input stays responsive (nuqs updates its state immediately); only the
   // URL writes are throttled.
-  const [search, setSearch] = useQueryState(
-    'search',
-    parseAsString.withDefault('').withOptions({ throttleMs: 300 }),
-  );
+  const [search, setSearch] = useQueryState('search', parseAsString.withDefault('').withOptions({ throttleMs: 300 }));
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
@@ -573,7 +568,12 @@ export default function UsersClient({
         id: 'name',
         accessorKey: 'name',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
-        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">
+            <UserAvatar name={row.original.name} image={row.original.image} email={row.original.email} size="sm" />
+            <span className="font-medium">{row.original.name}</span>
+          </div>
+        ),
         meta: { label: 'Name' },
       },
       {

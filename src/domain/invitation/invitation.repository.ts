@@ -1,3 +1,4 @@
+import { userBrief } from '@/domain/user/user.select';
 import type { InvitationStatus } from '@prisma/client';
 import prisma from '@/lib/db';
 
@@ -36,7 +37,7 @@ export async function listInvitations() {
   return prisma.invitation.findMany({
     include: {
       createdBy: {
-        select: { id: true, name: true, email: true },
+        ...userBrief,
       },
       languages: {
         include: { language: { select: { id: true, name: true, code: true } } },
@@ -59,7 +60,7 @@ export async function findInvitationByToken(token: string) {
     where: { token },
     include: {
       createdBy: {
-        select: { id: true, name: true, email: true },
+        ...userBrief,
       },
       languages: {
         include: { language: { select: { id: true, name: true, code: true } } },

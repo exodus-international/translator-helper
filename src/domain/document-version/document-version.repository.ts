@@ -1,7 +1,6 @@
+import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { DocumentStatus, Prisma } from '@prisma/client';
-
-const userBrief = { select: { id: true, name: true, email: true } } as const;
 
 /**
  * The shape the assignment lists render: who, which document, which language,
@@ -55,29 +54,11 @@ export async function getDocumentVersionById(id: string) {
         },
       },
       language: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      reviewer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
+      user: userBrief,
+      reviewer: userBrief,
       comments: {
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
+          user: userBrief,
         },
         orderBy: {
           createdAt: 'desc',
@@ -85,13 +66,7 @@ export async function getDocumentVersionById(id: string) {
       },
       activityLogs: {
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
+          user: userBrief,
         },
         orderBy: {
           createdAt: 'desc',
@@ -116,29 +91,11 @@ export async function getDocumentVersionByDocumentAndLanguage(documentId: string
         },
       },
       language: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      reviewer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
+      user: userBrief,
+      reviewer: userBrief,
       comments: {
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
+          user: userBrief,
         },
         orderBy: {
           createdAt: 'desc',
@@ -146,13 +103,7 @@ export async function getDocumentVersionByDocumentAndLanguage(documentId: string
       },
       activityLogs: {
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
+          user: userBrief,
         },
         orderBy: {
           createdAt: 'desc',
@@ -183,20 +134,8 @@ export async function createDocumentVersion(data: {
     include: {
       document: true,
       language: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      reviewer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
+      user: userBrief,
+      reviewer: userBrief,
     },
   });
 }
@@ -223,20 +162,8 @@ export async function updateDocumentVersion(id: string, content: string, userId:
     include: {
       document: true,
       language: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      reviewer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
+      user: userBrief,
+      reviewer: userBrief,
     },
   });
 }
@@ -251,20 +178,8 @@ export async function updateDocumentVersionStatus(id: string, status: DocumentSt
     include: {
       document: true,
       language: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      reviewer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
+      user: userBrief,
+      reviewer: userBrief,
     },
   });
 }

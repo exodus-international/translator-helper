@@ -6,7 +6,7 @@ import { AnnouncementModal, AnnouncementModalData } from '@/components/announcem
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { buildDocumentPath } from '@/domain/document/document-url';
 import ProjectCard from '@/components/project-card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserAvatar } from '@/components/user-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -57,11 +57,13 @@ type VersionWithDetails = {
     id: string;
     name: string | null;
     email: string;
+    image: string | null;
   } | null;
   reviewer: {
     id: string;
     name: string | null;
     email: string;
+    image: string | null;
   } | null;
 };
 
@@ -126,12 +128,38 @@ type WorkItem = {
   isMyTurn: boolean;
   deadline: Date | string | null;
   url: string;
-  translatorName: string | null;
-  reviewerName: string | null;
+  translator: Person | null;
+  reviewer: Person | null;
   /** Whether the current user is the translator / reviewer, to flag the "you" cell. */
   translatorIsYou: boolean;
   reviewerIsYou: boolean;
 };
+
+/** Just enough of someone to show their face and their name. */
+type Person = { name: string | null; email: string; image: string | null };
+
+function toPerson(
+  user: { name: string | null; email: string; image?: string | null } | null | undefined,
+): Person | null {
+  return user ? { name: user.name, email: user.email, image: user.image ?? null } : null;
+}
+
+/** A person in a table cell, with the badge that marks the reader as that person. */
+function PersonCell({ person, isYou }: { person: Person | null; isYou?: boolean }) {
+  if (!person) return <span className="text-sm text-muted-foreground">{'\u2014'}</span>;
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <UserAvatar name={person.name} image={person.image} email={person.email} size="xs" />
+      <span className="text-sm text-muted-foreground">{person.name}</span>
+      {isYou && (
+        <Badge variant="primary" appearance="light" size="xs">
+          You
+        </Badge>
+      )}
+    </span>
+  );
+}
 
 /**
  * Whether the work sits with the user right now. A translator acts while the
@@ -159,8 +187,8 @@ function toWorkItem(version: VersionWithDetails, role: WorkItem['role'], key: st
     isMyTurn: isActionable(role, version.status),
     deadline: version.deadline,
     url: getVersionUrl(version),
-    translatorName: version.user?.name ?? null,
-    reviewerName: version.reviewer?.name ?? null,
+    translator: toPerson(version.user),
+    reviewer: toPerson(version.reviewer),
     translatorIsYou: version.user?.id === userId,
     reviewerIsYou: version.reviewer?.id === userId,
   };
@@ -239,34 +267,17 @@ function WorkTable({ items, onNavigate }: { items: WorkItem[]; onNavigate: (url:
                   <span className="text-sm font-medium">{item.languageName}</span>
                 </TableCell>
                 <TableCell>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="text-sm text-muted-foreground">{item.translatorName ?? '—'}</span>
-                    {item.translatorIsYou && (
-                      <Badge variant="primary" appearance="light" size="xs">
-                        You
-                      </Badge>
-                    )}
-                  </span>
+                  <PersonCell person={item.translator} isYou={item.translatorIsYou} />
                 </TableCell>
                 <TableCell>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="text-sm text-muted-foreground">{item.reviewerName ?? '—'}</span>
-                    {item.reviewerIsYou && (
-                      <Badge variant="primary" appearance="light" size="xs">
-                        You
-                      </Badge>
-                    )}
-                  </span>
+                  <PersonCell person={item.reviewer} isYou={item.reviewerIsYou} />
                 </TableCell>
                 <TableCell>
                   {statusConfig ? (
                     <span
                       className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
                     >
-                      <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: statusConfig.color.hex }}
-                      />
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: statusConfig.color.hex }} />
                       {statusConfig.name}
                     </span>
                   ) : (
@@ -398,14 +409,7 @@ export default function DashboardClient({
                 <div>
                   <h1 className="text-2xl font-bold">Dashboard</h1>
                   <div className="flex items-center gap-2 mt-1">
-                    <Avatar size="sm" name={user.name || undefined}>
-                      <AvatarFallback name={user.name || undefined}>
-                        {user.name
-                          .split(' ')
-                          .map((name) => name.charAt(0))
-                          .join('')}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
                     <p className="text-gray-600">Welcome back, {user.name}</p>
                   </div>
                 </div>
@@ -548,10 +552,10 @@ export default function DashboardClient({
                             <span className="text-sm font-medium">{version.language.name}</span>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-muted-foreground">{version.user?.name ?? '\u2014'}</span>
+                            <PersonCell person={toPerson(version.user)} />
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-muted-foreground">{version.reviewer?.name ?? '\u2014'}</span>
+                            <PersonCell person={toPerson(version.reviewer)} />
                           </TableCell>
                           <TableCell>
                             <span

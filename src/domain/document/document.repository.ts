@@ -1,3 +1,4 @@
+import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { DocumentType, Prisma, SuggestionStatus } from '@prisma/client';
 
@@ -6,11 +7,10 @@ const userWithLanguages = {
     id: true,
     name: true,
     email: true,
+    image: true,
     languages: { select: { languageId: true } },
   },
 } as const;
-
-const userBrief = { select: { id: true, name: true, email: true } } as const;
 
 const versionWithUser = {
   include: { language: true, user: userWithLanguages },

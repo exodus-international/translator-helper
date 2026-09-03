@@ -32,6 +32,8 @@ export type AnalyticsEvent =
   // ── Profile / account ────────────────────────────────────────────────
   | 'profile_updated'
   | 'password_changed'
+  | 'avatar_uploaded'
+  | 'avatar_removed'
   // ── Feedback / support ───────────────────────────────────────────────
   | 'support_link_clicked'
   | 'bug_report_clicked'

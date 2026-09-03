@@ -1,16 +1,20 @@
 'use client';
 
+import { AvatarUploader } from '@/components/avatar-uploader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { updateUserProfileAction } from '@/domain/user/user.actions';
 import { capture } from '@/lib/analytics';
 import { authClient } from '@/lib/auth-client';
+import { formatUnambiguousDate } from '@/lib/format';
 import { TShirtSize } from '@prisma/client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
@@ -38,85 +42,48 @@ interface UserProfile {
 
 interface ProfileClientProps {
   profile: UserProfile;
+  avatarUploadEnabled: boolean;
 }
 
-export default function ProfileClient({ profile }: ProfileClientProps) {
+export default function ProfileClient({ profile, avatarUploadEnabled }: ProfileClientProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
           <h1 className="text-2xl font-bold">Profile</h1>
+          <p className="text-sm text-gray-600">Your picture, contact details and password.</p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-2xl space-y-6">
-        <ProfileInfoSection profile={profile} />
+      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+        <IdentityCard profile={profile} avatarUploadEnabled={avatarUploadEnabled} />
+        <ProfileDetailsForm profile={profile} />
         <ChangePasswordSection />
       </div>
     </div>
   );
 }
 
-function ProfileInfoSection({ profile }: { profile: UserProfile }) {
-  const [loading, setLoading] = useState(false);
-  const [name, setName] = useState(profile.name);
-  const [streetAddress, setStreetAddress] = useState(profile.streetAddress ?? '');
-  const [city, setCity] = useState(profile.city ?? '');
-  const [state, setState] = useState(profile.state ?? '');
-  const [zipCode, setZipCode] = useState(profile.zipCode ?? '');
-  const [country, setCountry] = useState(profile.country ?? '');
-  const [tShirtSize, setTShirtSize] = useState<string>(profile.tShirtSize ?? '');
-  const [exodus90AppId, setExodus90AppId] = useState(profile.exodus90AppId ?? '');
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!name.trim()) {
-      toast.error('Full name is required');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await updateUserProfileAction({
-        name: name.trim(),
-        streetAddress: streetAddress.trim() || null,
-        city: city.trim() || null,
-        state: state.trim() || null,
-        zipCode: zipCode.trim() || null,
-        country: country.trim() || null,
-        tShirtSize: tShirtSize || null,
-        exodus90AppId: exodus90AppId.trim() || null,
-      });
-      capture('profile_updated');
-      toast.success('Profile updated');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update profile');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+/** Who you are: picture, and the things only an administrator can change. */
+function IdentityCard({ profile, avatarUploadEnabled }: ProfileClientProps) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Profile Information</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4 space-y-2">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span className="font-medium">Email:</span>
-            <span>{profile.email}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span className="font-medium">Role:</span>
+      <CardContent className="space-y-5 py-3">
+        <AvatarUploader name={profile.name} image={profile.image} email={profile.email} enabled={avatarUploadEnabled} />
+
+        <Separator />
+
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <Detail label="Email">
+            <span className="break-all">{profile.email}</span>
+          </Detail>
+          <Detail label="Role">
             <Badge variant={profile.role === 'ADMIN' ? 'primary' : 'secondary'} size="sm">
               {profile.role}
             </Badge>
-          </div>
-          {profile.languages.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span className="font-medium">Languages:</span>
+          </Detail>
+          <Detail label="Languages">
+            {profile.languages.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {profile.languages.map((ul) => (
                   <Badge key={ul.language.id} variant="outline" size="sm">
@@ -124,117 +91,215 @@ function ProfileInfoSection({ profile }: { profile: UserProfile }) {
                   </Badge>
                 ))}
               </div>
-            </div>
-          )}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span className="font-medium">Joined:</span>
-            <span>{new Date(profile.createdAt).toLocaleDateString()}</span>
-          </div>
-        </div>
+            ) : (
+              <span className="text-muted-foreground">None assigned</span>
+            )}
+          </Detail>
+          <Detail label="Joined">{formatUnambiguousDate(profile.createdAt)}</Detail>
+        </dl>
 
-        <form onSubmit={handleSave} className="space-y-4">
-          <div>
-            <Label htmlFor="profile-name">
-              Full Name <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="profile-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="profile-street">Street Address</Label>
-            <Input
-              id="profile-street"
-              value={streetAddress}
-              onChange={(e) => setStreetAddress(e.target.value)}
-              placeholder="Street address"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="profile-city">City</Label>
-              <Input
-                id="profile-city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="City"
-              />
-            </div>
-            <div>
-              <Label htmlFor="profile-state">State / Province</Label>
-              <Input
-                id="profile-state"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                placeholder="State or province"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="profile-zip">Zip / Postal Code</Label>
-              <Input
-                id="profile-zip"
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-                placeholder="Zip code"
-              />
-            </div>
-            <div>
-              <Label htmlFor="profile-country">Country</Label>
-              <Input
-                id="profile-country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                placeholder="Country"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="profile-tshirt">T-Shirt Size</Label>
-            <Select value={tShirtSize || NONE_VALUE} onValueChange={(v) => setTShirtSize(v === NONE_VALUE ? '' : v)}>
-              <SelectTrigger id="profile-tshirt">
-                <SelectValue placeholder="Select size" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE_VALUE}>Not set</SelectItem>
-                {T_SHIRT_SIZES.map((size) => (
-                  <SelectItem key={size} value={size}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="profile-exodus90">Exodus90 App ID</Label>
-            <Input
-              id="profile-exodus90"
-              value={exodus90AppId}
-              onChange={(e) => setExodus90AppId(e.target.value)}
-              placeholder="Your Exodus90 app ID"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              You can find this in the My Account section of the Me page in the Exodus90 app.
-            </p>
-          </div>
-
-          <div className="flex justify-end">
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
+        <p className="text-xs text-muted-foreground">
+          Email, role and languages are managed by an administrator. Ask one to change them.
+        </p>
       </CardContent>
     </Card>
+  );
+}
+
+function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+      <dd className="flex items-center gap-2 text-sm">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * Name, sizing and address in one form. The address is only ever used for
+ * shipping, which the section says out loud so nobody wonders why it is asked
+ * for.
+ */
+function ProfileDetailsForm({ profile }: { profile: UserProfile }) {
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState({
+    name: profile.name,
+    streetAddress: profile.streetAddress ?? '',
+    city: profile.city ?? '',
+    state: profile.state ?? '',
+    zipCode: profile.zipCode ?? '',
+    country: profile.country ?? '',
+    tShirtSize: (profile.tShirtSize ?? '') as string,
+    exodus90AppId: profile.exodus90AppId ?? '',
+  });
+  const [form, setForm] = useState(saved);
+
+  const set = (field: keyof typeof form) => (value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+  const dirty = useMemo(
+    () => (Object.keys(form) as Array<keyof typeof form>).some((key) => form[key] !== saved[key]),
+    [form, saved],
+  );
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!form.name.trim()) {
+      toast.error('Full name is required');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await updateUserProfileAction({
+        name: form.name.trim(),
+        streetAddress: form.streetAddress.trim() || null,
+        city: form.city.trim() || null,
+        state: form.state.trim() || null,
+        zipCode: form.zipCode.trim() || null,
+        country: form.country.trim() || null,
+        tShirtSize: form.tShirtSize || null,
+        exodus90AppId: form.exodus90AppId.trim() || null,
+      });
+      capture('profile_updated');
+      setSaved(form);
+      toast.success('Profile updated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSave} className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal details</CardTitle>
+          <CardDescription>How you appear to the rest of the team.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup className="gap-5">
+            <Field>
+              <FieldLabel htmlFor="profile-name">
+                Full name <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                id="profile-name"
+                value={form.name}
+                onChange={(e) => set('name')(e.target.value)}
+                autoComplete="name"
+                required
+              />
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="profile-exodus90">Exodus 90 app ID</FieldLabel>
+              <Input
+                id="profile-exodus90"
+                value={form.exodus90AppId}
+                onChange={(e) => set('exodus90AppId')(e.target.value)}
+                placeholder="Your Exodus 90 app ID"
+              />
+              <FieldDescription>Find it under My Account on the Me page in the Exodus 90 app.</FieldDescription>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Shipping</CardTitle>
+          <CardDescription>Where to send anything we mail you, and what size to send.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup className="gap-5">
+            <Field>
+              <FieldLabel htmlFor="profile-street">Street address</FieldLabel>
+              <Input
+                id="profile-street"
+                value={form.streetAddress}
+                onChange={(e) => set('streetAddress')(e.target.value)}
+                placeholder="Street and number"
+                autoComplete="street-address"
+              />
+            </Field>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="profile-city">City</FieldLabel>
+                <Input
+                  id="profile-city"
+                  value={form.city}
+                  onChange={(e) => set('city')(e.target.value)}
+                  placeholder="City"
+                  autoComplete="address-level2"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="profile-state">State / province</FieldLabel>
+                <Input
+                  id="profile-state"
+                  value={form.state}
+                  onChange={(e) => set('state')(e.target.value)}
+                  placeholder="State or province"
+                  autoComplete="address-level1"
+                />
+              </Field>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="profile-zip">Zip / postal code</FieldLabel>
+                <Input
+                  id="profile-zip"
+                  value={form.zipCode}
+                  onChange={(e) => set('zipCode')(e.target.value)}
+                  placeholder="Postal code"
+                  autoComplete="postal-code"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="profile-country">Country</FieldLabel>
+                <Input
+                  id="profile-country"
+                  value={form.country}
+                  onChange={(e) => set('country')(e.target.value)}
+                  placeholder="Country"
+                  autoComplete="country-name"
+                />
+              </Field>
+            </div>
+
+            <Field>
+              <FieldLabel htmlFor="profile-tshirt">T-shirt size</FieldLabel>
+              <Select
+                value={form.tShirtSize || NONE_VALUE}
+                onValueChange={(v) => set('tShirtSize')(v === NONE_VALUE ? '' : v)}
+              >
+                <SelectTrigger id="profile-tshirt" className="w-full sm:w-48">
+                  <SelectValue placeholder="Select size" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>Not set</SelectItem>
+                  {T_SHIRT_SIZES.map((size) => (
+                    <SelectItem key={size} value={size}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+      </Card>
+
+      <div className="flex items-center justify-end gap-3">
+        {dirty && <span className="text-sm text-muted-foreground">You have unsaved changes</span>}
+        <Button type="submit" disabled={loading || !dirty}>
+          {loading ? 'Saving…' : 'Save changes'}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -244,6 +309,8 @@ function ChangePasswordSection() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [revokeOtherSessions, setRevokeOtherSessions] = useState(false);
+
+  const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,8 +344,8 @@ function ChangePasswordSection() {
       setNewPassword('');
       setConfirmPassword('');
       setRevokeOtherSessions(false);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to change password');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to change password');
     } finally {
       setLoading(false);
     }
@@ -287,58 +354,68 @@ function ChangePasswordSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Change Password</CardTitle>
+        <CardTitle>Password</CardTitle>
+        <CardDescription>At least 8 characters. You will stay signed in on this device.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          <div>
-            <Label htmlFor="current-password">Current Password</Label>
-            <Input
-              id="current-password"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-            />
-          </div>
+        <form onSubmit={handleChangePassword} className="space-y-6">
+          <FieldGroup className="gap-5">
+            <Field>
+              <FieldLabel htmlFor="current-password">Current password</FieldLabel>
+              <Input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </Field>
 
-          <div>
-            <Label htmlFor="new-password">New Password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-          </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="new-password">New password</FieldLabel>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                />
+              </Field>
+              <Field data-invalid={mismatch || undefined}>
+                <FieldLabel htmlFor="confirm-password">Confirm new password</FieldLabel>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  aria-invalid={mismatch || undefined}
+                  required
+                  minLength={8}
+                />
+                {mismatch && <FieldDescription className="text-destructive">Passwords do not match</FieldDescription>}
+              </Field>
+            </div>
 
-          <div>
-            <Label htmlFor="confirm-password">Confirm New Password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-          </div>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={revokeOtherSessions}
-              onChange={(e) => setRevokeOtherSessions(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Sign out all other sessions
-          </label>
+            <Field orientation="horizontal">
+              <Checkbox
+                id="revoke-sessions"
+                checked={revokeOtherSessions}
+                onCheckedChange={(checked) => setRevokeOtherSessions(checked === true)}
+              />
+              <FieldLabel htmlFor="revoke-sessions" className="font-normal">
+                Sign out of all other devices
+              </FieldLabel>
+            </Field>
+          </FieldGroup>
 
           <div className="flex justify-end">
             <Button type="submit" disabled={loading}>
-              {loading ? 'Changing...' : 'Change Password'}
+              {loading ? 'Changing…' : 'Change password'}
             </Button>
           </div>
         </form>

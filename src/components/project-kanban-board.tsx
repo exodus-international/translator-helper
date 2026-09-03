@@ -1,6 +1,5 @@
 'use client';
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,6 +30,7 @@ import {
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
 import { listTranslationProjectMembersAction } from '@/domain/user-language/user-language.actions';
 import { DocumentSearchInput } from '@/components/document-search-input';
+import { UserAvatar } from '@/components/user-avatar';
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { DocumentTypeFilter } from '@/components/document-type-filter';
 import { useActiveLanguage } from '@/components/analytics-project-group';
@@ -50,27 +50,20 @@ const UNASSIGN_VALUE = '__none__';
 
 const TYPE_FILTER_STORAGE_KEY = 'kanban:documentTypeFilter';
 
-const getInitials = (name: string | null | undefined) =>
-  (name ?? '')
-    .split(' ')
-    .map((n) => n.charAt(0))
-    .join('');
-
-type MemberLike = { id: string; name: string | null };
+type MemberLike = { id: string; name: string | null; email?: string | null; image?: string | null };
 
 function MemberAvatarStack({ users }: { users: MemberLike[] }) {
   return (
     <>
       {users.map((u) => (
-        <Avatar
+        <UserAvatar
           key={u.id}
+          name={u.name}
+          image={u.image}
+          email={u.email}
           size="sm"
-          name={u.name || undefined}
           className="border-2 border-background"
-          title={u.name || undefined}
-        >
-          <AvatarFallback name={u.name || undefined}>{getInitials(u.name)}</AvatarFallback>
-        </Avatar>
+        />
       ))}
     </>
   );
@@ -81,7 +74,7 @@ function MemberSelectItems({
   showUnassign,
   unassignLabel,
 }: {
-  members: { user: { id: string; name: string | null; email: string } }[];
+  members: { user: { id: string; name: string | null; email: string; image?: string | null } }[];
   showUnassign: boolean;
   unassignLabel: string;
 }) {
@@ -332,7 +325,7 @@ export default function ProjectKanbanBoard({
   }
 
   const availableUsers = useMemo(() => {
-    const userMap = new Map<string, { id: string; name: string; email: string }>();
+    const userMap = new Map<string, { id: string; name: string; email: string; image: string | null }>();
 
     documents.forEach((doc) => {
       doc.versions?.forEach((version: any) => {
@@ -341,16 +334,7 @@ export default function ProjectKanbanBoard({
             id: version.user.id,
             name: version.user.name,
             email: version.user.email,
-          });
-        }
-      });
-
-      doc.versions?.forEach((version: any) => {
-        if (version?.user) {
-          userMap.set(version.user.id, {
-            id: version.user.id,
-            name: version.user.name,
-            email: version.user.email,
+            image: version.user.image ?? null,
           });
         }
       });
@@ -458,12 +442,15 @@ export default function ProjectKanbanBoard({
           try {
             const result = await updateDocumentVersionStatusAction(versionId, newStatus);
             if (result.github?.status === 'success') {
-              toast.success(result.github.prUrl ? 'GitHub PR created successfully' : 'Deployed to GitHub successfully', {
-                action: result.github.prUrl
-                  ? { label: 'Open PR', onClick: () => window.open(result.github!.prUrl, '_blank') }
-                  : undefined,
-                duration: 8000,
-              });
+              toast.success(
+                result.github.prUrl ? 'GitHub PR created successfully' : 'Deployed to GitHub successfully',
+                {
+                  action: result.github.prUrl
+                    ? { label: 'Open PR', onClick: () => window.open(result.github!.prUrl, '_blank') }
+                    : undefined,
+                  duration: 8000,
+                },
+              );
             } else if (result.github?.status === 'failed') {
               toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
             }
@@ -508,9 +495,13 @@ export default function ProjectKanbanBoard({
               <SelectItem value="all">All users</SelectItem>
               <SelectItem value="me">
                 <div className="flex items-center gap-2">
-                  <Avatar size="sm" name={user.name || undefined} className="pointer-events-none">
-                    <AvatarFallback name={user.name || undefined}>{getInitials(user.name)}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={user.name}
+                    image={user.image}
+                    email={user.email}
+                    size="sm"
+                    className="pointer-events-none"
+                  />
                   <span>Me</span>
                 </div>
               </SelectItem>
@@ -519,9 +510,13 @@ export default function ProjectKanbanBoard({
                 .map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     <div className="flex items-center gap-2">
-                      <Avatar size="sm" name={u.name || undefined} className="pointer-events-none">
-                        <AvatarFallback name={u.name || undefined}>{getInitials(u.name)}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={u.name}
+                        image={u.image}
+                        email={u.email}
+                        size="sm"
+                        className="pointer-events-none"
+                      />
                       <span>{u.name}</span>
                     </div>
                   </SelectItem>
@@ -625,7 +620,7 @@ export default function ProjectKanbanBoard({
                                     // For PENDING_REVIEW: show reviewer
                                     // For IN_PROGRESS: show translator
                                     // For APPROVED/DEPLOYED: show both
-                                    const usersToShow: { name: string; id: string }[] = [];
+                                    const usersToShow: { name: string; id: string; image?: string | null }[] = [];
 
                                     if (version?.status === DocumentStatus.PENDING_REVIEW && reviewer) {
                                       usersToShow.push(reviewer);

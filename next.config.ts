@@ -2,7 +2,12 @@ import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    // Avatars are cropped and downscaled in the browser before they are sent,
+    // so uploads land far below this. The headroom is for the server action's
+    // own multipart overhead, not for bigger pictures.
+    serverActions: { bodySizeLimit: '3mb' },
+  },
 };
 
 export default withSentryConfig(nextConfig, {

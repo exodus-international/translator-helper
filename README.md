@@ -11,6 +11,7 @@ A comprehensive translation management system built with Next.js, Prisma, and Be
 - ✅ **Review System**: Comments, approve/request changes functionality
 - ✅ **Deploy Feature**: Download translated files with status tracking
 - ✅ **Activity Logging**: Track all changes with user attribution
+- ✅ **Profile Pictures**: Upload an avatar on your profile — see [docs/AVATARS.md](docs/AVATARS.md)
 - ✅ **Admin Panel**: Manage languages and folders
 
 ## Tech Stack
@@ -35,21 +36,30 @@ A comprehensive translation management system built with Next.js, Prisma, and Be
 pnpm install
 ```
 
-### 2. Start the Database
+### 2. Start the Database and Object Storage
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+
+This starts Postgres on port 5511 and a MinIO on port 9011 (console on 9012),
+with a public `translation-helper` bucket already created. The bucket backs
+profile pictures and generated audio — see [docs/AVATARS.md](docs/AVATARS.md)
+and [docs/AUDIO.md](docs/AUDIO.md).
 
 ### 3. Set Up Environment Variables
 
-Create a `.env` file:
+Copy `.env.example` to `.env` and fill in the secret:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5511/translation_helper"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 BETTER_AUTH_SECRET="your-secret-key-here" # Generate a secure random string
 ```
+
+The `AUDIO_S3_*` block in `.env.example` already matches the MinIO above, so
+picture uploads work locally. Leave it out and the app still runs; the profile
+page then says uploads are unavailable.
 
 ### 4. Run Database Migrations
 
