@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +15,6 @@ import { validateFilename } from '@/domain/document/validate-filename';
 import { updateDocumentAction } from '@/domain/document/document.actions';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { capture } from '@/lib/analytics';
-import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -90,22 +90,12 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <Link href="/documents">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold">Edit Document</h1>
-              <p className="text-gray-600">Editing: {document.title}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        back={{ href: '/documents', label: 'Documents' }}
+        title="Edit Document"
+        description={`Editing: ${document.title}`}
+      />
 
       <div className="container mx-auto px-4 py-4">
         <Card className="p-4">
@@ -166,11 +156,9 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
               )}
 
               <div className="flex justify-between">
-                <Link href="/documents">
-                  <Button type="button" variant="outline">
-                    Cancel
-                  </Button>
-                </Link>
+                <Button asChild type="button" variant="outline">
+                  <Link href="/documents">Cancel</Link>
+                </Button>
                 <Button type="submit" disabled={loading || !title || !!filenameError}>
                   {loading ? 'Saving...' : 'Save Changes'}
                 </Button>

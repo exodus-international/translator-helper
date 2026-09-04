@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
 import { capture } from '@/lib/analytics';
 import { Language, Prisma } from '@prisma/client';
-import { ArrowLeft, ExternalLink, Languages, Plus, Users } from 'lucide-react';
+import { ExternalLink, Languages, Plus, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -105,21 +106,13 @@ export default function TranslationsClient({
   const hasNoLanguages = languages.length === 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Link
-                href="/admin/projects"
-                className="text-sm text-gray-600 hover:text-gray-900 mb-2 inline-flex items-center gap-1"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Projects
-              </Link>
-              <h1 className="text-2xl font-bold">{sourceProject.name}</h1>
-              <p className="text-gray-600">Translation Projects</p>
-            </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        back={{ href: '/admin/projects', label: 'Back to Projects' }}
+        title={sourceProject.name}
+        description="Translation Projects"
+        actions={
+          <>
             <Dialog
               open={dialogOpen}
               onOpenChange={(open) => {
@@ -129,7 +122,7 @@ export default function TranslationsClient({
             >
               <DialogTrigger asChild>
                 <Button disabled={availableLanguages.length === 0}>
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus />
                   Create Translation Project
                 </Button>
               </DialogTrigger>
@@ -178,7 +171,7 @@ export default function TranslationsClient({
               </DialogContent>
             </Dialog>
             {hasNoLanguages && (
-              <div className="text-sm text-gray-500 mt-2 flex items-center gap-2">
+              <div className="text-sm text-gray-500 flex items-center gap-2">
                 <span>No target languages available.</span>
                 <Link href="/admin/languages" className="text-blue-600 hover:underline flex items-center gap-1">
                   Add languages
@@ -187,11 +180,11 @@ export default function TranslationsClient({
               </div>
             )}
             {!hasNoLanguages && availableLanguages.length === 0 && (
-              <div className="text-sm text-gray-500 mt-2">All languages already have translation projects.</div>
+              <div className="text-sm text-gray-500">All languages already have translation projects.</div>
             )}
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4">

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
 import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
@@ -167,7 +168,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     );
     const isZen = layout === 'zen';
     const isYaml = contentLanguage === 'yaml';
-    const { open: sidebarOpen, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
+    const { open: sidebarOpen, openMobile, setOpenMobile, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
+    const isMobile = useIsMobile();
+    // Mobile shows one pane at a time; translation is the working pane, so start there.
+    const [mobilePane, setMobilePane] = useState<'source' | 'translation'>('translation');
     const [mounted, setMounted] = useState(false);
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
@@ -288,6 +292,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
       setActiveThreadId(suggestion.id);
+      if (isMobile) {
+        // The thread list lives in the mobile Sheet; jump back to the
+        // translation pane so the selected suggestion is actually visible.
+        setOpenMobile(false);
+        setMobilePane('translation');
+      }
       try {
         // Only scroll editor for anchored suggestions
         if (
@@ -332,9 +342,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     };
 
     const cardClassName = isZen
-      ? 'p-3 h-full flex flex-col min-w-0 min-h-0'
-      : 'p-0 gap-0 shadow-none h-full flex flex-col min-w-0 min-h-0';
+      ? 'p-3 flex flex-1 flex-col min-w-0 min-h-0'
+      : 'p-0 gap-0 shadow-none flex flex-1 flex-col min-w-0 min-h-0';
     const bodyClassName = isZen ? 'flex-1 min-h-0 overflow-hidden relative' : 'flex-1 min-h-0 overflow-hidden';
+    const sourcePaneVisible = !isMobile || mobilePane === 'source';
+    const translationPaneVisible = !isMobile || mobilePane === 'translation';
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -516,6 +528,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     };
 
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
+    // On mobile the panel is the offcanvas Sheet (openMobile); on desktop it's
+    // the docked sidebar (open). "Show panel" must appear whenever it's closed,
+    // otherwise mobile users with a pre-opened desktop state can't reach it.
+    const panelHidden = isMobile ? !openMobile : !sidebarOpen;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
@@ -523,11 +539,31 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
     return (
       <>
-        <div className={cn('grid grid-cols-2 border-0 flex-1 min-w-0', isZen && 'h-full')}>
-          <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
+        <div className={cn('flex min-w-0 flex-1 flex-col border-0 md:grid md:grid-cols-2', isZen && 'h-full')}>
+          {/* Mobile: one pane at a time, toggled by this switcher. Desktop: both panes side by side. */}
+          <Tabs
+            value={mobilePane}
+            onValueChange={(value) => setMobilePane(value as 'source' | 'translation')}
+            className="shrink-0 px-2 pt-2 md:hidden"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="source">Source</TabsTrigger>
+              <TabsTrigger value="translation">Translation</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Card
+            className={cn(
+              cardClassName,
+              'rounded-none border-t-0 border-r-0 pt-1',
+              sourcePaneVisible ? 'flex' : 'hidden md:flex',
+            )}
+          >
             <div className="flex h-12 items-center justify-between px-2">
-              <h2 className="text-sm font-semibold">Source (English)</h2>
-              <div className="flex items-center gap-2">
+              {/* The mobile switcher above already names this pane; the language
+                  badge below still travels with the header. */}
+              <h2 className="hidden min-w-0 truncate text-sm font-semibold md:block">Source (English)</h2>
+              <div className="flex flex-1 items-center gap-2 md:flex-none md:justify-end">
                 {!isSourceEditing &&
                   !isYaml &&
                   (mounted ? (
@@ -568,13 +604,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {canEditSource && !isSourceEditing && (
                   <>
                     <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
-                      <Edit className="h-4 w-4 mr-2" />
+                      <Edit />
                       Edit
                     </Button>
                     {/* <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 />
                         Delete
                       </Button>
                     </AlertDialogTrigger>
@@ -596,11 +632,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {isSourceEditing && (
                   <>
                     <Button variant="outline" size="sm" onClick={handleSourceSave} disabled={sourceSaving}>
-                      <Save className="h-4 w-4 mr-2" />
+                      <Save />
                       {sourceSaving ? 'Saving...' : 'Save'}
                     </Button>
                     <Button variant="outline" size="sm" onClick={handleSourceCancel} disabled={sourceSaving}>
-                      <X className="h-4 w-4 mr-2" />
+                      <X />
                       Cancel
                     </Button>
                   </>
@@ -651,20 +687,26 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             </div>
           </Card>
 
-          <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
+          <Card
+            className={cn(
+              cardClassName,
+              'rounded-none border-t-0 border-r-0 pt-1',
+              translationPaneVisible ? 'flex' : 'hidden md:flex',
+            )}
+          >
             <div className="flex h-12 items-center justify-between px-2">
-              <h2 className="text-sm font-semibold">Translation</h2>
-              <div className="flex items-center gap-2">
+              <h2 className="hidden min-w-0 truncate text-sm font-semibold md:block">Translation</h2>
+              <div className="flex flex-1 items-center gap-2 md:flex-none md:justify-end">
                 {variant === 'translate' ? (
                   isYaml ? null : mounted ? (
                     <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
                       <TabsList>
                         <TabsTrigger value="edit">
-                          <FileEdit className="h-4 w-4 mr-2" />
+                          <FileEdit />
                           Edit
                         </TabsTrigger>
                         <TabsTrigger value="preview">
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Eye />
                           Preview
                         </TabsTrigger>
                       </TabsList>
@@ -679,7 +721,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           translateTab === 'edit' && 'bg-background shadow-sm',
                         )}
                       >
-                        <FileEdit className="h-4 w-4 mr-2" />
+                        <FileEdit />
                         Edit
                       </button>
                       <button
@@ -690,7 +732,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           translateTab === 'preview' && 'bg-background shadow-sm',
                         )}
                       >
-                        <Eye className="h-4 w-4 mr-2" />
+                        <Eye />
                         Preview
                       </button>
                     </div>
@@ -752,12 +794,18 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {translationBadge}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
-                {hasSidebar && !sidebarOpen && (
-                  <Button variant="outline" size="sm" onClick={toggleSidebar} className="h-7 text-xs">
-                    <PanelRightOpen className="h-3.5 w-3.5 mr-1" />
-                    Show panel
+                {hasSidebar && panelHidden && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSidebar}
+                    className="h-7 text-xs"
+                    aria-label="Show panel"
+                  >
+                    <PanelRightOpen />
+                    <span className="hidden sm:inline">Show panel</span>
                     {openSuggestionsCount > 0 && (
-                      <Badge variant="primary" className="ml-1 h-4 min-w-4 px-1 text-[10px]">
+                      <Badge variant="primary" className="h-4 min-w-4 px-1 text-[10px]">
                         {openSuggestionsCount}
                       </Badge>
                     )}
@@ -800,7 +848,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       />
                     )}
                     {showSuggestionForm && selectedRange && (
-                      <div className="absolute right-4 w-96 bg-green-400 border rounded-lg shadow-lg p-4 z-50">
+                      <div className="absolute inset-x-2 z-50 rounded-lg border bg-background p-4 shadow-lg sm:inset-x-auto sm:right-4 sm:w-96">
                         <SuggestionForm
                           type={suggestionFormType}
                           initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
@@ -890,7 +938,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         />
                       )}
                       {showSuggestionForm && selectedRange && (
-                        <div className="absolute top-4 right-4 w-[75%] bg-white border rounded-lg shadow-lg p-4 z-50">
+                        <div className="absolute inset-x-2 top-2 z-50 rounded-lg border bg-background p-4 shadow-lg sm:inset-x-auto sm:top-4 sm:right-4 sm:w-[75%]">
                           <SuggestionForm
                             type={suggestionFormType}
                             initialProposedText={
@@ -939,8 +987,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Document info
                 </span>
-                <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="h-7 w-7 p-0">
-                  <PanelRightClose className="h-4 w-4" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => (isMobile ? setOpenMobile(false) : setSidebarOpen(false))}
+                  className="h-7 w-7 p-0"
+                  aria-label="Close panel"
+                >
+                  <PanelRightClose />
                 </Button>
               </div>
               {sidebarHeader}
@@ -956,12 +1010,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     >
                       {sidebarView === 'details' ? (
                         <>
-                          <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                          <ChevronDown />
                           Hide details
                         </>
                       ) : (
                         <>
-                          <ChevronRight className="h-3.5 w-3.5 mr-1" />
+                          <ChevronRight />
                           Open details
                         </>
                       )}

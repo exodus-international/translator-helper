@@ -206,16 +206,18 @@ export function StatusDropdown({
         variant="outline"
         disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
         className={cn(
-          'gap-2 h-auto py-1.5 px-3',
+          'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
           currentStatusConfig.color.badgeClass,
           'border',
           'hover:opacity-90',
           'font-medium',
         )}
       >
-        <CurrentStatusIcon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
-        <span className={cn('font-medium', currentStatusConfig.color.textClass)}>{currentStatusConfig.name}</span>
-        <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+        <CurrentStatusIcon className={cn('shrink-0', currentStatusConfig.color.textClass)} />
+        <span className={cn('min-w-0 truncate font-medium', currentStatusConfig.color.textClass)}>
+          {currentStatusConfig.name}
+        </span>
+        <ChevronDown className="shrink-0 opacity-50" />
       </Button>
     );
   }
@@ -229,16 +231,18 @@ export function StatusDropdown({
           variant="outline"
           disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
           className={cn(
-            'gap-2 h-auto py-1.5 px-3',
+            'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
             currentStatusConfig.color.badgeClass,
             'border',
             'hover:opacity-90',
             'font-medium',
           )}
         >
-          <CurrentStatusIcon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
-          <span className={cn('font-medium', currentStatusConfig.color.textClass)}>{currentStatusConfig.name}</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+          <CurrentStatusIcon className={cn('shrink-0', currentStatusConfig.color.textClass)} />
+          <span className={cn('min-w-0 truncate font-medium', currentStatusConfig.color.textClass)}>
+            {currentStatusConfig.name}
+          </span>
+          <ChevronDown className="shrink-0 opacity-50" />
         </Button>
       </DropdownMenuPrimitive.Trigger>
 

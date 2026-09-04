@@ -169,13 +169,20 @@ function ReviewToolbar({ document, sourceVersion, user }: { document: any; sourc
     }
   };
 
+  // Header actions, ordered by workflow: status → contextual actions → passive.
   const actions = (
     <>
-      {(targetVersion?.status === DocumentStatus.APPROVED || targetVersion?.status === DocumentStatus.DEPLOYED) && (
-        <Button variant="default" size="sm" onClick={handleDownload} disabled={isAnyLoading}>
-          <Download className="h-4 w-4 mr-1" />
-          Download
-        </Button>
+      {targetVersion && (
+        <StatusDropdown
+          currentStatus={targetVersion.status}
+          versionId={targetVersion.id}
+          user={user}
+          documentId={document.id}
+          disabled={isAnyLoading}
+          onStatusChange={handleStatusChange}
+          onReviewRequested={openReviewDialog}
+          openSuggestionsCount={openSuggestionsCount}
+        />
       )}
       {targetVersion?.status === DocumentStatus.PENDING_REVIEW && (
         <Button
@@ -189,21 +196,15 @@ function ReviewToolbar({ document, sourceVersion, user }: { document: any; sourc
               : ''
           }
         >
-          {waitingForFinalLabel ? <FileCheck className="h-4 w-4" /> : <FilePlus className="h-4 w-4" />}
+          {waitingForFinalLabel ? <FileCheck /> : <FilePlus />}
           {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
         </Button>
       )}
-      {targetVersion && (
-        <StatusDropdown
-          currentStatus={targetVersion.status}
-          versionId={targetVersion.id}
-          user={user}
-          documentId={document.id}
-          disabled={isAnyLoading}
-          onStatusChange={handleStatusChange}
-          onReviewRequested={openReviewDialog}
-          openSuggestionsCount={openSuggestionsCount}
-        />
+      {(targetVersion?.status === DocumentStatus.APPROVED || targetVersion?.status === DocumentStatus.DEPLOYED) && (
+        <Button variant="default" size="sm" onClick={handleDownload} disabled={isAnyLoading}>
+          <Download />
+          Download
+        </Button>
       )}
     </>
   );

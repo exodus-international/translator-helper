@@ -6,6 +6,7 @@ import { AnnouncementModal, AnnouncementModalData } from '@/components/announcem
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { buildDocumentPath } from '@/domain/document/document-url';
 import ProjectCard from '@/components/project-card';
+import { PageHeader } from '@/components/page-header';
 import { UserAvatar } from '@/components/user-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -401,34 +402,26 @@ export default function DashboardClient({
     <>
       {announcements.banner && <AnnouncementBanner announcement={announcements.banner} />}
       {announcements.modal && <AnnouncementModal announcement={announcements.modal} />}
-      <div className="min-h-screen bg-gray-50">
-        <div className="border-b bg-white">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div>
-                  <h1 className="text-2xl font-bold">Dashboard</h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
-                    <p className="text-gray-600">Welcome back, {user.name}</p>
-                  </div>
-                </div>
-              </div>
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          title="Dashboard"
+          description={
+            <div className="flex items-center gap-2">
+              <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
+              <span>Welcome back, {user.name}</span>
             </div>
-
-            <div className="mt-4">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
+          }
+        >
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        </div>
+        </PageHeader>
 
         <div className="container mx-auto px-4 py-6 space-y-8">
           {/* Projects section */}

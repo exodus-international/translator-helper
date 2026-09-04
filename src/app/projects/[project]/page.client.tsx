@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { updateSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import { capture } from '@/lib/analytics';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
@@ -154,20 +155,24 @@ export default function ProjectDetailClient({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
+    <div className="min-h-screen bg-background">
+      <div className="border-b bg-background">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4 mb-3">
-            <Link href="/dashboard" className="text-gray-500 hover:text-gray-900 transition-colors">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold">{sourceProject.name}</h1>
-              {sourceProject.description && <p className="text-sm text-gray-500 mt-0.5">{sourceProject.description}</p>}
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              <Link href="/dashboard" className="shrink-0 text-muted-foreground transition-colors hover:text-foreground">
+                <ArrowLeft className="size-5" />
+              </Link>
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-xl font-bold sm:text-2xl">{sourceProject.name}</h1>
+                {sourceProject.description && (
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">{sourceProject.description}</p>
+                )}
+              </div>
             </div>
-            <div>
+            <div className="sm:shrink-0">
               <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
-                <SelectTrigger className="min-w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
@@ -185,22 +190,27 @@ export default function ProjectDetailClient({
 
       <div className="container mx-auto px-4 py-4">
         <Tabs defaultValue="dashboard">
-          <TabsList>
+          <TabsList
+            className={cn(
+              'grid w-full grid-cols-3 sm:inline-flex sm:w-fit',
+              isAdminClient(user) && 'max-sm:grid-cols-4',
+            )}
+          >
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
-              <LayoutDashboard className="h-4 w-4" />
+              <LayoutDashboard className="hidden size-4 sm:block" />
               Dashboard
             </TabsTrigger>
             <TabsTrigger value="team" className="flex items-center gap-1.5">
-              <Users className="h-4 w-4" />
+              <Users className="hidden size-4 sm:block" />
               Team
             </TabsTrigger>
             <TabsTrigger value="statistics" className="flex items-center gap-1.5">
-              <BarChart3 className="h-4 w-4" />
+              <BarChart3 className="hidden size-4 sm:block" />
               Statistics
             </TabsTrigger>
             {isAdminClient(user) && (
               <TabsTrigger value="settings" className="flex items-center gap-1.5">
-                <Settings className="h-4 w-4" />
+                <Settings className="hidden size-4 sm:block" />
                 Settings
               </TabsTrigger>
             )}

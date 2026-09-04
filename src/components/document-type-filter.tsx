@@ -34,7 +34,7 @@ export function DocumentTypeFilter({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="min-w-[160px] justify-between font-normal">
+        <Button variant="outline" className="min-w-[140px] justify-between font-normal sm:min-w-[160px]">
           <span className={selected.length === 0 ? 'text-muted-foreground' : undefined}>{triggerLabel(selected)}</span>
           <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>

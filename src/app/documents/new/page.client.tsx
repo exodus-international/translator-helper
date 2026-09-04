@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -255,13 +256,8 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">New Document</h1>
-          <p className="text-gray-600">Upload a markdown or YAML file, or create a new document</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader title="New Document" description="Upload a markdown or YAML file, or create a new document" />
 
       <div className="container mx-auto px-4 py-4">
         <Card className="p-4">

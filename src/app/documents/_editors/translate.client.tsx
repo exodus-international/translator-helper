@@ -183,30 +183,30 @@ function SaveStatusIndicator({
   switch (status) {
     case 'saving':
       return (
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span>Saving...</span>
+        <div className="flex items-center gap-1.5 text-xs text-gray-500" title="Saving...">
+          <Loader2 className="size-3.5 animate-spin" />
+          <span className="hidden sm:inline">Saving...</span>
         </div>
       );
     case 'saved':
       return (
-        <div className="flex items-center gap-1.5 text-xs text-green-600">
-          <Cloud className="h-3.5 w-3.5" />
-          <span>Saved{timeStr ? ` at ${timeStr}` : ''}</span>
+        <div className="flex items-center gap-1.5 text-xs text-green-600" title={`Saved${timeStr ? ` at ${timeStr}` : ''}`}>
+          <Cloud className="size-3.5" />
+          <span className="hidden sm:inline">Saved{timeStr ? ` at ${timeStr}` : ''}</span>
         </div>
       );
     case 'unsaved':
       return (
-        <div className="flex items-center gap-1.5 text-xs text-amber-600">
-          <CloudOff className="h-3.5 w-3.5" />
-          <span>Unsaved changes</span>
+        <div className="flex items-center gap-1.5 text-xs text-amber-600" title="Unsaved changes">
+          <CloudOff className="size-3.5" />
+          <span className="hidden sm:inline">Unsaved changes</span>
         </div>
       );
     case 'error':
       return (
-        <div className="flex items-center gap-1.5 text-xs text-red-600">
-          <CloudOff className="h-3.5 w-3.5" />
-          <span>Save failed</span>
+        <div className="flex items-center gap-1.5 text-xs text-red-600" title="Save failed">
+          <CloudOff className="size-3.5" />
+          <span className="hidden sm:inline">Save failed</span>
         </div>
       );
   }
@@ -363,11 +363,17 @@ function TranslateToolbar({
                   onStatusChange={handleStatusChange}
                   onReviewRequested={handleOpenReviewDialog}
                 />
+                {targetVersion.status === 'IN_PROGRESS' && (
+                  <Button size="sm" onClick={handleOpenReviewDialog} disabled={busy}>
+                    <Send />
+                    Submit
+                  </Button>
+                )}
                 {content.trim().length > 0 ? (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm" disabled={busy || !targetLanguageId}>
-                        <Sparkles className="h-4 w-4 mr-2" />
+                        <Sparkles />
                         {translating ? 'Translating...' : 'Translate'}
                       </Button>
                     </AlertDialogTrigger>
@@ -386,7 +392,7 @@ function TranslateToolbar({
                   </AlertDialog>
                 ) : (
                   <Button variant="outline" size="sm" onClick={handleAutoTranslate} disabled={busy || !targetLanguageId}>
-                    <Sparkles className="h-4 w-4 mr-2" />
+                    <Sparkles />
                     {translating ? 'Translating...' : 'Translate'}
                   </Button>
                 )}
@@ -394,22 +400,16 @@ function TranslateToolbar({
                   <>
                     <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
                     <Button variant="outline" size="sm" onClick={handleSave} disabled={busy}>
-                      <Save className="h-4 w-4 mr-2" />
+                      <Save />
                       Save
                     </Button>
                   </>
-                )}
-                {targetVersion.status === 'IN_PROGRESS' && (
-                  <Button size="sm" onClick={handleOpenReviewDialog} disabled={busy}>
-                    <Send className="h-4 w-4 mr-2" />
-                    Submit
-                  </Button>
                 )}
                 {canDelete && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm" disabled={loading || isAnyLoading}>
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 />
                         Delete
                       </Button>
                     </AlertDialogTrigger>
@@ -445,7 +445,7 @@ function TranslateToolbar({
                 setZenMode(false);
               }}
             >
-              <Minimize2 className="h-4 w-4 mr-2" />
+              <Minimize2 />
               Exit Zen (Esc)
             </Button>
           </div>
@@ -455,12 +455,27 @@ function TranslateToolbar({
   }
 
   // ─── Default header ──────────────────────────────────────────
+  // Header actions, ordered by workflow: status/submit → save → AI assist → view → destructive.
   const actions = targetVersion ? (
     <>
+      <StatusDropdown
+        currentStatus={targetVersion.status}
+        versionId={targetVersion.id}
+        user={user}
+        documentId={document.id}
+        disabled={busy}
+        onStatusChange={handleStatusChange}
+        onReviewRequested={handleOpenReviewDialog}
+      />
       {targetVersion.status !== 'PENDING_TRANSLATION' && (
         <>
+          <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+          <Button variant="outline" size="sm" onClick={handleSave} disabled={busy}>
+            <Save />
+            Save
+          </Button>
           <Button variant="outline" size="sm" onClick={handleAutoTranslate} disabled={busy || !targetLanguageId}>
-            <Sparkles className="h-4 w-4 mr-1" />
+            <Sparkles />
             {translating ? 'Translating...' : 'AI Translate'}
           </Button>
           <Button
@@ -471,27 +486,13 @@ function TranslateToolbar({
               setZenMode(true);
             }}
           >
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-          <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={busy}>
-            <Save className="h-4 w-4 mr-1" />
-            Save
+            <Maximize2 />
           </Button>
         </>
       )}
-      <StatusDropdown
-        currentStatus={targetVersion.status}
-        versionId={targetVersion.id}
-        user={user}
-        documentId={document.id}
-        disabled={busy}
-        onStatusChange={handleStatusChange}
-        onReviewRequested={handleOpenReviewDialog}
-      />
       {canDelete && (
         <Button variant="outline" size="sm" onClick={handleDeleteTranslation} disabled={loading || isAnyLoading}>
-          <Trash2 className="h-4 w-4 mr-1" />
+          <Trash2 />
           Delete
         </Button>
       )}

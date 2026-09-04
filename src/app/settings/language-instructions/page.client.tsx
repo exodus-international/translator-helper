@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Language } from '@prisma/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { updateLanguageInstructionsAction } from '@/domain/language/language.actions';
@@ -53,17 +54,11 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Language Instructions</h1>
-              <p className="text-gray-600">Define custom guidance for the AI translator per language.</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        title="Language Instructions"
+        description="Define custom guidance for the AI translator per language."
+      />
 
       <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4">
