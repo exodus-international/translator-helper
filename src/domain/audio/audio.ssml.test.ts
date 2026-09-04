@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_PROSODY, escapeXml, renderPause, speechScriptToSsml } from './audio.ssml';
+import { DEFAULT_PROSODY, escapeXml, renderPause, speechScriptToSsml, validateSsml } from './audio.ssml';
 
 const opts = { voice: 'cs-CZ-AntoninNeural', locale: 'cs-CZ', maxBreakMs: 20_000 };
 
@@ -82,4 +82,52 @@ test('rate alone yields a prosody element with only a rate attribute', () => {
 
 test('default prosody is the listening-test pick', () => {
   assert.deepEqual(DEFAULT_PROSODY, { rate: '0.8', pitch: '-6%' });
+});
+
+// ─── Validation ──────────────────────────────────────────────
+//
+// Warnings, never refusals: these messages are read by whoever hand-wrote the
+// SSML, so the wording is pinned.
+
+test('valid SSML has nothing to complain about', () => {
+  const ssml = speechScriptToSsml({ segments: [{ kind: 'text', text: 'Ahoj' }] }, opts);
+  assert.deepEqual(validateSsml(ssml), []);
+});
+
+test('an unclosed tag is reported with the line it was opened on', () => {
+  const problems = validateSsml('<speak>\n  <prosody rate="0.8">Ahoj\n</speak>');
+  assert.ok(problems.some((p) => p.message === '<prosody> is never closed.' && p.line === 2));
+});
+
+test('a close with no opening is called out on its own line', () => {
+  const problems = validateSsml('<speak>\nAhoj</prosody>\n</speak>');
+  assert.ok(problems.some((p) => p.message === '</prosody> closes a tag that was never opened.' && p.line === 2));
+});
+
+test('a tag the provider does not know is named, not refused', () => {
+  const problems = validateSsml('<speak><breakk/></speak>');
+  assert.deepEqual(problems, [
+    { line: 1, message: '<breakk> is not a tag the speech provider is known to understand.' },
+  ]);
+});
+
+test('SSML that does not start with speak is called out', () => {
+  const problems = validateSsml('<voice name="cs-CZ-AntoninNeural">Ahoj</voice>');
+  assert.ok(problems.some((p) => p.message === 'The audio text has to start with a <speak> element.'));
+});
+
+test('a bare ampersand is caught, and an escaped one is not', () => {
+  const problems = validateSsml('<speak>Petr & Pavel</speak>');
+  assert.ok(problems.some((p) => p.message === 'A bare & has to be written as &amp; or the provider cannot read the text.'));
+  assert.deepEqual(validateSsml('<speak>Petr &amp; Pavel &#233; &#x41;</speak>'), []);
+});
+
+test('an empty box says so rather than listing everything that is missing', () => {
+  assert.deepEqual(validateSsml('   '), [
+    { line: 1, message: 'The audio text is empty, so there is nothing to say.' },
+  ]);
+});
+
+test('a self-closing break is not mistaken for something left open', () => {
+  assert.deepEqual(validateSsml('<speak>Ahoj<break time="1000ms"/>a jeste jednou</speak>'), []);
 });

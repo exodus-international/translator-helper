@@ -9,10 +9,11 @@ import {
   resetAudioTranscriptAction,
   saveAudioTranscriptAction,
 } from '@/domain/audio/audio.actions';
+import { validateSsml } from '@/domain/audio/audio.ssml';
 import type { AudioTranscriptView } from '@/domain/audio/audio.types';
 import { capture } from '@/lib/analytics';
-import { Loader2, Lock, RotateCcw, Save, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, Loader2, Lock, RotateCcw, Save, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 /**
@@ -54,6 +55,9 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
 
   const dirty = transcript !== null && draft !== transcript.ssml;
   const edited = transcript?.state !== 'generated';
+  // Advisory only. Save stays enabled: a rule this validator has not heard of
+  // must not stop someone using something the provider actually supports.
+  const problems = useMemo(() => (transcript?.canEdit ? validateSsml(draft) : []), [draft, transcript?.canEdit]);
 
   const save = async ({ regenerate }: { regenerate: boolean }) => {
     setSaving(true);
@@ -151,6 +155,18 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
           </div>
         )}
       </div>
+      {problems.length > 0 && (
+        <ul className="max-h-28 overflow-y-auto border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {problems.map((problem, index) => (
+            <li key={`${problem.line}-${index}`} className="flex items-start gap-1.5">
+              <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+              <span>
+                <span className="font-medium">Line {problem.line}:</span> {problem.message}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="min-h-0 flex-1">
         <RawEditorPane
           value={draft}

@@ -79,3 +79,98 @@ export function escapeXml(value: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
+
+// ─── Validation ──────────────────────────────────────────────
+
+/**
+ * Tags Azure's Speech Synthesis Markup Language defines. Anything outside this
+ * list is reported, not refused: the list ages as the API grows, and a warning
+ * that turns out to be wrong costs a moment's doubt, where a block would cost
+ * someone the feature.
+ */
+const KNOWN_SSML_TAGS = new Set([
+  'speak', 'voice', 'prosody', 'break', 'emphasis', 'audio', 'p', 's', 'sub',
+  'phoneme', 'lexicon', 'lang', 'say-as', 'mstts:express-as', 'mstts:silence',
+  'mstts:backgroundaudio', 'mstts:viseme', 'mstts:audioduration', 'bookmark', 'math',
+]);
+
+const VOID_SSML_TAGS = new Set(['break', 'bookmark', 'mstts:silence', 'mstts:viseme', 'mstts:audioduration', 'lexicon']);
+
+export interface SsmlProblem {
+  /** 1-indexed line the problem sits on, for pointing at it. */
+  line: number;
+  message: string;
+}
+
+/**
+ * Checks hand-written SSML and describes what looks wrong, in words for the
+ * person who wrote it. Never throws and never blocks: an SSML the provider
+ * rejects fails the generation with the provider's own message, which is a
+ * better teacher than a guess made here.
+ */
+export function validateSsml(ssml: string): SsmlProblem[] {
+  const problems: SsmlProblem[] = [];
+  const text = ssml.trim();
+
+  if (!text) {
+    return [{ line: 1, message: 'The audio text is empty, so there is nothing to say.' }];
+  }
+
+  const lineAt = (index: number) => ssml.slice(0, index).split('\n').length;
+  const stack: { tag: string; line: number }[] = [];
+  let roots = 0;
+
+  const TAG = /<\/?([a-zA-Z][\w:-]*)\b[^>]*?(\/?)>/g;
+  let match: RegExpExecArray | null;
+  while ((match = TAG.exec(ssml)) !== null) {
+    const [raw, rawTag, selfClosing] = match;
+    const tag = rawTag.toLowerCase();
+    const line = lineAt(match.index);
+    const closing = raw.startsWith('</');
+
+    if (!KNOWN_SSML_TAGS.has(tag)) {
+      problems.push({ line, message: `<${rawTag}> is not a tag the speech provider is known to understand.` });
+    }
+
+    if (closing) {
+      const openedAt = stack.findLastIndex((open) => open.tag === tag);
+      if (openedAt === -1) {
+        problems.push({ line, message: `</${rawTag}> closes a tag that was never opened.` });
+        continue;
+      }
+      // Everything still open inside the tag being closed was forgotten. Saying
+      // that is more use than "</speak> closes <prosody>", which describes the
+      // symptom at the wrong end of the document.
+      for (const forgotten of stack.splice(openedAt + 1).reverse()) {
+        problems.push({ line: forgotten.line, message: `<${forgotten.tag}> is never closed.` });
+      }
+      stack.pop();
+      continue;
+    }
+
+    if (stack.length === 0 && !selfClosing) roots += 1;
+    if (!selfClosing && !VOID_SSML_TAGS.has(tag)) stack.push({ tag, line });
+  }
+
+  for (const unclosed of stack.reverse()) {
+    problems.push({ line: unclosed.line, message: `<${unclosed.tag}> is never closed.` });
+  }
+
+  if (!/^<speak\b/i.test(text)) {
+    problems.push({ line: 1, message: 'The audio text has to start with a <speak> element.' });
+  } else if (roots > 1) {
+    problems.push({ line: 1, message: 'There is more than one top-level element; the provider expects a single <speak>.' });
+  }
+
+  // An ampersand that starts no entity is the most common way hand-written
+  // SSML stops being XML, and the provider's message for it is cryptic.
+  const AMPERSAND = /&(?!#\d+;|#x[0-9a-fA-F]+;|[a-zA-Z][a-zA-Z0-9]*;)/g;
+  while ((match = AMPERSAND.exec(ssml)) !== null) {
+    problems.push({
+      line: lineAt(match.index),
+      message: 'A bare & has to be written as &amp; or the provider cannot read the text.',
+    });
+  }
+
+  return problems.sort((a, b) => a.line - b.line);
+}
