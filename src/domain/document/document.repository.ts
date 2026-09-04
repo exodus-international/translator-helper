@@ -17,11 +17,46 @@ const versionWithUser = {
   orderBy: { updatedAt: 'desc' },
 } as const;
 
-const documentListInclude = {
-  folder: true, // Deprecated - kept for backward compatibility
+/**
+ * The documents list, without the markdown.
+ *
+ * `include` here returned every version's `content` — the same bug already
+ * fixed on the documents overview below. Nothing in the list renders a
+ * document body, so the body does not travel.
+ */
+const documentListSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  labels: true,
+  type: true,
+  deadline: true,
+  originalFilename: true,
+  folderId: true,
+  sourceProjectId: true,
+  createdAt: true,
+  updatedAt: true,
   sourceProject: true,
-  versions: versionWithUser,
-} satisfies Prisma.DocumentInclude;
+  versions: {
+    select: {
+      id: true,
+      documentId: true,
+      languageId: true,
+      status: true,
+      version: true,
+      deadline: true,
+      assignedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      userId: true,
+      reviewerId: true,
+      assignedById: true,
+      language: true,
+      user: userWithLanguages,
+    },
+    orderBy: { updatedAt: 'desc' },
+  },
+} satisfies Prisma.DocumentSelect;
 
 const documentDetailInclude = {
   folder: true, // Deprecated
@@ -35,7 +70,7 @@ const documentBasicInclude = {
   versions: true,
 } satisfies Prisma.DocumentInclude;
 
-type DocumentList = Prisma.DocumentGetPayload<{ include: typeof documentListInclude }>;
+export type DocumentList = Prisma.DocumentGetPayload<{ select: typeof documentListSelect }>;
 type DocumentDetail = Prisma.DocumentGetPayload<{ include: typeof documentDetailInclude }>;
 type DocumentBasic = Prisma.DocumentGetPayload<{ include: typeof documentBasicInclude }>;
 
@@ -60,7 +95,7 @@ export async function listDocuments(filters?: {
         ],
       }),
     },
-    include: documentListInclude,
+    select: documentListSelect,
     orderBy: { updatedAt: 'desc' },
   });
 }

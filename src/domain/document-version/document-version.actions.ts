@@ -43,6 +43,7 @@ import {
 } from '../translation-project/translation-project.repository';
 import {
   assignDocumentVersion,
+  assignmentSelect,
   createDocumentVersion,
   deleteDocumentVersion,
   getWorkVersionsForUser,
@@ -470,20 +471,7 @@ export async function getApprovedVersionsAction() {
       status: DocumentStatus.APPROVED,
       language: { code: { not: 'en' } },
     },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      language: true,
-      user: {
-        select: { id: true, name: true, email: true },
-      },
-      reviewer: {
-        select: { id: true, name: true, email: true },
-      },
-    },
+    select: assignmentSelect,
     orderBy: {
       updatedAt: 'desc',
     },

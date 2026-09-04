@@ -3,13 +3,47 @@ import { DocumentStatus, Prisma } from '@prisma/client';
 
 const userBrief = { select: { id: true, name: true, email: true } } as const;
 
-const assignmentInclude = {
-  document: { include: { sourceProject: true } },
-  language: true,
+/**
+ * The shape the assignment lists render: who, which document, which language,
+ * what state, by when.
+ *
+ * A `select` rather than an `include` because `include` also returns `content`
+ * — the whole markdown body of every version in the list. document.repository
+ * already learned this lesson on the documents overview; these lists are the
+ * same bug, on a table whose rows are kilobytes each.
+ */
+export const assignmentSelect = {
+  id: true,
+  documentId: true,
+  languageId: true,
+  status: true,
+  version: true,
+  deadline: true,
+  assignedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+  reviewerId: true,
+  assignedById: true,
+  document: {
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      type: true,
+      labels: true,
+      sourceProjectId: true,
+      sourceProject: { select: { id: true, name: true, identifier: true, acronym: true } },
+    },
+  },
+  language: { select: { id: true, name: true, code: true } },
   user: userBrief,
   reviewer: userBrief,
   assignedBy: userBrief,
-} satisfies Prisma.DocumentVersionInclude;
+} satisfies Prisma.DocumentVersionSelect;
+
+/** A version as the dashboard and translation-project lists render it. */
+export type VersionAssignment = Prisma.DocumentVersionGetPayload<{ select: typeof assignmentSelect }>;
 
 export async function getDocumentVersionById(id: string) {
   return prisma.documentVersion.findUnique({
@@ -283,7 +317,7 @@ export async function assignDocumentVersion(data: {
       ...assignment,
     },
     update: assignment,
-    include: assignmentInclude,
+    select: assignmentSelect,
   });
 }
 
@@ -294,13 +328,13 @@ export async function assignDocumentVersion(data: {
  * "Waiting for Deploy" (deployers only) and DEPLOYED work is finished, so
  * neither belongs in "My Work".
  */
-export async function getWorkVersionsForUser(userId: string) {
+export async function getWorkVersionsForUser(userId: string): Promise<VersionAssignment[]> {
   return prisma.documentVersion.findMany({
     where: {
       status: { notIn: [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED] },
       OR: [{ userId }, { reviewerId: userId }],
     },
-    include: assignmentInclude,
+    select: assignmentSelect,
     orderBy: {
       deadline: { sort: 'asc', nulls: 'last' },
     },
@@ -308,13 +342,16 @@ export async function getWorkVersionsForUser(userId: string) {
 }
 
 /** The versions belonging to a translation project — its language, its documents. */
-export async function listVersionsForTranslationProject(sourceProjectId: string, languageId: string) {
+export async function listVersionsForTranslationProject(
+  sourceProjectId: string,
+  languageId: string,
+): Promise<VersionAssignment[]> {
   return prisma.documentVersion.findMany({
     where: {
       languageId,
       document: { sourceProjectId },
     },
-    include: assignmentInclude,
+    select: assignmentSelect,
     orderBy: [{ deadline: { sort: 'asc', nulls: 'last' } }, { document: { title: 'asc' } }],
   });
 }
