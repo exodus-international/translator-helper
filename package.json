@@ -6,7 +6,7 @@
     "node": ">=20.18.1"
   },
   "scripts": {
-    "dev": "set -a && . ./.env 2>/dev/null; set +a; next dev --port ${PORT:-3000}",
+    "dev": "node scripts/copy-monaco.mjs && set -a && . ./.env 2>/dev/null; set +a; next dev --port ${PORT:-3000}",
     "build": "node scripts/copy-monaco.mjs && prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
