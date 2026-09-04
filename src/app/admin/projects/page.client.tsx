@@ -329,7 +329,7 @@ export default function ProjectsClient({
           total={total}
           pageSize={pageSize}
           onPageChange={(nextPage) => navigate({ page: nextPage === 1 ? null : nextPage })}
-          onPageSizeChange={(nextSize) => navigate({ pageSize: nextSize === DEFAULT_PAGE_SIZE ? null : nextSize })}
+          onPageSizeChange={(nextSize) => navigate({ perPage: nextSize === DEFAULT_PAGE_SIZE ? null : nextSize })}
           getPageHref={(target) =>
             `${pathname}${buildListSearchParams(searchParams, { page: target === 1 ? null : target })}`
           }

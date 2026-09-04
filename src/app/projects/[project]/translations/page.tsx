@@ -40,7 +40,7 @@ export default async function TranslationsPage({
   const sourceProject = await resolveProject(project, '/translations');
 
   // Server-side pagination, search, and sorting (issue #51). The URL carries
-  // ?page= ?q= ?sort= ?order= ?pageSize= so state stays shareable.
+  // ?page= ?q= ?sort= ?order= ?perPage= so state stays shareable.
   const list = parseListParams(query, {
     allowedSorts: TRANSLATION_PROJECT_SORTS,
     defaultSort: 'name',

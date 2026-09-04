@@ -30,7 +30,7 @@ export default async function ProjectsPage({
 
   // Server-side pagination, search, and sorting (issue #51). The admin list
   // always includes complete projects; the URL carries ?page= ?q= ?sort=
-  // ?order= ?pageSize= so state stays shareable and bookmarkable.
+  // ?order= ?perPage= so state stays shareable and bookmarkable.
   const params = await searchParams;
   const list = parseListParams(params, {
     allowedSorts: SOURCE_PROJECT_SORTS,

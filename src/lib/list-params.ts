@@ -7,7 +7,12 @@
 //   ?q=foo         free-text search (legacy ?search= is accepted too)
 //   ?sort=title    one of the page's allowed sort fields
 //   ?order=asc     asc | desc
-//   ?pageSize=25   rows per page (legacy ?perPage= is accepted too)
+//   ?perPage=25    rows per page (legacy ?pageSize= is accepted too)
+//
+// `perPage` is the canonical key because it is the one the app already
+// shipped: `use-data-table.ts` (nuqs + TanStack) parses `?page=`/`?perPage=`
+// and the admin Users table runs on it. One key across every list keeps
+// shared links portable between the client- and server-paginated pages.
 //
 // Kept free of React/Prisma so it can be unit tested in isolation.
 
@@ -67,7 +72,7 @@ export function parseListParams(raw: RawSearchParams, options: ListParamsOptions
   const defaultPageSize = options.defaultPageSize ?? DEFAULT_PAGE_SIZE;
 
   const page = parsePositiveInt(firstValue(raw.page), DEFAULT_PAGE);
-  const pageSizeRaw = firstValue(raw.pageSize) ?? firstValue(raw.perPage);
+  const pageSizeRaw = firstValue(raw.perPage) ?? firstValue(raw.pageSize);
   const pageSize = Math.min(
     MAX_PAGE_SIZE,
     Math.max(MIN_PAGE_SIZE, parsePositiveInt(pageSizeRaw, defaultPageSize)),
@@ -139,7 +144,8 @@ export function buildListSearchParams(
     }
   }
 
-  const resetsPage = 'q' in updates || 'search' in updates || 'sort' in updates || 'pageSize' in updates;
+  const resetsPage =
+    'q' in updates || 'search' in updates || 'sort' in updates || 'perPage' in updates || 'pageSize' in updates;
 
   for (const [key, value] of Object.entries(updates)) {
     if (value === null || value === undefined || value === '') {
@@ -155,7 +161,7 @@ export function buildListSearchParams(
 
   // Legacy aliases never leak into new URLs.
   if ('q' in updates) params.delete('search');
-  if ('pageSize' in updates) params.delete('perPage');
+  if ('perPage' in updates) params.delete('pageSize');
 
   const query = params.toString();
   return query ? `?${query}` : '';

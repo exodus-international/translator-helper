@@ -42,8 +42,8 @@ export default async function DocumentsPage({
   const params = await searchParams;
 
   // Server-side pagination, search, and sorting (issue #51): the URL is the
-  // source of truth (?page= ?q= ?sort= ?order= ?pageSize=) so state stays
-  // shareable and bookmarkable. Legacy ?search= / ?perPage= still parse.
+  // source of truth (?page= ?q= ?sort= ?order= ?perPage=) so state stays
+  // shareable and bookmarkable. Legacy ?search= / ?pageSize= still parse.
   const list = parseListParams(params, {
     allowedSorts: DOCUMENT_OVERVIEW_SORTS,
     defaultSort: 'updatedAt',

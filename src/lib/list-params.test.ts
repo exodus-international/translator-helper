@@ -27,9 +27,9 @@ test('parseListParams applies defaults for an empty query', () => {
   });
 });
 
-test('parseListParams reads the canonical ?page ?q ?sort ?order ?pageSize keys', () => {
+test('parseListParams reads the canonical ?page ?q ?sort ?order ?perPage keys', () => {
   const parsed = parseListParams(
-    { page: '3', q: ' exodus ', sort: 'title', order: 'asc', pageSize: '10' },
+    { page: '3', q: ' exodus ', sort: 'title', order: 'asc', perPage: '10' },
     options,
   );
   assert.equal(parsed.page, 3);
@@ -40,15 +40,20 @@ test('parseListParams reads the canonical ?page ?q ?sort ?order ?pageSize keys',
   assert.equal(parsed.take, 10);
 });
 
-test('parseListParams accepts legacy ?search and ?perPage aliases', () => {
-  const parsed = parseListParams({ search: 'lent', perPage: '50' }, options);
+test('parseListParams accepts legacy ?search and ?pageSize aliases', () => {
+  const parsed = parseListParams({ search: 'lent', pageSize: '50' }, options);
   assert.equal(parsed.q, 'lent');
+  assert.equal(parsed.pageSize, 50);
+});
+
+test('parseListParams prefers canonical ?perPage over the legacy ?pageSize alias', () => {
+  const parsed = parseListParams({ perPage: '50', pageSize: '10' }, options);
   assert.equal(parsed.pageSize, 50);
 });
 
 test('parseListParams clamps invalid numbers and falls back for unknown sorts', () => {
   const parsed = parseListParams(
-    { page: '0', pageSize: '9999', sort: 'nope', order: 'sideways' },
+    { page: '0', perPage: '9999', sort: 'nope', order: 'sideways' },
     options,
   );
   assert.equal(parsed.page, 1);
@@ -100,6 +105,16 @@ test('buildListSearchParams keeps an explicit page and drops empty values', () =
   const parsed = new URLSearchParams(next);
   assert.equal(parsed.get('page'), '2');
   assert.equal(parsed.get('q'), null);
+});
+
+test('buildListSearchParams writes perPage, resets the page, and clears the legacy alias', () => {
+  const current = new URLSearchParams({ page: '4', pageSize: '10', sourceProject: 'abc' });
+  const next = buildListSearchParams(current, { perPage: 50 });
+  const parsed = new URLSearchParams(next);
+  assert.equal(parsed.get('perPage'), '50');
+  assert.equal(parsed.get('pageSize'), null);
+  assert.equal(parsed.get('page'), null);
+  assert.equal(parsed.get('sourceProject'), 'abc');
 });
 
 test('getPageTokens shows every page up to seven', () => {
