@@ -32,6 +32,15 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  session: {
+    // Without this, every session lookup falls through to the database for two
+    // queries (session by token, then user by id). The signed cookie carries
+    // the session for five minutes, so the common case costs none.
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
   user: {
     additionalFields: {
       role: {
