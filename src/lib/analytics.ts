@@ -68,6 +68,7 @@ export type AnalyticsEvent =
   | 'audio_generation_failed'
   | 'audio_transcript_saved'
   | 'audio_transcript_reset'
+  | 'audio_transcript_kept'
   // ── Suggestions / review threads ─────────────────────────────────────
   | 'suggestion_created'
   | 'suggestion_applied'

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   getAudioTranscriptAction,
+  keepAudioTranscriptAction,
   regenerateAudioAction,
   resetAudioTranscriptAction,
   saveAudioTranscriptAction,
@@ -76,6 +77,19 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
       await load();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Could not save the audio text.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const keep = async () => {
+    setSaving(true);
+    try {
+      await keepAudioTranscriptAction(documentVersionId);
+      toast.success('Keeping your audio text.');
+      await load();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Could not keep the audio text.');
     } finally {
       setSaving(false);
     }
@@ -155,6 +169,27 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
           </div>
         )}
       </div>
+      {transcript.state === 'edited_outdated' && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
+          <p className="flex items-start gap-1.5 text-xs text-amber-900">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span>
+              The translation changed since this audio text was edited, so the recording may not say what the document
+              says. Your version is still what gets generated.
+            </span>
+          </p>
+          {transcript.canEdit && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={reset} disabled={saving}>
+                Rebuild from document
+              </Button>
+              <Button variant="ghost" size="sm" onClick={keep} disabled={saving}>
+                Keep mine
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
       {problems.length > 0 && (
         <ul className="max-h-28 overflow-y-auto border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           {problems.map((problem, index) => (

@@ -106,14 +106,41 @@ export function resolveAudioSsml(input: TranscriptInput & { override?: string | 
 export type AudioTranscriptState = 'generated' | 'edited' | 'edited_outdated';
 
 /**
+ * A short, stable fingerprint of a string. FNV-1a: no crypto import, so this
+ * module stays usable wherever the rules are, and a hash rather than the text
+ * itself keeps a second copy of every transcript out of the database.
+ *
+ * Collisions would mean a missed prompt, never a wrong transcript. The
+ * override is still what gets spoken either way.
+ */
+export function fingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `${text.length.toString(36)}-${hash.toString(36)}`;
+}
+
+/**
  * What state a version's transcript is in: derived from the document, hand
  * edited, or hand edited before the document moved on underneath it.
  *
- * The third value arrives with the conflict work; until a fingerprint is
- * stored, an override is simply "edited".
+ * The comparison is of derived SSML, not of the version counter. Auto-save
+ * bumps that counter every few seconds of typing, so counting versions would
+ * call a transcript out of date because somebody bolded a word. What matters
+ * is whether the words and pauses a narrator reads actually changed.
  */
-export function transcriptState(input: { override?: string | null }): AudioTranscriptState {
-  return input.override?.trim() ? 'edited' : 'generated';
+export function transcriptState(input: {
+  override?: string | null;
+  /** Fingerprint stored when the override was saved. */
+  baseline?: string | null;
+  /** What deriving from the document right now produces. */
+  derived?: string | null;
+}): AudioTranscriptState {
+  if (!input.override?.trim()) return 'generated';
+  if (!input.baseline || input.derived == null) return 'edited';
+  return input.baseline === fingerprint(input.derived) ? 'edited' : 'edited_outdated';
 }
 
 /** True when the document has no readable words left after the Markdown comes off. */

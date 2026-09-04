@@ -8,7 +8,14 @@ import { createActivityLog } from '../activity-log/activity-log.repository';
 import { assertCanEditDocumentVersion } from '../document-version/document-version.permissions';
 import { getUserRoleForLanguage } from '../user-language/user-language.repository';
 import { getLatestAudioFileForVersion } from './audio.repository';
-import { advanceJob, getAudioReadiness, getTranscript, saveTranscript, startGeneration } from './audio.service';
+import {
+  advanceJob,
+  getAudioReadiness,
+  getTranscript,
+  keepTranscript,
+  saveTranscript,
+  startGeneration,
+} from './audio.service';
 import type {
   AudioFileView,
   AudioGenerationOutcome,
@@ -76,6 +83,23 @@ export async function saveAudioTranscriptAction(documentVersionId: string, ssml:
     userId: user.id,
     action: 'audio_transcript_edited',
     details: { characters: ssml.length },
+  });
+}
+
+/**
+ * Answers the conflict prompt with "keep mine": the hand-edited SSML stays and
+ * the tab stops saying the document moved on. Rebuilding from the document is
+ * the other answer, and it is just a reset.
+ */
+export async function keepAudioTranscriptAction(documentVersionId: string): Promise<void> {
+  const { user } = await authorize('authenticated');
+  await assertCanEditDocumentVersion(documentVersionId, user);
+
+  await keepTranscript(documentVersionId);
+  await createActivityLog({
+    documentVersionId,
+    userId: user.id,
+    action: 'audio_transcript_kept',
   });
 }
 

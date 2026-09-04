@@ -4,6 +4,7 @@ import { AudioProvider, DocumentType } from '@prisma/client';
 import {
   audioSkipReason,
   deriveAudioSsml,
+  fingerprint,
   formatAudioError,
   hasReadableText,
   isAudioStale,
@@ -125,4 +126,46 @@ test('a transcript with nothing stored is the generated one', () => {
 
 test('a stored override makes the transcript an edited one', () => {
   assert.equal(transcriptState({ override: '<speak>Ahoj</speak>' }), 'edited');
+});
+
+test('an edited transcript stays current while the spoken words do not change', () => {
+  const derived = deriveAudioSsml(transcriptInput);
+  const state = transcriptState({
+    override: '<speak>Rucne</speak>',
+    baseline: fingerprint(derived),
+    derived,
+  });
+  assert.equal(state, 'edited');
+});
+
+// Auto-save bumps the version counter every few seconds of typing, so the
+// comparison is of what a narrator would read, not of version numbers.
+test('an edited transcript goes out of date when the spoken words change', () => {
+  const baseline = fingerprint(deriveAudioSsml(transcriptInput));
+  const afterEdit = deriveAudioSsml({ ...transcriptInput, content: '# Den 3\n\nDnes se budeme postit.' });
+
+  assert.equal(
+    transcriptState({ override: '<speak>Rucne</speak>', baseline, derived: afterEdit }),
+    'edited_outdated',
+  );
+});
+
+test('a Markdown-only change leaves an edited transcript alone', () => {
+  const baseline = fingerprint(deriveAudioSsml(transcriptInput));
+  // Bolding a word and adding frontmatter: same words, same pauses.
+  const cosmetic = deriveAudioSsml({
+    ...transcriptInput,
+    content: '---\nday: 3\n---\n\n# Den 3\n\nDnes se budeme **modlit**.',
+  });
+
+  assert.equal(transcriptState({ override: '<speak>Rucne</speak>', baseline, derived: cosmetic }), 'edited');
+});
+
+test('a document with no override is never out of date', () => {
+  assert.equal(transcriptState({ override: null, baseline: 'stale', derived: 'anything' }), 'generated');
+});
+
+test('a fingerprint is stable for the same text and differs for different text', () => {
+  assert.equal(fingerprint('<speak>Ahoj</speak>'), fingerprint('<speak>Ahoj</speak>'));
+  assert.notEqual(fingerprint('<speak>Ahoj</speak>'), fingerprint('<speak>Nazdar</speak>'));
 });

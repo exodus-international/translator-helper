@@ -288,6 +288,10 @@ model DocumentVersion {
   // script derived from `content`. Null means "derive it", which is what every
   // version does until someone edits the Audio text tab.
   audioSsml     String?        @db.Text
+  // Fingerprint of the SSML that would have been derived when `audioSsml` was
+  // saved. Comparing it against a fresh derivation is how an edited transcript
+  // learns that the words moved on without it.
+  audioSsmlBase String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   comments      Comment[]

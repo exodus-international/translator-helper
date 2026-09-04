@@ -17,6 +17,8 @@ import {
 } from './audio.repository';
 import {
   audioSkipReason,
+  deriveAudioSsml,
+  fingerprint,
   formatAudioError,
   hasReadableText,
   isAudioStale,
@@ -378,14 +380,22 @@ export async function getTranscript(
   if (skip) return null;
 
   const provider = getSpeechProvider(version.language.audioProvider!);
-  const resolved = resolveAudioSsml({
+  const input = {
     content: version.content,
-    override: version.audioSsml,
     voice: version.language.audioVoice!,
     maxBreakMs: provider.maxBreakMs,
+  };
+  const resolved = resolveAudioSsml({ ...input, override: version.audioSsml });
+
+  // Derived only to compare against the fingerprint, and only when there is an
+  // override to compare: a document with no override cannot be out of date.
+  const state = transcriptState({
+    override: version.audioSsml,
+    baseline: version.audioSsmlBase,
+    derived: version.audioSsml ? deriveAudioSsml(input) : null,
   });
 
-  return { ...resolved, state: transcriptState({ override: version.audioSsml }) };
+  return { ...resolved, state };
 }
 
 /**
@@ -394,8 +404,40 @@ export async function getTranscript(
  * permission check; this only writes.
  */
 export async function saveTranscript(documentVersionId: string, ssml: string | null): Promise<void> {
+  const stored = ssml?.trim() ? ssml : null;
   await prisma.documentVersion.update({
     where: { id: documentVersionId },
-    data: { audioSsml: ssml?.trim() ? ssml : null },
+    data: { audioSsml: stored, audioSsmlBase: stored ? await currentBaseline(documentVersionId) : null },
   });
+}
+
+/**
+ * Accepts the document as it stands: the override is left alone and the
+ * fingerprint is refreshed, so the tab stops asking. The other half of the
+ * conflict — rebuilding from the document — is a save of the derived SSML,
+ * which needs no special case.
+ */
+export async function keepTranscript(documentVersionId: string): Promise<void> {
+  await prisma.documentVersion.update({
+    where: { id: documentVersionId },
+    data: { audioSsmlBase: await currentBaseline(documentVersionId) },
+  });
+}
+
+/** The fingerprint of what this version derives to right now, or null when it cannot be derived. */
+async function currentBaseline(documentVersionId: string): Promise<string | null> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    include: { language: true },
+  });
+  if (!version?.language.audioProvider || !version.language.audioVoice) return null;
+
+  const provider = getSpeechProvider(version.language.audioProvider);
+  return fingerprint(
+    deriveAudioSsml({
+      content: version.content,
+      voice: version.language.audioVoice,
+      maxBreakMs: provider.maxBreakMs,
+    }),
+  );
 }
