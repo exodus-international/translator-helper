@@ -64,6 +64,8 @@ interface TranslationProjectClientProps {
   }>[];
 }
 
+const UNASSIGNED_VALUE = '__unassigned__';
+
 const ROLE_LABELS: Record<ProjectRole, string> = {
   PROJECT_MANAGER: 'Project Manager',
   REVIEWER: 'Reviewer',
@@ -451,14 +453,16 @@ export default function TranslationProjectClient({
                     <div>
                       <Label htmlFor="assignee">Assign To (optional)</Label>
                       <Select
-                        value={selectedAssigneeId || ''}
-                        onValueChange={(value) => setSelectedAssigneeId(value || null)}
+                        value={selectedAssigneeId || UNASSIGNED_VALUE}
+                        onValueChange={(value) =>
+                          setSelectedAssigneeId(value === UNASSIGNED_VALUE ? null : value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Unassigned (visible to all)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Unassigned (visible to all)</SelectItem>
+                          <SelectItem value={UNASSIGNED_VALUE}>Unassigned (visible to all)</SelectItem>
                           {sortedMembers.map((member) => (
                             <SelectItem key={member.userId} value={member.userId}>
                               {member.user.name}
