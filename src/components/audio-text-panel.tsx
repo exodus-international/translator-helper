@@ -1,33 +1,44 @@
 'use client';
 
 import { RawEditorPane } from '@/components/raw-editor-panel';
-import { getAudioTranscriptAction } from '@/domain/audio/audio.actions';
+import { Button } from '@/components/ui/button';
+import {
+  getAudioTranscriptAction,
+  regenerateAudioAction,
+  saveAudioTranscriptAction,
+} from '@/domain/audio/audio.actions';
 import type { AudioTranscriptView } from '@/domain/audio/audio.types';
-import { Loader2 } from 'lucide-react';
+import { capture } from '@/lib/analytics';
+import { Loader2, Lock, Save, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 /**
  * The Audio text tab: the SSML that would be sent to the speech provider for
- * this version.
+ * this version, and the place to change it.
  *
  * Until this existed the transcript was built at generation time and thrown
- * away, so a mispronounced name could only be fixed by misspelling the document
- * readers see. Showing it is the first half of the fix.
+ * away, so the only way to fix a mispronounced name was to misspell it in the
+ * document readers see. Editing here never touches the document.
  *
- * Everything comes from a server action, deliberately: the SSML is built by the
- * audio rules, which pull in a Markdown parser and have no business in a
+ * Everything goes through server actions, deliberately: the SSML is built by
+ * the audio rules, which pull in a Markdown parser that has no business in a
  * browser bundle.
  */
 export function AudioTextPanel({ documentVersionId }: { documentVersionId: string }) {
   const [transcript, setTranscript] = useState<AudioTranscriptView | null>(null);
+  const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setTranscript(await getAudioTranscriptAction(documentVersionId));
+      const loaded = await getAudioTranscriptAction(documentVersionId);
+      setTranscript(loaded);
+      setDraft(loaded?.ssml ?? '');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load the audio text.');
     } finally {
@@ -38,6 +49,30 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
   useEffect(() => {
     load();
   }, [load]);
+
+  const dirty = transcript !== null && draft !== transcript.ssml;
+
+  const save = async ({ regenerate }: { regenerate: boolean }) => {
+    setSaving(true);
+    try {
+      await saveAudioTranscriptAction(documentVersionId, draft);
+      capture('audio_transcript_saved', { regenerate });
+
+      if (regenerate) {
+        const outcome = await regenerateAudioAction(documentVersionId);
+        if (outcome.status === 'failed') toast.error(outcome.error);
+        else if (outcome.status === 'skipped') toast.warning('Saved, but this document gets no audio.');
+        else toast.success('Saved. The audio is being generated from it.');
+      } else {
+        toast.success('Audio text saved. The next generation will use it.');
+      }
+      await load();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Could not save the audio text.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -64,11 +99,38 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
 
   return (
     <div className="flex h-full flex-col">
-      <p className="border-b bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-        This is what is sent to the speech provider. It is built from the translation, so editing the text changes it.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {!transcript.canEdit && <Lock className="h-3.5 w-3.5 shrink-0" />}
+          {transcript.canEdit
+            ? 'Sent to the speech provider as it stands. Editing it never changes the document.'
+            : (transcript.readOnlyReason ?? 'This audio text is read-only.')}
+        </p>
+        {transcript.canEdit && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => save({ regenerate: false })} disabled={!dirty || saving}>
+              <Save className="mr-1.5 h-3.5 w-3.5" />
+              Save
+            </Button>
+            <Button size="sm" onClick={() => save({ regenerate: true })} disabled={saving}>
+              {saving ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Save &amp; regenerate
+            </Button>
+          </div>
+        )}
+      </div>
       <div className="min-h-0 flex-1">
-        <RawEditorPane value={transcript.ssml} readOnly language="xml" fullHeight />
+        <RawEditorPane
+          value={draft}
+          onChange={transcript.canEdit ? setDraft : undefined}
+          readOnly={!transcript.canEdit || saving}
+          language="xml"
+          fullHeight
+        />
       </div>
     </div>
   );

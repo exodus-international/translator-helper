@@ -1,10 +1,14 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
-import type { AudioFile } from '@prisma/client';
+import prisma from '@/lib/db';
+import { type SessionUser } from '@/lib/session';
+import { Role, type AudioFile } from '@prisma/client';
+import { createActivityLog } from '../activity-log/activity-log.repository';
 import { assertCanEditDocumentVersion } from '../document-version/document-version.permissions';
+import { getUserRoleForLanguage } from '../user-language/user-language.repository';
 import { getLatestAudioFileForVersion } from './audio.repository';
-import { advanceJob, getAudioReadiness, getTranscript, startGeneration } from './audio.service';
+import { advanceJob, getAudioReadiness, getTranscript, saveTranscript, startGeneration } from './audio.service';
 import type {
   AudioFileView,
   AudioGenerationOutcome,
@@ -47,16 +51,64 @@ export async function regenerateAudioAction(documentVersionId: string): Promise<
  * is also how the editor decides whether to offer the tab.
  */
 export async function getAudioTranscriptAction(documentVersionId: string): Promise<AudioTranscriptView | null> {
-  await authorize('authenticated');
+  const { user } = await authorize('authenticated');
 
   const transcript = await getTranscript(documentVersionId);
   if (!transcript) return null;
 
+  const permission = await transcriptPermission(documentVersionId, user);
   return {
     ssml: transcript.ssml,
     state: transcript.source === 'override' ? 'edited' : 'generated',
-    canEdit: false,
+    canEdit: permission.canEdit,
+    readOnlyReason: permission.reason,
   };
+}
+
+/** Stores hand-edited SSML. The next generation sends exactly this. */
+export async function saveAudioTranscriptAction(documentVersionId: string, ssml: string): Promise<void> {
+  const { user } = await authorize('authenticated');
+  await assertCanEditDocumentVersion(documentVersionId, user);
+
+  await saveTranscript(documentVersionId, ssml);
+  await createActivityLog({
+    documentVersionId,
+    userId: user.id,
+    action: 'audio_transcript_edited',
+    details: { characters: ssml.length },
+  });
+}
+
+/**
+ * Whether this reader may change the transcript, and if not, why not, in words
+ * meant for them. Editing a transcript is the same right as editing the
+ * version, so the throwing check is the authority; this only turns its refusal
+ * into something worth reading.
+ */
+async function transcriptPermission(
+  documentVersionId: string,
+  user: SessionUser,
+): Promise<{ canEdit: boolean; reason?: string }> {
+  try {
+    await assertCanEditDocumentVersion(documentVersionId, user);
+    return { canEdit: true };
+  } catch {
+    if (user.role === Role.ADMIN) return { canEdit: false, reason: 'This document cannot be edited.' };
+
+    const version = await prisma.documentVersion.findUnique({
+      where: { id: documentVersionId },
+      select: { language: { select: { id: true, name: true } } },
+    });
+    if (!version) return { canEdit: false, reason: 'This document cannot be edited.' };
+
+    const assigned = (await getUserRoleForLanguage(user.id, version.language.id)) !== null;
+    return {
+      canEdit: false,
+      reason: assigned
+        ? 'You cannot edit this document, so its audio text is read-only.'
+        : `You are not assigned to ${version.language.name}. Ask an admin to add the language to your profile.`,
+    };
+  }
 }
 
 function toView(audioFile: AudioFile): AudioFileView {
