@@ -1,15 +1,17 @@
 'use client';
 
 import { RawEditorPane } from '@/components/raw-editor-panel';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   getAudioTranscriptAction,
   regenerateAudioAction,
+  resetAudioTranscriptAction,
   saveAudioTranscriptAction,
 } from '@/domain/audio/audio.actions';
 import type { AudioTranscriptView } from '@/domain/audio/audio.types';
 import { capture } from '@/lib/analytics';
-import { Loader2, Lock, Save, Sparkles } from 'lucide-react';
+import { Loader2, Lock, RotateCcw, Save, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -51,6 +53,7 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
   }, [load]);
 
   const dirty = transcript !== null && draft !== transcript.ssml;
+  const edited = transcript?.state !== 'generated';
 
   const save = async ({ regenerate }: { regenerate: boolean }) => {
     setSaving(true);
@@ -69,6 +72,20 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
       await load();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Could not save the audio text.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const reset = async () => {
+    setSaving(true);
+    try {
+      await resetAudioTranscriptAction(documentVersionId);
+      capture('audio_transcript_reset');
+      toast.success('Back to the audio text built from the document.');
+      await load();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'Could not reset the audio text.');
     } finally {
       setSaving(false);
     }
@@ -100,14 +117,25 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {!transcript.canEdit && <Lock className="h-3.5 w-3.5 shrink-0" />}
-          {transcript.canEdit
-            ? 'Sent to the speech provider as it stands. Editing it never changes the document.'
-            : (transcript.readOnlyReason ?? 'This audio text is read-only.')}
-        </p>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className={edited ? 'bg-amber-50 text-amber-700 border-amber-200' : undefined}>
+            {edited ? 'Edited' : 'Generated'}
+          </Badge>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {!transcript.canEdit && <Lock className="h-3.5 w-3.5 shrink-0" />}
+            {transcript.canEdit
+              ? 'Sent to the speech provider as it stands. Editing it never changes the document.'
+              : (transcript.readOnlyReason ?? 'This audio text is read-only.')}
+          </p>
+        </div>
         {transcript.canEdit && (
           <div className="flex items-center gap-2">
+            {edited && (
+              <Button variant="ghost" size="sm" onClick={reset} disabled={saving}>
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                Reset to generated
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => save({ regenerate: false })} disabled={!dirty || saving}>
               <Save className="mr-1.5 h-3.5 w-3.5" />
               Save

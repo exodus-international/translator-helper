@@ -103,6 +103,19 @@ export function resolveAudioSsml(input: TranscriptInput & { override?: string | 
   return { ssml: deriveAudioSsml(input), source: 'derived' };
 }
 
+export type AudioTranscriptState = 'generated' | 'edited' | 'edited_outdated';
+
+/**
+ * What state a version's transcript is in: derived from the document, hand
+ * edited, or hand edited before the document moved on underneath it.
+ *
+ * The third value arrives with the conflict work; until a fingerprint is
+ * stored, an override is simply "edited".
+ */
+export function transcriptState(input: { override?: string | null }): AudioTranscriptState {
+  return input.override?.trim() ? 'edited' : 'generated';
+}
+
 /** True when the document has no readable words left after the Markdown comes off. */
 export function hasReadableText(content: string): boolean {
   return markdownToSpeechScript(content).segments.some((segment) => segment.kind === 'text');

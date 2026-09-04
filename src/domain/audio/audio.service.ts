@@ -22,7 +22,9 @@ import {
   isAudioStale,
   localeFromVoice,
   resolveAudioSsml,
+  transcriptState,
   type AudioErrorKind,
+  type AudioTranscriptState,
 } from './audio.rules';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
@@ -358,7 +360,9 @@ function errorMessage(error: unknown): string {
  * Returns null when the document is not eligible for audio at all, which is
  * also what decides whether the Audio text tab exists.
  */
-export async function getTranscript(documentVersionId: string): Promise<{ ssml: string; source: 'derived' | 'override' } | null> {
+export async function getTranscript(
+  documentVersionId: string,
+): Promise<{ ssml: string; source: 'derived' | 'override'; state: AudioTranscriptState } | null> {
   const version = await prisma.documentVersion.findUnique({
     where: { id: documentVersionId },
     include: { document: { include: { sourceProject: true } }, language: true },
@@ -374,12 +378,14 @@ export async function getTranscript(documentVersionId: string): Promise<{ ssml: 
   if (skip) return null;
 
   const provider = getSpeechProvider(version.language.audioProvider!);
-  return resolveAudioSsml({
+  const resolved = resolveAudioSsml({
     content: version.content,
     override: version.audioSsml,
     voice: version.language.audioVoice!,
     maxBreakMs: provider.maxBreakMs,
   });
+
+  return { ...resolved, state: transcriptState({ override: version.audioSsml }) };
 }
 
 /**

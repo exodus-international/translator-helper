@@ -1,4 +1,5 @@
 import type { AudioProvider, AudioStatus } from '@prisma/client';
+import type { AudioTranscriptState } from './audio.rules';
 
 export type { AudioProvider, AudioStatus };
 
@@ -46,9 +47,6 @@ export interface AudioFileView {
   createdAt: string;
   updatedAt: string;
 }
-
-/** Where the SSML in the Audio text tab came from, and whether it still fits the document. */
-export type AudioTranscriptState = 'generated' | 'edited' | 'edited_outdated';
 
 /** What the Audio text tab needs to render itself. */
 export interface AudioTranscriptView {

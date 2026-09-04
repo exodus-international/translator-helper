@@ -10,6 +10,7 @@ import {
   localeFromVoice,
   parseAudioError,
   resolveAudioSsml,
+  transcriptState,
 } from './audio.rules';
 
 test('audio generated from the current version is not stale', () => {
@@ -114,4 +115,14 @@ test('a document with nothing to read is recognised before anything is generated
   assert.equal(hasReadableText('# Den 3\n\nDnes se budeme modlit.'), true);
   assert.equal(hasReadableText('<div data-read="false">jen na obrazovce</div>'), false);
   assert.equal(hasReadableText('   '), false);
+});
+
+test('a transcript with nothing stored is the generated one', () => {
+  assert.equal(transcriptState({ override: null }), 'generated');
+  assert.equal(transcriptState({ override: '  ' }), 'generated');
+  assert.equal(transcriptState({}), 'generated');
+});
+
+test('a stored override makes the transcript an edited one', () => {
+  assert.equal(transcriptState({ override: '<speak>Ahoj</speak>' }), 'edited');
 });

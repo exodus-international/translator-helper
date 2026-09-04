@@ -59,7 +59,7 @@ export async function getAudioTranscriptAction(documentVersionId: string): Promi
   const permission = await transcriptPermission(documentVersionId, user);
   return {
     ssml: transcript.ssml,
-    state: transcript.source === 'override' ? 'edited' : 'generated',
+    state: transcript.state,
     canEdit: permission.canEdit,
     readOnlyReason: permission.reason,
   };
@@ -76,6 +76,19 @@ export async function saveAudioTranscriptAction(documentVersionId: string, ssml:
     userId: user.id,
     action: 'audio_transcript_edited',
     details: { characters: ssml.length },
+  });
+}
+
+/** Drops the override so the transcript goes back to being derived from the document. */
+export async function resetAudioTranscriptAction(documentVersionId: string): Promise<void> {
+  const { user } = await authorize('authenticated');
+  await assertCanEditDocumentVersion(documentVersionId, user);
+
+  await saveTranscript(documentVersionId, null);
+  await createActivityLog({
+    documentVersionId,
+    userId: user.id,
+    action: 'audio_transcript_reset',
   });
 }
 
