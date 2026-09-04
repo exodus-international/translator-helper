@@ -15,9 +15,15 @@ import {
   releaseAudioFileToPending,
   setAudioFileJob,
 } from './audio.repository';
-import { audioSkipReason, formatAudioError, isAudioStale, type AudioErrorKind } from './audio.rules';
-import { markdownToSpeechScript } from './audio.script';
-import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
+import {
+  audioSkipReason,
+  formatAudioError,
+  hasReadableText,
+  isAudioStale,
+  localeFromVoice,
+  resolveAudioSsml,
+  type AudioErrorKind,
+} from './audio.rules';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
@@ -75,15 +81,13 @@ export async function startGeneration(
   // message so the card can word the two differently.
   let phase: AudioErrorKind = 'content';
   try {
-    const script = markdownToSpeechScript(version.content);
-    if (!script.segments.some((s) => s.kind === 'text')) {
+    if (!hasReadableText(version.content)) {
       throw new Error('The document has no readable text after stripping Markdown');
     }
-    const ssml = speechScriptToSsml(script, {
+    const { ssml } = resolveAudioSsml({
+      content: version.content,
       voice,
-      locale: localeFromVoice(voice),
       maxBreakMs: provider.maxBreakMs,
-      ...DEFAULT_PROSODY,
     });
 
     phase = 'provider';
@@ -275,10 +279,7 @@ async function fail(audioFile: AudioFile, message: string): Promise<AudioFile> {
   return updated;
 }
 
-/** `cs-CZ-AntoninNeural` -> `cs-CZ`. Provider voice ids lead with their locale. */
-export function localeFromVoice(voice: string): string {
-  return voice.split('-').slice(0, 2).join('-');
-}
+export { localeFromVoice };
 
 /** Azure allows 3-64 chars of [A-Za-z0-9-_.]; a UUID with a prefix fits. */
 function jobIdFor(audioFileId: string): string {
@@ -287,4 +288,34 @@ function jobIdFor(audioFileId: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The SSML for a version as the tab should show it: the stored override when
+ * there is one, otherwise what generation would derive right now.
+ *
+ * Returns null when the document is not eligible for audio at all, which is
+ * also what decides whether the Audio text tab exists.
+ */
+export async function getTranscript(documentVersionId: string): Promise<{ ssml: string; source: 'derived' | 'override' } | null> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    include: { document: { include: { sourceProject: true } }, language: true },
+  });
+  if (!version) return null;
+
+  const skip = audioSkipReason({
+    language: version.language,
+    document: version.document,
+    storageConfigured: isAudioStorageConfigured(),
+    providerConfigured: (provider) => getSpeechProvider(provider).isConfigured(),
+  });
+  if (skip) return null;
+
+  const provider = getSpeechProvider(version.language.audioProvider!);
+  return resolveAudioSsml({
+    content: version.content,
+    voice: version.language.audioVoice!,
+    maxBreakMs: provider.maxBreakMs,
+  });
 }

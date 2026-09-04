@@ -101,6 +101,8 @@ interface ViewerConfig {
   };
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /** Version id when this document is eligible for audio; enables the Audio text tab. */
+  audioTextVersionId?: string | null;
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
   sidebarSummary?: ReactNode;
   sidebarDetails?: ReactNode;
@@ -124,6 +126,7 @@ function EditorViewer({
   reviewConfig,
   translationPlaceholder,
   translationPreviewEmptyText,
+  audioTextVersionId,
   onEditSuggestion,
   sidebarSummary,
   sidebarDetails,
@@ -195,6 +198,7 @@ function EditorViewer({
       translationFormattedContent={translationFormattedContent}
       translationPlaceholder={translationPlaceholder}
       translationPreviewEmptyText={translationPreviewEmptyText}
+      audioTextVersionId={audioTextVersionId}
       onTranslationChange={setContent}
       sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
       translationBadge={<Badge variant="secondary">{targetVersion?.language?.name || 'New Translation'}</Badge>}
@@ -355,6 +359,8 @@ interface DocumentEditorProps {
   viewerRef?: Ref<SourceTranslationViewerHandle>;
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /** Version id when this document is eligible for audio; enables the Audio text tab. */
+  audioTextVersionId?: string | null;
 
   // Capabilities (value or function of live targetVersion from store)
   canEditSource: CapFn;
@@ -397,6 +403,7 @@ export function DocumentEditor({
   viewerRef,
   translationPlaceholder,
   translationPreviewEmptyText,
+  audioTextVersionId,
   canEditSource,
   canCreateSuggestions,
   disableReopen,
@@ -444,6 +451,7 @@ export function DocumentEditor({
               reviewConfig={reviewConfig}
               translationPlaceholder={translationPlaceholder}
               translationPreviewEmptyText={translationPreviewEmptyText}
+              audioTextVersionId={audioTextVersionId}
               onEditSuggestion={onEditSuggestion}
               sidebarSummary={sidebarSummary}
               sidebarDetails={sidebarDetails}

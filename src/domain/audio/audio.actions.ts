@@ -4,8 +4,13 @@ import { authorize } from '@/lib/authorize';
 import type { AudioFile } from '@prisma/client';
 import { assertCanEditDocumentVersion } from '../document-version/document-version.permissions';
 import { getLatestAudioFileForVersion } from './audio.repository';
-import { advanceJob, getAudioReadiness, startGeneration } from './audio.service';
-import type { AudioFileView, AudioGenerationOutcome, AudioReadiness } from './audio.types';
+import { advanceJob, getAudioReadiness, getTranscript, startGeneration } from './audio.service';
+import type {
+  AudioFileView,
+  AudioGenerationOutcome,
+  AudioReadiness,
+  AudioTranscriptView,
+} from './audio.types';
 
 export async function getLatestAudioFileAction(documentVersionId: string): Promise<AudioFileView | null> {
   await authorize('authenticated');
@@ -34,6 +39,24 @@ export async function regenerateAudioAction(documentVersionId: string): Promise<
   const { user } = await authorize('authenticated');
   await assertCanEditDocumentVersion(documentVersionId, user);
   return startGeneration(documentVersionId, user.id, { trigger: 'regeneration' });
+}
+
+/**
+ * What the Audio text tab renders: the SSML that would be sent to Azure for
+ * this version right now. Null when the document gets no audio at all, which
+ * is also how the editor decides whether to offer the tab.
+ */
+export async function getAudioTranscriptAction(documentVersionId: string): Promise<AudioTranscriptView | null> {
+  await authorize('authenticated');
+
+  const transcript = await getTranscript(documentVersionId);
+  if (!transcript) return null;
+
+  return {
+    ssml: transcript.ssml,
+    state: transcript.source === 'override' ? 'edited' : 'generated',
+    canEdit: false,
+  };
 }
 
 function toView(audioFile: AudioFile): AudioFileView {

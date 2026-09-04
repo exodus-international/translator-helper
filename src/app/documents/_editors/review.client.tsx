@@ -27,6 +27,8 @@ interface ReviewClientProps {
   targetLanguage?: { code: string; name: string } | null;
   translationProjectId?: string | null;
   user: SessionUser;
+  /** Set when this document gets audio; enables the Audio text tab. */
+  audioTextVersionId?: string | null;
   initialSuggestions?: any[];
 }
 
@@ -44,6 +46,7 @@ export default function ReviewClient({
   targetLanguage,
   translationProjectId = null,
   user,
+  audioTextVersionId = null,
   initialSuggestions = [],
 }: ReviewClientProps) {
   useAnalyticsProjectGroup(document?.sourceProject?.id, document?.sourceProject?.name);
@@ -57,6 +60,7 @@ export default function ReviewClient({
       initialSuggestions={initialSuggestions}
       translationProjectId={translationProjectId}
       user={user}
+      audioTextVersionId={audioTextVersionId}
       variant="review"
       header={<ReviewToolbar document={document} sourceVersion={sourceVersion} user={user} />}
       canEditSource={(tv) => isAdminClient(user) && !isApprovedOrLater(tv)}

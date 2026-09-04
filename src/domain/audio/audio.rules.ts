@@ -1,4 +1,6 @@
 import type { AudioProvider, DocumentType } from '@prisma/client';
+import { markdownToSpeechScript } from './audio.script';
+import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
 import type { AudioSkipReason } from './audio.types';
 
 /**
@@ -48,4 +50,60 @@ export function parseAudioError(stored: string | null): { kind: AudioErrorKind |
   const match = stored.match(ERROR_PREFIX);
   if (!match) return { kind: 'unknown', message: stored };
   return { kind: match[1] as AudioErrorKind, message: stored.slice(match[0].length) };
+}
+
+// ─── The transcript ──────────────────────────────────────────
+//
+// The SSML a version is spoken from is normally derived from its Markdown, but
+// a person may store their own and have that sent instead. These decide which
+// one wins and what state the transcript is in; the service does the talking to
+// the database and the provider.
+
+/** `cs-CZ-AntoninNeural` -> `cs-CZ`. Provider voice ids lead with their locale. */
+export function localeFromVoice(voice: string): string {
+  return voice.split('-').slice(0, 2).join('-');
+}
+
+export interface TranscriptInput {
+  /** The version's stored Markdown. */
+  content: string;
+  /** Provider voice identifier for the document's language. */
+  voice: string;
+  /** Longest single break the provider honours. */
+  maxBreakMs: number;
+}
+
+/** Exactly what generation would send for a version with no override. */
+export function deriveAudioSsml({ content, voice, maxBreakMs }: TranscriptInput): string {
+  return speechScriptToSsml(markdownToSpeechScript(content), {
+    voice,
+    locale: localeFromVoice(voice),
+    maxBreakMs,
+    ...DEFAULT_PROSODY,
+  });
+}
+
+export type AudioSsmlSource = 'derived' | 'override';
+
+export interface ResolvedAudioSsml {
+  ssml: string;
+  source: AudioSsmlSource;
+}
+
+/**
+ * The one answer to "what SSML do we send for this version, and where did it
+ * come from". A stored override is sent verbatim, wrapper and voice included,
+ * which is what lets someone fix a pronunciation without touching the text
+ * readers see — and what makes an edited document keep its voice after the
+ * language's default changes.
+ */
+export function resolveAudioSsml(input: TranscriptInput & { override?: string | null }): ResolvedAudioSsml {
+  const override = input.override?.trim();
+  if (override) return { ssml: input.override!, source: 'override' };
+  return { ssml: deriveAudioSsml(input), source: 'derived' };
+}
+
+/** True when the document has no readable words left after the Markdown comes off. */
+export function hasReadableText(content: string): boolean {
+  return markdownToSpeechScript(content).segments.some((segment) => segment.kind === 'text');
 }

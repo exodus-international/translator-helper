@@ -46,3 +46,16 @@ export interface AudioFileView {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Where the SSML in the Audio text tab came from, and whether it still fits the document. */
+export type AudioTranscriptState = 'generated' | 'edited' | 'edited_outdated';
+
+/** What the Audio text tab needs to render itself. */
+export interface AudioTranscriptView {
+  ssml: string;
+  state: AudioTranscriptState;
+  /** False when the reader may look but not change it. */
+  canEdit: boolean;
+  /** Why they may not, in words meant for them. */
+  readOnlyReason?: string;
+}
