@@ -55,8 +55,8 @@ export function DocumentEditorHeader({
   actions: ReactNode;
 }) {
   return (
-    <div className="border-b bg-white">
-      <div className="px-3 py-1.5 flex items-center justify-between gap-3">
+    <div className="border-b bg-background">
+      <div className="flex flex-col gap-2 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {document.sourceProject && (
             <>
@@ -70,11 +70,11 @@ export function DocumentEditorHeader({
             </>
           )}
           <h1 className="text-sm font-semibold truncate">{document.title}</h1>
-          <span className="text-xs text-gray-500 shrink-0">
+          <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
             {sourceLanguageName} → {targetLanguageName}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { AvatarUploader } from '@/components/avatar-uploader';
+import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,13 +48,8 @@ interface ProfileClientProps {
 
 export default function ProfileClient({ profile, avatarUploadEnabled }: ProfileClientProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">Profile</h1>
-          <p className="text-sm text-gray-600">Your picture, contact details and password.</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader title="Profile" description="Your picture, contact details and password." />
 
       <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
         <IdentityCard profile={profile} avatarUploadEnabled={avatarUploadEnabled} />

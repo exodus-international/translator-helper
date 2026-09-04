@@ -26,6 +26,8 @@ import {
 } from '@/domain/document-version/document-version.actions';
 import { translateDocumentAction } from '@/domain/translation/translation.actions';
 import { capture } from '@/lib/analytics';
+import { cn } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -171,6 +173,16 @@ export default function TranslateClient({
 // Toolbar (covers both regular and zen variants)
 // ──────────────────────────────────────────────────────────────────────
 
+const SAVE_STATUS_META: Record<
+  'saved' | 'unsaved' | 'saving' | 'error',
+  { icon: LucideIcon; textClass: string; label: string; spin?: boolean }
+> = {
+  saving: { icon: Loader2, textClass: 'text-muted-foreground', label: 'Saving...', spin: true },
+  saved: { icon: Cloud, textClass: 'text-green-600', label: 'Saved' },
+  unsaved: { icon: CloudOff, textClass: 'text-amber-600', label: 'Unsaved changes' },
+  error: { icon: CloudOff, textClass: 'text-red-600', label: 'Save failed' },
+};
+
 function SaveStatusIndicator({
   status,
   lastSavedAt,
@@ -178,38 +190,17 @@ function SaveStatusIndicator({
   status: 'saved' | 'unsaved' | 'saving' | 'error';
   lastSavedAt: Date | null;
 }) {
+  const meta = SAVE_STATUS_META[status];
+  const Icon = meta.icon;
   const timeStr = lastSavedAt ? lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+  const label = status === 'saved' && timeStr ? `Saved at ${timeStr}` : meta.label;
 
-  switch (status) {
-    case 'saving':
-      return (
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span>Saving...</span>
-        </div>
-      );
-    case 'saved':
-      return (
-        <div className="flex items-center gap-1.5 text-xs text-green-600">
-          <Cloud className="h-3.5 w-3.5" />
-          <span>Saved{timeStr ? ` at ${timeStr}` : ''}</span>
-        </div>
-      );
-    case 'unsaved':
-      return (
-        <div className="flex items-center gap-1.5 text-xs text-amber-600">
-          <CloudOff className="h-3.5 w-3.5" />
-          <span>Unsaved changes</span>
-        </div>
-      );
-    case 'error':
-      return (
-        <div className="flex items-center gap-1.5 text-xs text-red-600">
-          <CloudOff className="h-3.5 w-3.5" />
-          <span>Save failed</span>
-        </div>
-      );
-  }
+  return (
+    <div className={cn('flex items-center gap-1.5 text-xs', meta.textClass)} title={label}>
+      <Icon className={cn('size-3.5', meta.spin && 'animate-spin')} />
+      <span className="hidden sm:inline">{label}</span>
+    </div>
+  );
 }
 
 function TranslateToolbar({
@@ -343,14 +334,14 @@ function TranslateToolbar({
   };
 
   const busy = loading || translating || isAnyLoading;
-  const canDelete = targetVersion?.status === 'PENDING_TRANSLATION' && isAdminClient(user);
+  const canDelete = targetVersion?.status === DocumentStatus.PENDING_TRANSLATION && isAdminClient(user);
 
   // ─── Zen mode header ──────────────────────────────────────────
   if (zenMode) {
     return (
-      <div className="border-b bg-white shadow-sm">
+      <div className="border-b bg-background shadow-sm">
         <div className="px-4 py-2 flex items-center justify-between">
-          <div className="text-sm text-gray-600">{document.title} • Zen Mode</div>
+          <div className="min-w-0 truncate text-sm text-muted-foreground">{document.title} • Zen Mode</div>
           <div className="flex flex-wrap items-center gap-2">
             {targetVersion ? (
               <>
@@ -363,11 +354,26 @@ function TranslateToolbar({
                   onStatusChange={handleStatusChange}
                   onReviewRequested={handleOpenReviewDialog}
                 />
+                {targetVersion.status === DocumentStatus.IN_PROGRESS && (
+                  <Button size="sm" onClick={handleOpenReviewDialog} disabled={busy}>
+                    <Send />
+                    Submit
+                  </Button>
+                )}
+                {targetVersion.status !== DocumentStatus.PENDING_TRANSLATION && (
+                  <>
+                    <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+                    <Button variant="outline" size="sm" onClick={handleSave} disabled={busy}>
+                      <Save />
+                      Save
+                    </Button>
+                  </>
+                )}
                 {content.trim().length > 0 ? (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm" disabled={busy || !targetLanguageId}>
-                        <Sparkles className="h-4 w-4 mr-2" />
+                        <Sparkles />
                         {translating ? 'Translating...' : 'Translate'}
                       </Button>
                     </AlertDialogTrigger>
@@ -386,30 +392,26 @@ function TranslateToolbar({
                   </AlertDialog>
                 ) : (
                   <Button variant="outline" size="sm" onClick={handleAutoTranslate} disabled={busy || !targetLanguageId}>
-                    <Sparkles className="h-4 w-4 mr-2" />
+                    <Sparkles />
                     {translating ? 'Translating...' : 'Translate'}
                   </Button>
                 )}
-                {targetVersion.status !== 'PENDING_TRANSLATION' && (
-                  <>
-                    <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
-                    <Button variant="outline" size="sm" onClick={handleSave} disabled={busy}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
-                  </>
-                )}
-                {targetVersion.status === 'IN_PROGRESS' && (
-                  <Button size="sm" onClick={handleOpenReviewDialog} disabled={busy}>
-                    <Send className="h-4 w-4 mr-2" />
-                    Submit
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    capture('zen_mode_toggled', { enabled: false });
+                    setZenMode(false);
+                  }}
+                >
+                  <Minimize2 />
+                  Exit Zen (Esc)
+                </Button>
                 {canDelete && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm" disabled={loading || isAnyLoading}>
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 />
                         Delete
                       </Button>
                     </AlertDialogTrigger>
@@ -433,21 +435,10 @@ function TranslateToolbar({
                 Start Translation
               </Button>
             ) : (
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 Please select a target language from the documents page to start translating.
               </span>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                capture('zen_mode_toggled', { enabled: false });
-                setZenMode(false);
-              }}
-            >
-              <Minimize2 className="h-4 w-4 mr-2" />
-              Exit Zen (Esc)
-            </Button>
           </div>
         </div>
       </div>
@@ -455,12 +446,27 @@ function TranslateToolbar({
   }
 
   // ─── Default header ──────────────────────────────────────────
+  // Header actions, ordered by workflow: status/submit → save → AI assist → view → destructive.
   const actions = targetVersion ? (
     <>
-      {targetVersion.status !== 'PENDING_TRANSLATION' && (
+      <StatusDropdown
+        currentStatus={targetVersion.status}
+        versionId={targetVersion.id}
+        user={user}
+        documentId={document.id}
+        disabled={busy}
+        onStatusChange={handleStatusChange}
+        onReviewRequested={handleOpenReviewDialog}
+      />
+      {targetVersion.status !== DocumentStatus.PENDING_TRANSLATION && (
         <>
+          <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
+          <Button variant="outline" size="sm" onClick={handleSave} disabled={busy}>
+            <Save />
+            Save
+          </Button>
           <Button variant="outline" size="sm" onClick={handleAutoTranslate} disabled={busy || !targetLanguageId}>
-            <Sparkles className="h-4 w-4 mr-1" />
+            <Sparkles />
             {translating ? 'Translating...' : 'AI Translate'}
           </Button>
           <Button
@@ -471,27 +477,13 @@ function TranslateToolbar({
               setZenMode(true);
             }}
           >
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-          <SaveStatusIndicator status={saveStatus} lastSavedAt={lastSavedAt} />
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={busy}>
-            <Save className="h-4 w-4 mr-1" />
-            Save
+            <Maximize2 />
           </Button>
         </>
       )}
-      <StatusDropdown
-        currentStatus={targetVersion.status}
-        versionId={targetVersion.id}
-        user={user}
-        documentId={document.id}
-        disabled={busy}
-        onStatusChange={handleStatusChange}
-        onReviewRequested={handleOpenReviewDialog}
-      />
       {canDelete && (
         <Button variant="outline" size="sm" onClick={handleDeleteTranslation} disabled={loading || isAnyLoading}>
-          <Trash2 className="h-4 w-4 mr-1" />
+          <Trash2 />
           Delete
         </Button>
       )}
@@ -501,7 +493,7 @@ function TranslateToolbar({
       Start Translation
     </Button>
   ) : (
-    <span className="text-sm text-gray-500">
+    <span className="text-sm text-muted-foreground">
       Please select a target language from the documents page to start translating.
     </span>
   );

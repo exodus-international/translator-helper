@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
@@ -42,41 +43,37 @@ export function AdminListPage({
   children,
 }: AdminListPageProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">{title}</h1>
-              <p className="text-gray-600">{description}</p>
-            </div>
-            <Dialog open={dialogOpen} onOpenChange={onDialogOpenChange}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {addLabel}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{dialogTitle}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={onSubmit} className="space-y-4">
-                  {formFields}
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => onDialogOpenChange(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={loading}>
-                      {loading ? 'Saving...' : 'Save'}
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        title={title}
+        description={description}
+        actions={
+          <Dialog open={dialogOpen} onOpenChange={onDialogOpenChange}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus />
+                {addLabel}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{dialogTitle}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={onSubmit} className="space-y-4">
+                {formFields}
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => onDialogOpenChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4">{children}</div>

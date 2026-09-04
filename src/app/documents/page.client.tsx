@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { PageHeader } from '@/components/page-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DocumentSearchInput } from '@/components/document-search-input';
@@ -155,42 +156,38 @@ export default function DocumentsClient({
   const totalColumns = 3 + languages.length + (isAdmin ? 1 : 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Documents Overview</h1>
-              <p className="text-gray-600">View translation status across all languages</p>
-            </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        title="Documents Overview"
+        description="View translation status across all languages"
+        actions={
+          <Button asChild>
             <Link href="/documents/new">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Document
-              </Button>
+              <Plus />
+              New Document
             </Link>
-          </div>
-
-          <div className="mt-4 flex gap-4 items-center">
-            <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
-            <div className="w-48">
-              <Select value={selectedSourceProject} onValueChange={setSelectedSourceProject}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All projects</SelectItem>
-                  {sourceProjects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name} ({project._count.documents})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          </Button>
+        }
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
+          <div className="w-full sm:w-48">
+            <Select value={selectedSourceProject} onValueChange={setSelectedSourceProject}>
+              <SelectTrigger className="w-full sm:w-fit">
+                <SelectValue placeholder="All projects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All projects</SelectItem>
+                {sourceProjects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name} ({project._count.documents})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="container mx-auto px-4 py-4">
         {filteredDocuments.length === 0 ? (

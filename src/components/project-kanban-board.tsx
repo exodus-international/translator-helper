@@ -480,13 +480,13 @@ export default function ProjectKanbanBoard({
   return (
     <div>
       {deployDialog}
-      <div className="flex gap-4 items-center mb-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
-        <div className="flex gap-4 items-center text-sm text-gray-600">
-          <span>Filters:</span>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-4">
+          <span className="hidden sm:inline">Filters:</span>
           <DocumentTypeFilter selected={selectedTypes} onChange={handleTypeFilterChange} />
           <Select value={selectedUser} onValueChange={setSelectedUser}>
-            <SelectTrigger className="min-w-[200px]">
+            <SelectTrigger className="min-w-0 flex-1 sm:min-w-[200px]">
               <div className="flex items-center gap-2">
                 <SelectValue placeholder="All users" className="[&_div]:hidden! [&_span:last-child]:inline!" />
               </div>

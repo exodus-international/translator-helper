@@ -3,6 +3,7 @@
 import { DeleteConfirmDialog } from '@/components/admin-list-page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -146,21 +147,17 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
       : `New ${type === 'BANNER' ? 'Banner' : 'Modal'}`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Announcements</h1>
-              <p className="text-gray-600">Notify users about new functionality or ask for their input</p>
-            </div>
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Announcement
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        title="Announcements"
+        description="Notify users about new functionality or ask for their input"
+        actions={
+          <Button onClick={openCreate}>
+            <Plus />
+            Add Announcement
+          </Button>
+        }
+      />
 
       <Dialog
         open={dialogOpen}
