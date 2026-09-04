@@ -34,7 +34,6 @@ import { DocumentStatus, DocumentType, Language } from '@prisma/client';
 import { ArrowDown, ArrowUp, ArrowUpDown, FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Fragment, useMemo } from 'react';
 import type { DocumentOverviewSort } from '@/domain/document/document.repository';
 
 // Mirrors `documentOverviewSelect` in document.repository.ts. Keep the two in
@@ -151,35 +150,6 @@ export default function DocumentsClient({
     router.push(`${pathname}${buildListSearchParams(searchParams, updates)}`);
   };
 
-  // Group the current page by source project, preserving the server-side sort
-  // order — first appearance wins, so sorted documents stay sorted.
-  const groupedDocuments = useMemo(() => {
-    const groups: Array<{ projectName: string; projectId: string | null; docs: DocumentWithVersions[] }> = [];
-    const projectMap = new Map<string | null, DocumentWithVersions[]>();
-
-    for (const doc of documents) {
-      const key = doc.sourceProjectId;
-      if (!projectMap.has(key)) {
-        projectMap.set(key, []);
-      }
-      projectMap.get(key)!.push(doc);
-    }
-
-    for (const [projectId, docs] of projectMap) {
-      const projectName = docs[0]?.sourceProject?.name || 'Unassigned';
-      groups.push({ projectName, projectId, docs });
-    }
-
-    // Move "Unassigned" to the end
-    groups.sort((a, b) => {
-      if (a.projectId === null) return 1;
-      if (b.projectId === null) return -1;
-      return 0;
-    });
-
-    return groups;
-  }, [documents]);
-
   // The title opens the language this document is actually being worked in,
   // falling back to the first target language. With no target languages at all
   // there is no editor URL to build, so it links to the overview row's edit form.
@@ -211,14 +181,7 @@ export default function DocumentsClient({
     return version?.id;
   };
 
-  const totalColumns = 3 + languages.length + (isAdmin ? 1 : 0);
   const isFiltered = searchQuery !== '' || selectedSourceProject !== 'all' || selectedType !== 'all';
-
-  // The project-grouped table is the default overview. Any explicit sort
-  // renders a flat list in true global order instead — grouping would only
-  // sort within each bucket and repeat project headers across pages.
-  const isGroupedView = sort === 'updatedAt' && order === 'desc';
-  const tableSections = isGroupedView ? groupedDocuments : [{ projectName: '', projectId: 'flat', docs: documents }];
 
   const sortHrefFor = (key: DocumentOverviewSort) => {
     const nextOrder = sort === key && order === 'asc' ? 'desc' : 'asc';
@@ -371,130 +334,121 @@ export default function DocumentsClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tableSections.map((group) => (
-                  <Fragment key={`group-${group.projectId || 'unassigned'}`}>
-                    {/* Group header row (grouped overview only) */}
-                    {isGroupedView && (
-                      <TableRow className="bg-gray-100/60 hover:bg-gray-100/60">
-                        <TableCell colSpan={totalColumns} className="py-2 px-4">
-                          <span className="text-sm font-semibold text-gray-700">{group.projectName}</span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            ({group.docs.length} {group.docs.length === 1 ? 'document' : 'documents'})
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    )}
-
-                    {/* Document rows */}
-                    {group.docs.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <Link
-                              href={titleHref(doc)}
-                              prefetch={false}
-                              className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {doc.title}
-                            </Link>
-                            {doc.labels && doc.labels.length > 0 && (
-                              <div className="flex gap-1 flex-wrap">
-                                {doc.labels.map((label: string) => (
-                                  <Badge key={label} variant="secondary" className="text-xs py-0">
-                                    {label}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
+                {/*
+                  Flat list, never grouped by project. Grouping could only ever
+                  see the rows the server sliced out for this page, so headers
+                  would repeat across pages, their counts would report the page
+                  rather than the project, and the bucketing would pull rows out
+                  of the true global sort. The project filter (whose dropdown
+                  carries real per-project counts) is the way to view one project.
+                */}
+                {documents.map((doc) => (
+                  <TableRow key={doc.id}>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Link
+                          href={titleHref(doc)}
+                          prefetch={false}
+                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {doc.title}
+                        </Link>
+                        {doc.labels && doc.labels.length > 0 && (
+                          <div className="flex gap-1 flex-wrap">
+                            {doc.labels.map((label: string) => (
+                              <Badge key={label} variant="secondary" className="text-xs py-0">
+                                {label}
+                              </Badge>
+                            ))}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-gray-600 text-sm">{doc.originalFilename || '—'}</TableCell>
-                        <TableCell>
-                          {doc.type ? (
-                            <DocumentTypeBadge type={doc.type} />
-                          ) : (
-                            <span className="text-gray-400 text-sm">—</span>
-                          )}
-                        </TableCell>
-                        {languages.map((lang) => {
-                          const status = getLanguageStatus(doc, lang.id);
-                          const versionId = getVersionId(doc, lang.id);
-                          const statusConfig = getDocumentStatusConfig(status);
-                          const IndicatorIcon = statusConfig.icon;
-
-                          // One URL per language; the status decides which editor opens.
-                          const href = buildDocumentPath({
-                            projectIdentifier: doc.sourceProject?.identifier,
-                            slug: doc.slug,
-                            languageCode: lang.code,
-                            documentId: doc.id,
-                          });
-
-                          return (
-                            <TableCell key={lang.id} className="text-center">
-                              <Link href={href} prefetch={false} className="group inline-flex justify-center">
-                                <div
-                                  className={`${statusConfig.color.textClass} transition-transform group-hover:scale-125 cursor-pointer`}
-                                  title={versionId ? statusConfig.name : 'Start translation'}
-                                >
-                                  <IndicatorIcon className="h-4 w-4" />
-                                </div>
-                              </Link>
-                            </TableCell>
-                          );
-                        })}
-                        {isAdmin && (
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Link
-                                href={buildDocumentEditPath({
-                                  projectIdentifier: doc.sourceProject?.identifier,
-                                  slug: doc.slug,
-                                  documentId: doc.id,
-                                })}
-                                prefetch={false}
-                              >
-                                <Button variant="ghost" size="sm">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </Link>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Document</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete &ldquo;{doc.title}&rdquo;? This will delete the
-                                      source version and all translation versions. This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={async () => {
-                                        await handleDeleteDocument(doc.id);
-                                        capture('document_deleted', { location: 'list', document_id: doc.id });
-                                      }}
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
                         )}
-                      </TableRow>
-                    ))}
-                  </Fragment>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-600 text-sm">{doc.originalFilename || '—'}</TableCell>
+                    <TableCell>
+                      {doc.type ? (
+                        <DocumentTypeBadge type={doc.type} />
+                      ) : (
+                        <span className="text-gray-400 text-sm">—</span>
+                      )}
+                    </TableCell>
+                    {languages.map((lang) => {
+                      const status = getLanguageStatus(doc, lang.id);
+                      const versionId = getVersionId(doc, lang.id);
+                      const statusConfig = getDocumentStatusConfig(status);
+                      const IndicatorIcon = statusConfig.icon;
+
+                      // One URL per language; the status decides which editor opens.
+                      const href = buildDocumentPath({
+                        projectIdentifier: doc.sourceProject?.identifier,
+                        slug: doc.slug,
+                        languageCode: lang.code,
+                        documentId: doc.id,
+                      });
+
+                      return (
+                        <TableCell key={lang.id} className="text-center">
+                          <Link href={href} prefetch={false} className="group inline-flex justify-center">
+                            <div
+                              className={`${statusConfig.color.textClass} transition-transform group-hover:scale-125 cursor-pointer`}
+                              title={versionId ? statusConfig.name : 'Start translation'}
+                            >
+                              <IndicatorIcon className="h-4 w-4" />
+                            </div>
+                          </Link>
+                        </TableCell>
+                      );
+                    })}
+                    {isAdmin && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Link
+                            href={buildDocumentEditPath({
+                              projectIdentifier: doc.sourceProject?.identifier,
+                              slug: doc.slug,
+                              documentId: doc.id,
+                            })}
+                            prefetch={false}
+                          >
+                            <Button variant="ghost" size="sm">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Document</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete &ldquo;{doc.title}&rdquo;? This will delete the source
+                                  version and all translation versions. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={async () => {
+                                    await handleDeleteDocument(doc.id);
+                                    capture('document_deleted', { location: 'list', document_id: doc.id });
+                                  }}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
