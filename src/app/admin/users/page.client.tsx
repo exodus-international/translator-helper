@@ -730,6 +730,10 @@ export default function UsersClient({
   const { table } = useDataTable({
     data: searchedUsers,
     columns,
+    // Deliberately client-side (not the server-side list-params stack used by
+    // Documents/Projects): the last-seen / last-edit aggregates need
+    // full-table scans regardless, the admin user count is small, and CSV
+    // export operates on this same filtered/sorted view.
     initialState: {
       pagination: { pageIndex: 0, pageSize: 25 },
       sorting: [{ id: 'languages', desc: false }],

@@ -7,18 +7,45 @@ import { listTargetLanguages } from '../language/language.repository';
 import { createTranslationProject } from '../translation-project/translation-project.repository';
 import { createSourceProjectSchema, updateSourceProjectSchema } from './source-project.types';
 import {
+  countSourceProjects,
   listSourceProjects,
+  listSourceProjectsPaginated,
   getSourceProjectById,
   getSourceProjectByIdentifier,
   getSourceProjectsForUser,
   createSourceProject,
   updateSourceProject,
   deleteSourceProject,
+  type SourceProjectSort,
 } from './source-project.repository';
 
 export async function listSourceProjectsAction(options?: { includeComplete?: boolean }) {
   await authorize('authenticated');
   return await listSourceProjects(options);
+}
+
+/**
+ * Server-side pagination, search, and sorting for the admin projects list
+ * (issue #51). Returns the page plus the total for the range line.
+ *
+ * The count and the page are two independent queries, so a concurrent
+ * insert can make the total disagree with the page by one row. Fine at
+ * this scale; the pagination range clamps defensively regardless.
+ */
+export async function listSourceProjectsPaginatedAction(filters: {
+  search?: string;
+  includeComplete?: boolean;
+  sort?: SourceProjectSort;
+  order?: 'asc' | 'desc';
+  skip?: number;
+  take?: number;
+}) {
+  await authorize('authenticated');
+  const [sourceProjects, total] = await Promise.all([
+    listSourceProjectsPaginated(filters),
+    countSourceProjects(filters),
+  ]);
+  return { sourceProjects, total };
 }
 
 export async function getSourceProjectsForUserAction() {
