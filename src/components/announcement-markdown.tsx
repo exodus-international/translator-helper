@@ -1,7 +1,6 @@
 'use client';
 
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MarkdownPreview } from '@/components/markdown-preview';
 
 // Compact markdown styling for announcement surfaces. Deliberately does NOT
 // use `.prose` (globals.css): those rules are unlayered so they beat Tailwind
@@ -19,9 +18,5 @@ const MARKDOWN_CLASSES = [
 ].join(' ');
 
 export function AnnouncementMarkdown({ children }: { children: string }) {
-  return (
-    <div className={MARKDOWN_CLASSES}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
-    </div>
-  );
+  return <MarkdownPreview content={children} className={MARKDOWN_CLASSES} />;
 }
