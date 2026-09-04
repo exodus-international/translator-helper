@@ -129,7 +129,7 @@ export function Navigation({ user }: NavigationProps) {
                 <Menu />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex w-80 flex-col gap-0 p-0">
+            <SheetContent side="left" className="flex w-80 max-w-[85vw] flex-col gap-0 p-0">
               <SheetHeader className="border-b p-4 text-left">
                 <SheetTitle className="flex items-center gap-2 text-base font-bold">
                   <Logo size={24} />

@@ -17,8 +17,8 @@ import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analyt
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { Language } from '@prisma/client';
-import { ArrowLeft, BarChart3, CheckCircle2, LayoutDashboard, Settings, Users } from 'lucide-react';
-import Link from 'next/link';
+import { BarChart3, CheckCircle2, LayoutDashboard, Settings, Users } from 'lucide-react';
+import { PageHeader } from '@/components/page-header';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -156,37 +156,25 @@ export default function ProjectDetailClient({
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b bg-background">
-        <div className="container mx-auto px-4 py-4">
-          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <div className="flex min-w-0 flex-1 items-center gap-4">
-              <Link href="/dashboard" className="shrink-0 text-muted-foreground transition-colors hover:text-foreground">
-                <ArrowLeft className="size-5" />
-              </Link>
-              <div className="min-w-0 flex-1">
-                <h1 className="truncate text-xl font-bold sm:text-2xl">{sourceProject.name}</h1>
-                {sourceProject.description && (
-                  <p className="mt-0.5 truncate text-sm text-muted-foreground">{sourceProject.description}</p>
-                )}
-              </div>
-            </div>
-            <div className="sm:shrink-0">
-              <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  {languages.map((lang) => (
-                    <SelectItem key={lang.id} value={lang.id}>
-                      {lang.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        back={{ href: '/dashboard', label: 'Dashboard' }}
+        title={sourceProject.name}
+        description={sourceProject.description ?? undefined}
+        actions={
+          <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Select language" />
+            </SelectTrigger>
+            <SelectContent>
+              {languages.map((lang) => (
+                <SelectItem key={lang.id} value={lang.id}>
+                  {lang.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
+      />
 
       <div className="container mx-auto px-4 py-4">
         <Tabs defaultValue="dashboard">

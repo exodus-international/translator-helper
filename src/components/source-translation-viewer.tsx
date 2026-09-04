@@ -168,7 +168,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     );
     const isZen = layout === 'zen';
     const isYaml = contentLanguage === 'yaml';
-    const { open: sidebarOpen, openMobile, setOpenMobile, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
+    const { open: sidebarOpen, openMobile, setOpenMobile, toggleSidebar } = useSidebar();
     const isMobile = useIsMobile();
     // Mobile shows one pane at a time; translation is the working pane, so start there.
     const [mobilePane, setMobilePane] = useState<'source' | 'translation'>('translation');
@@ -345,6 +345,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       ? 'p-3 flex flex-1 flex-col min-w-0 min-h-0'
       : 'p-0 gap-0 shadow-none flex flex-1 flex-col min-w-0 min-h-0';
     const bodyClassName = isZen ? 'flex-1 min-h-0 overflow-hidden relative' : 'flex-1 min-h-0 overflow-hidden';
+    // Mobile: only the active pane is displayed; desktop keeps both side by side.
+    const paneVisibility = (visible: boolean) => (visible ? 'flex' : 'hidden md:flex');
     const sourcePaneVisible = !isMobile || mobilePane === 'source';
     const translationPaneVisible = !isMobile || mobilePane === 'translation';
 
@@ -556,7 +558,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             className={cn(
               cardClassName,
               'rounded-none border-t-0 border-r-0 pt-1',
-              sourcePaneVisible ? 'flex' : 'hidden md:flex',
+              paneVisibility(sourcePaneVisible),
             )}
           >
             <div className="flex h-12 items-center justify-between px-2">
@@ -691,7 +693,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             className={cn(
               cardClassName,
               'rounded-none border-t-0 border-r-0 pt-1',
-              translationPaneVisible ? 'flex' : 'hidden md:flex',
+              paneVisibility(translationPaneVisible),
             )}
           >
             <div className="flex h-12 items-center justify-between px-2">
@@ -990,7 +992,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => (isMobile ? setOpenMobile(false) : setSidebarOpen(false))}
+                  onClick={toggleSidebar}
                   className="h-7 w-7 p-0"
                   aria-label="Close panel"
                 >

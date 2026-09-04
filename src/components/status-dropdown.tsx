@@ -199,27 +199,29 @@ export function StatusDropdown({
   const translatorCannotChangeDeployedDocumentStatus =
     user.role === 'USER' && displayedStatus === DocumentStatus.DEPLOYED;
 
+  const triggerButton = (
+    <Button
+      variant="outline"
+      disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
+      className={cn(
+        'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
+        currentStatusConfig.color.badgeClass,
+        'border',
+        'hover:opacity-90',
+        'font-medium',
+      )}
+    >
+      <CurrentStatusIcon className={cn('shrink-0', currentStatusConfig.color.textClass)} />
+      <span className={cn('min-w-0 truncate font-medium', currentStatusConfig.color.textClass)}>
+        {currentStatusConfig.name}
+      </span>
+      <ChevronDown className="shrink-0 opacity-50" />
+    </Button>
+  );
+
   // Prevent hydration mismatch by only rendering after mount
   if (!mounted) {
-    return (
-      <Button
-        variant="outline"
-        disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
-        className={cn(
-          'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
-          currentStatusConfig.color.badgeClass,
-          'border',
-          'hover:opacity-90',
-          'font-medium',
-        )}
-      >
-        <CurrentStatusIcon className={cn('shrink-0', currentStatusConfig.color.textClass)} />
-        <span className={cn('min-w-0 truncate font-medium', currentStatusConfig.color.textClass)}>
-          {currentStatusConfig.name}
-        </span>
-        <ChevronDown className="shrink-0 opacity-50" />
-      </Button>
-    );
+    return triggerButton;
   }
 
   return (
@@ -227,23 +229,7 @@ export function StatusDropdown({
       {deployDialog}
       <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
       <DropdownMenuPrimitive.Trigger asChild>
-        <Button
-          variant="outline"
-          disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
-          className={cn(
-            'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
-            currentStatusConfig.color.badgeClass,
-            'border',
-            'hover:opacity-90',
-            'font-medium',
-          )}
-        >
-          <CurrentStatusIcon className={cn('shrink-0', currentStatusConfig.color.textClass)} />
-          <span className={cn('min-w-0 truncate font-medium', currentStatusConfig.color.textClass)}>
-            {currentStatusConfig.name}
-          </span>
-          <ChevronDown className="shrink-0 opacity-50" />
-        </Button>
+        {triggerButton}
       </DropdownMenuPrimitive.Trigger>
 
       <DropdownMenuPrimitive.Portal>
