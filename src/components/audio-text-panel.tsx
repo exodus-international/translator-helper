@@ -11,10 +11,10 @@ import {
   saveAudioTranscriptAction,
 } from '@/domain/audio/audio.actions';
 import { validateSsml } from '@/domain/audio/audio.ssml';
-import type { AudioTranscriptView } from '@/domain/audio/audio.types';
+import type { AudioGenerationOutcome, AudioTranscriptView } from '@/domain/audio/audio.types';
 import { capture } from '@/lib/analytics';
 import { AlertTriangle, Loader2, Lock, RotateCcw, Save, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 /**
@@ -29,7 +29,47 @@ import { toast } from 'sonner';
  * the audio rules, which pull in a Markdown parser that has no business in a
  * browser bundle.
  */
-export function AudioTextPanel({ documentVersionId }: { documentVersionId: string }) {
+/**
+ * The server actions this panel calls, injectable so a component test can drive
+ * it without a database or an Azure key. Same shape as the generation service's
+ * deps and the authorization gateway's.
+ */
+export interface AudioTextPanelActions {
+  load: (documentVersionId: string) => Promise<AudioTranscriptView | null>;
+  save: (documentVersionId: string, ssml: string) => Promise<void>;
+  reset: (documentVersionId: string) => Promise<void>;
+  keep: (documentVersionId: string) => Promise<void>;
+  regenerate: (documentVersionId: string) => Promise<AudioGenerationOutcome>;
+}
+
+const serverActions: AudioTextPanelActions = {
+  load: getAudioTranscriptAction,
+  save: saveAudioTranscriptAction,
+  reset: resetAudioTranscriptAction,
+  keep: keepAudioTranscriptAction,
+  regenerate: regenerateAudioAction,
+};
+
+/** How the SSML is edited. The default is Monaco; a test swaps in a textarea, because Monaco needs a real browser to mount. */
+export interface AudioTextEditorProps {
+  value: string;
+  onChange?: (value: string) => void;
+  readOnly?: boolean;
+}
+
+const monacoEditor = ({ value, onChange, readOnly }: AudioTextEditorProps) => (
+  <RawEditorPane value={value} onChange={onChange} readOnly={readOnly} language="xml" fullHeight />
+);
+
+export function AudioTextPanel({
+  documentVersionId,
+  actions = serverActions,
+  editor = monacoEditor,
+}: {
+  documentVersionId: string;
+  actions?: AudioTextPanelActions;
+  editor?: (props: AudioTextEditorProps) => ReactNode;
+}) {
   const [transcript, setTranscript] = useState<AudioTranscriptView | null>(null);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
@@ -40,7 +80,7 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
     setLoading(true);
     setError(null);
     try {
-      const loaded = await getAudioTranscriptAction(documentVersionId);
+      const loaded = await actions.load(documentVersionId);
       setTranscript(loaded);
       setDraft(loaded?.ssml ?? '');
     } catch (cause) {
@@ -48,7 +88,7 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
     } finally {
       setLoading(false);
     }
-  }, [documentVersionId]);
+  }, [documentVersionId, actions]);
 
   useEffect(() => {
     load();
@@ -63,11 +103,11 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
   const save = async ({ regenerate }: { regenerate: boolean }) => {
     setSaving(true);
     try {
-      await saveAudioTranscriptAction(documentVersionId, draft);
+      await actions.save(documentVersionId, draft);
       capture('audio_transcript_saved', { regenerate });
 
       if (regenerate) {
-        const outcome = await regenerateAudioAction(documentVersionId);
+        const outcome = await actions.regenerate(documentVersionId);
         if (outcome.status === 'failed') toast.error(outcome.error);
         else if (outcome.status === 'skipped') toast.warning('Saved, but this document gets no audio.');
         else toast.success('Saved. The audio is being generated from it.');
@@ -85,7 +125,7 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
   const keep = async () => {
     setSaving(true);
     try {
-      await keepAudioTranscriptAction(documentVersionId);
+      await actions.keep(documentVersionId);
       toast.success('Keeping your audio text.');
       await load();
     } catch (cause) {
@@ -98,7 +138,7 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
   const reset = async () => {
     setSaving(true);
     try {
-      await resetAudioTranscriptAction(documentVersionId);
+      await actions.reset(documentVersionId);
       capture('audio_transcript_reset');
       toast.success('Back to the audio text built from the document.');
       await load();
@@ -203,13 +243,11 @@ export function AudioTextPanel({ documentVersionId }: { documentVersionId: strin
         </ul>
       )}
       <div className="min-h-0 flex-1">
-        <RawEditorPane
-          value={draft}
-          onChange={transcript.canEdit ? setDraft : undefined}
-          readOnly={!transcript.canEdit || saving}
-          language="xml"
-          fullHeight
-        />
+        {editor({
+          value: draft,
+          onChange: transcript.canEdit ? setDraft : undefined,
+          readOnly: !transcript.canEdit || saving,
+        })}
       </div>
     </div>
   );

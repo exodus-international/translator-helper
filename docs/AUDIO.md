@@ -34,6 +34,35 @@ audio as skipped. Nothing breaks in an environment without credentials.
 - Admin, Source projects: choose which document types get audio. New projects
   default to Day and Daily Content.
 
+## The audio text (SSML)
+
+The provider is not sent Markdown. The document is stripped to prose, pauses
+become `<break>` elements, and the result is wrapped in SSML with the language's
+voice and `DEFAULT_PROSODY`. The review editor shows that document in an **Audio
+text** tab beside Formatted and Review, on documents that get audio.
+
+Edit it and the next generation sends exactly what you wrote, wrapper and all.
+That is how a mispronounced name gets fixed without misspelling it in the text
+readers see. The document itself is never modified by anything in the tab.
+
+- **Who** — whoever may edit the version: assigned to its language, or admin.
+  Everyone else reads it and is told why they cannot edit.
+- **Validation warns, never blocks.** Unclosed tags, an unknown tag, a bare `&`
+  are listed under the editor with their line. Save stays enabled: the known-tag
+  list ages as Azure's API grows. SSML the provider rejects fails the
+  generation with the provider's own message in the audio card.
+- **When the translation changes** the tab says the audio text was written for
+  an earlier text and offers *Rebuild from document* or *Keep mine*. Neither
+  happens on its own, and the hand-edited version keeps generating until one is
+  chosen. A Markdown-only edit (bolding, frontmatter) says nothing: the check
+  compares the derived SSML, not the version counter, which auto-save bumps
+  every few seconds.
+- **An edited transcript pins its voice.** The stored SSML names the voice, so
+  changing a language's default voice does not reach documents whose audio text
+  was edited. Reset to generated brings them back in line.
+
+PRD: issue #164.
+
 ## Pause markers
 
 Authors mark a pause in the source Markdown with an HTML comment, invisible in
