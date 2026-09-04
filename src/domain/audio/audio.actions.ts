@@ -12,6 +12,7 @@ import {
   advanceJob,
   getAudioReadiness,
   getTranscript,
+  getTranscriptState,
   keepTranscript,
   saveTranscript,
   startGeneration,
@@ -20,6 +21,7 @@ import type {
   AudioFileView,
   AudioGenerationOutcome,
   AudioReadiness,
+  AudioTranscriptState,
   AudioTranscriptView,
 } from './audio.types';
 
@@ -70,6 +72,12 @@ export async function getAudioTranscriptAction(documentVersionId: string): Promi
     canEdit: permission.canEdit,
     readOnlyReason: permission.reason,
   };
+}
+
+/** Whether this version's transcript is generated, edited, or edited before the text moved. */
+export async function getAudioTranscriptStateAction(documentVersionId: string): Promise<AudioTranscriptState> {
+  await authorize('authenticated');
+  return getTranscriptState(documentVersionId);
 }
 
 /** Stores hand-edited SSML. The next generation sends exactly this. */

@@ -1,6 +1,8 @@
 import type { AudioProvider, AudioStatus } from '@prisma/client';
 import type { AudioTranscriptState } from './audio.rules';
 
+export type { AudioTranscriptState };
+
 export type { AudioProvider, AudioStatus };
 
 /** What the caller of a status transition learns about the audio side effect. */

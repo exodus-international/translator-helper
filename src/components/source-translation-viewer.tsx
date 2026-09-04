@@ -59,6 +59,9 @@ interface SourceTranslationViewerProps {
    * appears on a document that will never have any.
    */
   audioTextVersionId?: string | null;
+  /** Set by something outside the viewer (the audio card) asking for a tab. */
+  requestedView?: 'audio' | null;
+  onRequestedViewShown?: () => void;
   onTranslationChange?: (value: string) => void;
   sourceBadge?: ReactNode;
   translationBadge?: ReactNode;
@@ -141,6 +144,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       translationPlaceholder = 'Enter your translation here...',
       translationPreviewEmptyText = '*No content yet...*',
       audioTextVersionId = null,
+      requestedView = null,
+      onRequestedViewShown,
       onTranslationChange,
       sourceBadge,
       translationBadge,
@@ -184,6 +189,15 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
     const [reviewViewMode, setReviewViewMode] = useState<TranslationViewMode>('review');
+
+    // A request is consumed, not mirrored: the tab strip stays the one place
+    // that knows which tab is open.
+    useEffect(() => {
+      if (requestedView === 'audio' && audioTextVersionId) {
+        setReviewViewMode('audio');
+        onRequestedViewShown?.();
+      }
+    }, [requestedView, audioTextVersionId, onRequestedViewShown]);
     const [isReviewEditing, setIsReviewEditing] = useState(reviewConfig?.editingDefault ?? false);
     const [showSuggestionForm, setShowSuggestionForm] = useState(false);
     const [suggestionFormType, setSuggestionFormType] = useState<SuggestionType>(SuggestionType.COMMENT);

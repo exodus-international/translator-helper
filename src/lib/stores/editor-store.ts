@@ -73,6 +73,14 @@ interface EditorState {
   loading: Set<LoadingKey>;
   dialog: DialogState;
 
+  /**
+   * Set when something outside the viewer asks it to show a particular tab —
+   * the audio card linking to the Audio text tab. The viewer clears it once it
+   * has switched, so it reads as a request rather than a second source of
+   * truth for which tab is open.
+   */
+  requestedTranslationView: 'audio' | null;
+
   // Config (set once at init)
   documentId: string;
   translationProjectId: string | null;
@@ -81,6 +89,8 @@ interface EditorState {
 // ─── Actions ─────────────────────────────────────────────────
 
 interface EditorActions {
+  requestTranslationView: (view: 'audio' | null) => void;
+
   // Content
   setContent: (content: string) => void;
   setSourceEditContent: (content: string) => void;
@@ -170,6 +180,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     sourceEditContent: config.sourceContent,
     loading: new Set<LoadingKey>(),
     dialog: { type: 'closed' },
+    requestedTranslationView: null,
     documentId: config.documentId,
     translationProjectId: config.translationProjectId,
 
@@ -362,6 +373,8 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     // ─── Dialogs ───────────────────────────────────────
+    requestTranslationView: (view) => set({ requestedTranslationView: view }),
+
     closeDialog: () => set({ dialog: { type: 'closed' } }),
 
     openReviewDialog: async () => {

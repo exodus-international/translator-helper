@@ -17,10 +17,8 @@ import {
 } from './audio.repository';
 import {
   audioSkipReason,
-  deriveAudioSsml,
   fingerprint,
   formatAudioError,
-  hasReadableText,
   isAudioStale,
   localeFromVoice,
   resolveAudioSsml,
@@ -28,11 +26,41 @@ import {
   type AudioErrorKind,
   type AudioTranscriptState,
 } from './audio.rules';
+import { markdownToSpeechScript } from './audio.script';
+import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
 
 const LOG_PREFIX = '[Audio]';
+
+export interface DerivationInput {
+  /** The version's stored Markdown. */
+  content: string;
+  /** Provider voice identifier for the document's language. */
+  voice: string;
+  /** Longest single break the provider honours. */
+  maxBreakMs: number;
+}
+
+/**
+ * Exactly what generation sends for a version with no override. Lives here
+ * rather than with the rules because it needs the Markdown parser, and the
+ * audio card imports the rules into the browser.
+ */
+export function deriveAudioSsml({ content, voice, maxBreakMs }: DerivationInput): string {
+  return speechScriptToSsml(markdownToSpeechScript(content), {
+    voice,
+    locale: localeFromVoice(voice),
+    maxBreakMs,
+    ...DEFAULT_PROSODY,
+  });
+}
+
+/** True when the document has no readable words left after the Markdown comes off. */
+export function hasReadableText(content: string): boolean {
+  return markdownToSpeechScript(content).segments.some((segment) => segment.kind === 'text');
+}
 
 /** Everything generation reads off a version. Named so a test can build one. */
 export interface VersionForGeneration {
@@ -136,10 +164,8 @@ export function createStartGeneration(deps: GenerationDeps = defaultGenerationDe
       throw new Error('The document has no readable text after stripping Markdown');
     }
     const { ssml } = resolveAudioSsml({
-      content: version.content,
       override: version.audioSsml,
-      voice,
-      maxBreakMs: provider.maxBreakMs,
+      derive: () => deriveAudioSsml({ content: version.content, voice, maxBreakMs: provider.maxBreakMs }),
     });
 
     phase = 'provider';
@@ -385,7 +411,7 @@ export async function getTranscript(
     voice: version.language.audioVoice!,
     maxBreakMs: provider.maxBreakMs,
   };
-  const resolved = resolveAudioSsml({ ...input, override: version.audioSsml });
+  const resolved = resolveAudioSsml({ override: version.audioSsml, derive: () => deriveAudioSsml(input) });
 
   // Derived only to compare against the fingerprint, and only when there is an
   // override to compare: a document with no override cannot be out of date.
@@ -396,6 +422,32 @@ export async function getTranscript(
   });
 
   return { ...resolved, state };
+}
+
+/**
+ * Just the transcript's state, for callers that do not need the SSML itself.
+ * Derives nothing when the version has no override, which is the common case
+ * and the one the audio card polls.
+ */
+export async function getTranscriptState(documentVersionId: string): Promise<AudioTranscriptState> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    select: { content: true, audioSsml: true, audioSsmlBase: true, language: true },
+  });
+  if (!version?.audioSsml || !version.language.audioProvider || !version.language.audioVoice) {
+    return transcriptState({ override: version?.audioSsml });
+  }
+
+  const provider = getSpeechProvider(version.language.audioProvider);
+  return transcriptState({
+    override: version.audioSsml,
+    baseline: version.audioSsmlBase,
+    derived: deriveAudioSsml({
+      content: version.content,
+      voice: version.language.audioVoice,
+      maxBreakMs: provider.maxBreakMs,
+    }),
+  });
 }
 
 /**

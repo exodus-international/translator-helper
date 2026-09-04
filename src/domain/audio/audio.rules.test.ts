@@ -3,16 +3,15 @@ import test from 'node:test';
 import { AudioProvider, DocumentType } from '@prisma/client';
 import {
   audioSkipReason,
-  deriveAudioSsml,
   fingerprint,
   formatAudioError,
-  hasReadableText,
   isAudioStale,
   localeFromVoice,
   parseAudioError,
   resolveAudioSsml,
   transcriptState,
 } from './audio.rules';
+import { deriveAudioSsml, hasReadableText } from './audio.service';
 
 test('audio generated from the current version is not stale', () => {
   assert.equal(isAudioStale({ sourceVersion: 4 }, { version: 4 }), false);
@@ -93,14 +92,17 @@ test('the derived SSML carries the voice, the locale and the words', () => {
 });
 
 test('with no override, the derived script is what gets spoken', () => {
-  const resolved = resolveAudioSsml(transcriptInput);
+  const resolved = resolveAudioSsml({ derive: () => deriveAudioSsml(transcriptInput) });
   assert.equal(resolved.source, 'derived');
   assert.equal(resolved.ssml, deriveAudioSsml(transcriptInput));
 });
 
-test('an override is sent verbatim, wrapper and all', () => {
+test('an override is sent verbatim, wrapper and all, and nothing is derived', () => {
   const override = '<speak version="1.0" xml:lang="cs-CZ"><voice name="cs-CZ-JitkaNeural">Ahoj</voice></speak>';
-  const resolved = resolveAudioSsml({ ...transcriptInput, override });
+  const resolved = resolveAudioSsml({
+    override,
+    derive: () => assert.fail('deriving is wasted work when an override exists'),
+  });
   assert.equal(resolved.source, 'override');
   assert.equal(resolved.ssml, override);
 });
@@ -108,8 +110,9 @@ test('an override is sent verbatim, wrapper and all', () => {
 // A cleared editor stores an empty string rather than null; treating that as an
 // override would send Azure nothing at all.
 test('a blank override is no override', () => {
-  assert.equal(resolveAudioSsml({ ...transcriptInput, override: '   \n' }).source, 'derived');
-  assert.equal(resolveAudioSsml({ ...transcriptInput, override: null }).source, 'derived');
+  const derive = () => deriveAudioSsml(transcriptInput);
+  assert.equal(resolveAudioSsml({ override: '   \n', derive }).source, 'derived');
+  assert.equal(resolveAudioSsml({ override: null, derive }).source, 'derived');
 });
 
 test('a document with nothing to read is recognised before anything is generated', () => {

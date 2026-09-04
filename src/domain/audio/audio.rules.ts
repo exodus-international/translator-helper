@@ -1,6 +1,4 @@
 import type { AudioProvider, DocumentType } from '@prisma/client';
-import { markdownToSpeechScript } from './audio.script';
-import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
 import type { AudioSkipReason } from './audio.types';
 
 /**
@@ -64,25 +62,6 @@ export function localeFromVoice(voice: string): string {
   return voice.split('-').slice(0, 2).join('-');
 }
 
-export interface TranscriptInput {
-  /** The version's stored Markdown. */
-  content: string;
-  /** Provider voice identifier for the document's language. */
-  voice: string;
-  /** Longest single break the provider honours. */
-  maxBreakMs: number;
-}
-
-/** Exactly what generation would send for a version with no override. */
-export function deriveAudioSsml({ content, voice, maxBreakMs }: TranscriptInput): string {
-  return speechScriptToSsml(markdownToSpeechScript(content), {
-    voice,
-    locale: localeFromVoice(voice),
-    maxBreakMs,
-    ...DEFAULT_PROSODY,
-  });
-}
-
 export type AudioSsmlSource = 'derived' | 'override';
 
 export interface ResolvedAudioSsml {
@@ -96,11 +75,16 @@ export interface ResolvedAudioSsml {
  * which is what lets someone fix a pronunciation without touching the text
  * readers see — and what makes an edited document keep its voice after the
  * language's default changes.
+ *
+ * Deriving is passed in as a function, not a value, for two reasons: it is
+ * wasted work when an override exists, and it needs a Markdown parser that
+ * must not follow this module into a browser bundle. The audio card imports
+ * these rules.
  */
-export function resolveAudioSsml(input: TranscriptInput & { override?: string | null }): ResolvedAudioSsml {
+export function resolveAudioSsml(input: { override?: string | null; derive: () => string }): ResolvedAudioSsml {
   const override = input.override?.trim();
   if (override) return { ssml: input.override!, source: 'override' };
-  return { ssml: deriveAudioSsml(input), source: 'derived' };
+  return { ssml: input.derive(), source: 'derived' };
 }
 
 export type AudioTranscriptState = 'generated' | 'edited' | 'edited_outdated';
@@ -141,9 +125,4 @@ export function transcriptState(input: {
   if (!input.override?.trim()) return 'generated';
   if (!input.baseline || input.derived == null) return 'edited';
   return input.baseline === fingerprint(input.derived) ? 'edited' : 'edited_outdated';
-}
-
-/** True when the document has no readable words left after the Markdown comes off. */
-export function hasReadableText(content: string): boolean {
-  return markdownToSpeechScript(content).segments.some((segment) => segment.kind === 'text');
 }

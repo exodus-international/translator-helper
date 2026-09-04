@@ -151,6 +151,8 @@ function EditorViewer({
   const isApplyingSuggestion = useEditorStore((s) => s.loading.has('applySuggestion'));
   const isDismissingSuggestion = useEditorStore((s) => s.loading.has('dismissSuggestion'));
   const translationProjectId = useEditorStore((s) => s.translationProjectId);
+  const requestedTranslationView = useEditorStore((s) => s.requestedTranslationView);
+  const requestTranslationView = useEditorStore((s) => s.requestTranslationView);
   const openAssignTranslatorDialog = useEditorStore((s) => s.openAssignTranslatorDialog);
   const openAssignReviewerDialog = useEditorStore((s) => s.openAssignReviewerDialog);
   const unassignTranslator = useEditorStore((s) => s.unassignTranslator);
@@ -199,6 +201,8 @@ function EditorViewer({
       translationPlaceholder={translationPlaceholder}
       translationPreviewEmptyText={translationPreviewEmptyText}
       audioTextVersionId={audioTextVersionId}
+      requestedView={requestedTranslationView}
+      onRequestedViewShown={() => requestTranslationView(null)}
       onTranslationChange={setContent}
       sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
       translationBadge={<Badge variant="secondary">{targetVersion?.language?.name || 'New Translation'}</Badge>}
