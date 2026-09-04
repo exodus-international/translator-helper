@@ -1,8 +1,6 @@
 import { createStore } from 'zustand';
 import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
-import {
-  updateDocumentVersionAction,
-} from '@/domain/document-version/document-version.actions';
+import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { submitForReviewAction } from '@/domain/document-version/document-version.actions';
 import {
   applySuggestionAction,
@@ -44,7 +42,7 @@ export type LoadingKey =
 interface MemberInfo {
   id: string;
   userId?: string;
-  user: { id: string; name: string | null; email: string };
+  user: { id: string; name: string | null; email: string; image?: string | null };
 }
 
 type DialogState =

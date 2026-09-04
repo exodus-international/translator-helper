@@ -1,5 +1,6 @@
 'use client';
 
+import { UserAvatar } from '@/components/user-avatar';
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { SidebarSection } from '@/components/sidebar-section';
@@ -235,7 +236,15 @@ function CollapsedGroupRow({ group }: { group: CollapsedEntry }) {
               {formatRelativeTime(group.lastTime)}
             </span>
           </div>
-          <div className="text-xs text-gray-400">by {representative.user.name || representative.user.email}</div>
+          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <UserAvatar
+              name={representative.user.name}
+              image={representative.user.image}
+              email={representative.user.email}
+              size="xs"
+            />
+            <span>by {representative.user.name || representative.user.email}</span>
+          </div>
         </div>
       </div>
       {isCollapsible && expanded && (

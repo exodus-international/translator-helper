@@ -1,5 +1,6 @@
 'use client';
 
+import { UserAvatar } from '@/components/user-avatar';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,23 @@ import type { LoadingKey } from '@/lib/stores/editor-store';
 
 function useDialogLoading(key: LoadingKey) {
   return useEditorStore((s) => s.loading.has(key));
+}
+
+/** A person in an assignment dropdown: face, name, and the address that disambiguates two of them. */
+function MemberOption({
+  user,
+  withEmail,
+}: {
+  user: { id: string; name: string | null; email: string; image?: string | null };
+  withEmail?: boolean;
+}) {
+  return (
+    <span className="flex items-center gap-2">
+      <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" className="pointer-events-none" />
+      <span>{user.name || user.email}</span>
+      {withEmail && user.name && <span className="text-muted-foreground">({user.email})</span>}
+    </span>
+  );
 }
 
 function SubmitReviewDialog() {
@@ -63,7 +81,7 @@ function SubmitReviewDialog() {
               <SelectContent>
                 {dialog.reviewers.map((member) => (
                   <SelectItem key={member.user.id} value={member.user.id}>
-                    {member.user.name} ({member.user.email})
+                    <MemberOption user={member.user} withEmail />
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -130,7 +148,7 @@ function AssignTranslatorDialog() {
               <SelectContent>
                 {dialog.members.map((m) => (
                   <SelectItem key={m.user.id} value={m.user.id}>
-                    {m.user.name || m.user.email}
+                    <MemberOption user={m.user} />
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -197,7 +215,7 @@ function AssignReviewerDialog() {
               <SelectContent>
                 {dialog.candidates.map((m) => (
                   <SelectItem key={m.user.id} value={m.user.id}>
-                    {m.user.name} ({m.user.email})
+                    <MemberOption user={m.user} withEmail />
                   </SelectItem>
                 ))}
               </SelectContent>

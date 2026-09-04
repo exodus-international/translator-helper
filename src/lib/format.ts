@@ -32,10 +32,7 @@ export function formatExactDateTime(value: Date | string): string {
  * "yesterday", "N days ago"), an unambiguous date beyond 30 days, and an em
  * dash when there is no activity at all.
  */
-export function formatLastActive(
-  value: Date | string | null | undefined,
-  now: Date = new Date(),
-): string {
+export function formatLastActive(value: Date | string | null | undefined, now: Date = new Date()): string {
   if (!value) return '—';
   const date = new Date(value);
   const days = Math.floor(
@@ -47,4 +44,17 @@ export function formatLastActive(
   if (days === 1) return 'yesterday';
   if (days <= 30) return `${days} days ago`;
   return formatUnambiguousDate(date);
+}
+
+/**
+ * Initials for an avatar fallback: the first letter of the first and last
+ * word, so "Marie Anne Dubois" reads as "MD" rather than "MAD". Falls back to
+ * "?" for people whose name we do not have.
+ */
+export function getInitials(name: string | null | undefined): string {
+  const words = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  const first = words[0].charAt(0);
+  const last = words.length > 1 ? words[words.length - 1].charAt(0) : '';
+  return (first + last).toUpperCase();
 }

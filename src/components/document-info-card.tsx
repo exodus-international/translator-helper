@@ -1,6 +1,6 @@
 'use client';
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserAvatar } from '@/components/user-avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getDocumentStatusConfig } from '@/constants/document-status';
@@ -9,22 +9,13 @@ import { Eye, Pencil, User, UserMinus, UserPlus } from 'lucide-react';
 
 interface DocumentInfoCardProps {
   status?: DocumentStatus | null;
-  translator?: { id: string; name: string | null; email: string } | null;
-  reviewer?: { id: string; name: string | null; email: string } | null;
+  translator?: { id: string; name: string | null; email: string; image?: string | null } | null;
+  reviewer?: { id: string; name: string | null; email: string; image?: string | null } | null;
   language?: string;
   onAssignTranslator?: () => void;
   onUnassignTranslator?: () => void;
   onAssignReviewer?: () => void;
   onUnassignReviewer?: () => void;
-}
-
-function getInitials(name: string | null): string {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .map((n) => n.charAt(0))
-    .join('')
-    .toUpperCase();
 }
 
 export function DocumentInfoCard({
@@ -73,11 +64,7 @@ export function DocumentInfoCard({
                   className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 hover:bg-muted transition-colors cursor-pointer group"
                   title="Change translator"
                 >
-                  <Avatar size="xs" name={translator.name || undefined}>
-                    <AvatarFallback name={translator.name || undefined} className="text-[10px]">
-                      {getInitials(translator.name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={translator.name} image={translator.image} email={translator.email} size="xs" />
                   <span className="text-xs font-medium">{translator.name}</span>
                   <Pencil className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
@@ -93,11 +80,7 @@ export function DocumentInfoCard({
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
-                <Avatar size="xs" name={translator.name || undefined}>
-                  <AvatarFallback name={translator.name || undefined} className="text-[10px]">
-                    {getInitials(translator.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar name={translator.name} image={translator.image} email={translator.email} size="xs" />
                 <span className="text-xs font-medium">{translator.name}</span>
               </div>
             )
@@ -125,11 +108,7 @@ export function DocumentInfoCard({
                   className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 hover:bg-muted transition-colors cursor-pointer group"
                   title="Change reviewer"
                 >
-                  <Avatar size="xs" name={reviewer.name || undefined}>
-                    <AvatarFallback name={reviewer.name || undefined} className="text-[10px]">
-                      {getInitials(reviewer.name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={reviewer.name} image={reviewer.image} email={reviewer.email} size="xs" />
                   <span className="text-xs font-medium">{reviewer.name}</span>
                   <Pencil className="h-2.5 w-2.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
@@ -145,11 +124,7 @@ export function DocumentInfoCard({
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
-                <Avatar size="xs" name={reviewer.name || undefined}>
-                  <AvatarFallback name={reviewer.name || undefined} className="text-[10px]">
-                    {getInitials(reviewer.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar name={reviewer.name} image={reviewer.image} email={reviewer.email} size="xs" />
                 <span className="text-xs font-medium">{reviewer.name}</span>
               </div>
             )
