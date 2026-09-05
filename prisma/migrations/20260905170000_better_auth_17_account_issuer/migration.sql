@@ -3,6 +3,10 @@
 -- provider-id strategy, then made NOT NULL with the compound unique index.
 ALTER TABLE "account" ADD COLUMN "issuer" TEXT;
 
+-- better-auth encodes the oauth branch as
+-- 'local:oauth:' || encodeURIComponent(providerId); every provider id in
+-- practice (github, google, ...) is URL-safe, so the plain concatenation
+-- matches. Revisit if a provider id with reserved characters is ever added.
 UPDATE "account"
 SET "issuer" = CASE
   WHEN "providerId" = 'credential' THEN 'local:credential'
