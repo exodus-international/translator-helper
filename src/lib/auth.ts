@@ -60,5 +60,9 @@ export const auth = betterAuth({
       },
     }),
   ],
+  // Without an explicit base URL better-auth derives the origin from each
+  // incoming request, which breaks redirect/callback URLs behind proxies and
+  // logs a warning on every cold start.
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   trustedOrigins: ['http://localhost:3000', process.env.NEXT_PUBLIC_APP_URL || ''],
 });
