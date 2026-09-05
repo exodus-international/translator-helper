@@ -56,6 +56,7 @@ export function AnnouncementModal({ announcement }: AnnouncementModalProps) {
         {announcement.ctaLabel && announcement.ctaUrl && (
           <DialogFooter>
             <Button
+              nativeButton={false}
               render={
                 <Link
                   href={announcement.ctaUrl}

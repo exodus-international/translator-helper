@@ -196,7 +196,7 @@ export default function DocumentsClient({
         title="Documents Overview"
         description="View translation status across all languages"
         actions={
-          <Button render={<Link href="/documents/new" />}>
+          <Button nativeButton={false} render={<Link href="/documents/new" />}>
             <Plus />
             New Document
           </Button>
@@ -285,7 +285,7 @@ export default function DocumentsClient({
                   Clear search and filters
                 </Button>
               ) : (
-                <Button render={<Link href="/documents/new" />}>New Document</Button>
+                <Button nativeButton={false} render={<Link href="/documents/new" />}>New Document</Button>
               )}
             </EmptyContent>
           </Empty>

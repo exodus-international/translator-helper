@@ -160,7 +160,7 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
               )}
 
               <div className="flex justify-between">
-                <Button type="button" variant="outline" render={<Link href="/documents" />}>
+                <Button type="button" variant="outline" nativeButton={false} render={<Link href="/documents" />}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={loading || !title || !!filenameError}>

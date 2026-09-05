@@ -227,7 +227,7 @@ export function AudioStatus({
             <Button
               variant="outline"
               size="sm"
-              render={<a href={audio.url} download target="_blank" rel="noopener noreferrer" />}
+              nativeButton={false} render={<a href={audio.url} download target="_blank" rel="noopener noreferrer" />}
             >
               <Download className="h-3 w-3 mr-1" />
               Download

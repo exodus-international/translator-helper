@@ -215,7 +215,7 @@ export function Navigation({ user }: NavigationProps) {
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {user.role === 'ADMIN' && (
-            <Button size="sm" className="hidden sm:inline-flex" render={<Link href="/documents/new" />}>
+            <Button size="sm" className="hidden sm:inline-flex" nativeButton={false} render={<Link href="/documents/new" />}>
               <FilePlus />
               New
             </Button>
