@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_PROSODY, escapeXml, renderPause, speechScriptToSsml, validateSsml } from './audio.ssml';
+import { DEFAULT_PROSODY, escapeXml, formatSsml, renderPause, speechScriptToSsml, validateSsml } from './audio.ssml';
 
 const opts = { voice: 'cs-CZ-AntoninNeural', locale: 'cs-CZ', maxBreakMs: 20_000 };
 
@@ -8,8 +8,11 @@ test('wraps text in speak and voice elements with the given locale and voice', (
   const ssml = speechScriptToSsml({ segments: [{ kind: 'text', text: 'Hello.' }] }, opts);
   assert.equal(
     ssml,
-    '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">' +
-      '<voice name="cs-CZ-AntoninNeural"><p>Hello.</p></voice></speak>',
+    '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">\n' +
+      '  <voice name="cs-CZ-AntoninNeural">\n' +
+      '    <p>Hello.</p>\n' +
+      '  </voice>\n' +
+      '</speak>',
   );
 });
 
@@ -44,18 +47,18 @@ test('segment order is preserved', () => {
     },
     opts,
   );
-  assert.ok(ssml.includes('<p>One.</p><break time="2000ms"/><p>Two.</p>'));
+  assert.ok(ssml.includes('<p>One.</p>\n    <break time="2000ms"/>\n    <p>Two.</p>'));
 });
 
 test('paragraphs separated by blank lines become separate p elements', () => {
   const ssml = speechScriptToSsml({ segments: [{ kind: 'text', text: 'First.\n\nSecond.' }] }, opts);
-  assert.ok(ssml.includes('<p>First.</p><p>Second.</p>'));
+  assert.ok(ssml.includes('<p>First.</p>\n    <p>Second.</p>'));
 });
 
 test('an empty script still produces well-formed SSML', () => {
   const ssml = speechScriptToSsml({ segments: [] }, opts);
   assert.ok(ssml.startsWith('<speak'));
-  assert.ok(ssml.endsWith('<voice name="cs-CZ-AntoninNeural"></voice></speak>'));
+  assert.ok(ssml.endsWith('<voice name="cs-CZ-AntoninNeural">\n  </voice>\n</speak>'));
 });
 
 test('rejects a non-positive break ceiling', () => {
@@ -67,7 +70,13 @@ test('rate and pitch wrap the whole body in one prosody element', () => {
     { segments: [{ kind: 'text', text: 'One.' }, { kind: 'pause', seconds: 2 }, { kind: 'text', text: 'Two.' }] },
     { ...opts, rate: '0.8', pitch: '-6%' },
   );
-  assert.ok(ssml.includes('<voice name="cs-CZ-AntoninNeural"><prosody rate="0.8" pitch="-6%"><p>One.</p><break time="2000ms"/><p>Two.</p></prosody></voice>'));
+  assert.equal(
+    ssml.split('\n').map((line) => line.trimStart()).join('\n'),
+    '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">\n' +
+      '<voice name="cs-CZ-AntoninNeural">\n<prosody rate="0.8" pitch="-6%">\n' +
+      '<p>One.</p>\n<break time="2000ms"/>\n<p>Two.</p>\n' +
+      '</prosody>\n</voice>\n</speak>',
+  );
 });
 
 test('no prosody element is emitted when neither rate nor pitch is given', () => {
@@ -77,7 +86,7 @@ test('no prosody element is emitted when neither rate nor pitch is given', () =>
 
 test('rate alone yields a prosody element with only a rate attribute', () => {
   const ssml = speechScriptToSsml({ segments: [{ kind: 'text', text: 'One.' }] }, { ...opts, rate: '-20%' });
-  assert.ok(ssml.includes('<prosody rate="-20%"><p>One.</p></prosody>'));
+  assert.ok(ssml.includes('<prosody rate="-20%">\n      <p>One.</p>\n    </prosody>'));
 });
 
 test('default prosody is the listening-test pick', () => {
@@ -130,4 +139,72 @@ test('an empty box says so rather than listing everything that is missing', () =
 
 test('a self-closing break is not mistaken for something left open', () => {
   assert.deepEqual(validateSsml('<speak>Ahoj<break time="1000ms"/>a jeste jednou</speak>'), []);
+});
+
+// ─── Formatting ──────────────────────────────────────────────
+//
+// The formatter may only move whitespace that no speech engine can hear.
+// Every test here is really the same question: did the words change?
+
+test('nests the wrapper elements one level per depth', () => {
+  const ssml = formatSsml(
+    '<speak><voice name="cs-CZ-AntoninNeural"><prosody rate="0.8"><p>Ahoj</p></prosody></voice></speak>',
+  );
+  assert.equal(
+    ssml,
+    '<speak>\n  <voice name="cs-CZ-AntoninNeural">\n    <prosody rate="0.8">\n      <p>Ahoj</p>\n    </prosody>\n  </voice>\n</speak>',
+  );
+});
+
+test('breaks between paragraphs and pauses, and keeps a paragraph on its own line', () => {
+  assert.equal(
+    formatSsml('<speak><p>One.</p><break time="1000ms"/><p>Two.</p></speak>'),
+    '<speak>\n  <p>One.</p>\n  <break time="1000ms"/>\n  <p>Two.</p>\n</speak>',
+  );
+});
+
+test('never separates inline markup from the words around it', () => {
+  const inline = '<speak><p>Modli se za <emphasis level="strong">Petra</emphasis> a <sub alias="Pavla">P.</sub></p></speak>';
+  assert.equal(formatSsml(inline), '<speak>\n  <p>Modli se za <emphasis level="strong">Petra</emphasis> a <sub alias="Pavla">P.</sub></p>\n</speak>');
+});
+
+test('a paragraph spanning several lines keeps them exactly as written', () => {
+  const ssml = formatSsml('<speak><p>Modlitba\nDny: _ / 7</p></speak>');
+  assert.ok(ssml.includes('<p>Modlitba\nDny: _ / 7</p>'));
+});
+
+test('formatting is idempotent, so pressing Format twice changes nothing', () => {
+  const once = speechScriptToSsml(
+    { segments: [{ kind: 'text', text: 'One.' }, { kind: 'pause', seconds: 2 }, { kind: 'text', text: 'Two.' }] },
+    { ...opts, ...DEFAULT_PROSODY },
+  );
+  assert.equal(formatSsml(once), once);
+});
+
+test('formatting changes nothing but whitespace between tags', () => {
+  const compact = '<speak><voice name="v"><prosody rate="0.8"><p>Ahoj</p><break time="1000ms"/><p>Nazdar</p></prosody></voice></speak>';
+  assert.equal(formatSsml(compact).replace(/>\s+</g, '><'), compact);
+});
+
+test('malformed SSML is laid out as far as it goes rather than refused', () => {
+  assert.equal(formatSsml('<speak><voice name="v"><p>hi</p></speak>'), '<speak>\n  <voice name="v">\n    <p>hi</p>\n  </speak>');
+  assert.equal(formatSsml('</p><speak>x</speak>'), '</p>\n<speak>x</speak>');
+  assert.equal(formatSsml(''), '');
+});
+
+test('a void break written without its slash does not indent everything after it', () => {
+  assert.equal(formatSsml('<speak><p>One.</p><break time="1000ms"><p>Two.</p></speak>'),
+    '<speak>\n  <p>One.</p>\n  <break time="1000ms">\n  <p>Two.</p>\n</speak>');
+});
+
+test('formatted SSML still passes validation', () => {
+  const ssml = speechScriptToSsml({ segments: [{ kind: 'text', text: 'Ahoj' }, { kind: 'pause', seconds: 1 }] }, { ...opts, ...DEFAULT_PROSODY });
+  assert.deepEqual(validateSsml(ssml), []);
+});
+
+test('problems in formatted SSML are reported on the line they sit on', () => {
+  const problems = validateSsml('<speak>\n  <voice name="v">\n    <p>Petr & Pavel</p>\n  </voice>\n</speak>');
+  assert.deepEqual(problems, [
+    { line: 3, message: 'A bare & has to be written as &amp; or the provider cannot read the text.' },
+  ]);
 });

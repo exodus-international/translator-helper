@@ -228,3 +228,39 @@ test('the box is not writable for someone who may only read it', async () => {
   const box = (await screen.findByLabelText('Audio text')) as HTMLTextAreaElement;
   assert.equal(box.readOnly, true);
 });
+
+test('Format indents what is in the box, and goes quiet once there is nothing to indent', async () => {
+  const user = userEvent.setup();
+  const { actions } = stubActions(editable);
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  const format = await screen.findByRole('button', { name: /^Format$/ });
+  await user.click(format);
+
+  const box = (await screen.findByLabelText('Audio text')) as HTMLTextAreaElement;
+  assert.equal(
+    box.value,
+    '<speak version="1.0" xml:lang="cs-CZ">\n  <voice name="cs-CZ-AntoninNeural">Ahoj</voice>\n</speak>',
+  );
+  await waitFor(() => assert.equal((format as HTMLButtonElement).disabled, true));
+});
+
+test('formatting counts as a change, so it can be saved', async () => {
+  const user = userEvent.setup();
+  const { actions, calls } = stubActions(editable);
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  await user.click(await screen.findByRole('button', { name: /^Format$/ }));
+  await user.click(screen.getByRole('button', { name: /^Save$/ }));
+
+  await waitFor(() => assert.equal(calls.save.length, 1));
+  assert.ok(calls.save[0].includes('\n  <voice'));
+});
+
+test('someone who may only read the audio text is not offered Format', async () => {
+  const { actions } = stubActions({ ...editable, canEdit: false, readOnlyReason: 'Read-only for you.' });
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  await screen.findByLabelText('Audio text');
+  assert.equal(screen.queryByRole('button', { name: /^Format$/ }), null);
+});

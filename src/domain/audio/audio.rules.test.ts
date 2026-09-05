@@ -9,6 +9,7 @@ import {
   localeFromVoice,
   parseAudioError,
   resolveAudioSsml,
+  transcriptBaseline,
   transcriptState,
 } from './audio.rules';
 import { deriveAudioSsml, hasReadableText } from './audio.service';
@@ -135,7 +136,7 @@ test('an edited transcript stays current while the spoken words do not change', 
   const derived = deriveAudioSsml(transcriptInput);
   const state = transcriptState({
     override: '<speak>Rucne</speak>',
-    baseline: fingerprint(derived),
+    baseline: transcriptBaseline(derived),
     derived,
   });
   assert.equal(state, 'edited');
@@ -144,7 +145,7 @@ test('an edited transcript stays current while the spoken words do not change', 
 // Auto-save bumps the version counter every few seconds of typing, so the
 // comparison is of what a narrator would read, not of version numbers.
 test('an edited transcript goes out of date when the spoken words change', () => {
-  const baseline = fingerprint(deriveAudioSsml(transcriptInput));
+  const baseline = transcriptBaseline(deriveAudioSsml(transcriptInput));
   const afterEdit = deriveAudioSsml({ ...transcriptInput, content: '# Den 3\n\nDnes se budeme postit.' });
 
   assert.equal(
@@ -154,7 +155,7 @@ test('an edited transcript goes out of date when the spoken words change', () =>
 });
 
 test('a Markdown-only change leaves an edited transcript alone', () => {
-  const baseline = fingerprint(deriveAudioSsml(transcriptInput));
+  const baseline = transcriptBaseline(deriveAudioSsml(transcriptInput));
   // Bolding a word and adding frontmatter: same words, same pauses.
   const cosmetic = deriveAudioSsml({
     ...transcriptInput,
@@ -171,4 +172,17 @@ test('a document with no override is never out of date', () => {
 test('a fingerprint is stable for the same text and differs for different text', () => {
   assert.equal(fingerprint('<speak>Ahoj</speak>'), fingerprint('<speak>Ahoj</speak>'));
   assert.notEqual(fingerprint('<speak>Ahoj</speak>'), fingerprint('<speak>Nazdar</speak>'));
+});
+
+// The transcript editor shows formatted SSML, so the layout of what is derived
+// can change without a word of it changing. The baseline must not notice.
+test('reindenting the derived SSML does not put an edited transcript out of date', () => {
+  const derived = deriveAudioSsml(transcriptInput);
+  const compact = derived.replace(/>\s+</g, '><');
+
+  assert.equal(transcriptBaseline(derived), transcriptBaseline(compact));
+  assert.equal(
+    transcriptState({ override: '<speak>Rucne</speak>', baseline: transcriptBaseline(compact), derived }),
+    'edited',
+  );
 });

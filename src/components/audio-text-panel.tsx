@@ -10,10 +10,10 @@ import {
   resetAudioTranscriptAction,
   saveAudioTranscriptAction,
 } from '@/domain/audio/audio.actions';
-import { validateSsml } from '@/domain/audio/audio.ssml';
+import { formatSsml, validateSsml } from '@/domain/audio/audio.ssml';
 import type { AudioGenerationOutcome, AudioTranscriptView } from '@/domain/audio/audio.types';
 import { capture } from '@/lib/analytics';
-import { AlertTriangle, Loader2, Lock, RotateCcw, Save, Sparkles } from 'lucide-react';
+import { AlertTriangle, IndentIncrease, Loader2, Lock, RotateCcw, Save, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -99,6 +99,8 @@ export function AudioTextPanel({
   // Advisory only. Save stays enabled: a rule this validator has not heard of
   // must not stop someone using something the provider actually supports.
   const problems = useMemo(() => (transcript?.canEdit ? validateSsml(draft) : []), [draft, transcript?.canEdit]);
+  // Generated SSML arrives indented; this is for what a person pastes in.
+  const formatted = useMemo(() => formatSsml(draft), [draft]);
 
   const save = async ({ regenerate }: { regenerate: boolean }) => {
     setSaving(true);
@@ -188,6 +190,16 @@ export function AudioTextPanel({
         </div>
         {transcript.canEdit && (
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDraft(formatted)}
+              disabled={saving || formatted === draft}
+              title="Indent the tags so the structure is readable. Nothing about what is spoken changes."
+            >
+              <IndentIncrease className="mr-1.5 h-3.5 w-3.5" />
+              Format
+            </Button>
             {edited && (
               <Button variant="ghost" size="sm" onClick={reset} disabled={saving}>
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />

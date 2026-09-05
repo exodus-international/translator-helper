@@ -17,11 +17,11 @@ import {
 } from './audio.repository';
 import {
   audioSkipReason,
-  fingerprint,
   formatAudioError,
   isAudioStale,
   localeFromVoice,
   resolveAudioSsml,
+  transcriptBaseline,
   transcriptState,
   type AudioErrorKind,
   type AudioTranscriptState,
@@ -485,7 +485,7 @@ async function currentBaseline(documentVersionId: string): Promise<string | null
   if (!version?.language.audioProvider || !version.language.audioVoice) return null;
 
   const provider = getSpeechProvider(version.language.audioProvider);
-  return fingerprint(
+  return transcriptBaseline(
     deriveAudioSsml({
       content: version.content,
       voice: version.language.audioVoice,

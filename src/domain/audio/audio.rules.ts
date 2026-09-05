@@ -107,6 +107,16 @@ export function fingerprint(text: string): string {
 }
 
 /**
+ * The fingerprint an override's baseline is stored as. Whitespace between tags
+ * comes out first: how the derived SSML is laid out is not what a narrator
+ * reads, and someone who edited their transcript should not be told the
+ * document moved because the formatter learned to indent.
+ */
+export function transcriptBaseline(derivedSsml: string): string {
+  return fingerprint(derivedSsml.replace(/>\s+</g, '><'));
+}
+
+/**
  * What state a version's transcript is in: derived from the document, hand
  * edited, or hand edited before the document moved on underneath it.
  *
@@ -124,5 +134,5 @@ export function transcriptState(input: {
 }): AudioTranscriptState {
   if (!input.override?.trim()) return 'generated';
   if (!input.baseline || input.derived == null) return 'edited';
-  return input.baseline === fingerprint(input.derived) ? 'edited' : 'edited_outdated';
+  return input.baseline === transcriptBaseline(input.derived) ? 'edited' : 'edited_outdated';
 }

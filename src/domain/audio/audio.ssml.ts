@@ -37,10 +37,13 @@ export function speechScriptToSsml(script: SpeechScript, options: SsmlOptions): 
     .map((segment) => (segment.kind === 'pause' ? renderPause(segment.seconds, options.maxBreakMs) : renderText(segment.text)))
     .join('');
 
-  return (
+  // Formatted, not compact: this is what the Audio text tab shows and what a
+  // person edits, so the structure has to be visible at a glance. Whitespace
+  // between elements is not spoken.
+  return formatSsml(
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${escapeXml(options.locale)}">` +
-    `<voice name="${escapeXml(options.voice)}">${wrapProsody(body, options)}</voice>` +
-    `</speak>`
+      `<voice name="${escapeXml(options.voice)}">${wrapProsody(body, options)}</voice>` +
+      `</speak>`,
   );
 }
 
@@ -173,4 +176,107 @@ export function validateSsml(ssml: string): SsmlProblem[] {
   }
 
   return problems.sort((a, b) => a.line - b.line);
+}
+
+// ─── Formatting ──────────────────────────────────────────────
+
+/**
+ * Elements that stand on their own line. The rest (emphasis, phoneme, say-as,
+ * sub, lang, bookmark) live inside a sentence, where a line break would put a
+ * space between words that had none and the narrator would hear it.
+ */
+const BLOCK_SSML_TAGS = new Set([
+  'speak', 'voice', 'prosody', 'p', 's', 'break', 'audio', 'lexicon',
+  'mstts:express-as', 'mstts:silence', 'mstts:backgroundaudio', 'mstts:audioduration',
+]);
+
+type SsmlToken =
+  | { kind: 'text'; raw: string }
+  | { kind: 'open' | 'close' | 'self' | 'other'; raw: string; tag: string };
+
+/**
+ * Indents SSML so its structure is readable, without changing a syllable of
+ * what gets spoken.
+ *
+ * The one rule that keeps it safe: a line break is only ever put between two
+ * tags where at least one is block level, and text is never separated from the
+ * tags around it. Whitespace between `</p>` and `<break/>` is nothing to a
+ * speech engine; whitespace dropped into the middle of a sentence is a pause
+ * the writer did not ask for.
+ *
+ * Tolerant of malformed input on purpose. This runs on hand-edited SSML, and
+ * the point of pressing Format on something broken is to see where it broke.
+ */
+export function formatSsml(ssml: string, indentUnit = '  '): string {
+  const tokens = tokenizeSsml(ssml.trim());
+  const lines: string[] = [];
+  let line = '';
+  let depth = 0;
+
+  // The last token actually written. Whitespace that gets dropped must leave
+  // the tags on either side of it looking adjacent, or reformatting already
+  // formatted SSML would run it all back onto one line.
+  let previous: SsmlToken | undefined;
+
+  for (const [index, token] of tokens.entries()) {
+    if (token.kind === 'text') {
+      // Whitespace between two block tags is ours to lay out again; anywhere
+      // else it may be the only thing keeping two words apart.
+      if (!token.raw.trim() && breaksBetween(previous, tokens[index + 1])) continue;
+      line += token.raw;
+      previous = token;
+      continue;
+    }
+
+    if (token.kind === 'close') depth = Math.max(0, depth - 1);
+    if (breaksBetween(previous, token)) {
+      lines.push(line);
+      line = indentUnit.repeat(depth);
+    }
+    line += token.raw;
+    if (token.kind === 'open') depth += 1;
+    previous = token;
+  }
+
+  lines.push(line);
+  return lines.join('\n');
+}
+
+/** True when a line break belongs between these two tokens. */
+function breaksBetween(before: SsmlToken | undefined, after: SsmlToken | undefined): boolean {
+  if (!before || !after) return false;
+  if (before.kind === 'text' || after.kind === 'text') return false;
+  // A closing tag follows whatever it wraps. Sending </p> to its own line after
+  // an inline element would leave the paragraph ending in stray whitespace.
+  if (after.kind === 'close') return isBlockTag(before.tag);
+  return isBlockTag(before.tag) || isBlockTag(after.tag);
+}
+
+function isBlockTag(tag: string): boolean {
+  return BLOCK_SSML_TAGS.has(tag);
+}
+
+const SSML_TOKEN = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/?[a-zA-Z][\w:-]*\b[^>]*>/g;
+
+function tokenizeSsml(ssml: string): SsmlToken[] {
+  const tokens: SsmlToken[] = [];
+  let cursor = 0;
+  for (const match of ssml.matchAll(SSML_TOKEN)) {
+    if (match.index > cursor) tokens.push({ kind: 'text', raw: ssml.slice(cursor, match.index) });
+    cursor = match.index + match[0].length;
+    tokens.push(classifyTag(match[0]));
+  }
+  if (cursor < ssml.length) tokens.push({ kind: 'text', raw: ssml.slice(cursor) });
+  return tokens;
+}
+
+function classifyTag(raw: string): SsmlToken {
+  const name = raw.match(/^<\/?([a-zA-Z][\w:-]*)/);
+  if (!name) return { kind: 'other', raw, tag: '' };
+  const tag = name[1].toLowerCase();
+  if (raw.startsWith('</')) return { kind: 'close', raw, tag };
+  // A void element written without the slash still closes itself here; SSML has
+  // no <break> to close, and treating it as open would indent the rest.
+  if (raw.endsWith('/>') || VOID_SSML_TAGS.has(tag)) return { kind: 'self', raw, tag };
+  return { kind: 'open', raw, tag };
 }
