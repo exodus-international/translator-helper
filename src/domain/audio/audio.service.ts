@@ -1,7 +1,7 @@
 import prisma from '@/lib/db';
 import { isAudioStorageConfigured } from '@/lib/audio-storage-config';
 import { putObject } from '@/lib/object-storage';
-import { AudioStatus, type AudioFile } from '@prisma/client';
+import { AudioStatus, type AudioFile, type AudioProvider, type DocumentType } from '@prisma/client';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { resolveAudioObjectKey } from './audio.paths';
 import {
@@ -15,7 +15,17 @@ import {
   releaseAudioFileToPending,
   setAudioFileJob,
 } from './audio.repository';
-import { audioSkipReason, formatAudioError, isAudioStale, type AudioErrorKind } from './audio.rules';
+import {
+  audioSkipReason,
+  formatAudioError,
+  isAudioStale,
+  localeFromVoice,
+  resolveAudioSsml,
+  transcriptBaseline,
+  transcriptState,
+  type AudioErrorKind,
+  type AudioTranscriptState,
+} from './audio.rules';
 import { markdownToSpeechScript } from './audio.script';
 import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
@@ -24,28 +34,103 @@ import type { SynthesisResult } from './providers/speech-provider';
 
 const LOG_PREFIX = '[Audio]';
 
+export interface DerivationInput {
+  /** The version's stored Markdown. */
+  content: string;
+  /** Provider voice identifier for the document's language. */
+  voice: string;
+  /** Longest single break the provider honours. */
+  maxBreakMs: number;
+}
+
+/**
+ * Exactly what generation sends for a version with no override. Lives here
+ * rather than with the rules because it needs the Markdown parser, and the
+ * audio card imports the rules into the browser.
+ */
+export function deriveAudioSsml({ content, voice, maxBreakMs }: DerivationInput): string {
+  return speechScriptToSsml(markdownToSpeechScript(content), {
+    voice,
+    locale: localeFromVoice(voice),
+    maxBreakMs,
+    ...DEFAULT_PROSODY,
+  });
+}
+
+/** True when the document has no readable words left after the Markdown comes off. */
+export function hasReadableText(content: string): boolean {
+  return markdownToSpeechScript(content).segments.some((segment) => segment.kind === 'text');
+}
+
+/** Everything generation reads off a version. Named so a test can build one. */
+export interface VersionForGeneration {
+  id: string;
+  content: string;
+  audioSsml: string | null;
+  version: number;
+  language: { code: string; audioProvider: AudioProvider | null; audioVoice: string | null };
+  document: {
+    type: DocumentType | null;
+    originalFilename: string | null;
+    slug: string;
+    sourceProject: { identifier: string | null; audioDocumentTypes: DocumentType[] } | null;
+  };
+}
+
+/**
+ * The service's reach into the database, the provider and object storage,
+ * injectable so what the provider is actually sent can be asserted without
+ * either. Same shape as `createAuthorize` in the authorization gateway.
+ */
+export interface GenerationDeps {
+  loadVersion: (id: string) => Promise<VersionForGeneration | null>;
+  storageConfigured: () => boolean;
+  getProvider: typeof getSpeechProvider;
+  createAudioFile: typeof createAudioFile;
+  setAudioFileJob: typeof setAudioFileJob;
+  claimForProcessing: typeof claimAudioFileForProcessing;
+  markFailed: typeof markAudioFileFailed;
+  log: typeof createActivityLog;
+  /** Uploads the finished audio and marks the record ready. */
+  finish: typeof complete;
+}
+
+const defaultGenerationDeps: GenerationDeps = {
+  loadVersion: (id) =>
+    prisma.documentVersion.findUnique({
+      where: { id },
+      include: { document: { include: { sourceProject: true } }, language: true },
+    }),
+  storageConfigured: isAudioStorageConfigured,
+  getProvider: getSpeechProvider,
+  createAudioFile,
+  setAudioFileJob,
+  claimForProcessing: claimAudioFileForProcessing,
+  markFailed: markAudioFileFailed,
+  log: createActivityLog,
+  finish: (audioFile, result, ctx) => complete(audioFile, result, ctx),
+};
+
 /**
  * Creates an audio record for a document version and hands the synthesis to
  * the language's provider. Never throws: configuration gaps come back as
  * `skipped`, everything else as `failed`, so a status transition is never
  * blocked by audio.
  */
-export async function startGeneration(
+export function createStartGeneration(deps: GenerationDeps = defaultGenerationDeps) {
+  return async function startGeneration(
   documentVersionId: string,
   userId: string,
   options: { trigger?: 'approval' | 'regeneration' } = {},
 ): Promise<AudioGenerationOutcome> {
-  const version = await prisma.documentVersion.findUnique({
-    where: { id: documentVersionId },
-    include: { document: { include: { sourceProject: true } }, language: true },
-  });
+  const version = await deps.loadVersion(documentVersionId);
   if (!version) return { status: 'failed', error: `Document version not found: ${documentVersionId}` };
 
   const skip = audioSkipReason({
     language: version.language,
     document: version.document,
-    storageConfigured: isAudioStorageConfigured(),
-    providerConfigured: (provider) => getSpeechProvider(provider).isConfigured(),
+    storageConfigured: deps.storageConfigured(),
+    providerConfigured: (provider) => deps.getProvider(provider).isConfigured(),
   });
   if (skip) {
     console.log(`${LOG_PREFIX} skipping generation for ${documentVersionId}: ${skip}`);
@@ -53,21 +138,21 @@ export async function startGeneration(
   }
 
   const { language, document } = version;
-  const provider = getSpeechProvider(language.audioProvider!);
+  const provider = deps.getProvider(language.audioProvider!);
   const voice = language.audioVoice!;
 
-  const audioFile = await createAudioFile({
+  const audioFile = await deps.createAudioFile({
     documentVersionId,
     provider: provider.id,
     voice,
     sourceVersion: version.version,
     triggeredByUserId: userId,
   });
-  await createActivityLog({
+  await deps.log({
     documentVersionId,
     userId,
     action: options.trigger === 'regeneration' ? 'audio_regeneration_requested' : 'audio_generation_started',
-    details: { audioFileId: audioFile.id, voice },
+    details: { audioFileId: audioFile.id, voice, ssmlSource: version.audioSsml ? 'override' : 'derived' },
   });
 
   // Anything thrown before the provider is asked is our problem (content or
@@ -75,34 +160,35 @@ export async function startGeneration(
   // message so the card can word the two differently.
   let phase: AudioErrorKind = 'content';
   try {
-    const script = markdownToSpeechScript(version.content);
-    if (!script.segments.some((s) => s.kind === 'text')) {
+    if (!version.audioSsml && !hasReadableText(version.content)) {
       throw new Error('The document has no readable text after stripping Markdown');
     }
-    const ssml = speechScriptToSsml(script, {
-      voice,
-      locale: localeFromVoice(voice),
-      maxBreakMs: provider.maxBreakMs,
-      ...DEFAULT_PROSODY,
+    const { ssml } = resolveAudioSsml({
+      override: version.audioSsml,
+      derive: () => deriveAudioSsml({ content: version.content, voice, maxBreakMs: provider.maxBreakMs }),
     });
 
     phase = 'provider';
     const outcome = await provider.submit({ jobId: jobIdFor(audioFile.id), ssml });
     if (outcome.kind === 'result') {
       // Synchronous provider: finish in the same call.
-      await claimAudioFileForProcessing(audioFile.id);
-      await complete(audioFile, outcome.result, { document, languageCode: language.code });
+      await deps.claimForProcessing(audioFile.id);
+      await deps.finish(audioFile, outcome.result, { document, languageCode: language.code });
     } else {
-      await setAudioFileJob(audioFile.id, outcome.jobId);
+      await deps.setAudioFileJob(audioFile.id, outcome.jobId);
     }
     return { status: 'success', audioFileId: audioFile.id };
   } catch (error: unknown) {
     const message = errorMessage(error);
     console.error(`${LOG_PREFIX} generation failed for ${documentVersionId}:`, message);
-    await fail(audioFile, formatAudioError(phase, message));
+    await failWith(deps, audioFile, formatAudioError(phase, message));
     return { status: 'failed', error: message };
   }
+  };
 }
+
+/** Production instance. */
+export const startGeneration = createStartGeneration();
 
 /**
  * Moves one record forward: polls the provider, and on success uploads the
@@ -263,9 +349,18 @@ async function complete(
 }
 
 async function fail(audioFile: AudioFile, message: string): Promise<AudioFile> {
-  const updated = await markAudioFileFailed(audioFile.id, message);
+  return failWith({ markFailed: markAudioFileFailed, log: createActivityLog }, audioFile, message);
+}
+
+/** Marks a record failed and logs it, through whichever pair of writers it is given. */
+async function failWith(
+  deps: Pick<GenerationDeps, 'markFailed' | 'log'>,
+  audioFile: AudioFile,
+  message: string,
+): Promise<AudioFile> {
+  const updated = await deps.markFailed(audioFile.id, message);
   if (audioFile.triggeredByUserId) {
-    await createActivityLog({
+    await deps.log({
       documentVersionId: audioFile.documentVersionId,
       userId: audioFile.triggeredByUserId,
       action: 'audio_generation_failed',
@@ -275,10 +370,7 @@ async function fail(audioFile: AudioFile, message: string): Promise<AudioFile> {
   return updated;
 }
 
-/** `cs-CZ-AntoninNeural` -> `cs-CZ`. Provider voice ids lead with their locale. */
-export function localeFromVoice(voice: string): string {
-  return voice.split('-').slice(0, 2).join('-');
-}
+export { localeFromVoice };
 
 /** Azure allows 3-64 chars of [A-Za-z0-9-_.]; a UUID with a prefix fits. */
 function jobIdFor(audioFileId: string): string {
@@ -287,4 +379,117 @@ function jobIdFor(audioFileId: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The SSML for a version as the tab should show it: the stored override when
+ * there is one, otherwise what generation would derive right now.
+ *
+ * Returns null when the document is not eligible for audio at all, which is
+ * also what decides whether the Audio text tab exists.
+ */
+export async function getTranscript(
+  documentVersionId: string,
+): Promise<{ ssml: string; source: 'derived' | 'override'; state: AudioTranscriptState } | null> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    include: { document: { include: { sourceProject: true } }, language: true },
+  });
+  if (!version) return null;
+
+  const skip = audioSkipReason({
+    language: version.language,
+    document: version.document,
+    storageConfigured: isAudioStorageConfigured(),
+    providerConfigured: (provider) => getSpeechProvider(provider).isConfigured(),
+  });
+  if (skip) return null;
+
+  const provider = getSpeechProvider(version.language.audioProvider!);
+  const input = {
+    content: version.content,
+    voice: version.language.audioVoice!,
+    maxBreakMs: provider.maxBreakMs,
+  };
+  const resolved = resolveAudioSsml({ override: version.audioSsml, derive: () => deriveAudioSsml(input) });
+
+  // Derived only to compare against the fingerprint, and only when there is an
+  // override to compare: a document with no override cannot be out of date.
+  const state = transcriptState({
+    override: version.audioSsml,
+    baseline: version.audioSsmlBase,
+    derived: version.audioSsml ? deriveAudioSsml(input) : null,
+  });
+
+  return { ...resolved, state };
+}
+
+/**
+ * Just the transcript's state, for callers that do not need the SSML itself.
+ * Derives nothing when the version has no override, which is the common case
+ * and the one the audio card polls.
+ */
+export async function getTranscriptState(documentVersionId: string): Promise<AudioTranscriptState> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    select: { content: true, audioSsml: true, audioSsmlBase: true, language: true },
+  });
+  if (!version?.audioSsml || !version.language.audioProvider || !version.language.audioVoice) {
+    return transcriptState({ override: version?.audioSsml });
+  }
+
+  const provider = getSpeechProvider(version.language.audioProvider);
+  return transcriptState({
+    override: version.audioSsml,
+    baseline: version.audioSsmlBase,
+    derived: deriveAudioSsml({
+      content: version.content,
+      voice: version.language.audioVoice,
+      maxBreakMs: provider.maxBreakMs,
+    }),
+  });
+}
+
+/**
+ * Stores hand-edited SSML for a version, or clears it with null so the
+ * transcript goes back to being derived. The caller is responsible for the
+ * permission check; this only writes.
+ */
+export async function saveTranscript(documentVersionId: string, ssml: string | null): Promise<void> {
+  const stored = ssml?.trim() ? ssml : null;
+  await prisma.documentVersion.update({
+    where: { id: documentVersionId },
+    data: { audioSsml: stored, audioSsmlBase: stored ? await currentBaseline(documentVersionId) : null },
+  });
+}
+
+/**
+ * Accepts the document as it stands: the override is left alone and the
+ * fingerprint is refreshed, so the tab stops asking. The other half of the
+ * conflict — rebuilding from the document — is a save of the derived SSML,
+ * which needs no special case.
+ */
+export async function keepTranscript(documentVersionId: string): Promise<void> {
+  await prisma.documentVersion.update({
+    where: { id: documentVersionId },
+    data: { audioSsmlBase: await currentBaseline(documentVersionId) },
+  });
+}
+
+/** The fingerprint of what this version derives to right now, or null when it cannot be derived. */
+async function currentBaseline(documentVersionId: string): Promise<string | null> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    include: { language: true },
+  });
+  if (!version?.language.audioProvider || !version.language.audioVoice) return null;
+
+  const provider = getSpeechProvider(version.language.audioProvider);
+  return transcriptBaseline(
+    deriveAudioSsml({
+      content: version.content,
+      voice: version.language.audioVoice,
+      maxBreakMs: provider.maxBreakMs,
+    }),
+  );
 }

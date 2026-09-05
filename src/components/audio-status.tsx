@@ -5,11 +5,22 @@ import { Card } from '@/components/ui/card';
 import { SidebarSection } from '@/components/sidebar-section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Copy, Download, Loader2, Pause, Play, RefreshCw, Volume2 } from 'lucide-react';
-import { advanceAudioJobAction, getLatestAudioFileAction, regenerateAudioAction } from '@/domain/audio/audio.actions';
+import { AlertCircle, Copy, Download, FileText, Loader2, Pause, Play, RefreshCw, Volume2 } from 'lucide-react';
+import {
+  advanceAudioJobAction,
+  getAudioTranscriptStateAction,
+  getLatestAudioFileAction,
+  regenerateAudioAction,
+} from '@/domain/audio/audio.actions';
 import { isAudioStale, parseAudioError } from '@/domain/audio/audio.rules';
-import { AUDIO_SKIP_MESSAGES, type AudioFileView } from '@/domain/audio/audio.types';
+import {
+  AUDIO_SKIP_MESSAGES,
+  type AudioFileView,
+  type AudioTranscriptState,
+} from '@/domain/audio/audio.types';
 import { capture } from '@/lib/analytics';
+import { useEditorStore } from '@/lib/stores/editor-provider';
+import { cn } from '@/lib/utils';
 import { DocumentStatus } from '@prisma/client';
 import { toast } from 'sonner';
 
@@ -44,9 +55,19 @@ export function AudioStatus({
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [fileMissing, setFileMissing] = useState(false);
+  // Read once rather than on every poll tick: the card polls while a job runs,
+  // and the transcript does not change under it.
+  const [transcriptState, setTranscriptState] = useState<AudioTranscriptState>('generated');
+  const requestTranslationView = useEditorStore((s) => s.requestTranslationView);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playbackTracked = useRef(false);
   const failureTracked = useRef<string | null>(null);
+
+  useEffect(() => {
+    getAudioTranscriptStateAction(documentVersionId)
+      .then(setTranscriptState)
+      .catch(() => setTranscriptState('generated'));
+  }, [documentVersionId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,6 +178,32 @@ export function AudioStatus({
 
   const body = (
     <>
+      {transcriptState !== 'generated' && (
+        <div
+          className={cn(
+            'mb-2 rounded-md border px-2 py-1.5 text-xs',
+            transcriptState === 'edited_outdated'
+              ? 'border-amber-200 bg-amber-50 text-amber-900'
+              : 'border-gray-200 bg-gray-50 text-gray-600',
+          )}
+        >
+          <p className="flex items-start gap-1.5">
+            <FileText className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span>
+              {transcriptState === 'edited_outdated'
+                ? 'The audio text was edited by hand, and the translation has changed since.'
+                : 'The audio text was edited by hand, so this is not read straight from the translation.'}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => requestTranslationView('audio')}
+            className="mt-1 ml-5 underline underline-offset-2 hover:no-underline"
+          >
+            Open the audio text
+          </button>
+        </div>
+      )}
 
       {!audio && (
         <div className="text-sm text-gray-500">

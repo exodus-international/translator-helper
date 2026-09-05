@@ -26,6 +26,7 @@ import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
 import { ThreadSidebar } from './thread-sidebar';
+import { AudioTextPanel } from '@/components/audio-text-panel';
 // SuggestionType enum values
 const SuggestionType = {
   COMMENT: 'COMMENT' as const,
@@ -40,6 +41,9 @@ export interface SourceTranslationViewerHandle {
   exitTranslationEditMode: () => void;
 }
 
+/** Formatted and Review are the old pair; Audio text is offered only where audio applies. */
+type TranslationViewMode = 'formatted' | 'review' | 'audio';
+
 interface SourceTranslationViewerProps {
   variant: ViewerVariant;
   className?: string;
@@ -50,6 +54,15 @@ interface SourceTranslationViewerProps {
   translationFormattedContent?: string;
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /**
+   * Offers the Audio text tab. Resolved on the server from the same eligibility
+   * check that decides whether audio is generated at all, so the tab never
+   * appears on a document that will never have any.
+   */
+  audioTextVersionId?: string | null;
+  /** Set by something outside the viewer (the audio card) asking for a tab. */
+  requestedView?: 'audio' | null;
+  onRequestedViewShown?: () => void;
   onTranslationChange?: (value: string) => void;
   sourceBadge?: ReactNode;
   translationBadge?: ReactNode;
@@ -131,6 +144,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       translationFormattedContent,
       translationPlaceholder = 'Enter your translation here...',
       translationPreviewEmptyText = '*No content yet...*',
+      audioTextVersionId = null,
+      requestedView = null,
+      onRequestedViewShown,
       onTranslationChange,
       sourceBadge,
       translationBadge,
@@ -176,7 +192,16 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
-    const [reviewViewMode, setReviewViewMode] = useState<'formatted' | 'review'>('review');
+    const [reviewViewMode, setReviewViewMode] = useState<TranslationViewMode>('review');
+
+    // A request is consumed, not mirrored: the tab strip stays the one place
+    // that knows which tab is open.
+    useEffect(() => {
+      if (requestedView === 'audio' && audioTextVersionId) {
+        setReviewViewMode('audio');
+        onRequestedViewShown?.();
+      }
+    }, [requestedView, audioTextVersionId, onRequestedViewShown]);
     const [isReviewEditing, setIsReviewEditing] = useState(reviewConfig?.editingDefault ?? false);
     const [showSuggestionForm, setShowSuggestionForm] = useState(false);
     const [suggestionFormType, setSuggestionFormType] = useState<SuggestionType>(SuggestionType.COMMENT);
@@ -743,7 +768,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   mounted ? (
                     <Tabs
                       value={reviewViewMode}
-                      onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'review')}
+                      onValueChange={(value) => setReviewViewMode(value as TranslationViewMode)}
                     >
                       <TabsList>
                         <TabsTrigger value="formatted">Formatted</TabsTrigger>
@@ -758,6 +783,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                             </Badge>
                           )}
                         </TabsTrigger>
+                        {audioTextVersionId && <TabsTrigger value="audio">Audio text</TabsTrigger>}
                       </TabsList>
                     </Tabs>
                   ) : (
@@ -894,6 +920,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                   {translationEditActions}
                 </div>
+              ) : audioTextVersionId && reviewViewMode === 'audio' ? (
+                <AudioTextPanel documentVersionId={audioTextVersionId} />
               ) : !isYaml && reviewViewMode === 'formatted' ? (
                 <div className="prose max-w-none h-full overflow-y-auto p-3">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>

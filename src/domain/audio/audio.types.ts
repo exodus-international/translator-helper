@@ -1,4 +1,7 @@
 import type { AudioProvider, AudioStatus } from '@prisma/client';
+import type { AudioTranscriptState } from './audio.rules';
+
+export type { AudioTranscriptState };
 
 export type { AudioProvider, AudioStatus };
 
@@ -45,4 +48,14 @@ export interface AudioFileView {
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** What the Audio text tab needs to render itself. */
+export interface AudioTranscriptView {
+  ssml: string;
+  state: AudioTranscriptState;
+  /** False when the reader may look but not change it. */
+  canEdit: boolean;
+  /** Why they may not, in words meant for them. */
+  readOnlyReason?: string;
 }

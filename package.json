@@ -6,17 +6,19 @@
     "node": ">=20.18.1"
   },
   "scripts": {
-    "dev": "set -a && . ./.env 2>/dev/null; set +a; next dev --port ${PORT:-3000}",
+    "dev": "node scripts/copy-monaco.mjs && set -a && . ./.env 2>/dev/null; set +a; next dev --port ${PORT:-3000}",
     "build": "node scripts/copy-monaco.mjs && prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test $(find src -name '*.test.ts' -o -name '*.test.tsx')",
+    "test": "pnpm test:unit && pnpm test:components",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "node scripts/copy-monaco.mjs",
     "format": "prettier --write .",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
     "release:prepare": "bash scripts/release.sh",
-    "release:tag": "bash scripts/release-tag.sh"
+    "release:tag": "bash scripts/release-tag.sh",
+    "test:unit": "tsx --test $(find src -name '*.test.ts')",
+    "test:components": "tsx --test --import ./tests/setup-dom.ts $(find src -name '*.test.tsx')"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -64,7 +66,11 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^15.11.7",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
