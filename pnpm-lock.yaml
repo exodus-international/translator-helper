@@ -5,11 +5,11 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  js-yaml@<3.15.0: '>=3.15.0'
-  mdast-util-to-hast@<13.2.1: '>=13.2.1'
-  '@babel/core@<=7.29.0': '>=7.29.6'
-  dompurify@<=3.4.11: '>=3.4.12'
-  browserslist@<=4.28.6: '>=4.28.7'
+  js-yaml@<3.15.0: 3.15.0
+  mdast-util-to-hast@<13.2.1: 13.2.1
+  '@babel/core@<=7.29.0': 7.29.7
+  dompurify@<=3.4.11: 3.4.14
+  browserslist@<=4.28.6: 4.28.9
 
 importers:
 
@@ -299,7 +299,7 @@ packages:
     resolution: {integrity: sha512-UPUVSyXbOh627KiCIGQSgwWzGeBKLkaJ9PJEdrngIwMSzxLR4jS4+f1f1jb7VzBbg8nFLaYotvVPFCTqdrmTAg==}
     engines: {node: '>=6.9.0'}
     peerDependencies:
-      '@babel/core': '>=7.29.6'
+      '@babel/core': 7.29.7
 
   '@babel/helper-string-parser@7.27.1':
     resolution: {integrity: sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA==}
@@ -4953,7 +4953,7 @@ packages:
     resolution: {integrity: sha512-UQ+MSxlhRm1bzjhU+DcuXfjFO1FzNtqhK5+9Yvlp90ItDLk5vT932A0rFu619nf7RVS+Y/VeaUW1jaRDqZ8VJw==}
     hasBin: true
     peerDependencies:
-      browserslist: '>=4.28.7'
+      browserslist: 4.28.9
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
