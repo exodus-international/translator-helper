@@ -29,12 +29,6 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
-  account: {
-    // 1.7 keys accounts on (issuer, accountId). provider-id preserves the
-    // provider-scoped identity semantics of pre-1.7 data (see the 1.7
-    // upgrade guide — "issuer" would require a re-key migration).
-    identityStrategy: 'provider-id',
-  },
   emailAndPassword: {
     enabled: true,
   },
