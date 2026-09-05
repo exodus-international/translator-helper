@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import { Role, TShirtSize } from '@prisma/client';
+import { Role, TShirtSize } from '@/generated/prisma/enums';
 
 interface ProfileData {
   name?: string;

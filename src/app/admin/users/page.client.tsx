@@ -47,7 +47,7 @@ import { downloadCsv } from '@/lib/download';
 import { adminUpdateUserProfileAction, updateUserRoleAction } from '@/domain/user/user.actions';
 import { useDataTable } from '@/hooks/use-data-table';
 import { authClient } from '@/lib/auth-client';
-import { InvitationStatus, Role, TShirtSize } from '@prisma/client';
+import { InvitationStatus, Role, TShirtSize } from '@/generated/prisma/enums';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   Ban,

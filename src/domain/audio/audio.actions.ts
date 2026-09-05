@@ -1,7 +1,7 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
-import type { AudioFile } from '@prisma/client';
+import type { AudioFile } from '@/generated/prisma/client';
 import { assertCanEditDocumentVersion } from '../document-version/document-version.permissions';
 import { getLatestAudioFileForVersion } from './audio.repository';
 import { advanceJob, getAudioReadiness, startGeneration } from './audio.service';

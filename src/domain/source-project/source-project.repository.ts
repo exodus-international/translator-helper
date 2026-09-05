@@ -1,5 +1,6 @@
 import prisma from '@/lib/db';
-import type { DocumentType, Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 
 export async function listSourceProjects(options?: { includeComplete?: boolean }) {
   return prisma.sourceProject.findMany({

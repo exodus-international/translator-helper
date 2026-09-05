@@ -15,7 +15,7 @@ import { createTranslationProjectAction } from '@/domain/translation-project/tra
 import type { TranslationProjectSort } from '@/domain/translation-project/translation-project.repository';
 import { buildListSearchParams, DEFAULT_PAGE_SIZE } from '@/lib/list-params';
 import { capture } from '@/lib/analytics';
-import { Language, Prisma } from '@prisma/client';
+import type { Language, Prisma } from '@/generated/prisma/client';
 import { ExternalLink, Languages, Plus, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';

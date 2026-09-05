@@ -1,4 +1,4 @@
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { FilePathParams } from './github.types';
 
 /**

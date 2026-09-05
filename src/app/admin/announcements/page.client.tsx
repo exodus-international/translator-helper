@@ -15,7 +15,8 @@ import {
   toggleAnnouncementActiveAction,
   updateAnnouncementAction,
 } from '@/domain/announcement/announcement.actions';
-import { AnnouncementType, type Announcement } from '@prisma/client';
+import { type Announcement } from '@/generated/prisma/client';
+import { AnnouncementType } from '@/generated/prisma/enums';
 import { ArrowLeft, Edit, EyeOff, Megaphone, MessageSquare, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';

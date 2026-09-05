@@ -1,5 +1,5 @@
 import { userBrief } from '@/domain/user/user.select';
-import type { InvitationStatus } from '@prisma/client';
+import { InvitationStatus } from '@/generated/prisma/enums';
 import prisma from '@/lib/db';
 
 export async function createInvitation(

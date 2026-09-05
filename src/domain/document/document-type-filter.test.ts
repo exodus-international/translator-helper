@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import {
   DocumentTypeFilterValue,
   NO_TYPE,

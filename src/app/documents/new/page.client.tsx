@@ -21,7 +21,7 @@ import { parseFrontmatter } from '@/lib/frontmatter';
 import { FileText, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import type { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
 
 interface NewDocumentClientProps {

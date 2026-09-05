@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { isUuid } from '@/lib/uuid';
 
 /**

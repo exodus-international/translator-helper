@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import type { AudioProvider } from '@prisma/client';
+import { AudioProvider } from '@/generated/prisma/enums';
 
 export async function listLanguages() {
   return prisma.language.findMany({

@@ -10,7 +10,7 @@ import { advanceAudioJobAction, getLatestAudioFileAction, regenerateAudioAction 
 import { isAudioStale, parseAudioError } from '@/domain/audio/audio.rules';
 import { AUDIO_SKIP_MESSAGES, type AudioFileView } from '@/domain/audio/audio.types';
 import { capture } from '@/lib/analytics';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
 
 interface AudioStatusProps {

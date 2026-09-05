@@ -1,4 +1,4 @@
-import { ProjectRole } from '@prisma/client';
+import { ProjectRole } from '@/generated/prisma/enums';
 import { z } from 'zod';
 
 export const setUserLanguagesSchema = z.object({

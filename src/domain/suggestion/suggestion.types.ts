@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SuggestionStatus, SuggestionType } from '@prisma/client';
+import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 
 export const createSuggestionSchema = z.object({
   documentVersionId: z.string(),

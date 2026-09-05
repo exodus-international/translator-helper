@@ -14,7 +14,7 @@ import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analyt
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useEditorStore } from '@/lib/stores/editor-provider';
-import { DocumentStatus, SuggestionStatus } from '@prisma/client';
+import { DocumentStatus, SuggestionStatus } from '@/generated/prisma/enums';
 import { Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';

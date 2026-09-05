@@ -1,6 +1,6 @@
 import { authorize } from '@/lib/authorize';
 import type { SessionUser } from '@/lib/session';
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
 import { getTranslationProjectBySourceAndLanguage } from '../translation-project/translation-project.repository';

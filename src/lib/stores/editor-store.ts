@@ -20,7 +20,7 @@ import {
   listTranslationProjectMembersAction,
 } from '@/domain/user-language/user-language.actions';
 import { deleteDocumentAction } from '@/domain/document/document.actions';
-import { DocumentStatus, SuggestionType } from '@prisma/client';
+import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
 import { capture } from '@/lib/analytics';
 
