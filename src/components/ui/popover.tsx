@@ -51,14 +51,6 @@ function PopoverContent({
   )
 }
 
-function PopoverAnchor({
-  ...props
-}: React.ComponentProps<"div">) {
-  // Base UI has no Anchor part; anchor via Positioner's `anchor` prop instead.
-  // Inert passthrough kept for API compatibility.
-  return <div data-slot="popover-anchor" {...props} />
-}
-
 function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -96,7 +88,6 @@ export {
   Popover,
   PopoverTrigger,
   PopoverContent,
-  PopoverAnchor,
   PopoverHeader,
   PopoverTitle,
   PopoverDescription,

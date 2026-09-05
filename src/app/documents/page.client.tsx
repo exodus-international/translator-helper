@@ -217,7 +217,15 @@ export default function DocumentsClient({
               <FieldLabel htmlFor="documents-project-filter">Project</FieldLabel>
               <Select
                 value={selectedSourceProject}
-                onValueChange={(value) => navigate({ sourceProject: value === 'all' ? null : value, page: null })}
+                onValueChange={(value) =>
+                  navigate({ sourceProject: !value || value === 'all' ? null : value, page: null })
+                }
+                items={{
+                  all: 'All projects',
+                  ...Object.fromEntries(
+                    sourceProjects.map((project) => [project.id, `${project.name} (${project._count.documents})`]),
+                  ),
+                }}
               >
                 <SelectTrigger id="documents-project-filter" className="w-full sm:w-48">
                   <SelectValue placeholder="All projects" />
@@ -238,7 +246,13 @@ export default function DocumentsClient({
               <FieldLabel htmlFor="documents-type-filter">Type</FieldLabel>
               <Select
                 value={selectedType}
-                onValueChange={(value) => navigate({ type: value === 'all' ? null : value, page: null })}
+                onValueChange={(value) => navigate({ type: !value || value === 'all' ? null : value, page: null })}
+                items={{
+                  all: 'All types',
+                  ...Object.fromEntries(
+                    DOCUMENT_TYPE_SEQUENCE.map((type) => [type, DOCUMENT_TYPE_CONFIGS[type].name]),
+                  ),
+                }}
               >
                 <SelectTrigger id="documents-type-filter" className="w-full sm:w-40">
                   <SelectValue placeholder="All types" />

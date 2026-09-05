@@ -323,7 +323,11 @@ export default function TranslationProjectClient({
                     </div>
                     <div>
                       <Label htmlFor="role">Role *</Label>
-                      <Select value={selectedRole} onValueChange={(role) => setSelectedRole(role as ProjectRole)}>
+                      <Select
+                        value={selectedRole}
+                        onValueChange={(role) => role && setSelectedRole(role as ProjectRole)}
+                        items={ROLE_LABELS}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a role" />
                         </SelectTrigger>
@@ -366,8 +370,9 @@ export default function TranslationProjectClient({
                         <Badge variant="secondary">{ROLE_LABELS[member.role]}</Badge>
                         <Select
                           value={member.role}
-                          onValueChange={(value) => handleChangeRole(member.userId, value as ProjectRole)}
+                          onValueChange={(value) => value && handleChangeRole(member.userId, value as ProjectRole)}
                           disabled={loading}
+                          items={ROLE_LABELS}
                         >
                           <SelectTrigger className="h-6 w-auto border-dashed">
                             <SelectValue placeholder="Change role" />

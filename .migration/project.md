@@ -21,7 +21,9 @@ label, separator, button, badge, checkbox, tabs, tooltip, scroll-area, popover, 
 - Menu items: `onSelect` → `onClick`; keep-open `onSelect={e => e.preventDefault()}` → removed on CheckboxItem (Base `closeOnClick` defaults false) and `closeOnClick={false}` on status-dropdown items.
 - Select: `onValueChange` null-widening wrapped at 16+ sites; `items` label maps added at every select site (Base `Select.Value` renders raw values otherwise); `''` sentinels → `value={x || null}`; one `|| undefined` uncontrolled bug avoided.
 - Tooltip: `delayDuration` → `delay` (sidebar + admin users).
-- Untouched by rule: cmdk (command), sonner, stepper (custom, no radix), Monaco/TanStack code, `data-[state=selected]` (TanStack), sidebar's own data-state API. combobox.tsx was already Base-authored (its tw-animate idiom left as-is).
+- Untouched by rule: sonner, stepper (custom, no radix), Monaco/TanStack code, `data-[state=selected]` (TanStack), sidebar's own data-state API. combobox.tsx was already Base-authored (its tw-animate idiom left as-is).
+- **FLAGGED exception to "never touch cmdk":** `src/components/ui/command.tsx` (cmdk-based) received one typing-only change — `CommandDialog`'s props narrowed to `children?: React.ReactNode` because Base `Dialog.Popup`'s payload-children type leaked through the composition. No cmdk parts or behavior touched. Documented here because it belongs to no per-component report.
+- `src/components/ui/field.tsx:120` (`has-data-[state=checked]:` → `has-data-checked:`) is not a radix wrapper migration but a required ripple of the checkbox migration; documented in `.migration/checkbox.md`.
 
 ## Verification
 
@@ -32,7 +34,7 @@ label, separator, button, badge, checkbox, tabs, tooltip, scroll-area, popover, 
 
 ## FLAG (whole-project, legacy style)
 
-- **components.json still says `"style": "new-york"`, `"base": "radix"`.** Future `shadcn add` runs will deliver radix-flavored wrappers that conflict with these migrated files. Options: switch style/base when a base-new-york equivalent exists, adopt a `base-*` style intentionally (restyle risk), or add components manually. User decision — not changed.
+- **components.json still says `"style": "new-york"` (no explicit `base` key; the CLI resolves it as radix).** Future `shadcn add` runs will deliver radix-flavored wrappers that conflict with these migrated files. Options: switch style/base when a base-new-york equivalent exists, adopt a `base-*` style intentionally (restyle risk), or add components manually. User decision — not changed.
 - Base UI Portal renders a wrapping `<div>` (radix rendered none) — spot-check nested dialog/portaled z-index stacking.
 - Default collision padding is 5 (radix 0) and collision boundary defaults to clipping ancestors — edge-anchored popovers may sit a few px differently.
 

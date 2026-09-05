@@ -976,7 +976,11 @@ export default function UsersClient({
           <form onSubmit={handleRoleDialogSubmit} className="space-y-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Select Role</label>
-              <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as Role)}>
+              <Select
+                value={selectedRole || undefined}
+                onValueChange={(value) => value && setSelectedRole(value as Role)}
+                items={{ [Role.USER]: 'User', [Role.ADMIN]: 'Admin' }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
