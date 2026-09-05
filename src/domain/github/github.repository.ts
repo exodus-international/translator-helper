@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import { GitHubPRStatus } from '@prisma/client';
+import { GitHubPRStatus } from '@/generated/prisma/enums';
 
 export async function createGitHubCommit(data: {
   documentVersionId: string;

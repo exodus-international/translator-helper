@@ -16,7 +16,7 @@ import { capture } from '@/lib/analytics';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { Language } from '@prisma/client';
+import { Language } from '@/generated/prisma/client';
 import { BarChart3, CheckCircle2, LayoutDashboard, Settings, Users } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { useRouter } from 'next/navigation';

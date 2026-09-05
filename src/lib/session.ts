@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { headers } from 'next/headers';
 import { cache } from 'react';
 import { auth } from './auth';

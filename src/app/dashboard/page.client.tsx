@@ -26,7 +26,7 @@ import {
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus, DocumentType } from '@prisma/client';
+import { DocumentStatus, DocumentType } from '@/generated/prisma/enums';
 import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';

@@ -9,7 +9,7 @@ import { completeOnboardingAction } from '@/domain/user/user.actions';
 import { capture } from '@/lib/analytics';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { TShirtSize } from '@prisma/client';
+import { TShirtSize } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);

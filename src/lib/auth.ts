@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { admin } from 'better-auth/plugins';

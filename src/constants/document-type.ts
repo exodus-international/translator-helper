@@ -1,4 +1,4 @@
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import type { LucideIcon } from 'lucide-react';
 import { CalendarDays, Compass, FileCog, Newspaper, Users } from 'lucide-react';
 

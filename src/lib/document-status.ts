@@ -1,7 +1,7 @@
 import {
   getStepForDocumentStatus,
 } from '@/constants/document-status';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 
 /**
  * Maps DocumentStatus to stepper step number (1-5)

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DOCUMENT_STATUS_CONFIGS, DOCUMENT_STATUS_SEQUENCE } from '@/constants/document-status';
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { BarChart3, FileText, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 

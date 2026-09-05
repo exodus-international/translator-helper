@@ -7,7 +7,7 @@ import { listTargetLanguages } from '@/domain/language/language.repository';
 import { listSourceProjectsAction } from '@/domain/source-project/source-project.actions';
 import { buildListSearchParams, DEFAULT_ORDER, getTotalPages, parseListParams, toURLSearchParams } from '@/lib/list-params';
 import { getCurrentUser } from '@/lib/session';
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { redirect } from 'next/navigation';
 import DocumentsClient from './page.client';
 

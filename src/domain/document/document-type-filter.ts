@@ -1,4 +1,4 @@
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 
 /**
  * Sentinel for documents that have no `type` set. Without it, selecting any

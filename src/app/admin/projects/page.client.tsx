@@ -31,7 +31,8 @@ import {
 } from '@/components/project-form';
 import { buildListSearchParams, DEFAULT_PAGE_SIZE } from '@/lib/list-params';
 import { capture } from '@/lib/analytics';
-import { DocumentType, SourceProject } from '@prisma/client';
+import { SourceProject } from '@/generated/prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { CheckCircle2, Edit, FolderOpen, Languages } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';

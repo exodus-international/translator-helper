@@ -6,7 +6,7 @@ import {
   SourceProjectStatus,
   SuggestionStatus,
   SuggestionType,
-} from '@prisma/client';
+} from '../../src/generated/prisma/client';
 
 // ---------------------------------------------------------------------------
 // Helpers used by both datasets and seed.ts

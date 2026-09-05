@@ -1,4 +1,4 @@
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import type { LucideIcon } from 'lucide-react';
 import { AlertCircle, CheckCircle2, Circle, Clock3, PenLine, Rocket } from 'lucide-react';
 

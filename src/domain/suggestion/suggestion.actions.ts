@@ -2,7 +2,7 @@
 
 import { authorize } from '@/lib/authorize';
 import { applyTextEditAtRange, extractTextAtRange, isRangeWithinBounds } from '@/lib/text-range';
-import { SuggestionStatus, SuggestionType } from '@prisma/client';
+import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';

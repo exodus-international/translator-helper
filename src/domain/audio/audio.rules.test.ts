@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AudioProvider, DocumentType } from '@prisma/client';
+import { AudioProvider, DocumentType } from '@/generated/prisma/enums';
 import { audioSkipReason, formatAudioError, isAudioStale, parseAudioError } from './audio.rules';
 
 test('audio generated from the current version is not stale', () => {

@@ -1,4 +1,4 @@
-import type { AudioProvider, AudioStatus } from '@prisma/client';
+import { AudioProvider, AudioStatus } from '@/generated/prisma/enums';
 
 export type { AudioProvider, AudioStatus };
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GitHubPRStatus } from '@prisma/client';
+import { GitHubPRStatus } from '@/generated/prisma/enums';
 import { verifyWebhookSignature } from '@/domain/github/github.service';
 import { getGitHubCommitsByPRNumber, updateGitHubCommitPRStatus } from '@/domain/github/github.repository';
 import { pullRequestWebhookSchema } from '@/domain/github/github.types';

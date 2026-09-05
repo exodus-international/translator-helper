@@ -1,5 +1,6 @@
+import { PrismaPg } from '@prisma/adapter-pg';
 import { auth } from '@/lib/auth';
-import { DocumentStatus, PrismaClient } from '@prisma/client';
+import { DocumentStatus, PrismaClient } from '../src/generated/prisma/client';
 
 import { CONTENT_BY_LANGUAGE, ENGLISH_CONTENT } from './seed-data/content';
 import {
@@ -16,7 +17,9 @@ import {
   daysFromNow,
 } from './seed-data/datasets';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 // ---------------------------------------------------------------------------
 // 1. Cleanup
