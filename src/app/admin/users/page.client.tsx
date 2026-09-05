@@ -49,6 +49,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { authClient } from '@/lib/auth-client';
 import { InvitationStatus, Role, TShirtSize } from '@/generated/prisma/enums';
 import type { ColumnDef } from '@tanstack/react-table';
+import type { DataTableFeatures } from '@/hooks/use-data-table';
 import {
   Ban,
   Check,
@@ -167,7 +168,7 @@ const ROLE_OPTIONS = [
   { label: 'User', value: Role.USER },
 ];
 
-function lastActivityColumn(id: 'lastSeenAt' | 'lastDocumentEditAt', label: string): ColumnDef<User> {
+function lastActivityColumn(id: 'lastSeenAt' | 'lastDocumentEditAt', label: string): ColumnDef<DataTableFeatures, User> {
   return {
     id,
     accessorFn: (row) => (row[id] ? new Date(row[id]).getTime() : 0),
@@ -563,7 +564,7 @@ export default function UsersClient({
     [availableLanguages],
   );
 
-  const columns = useMemo<ColumnDef<User>[]>(
+  const columns = useMemo<ColumnDef<DataTableFeatures, User>[]>(
     () => [
       {
         id: 'name',
@@ -601,7 +602,7 @@ export default function UsersClient({
             <span className="text-xs text-gray-400">—</span>
           ),
         filterFn: 'arrIncludesSome',
-        sortingFn: (rowA, rowB) => compareByLanguageThenName(rowA.original, rowB.original),
+        sortFn: (rowA, rowB) => compareByLanguageThenName(rowA.original, rowB.original),
         enableColumnFilter: true,
         meta: {
           label: 'Languages',

@@ -1,20 +1,32 @@
 import {
+  columnFacetingFeature,
+  columnFilteringFeature,
+  columnOrderingFeature,
+  columnPinningFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  createFacetedMinMaxValues,
+  createFacetedRowModel,
+  createFacetedUniqueValues,
+  createFilteredRowModel,
+  createPaginatedRowModel,
+  createSortedRowModel,
+  filterFn_arrIncludesSome,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
   type ColumnFiltersState,
-  getCoreRowModel,
-  getFacetedMinMaxValues,
-  getFacetedRowModel,
-  getFacetedUniqueValues,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
   type PaginationState,
+  type ReactTable,
+  type RowData,
   type RowSelectionState,
   type SortingState,
   type TableOptions,
-  type TableState,
   type Updater,
-  useReactTable,
-  type VisibilityState,
+  type ColumnVisibilityState,
+  type TableState,
 } from "@tanstack/react-table";
 import {
   parseAsArrayOf,
@@ -38,17 +50,41 @@ const ARRAY_SEPARATOR = ",";
 const DEBOUNCE_MS = 300;
 const THROTTLE_MS = 50;
 
-interface UseDataTableProps<TData>
+// v9 requires explicit feature registration; this app's tables all share the
+// same feature set, so it is built once at module level.
+export const dataTableFeatures = tableFeatures({
+  columnFacetingFeature,
+  columnFilteringFeature,
+  columnOrderingFeature,
+  columnPinningFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  facetedMinMaxValues: createFacetedMinMaxValues(),
+  facetedRowModel: createFacetedRowModel(),
+  facetedUniqueValues: createFacetedUniqueValues(),
+  filterFns: { arrIncludesSome: filterFn_arrIncludesSome },
+  filteredRowModel: createFilteredRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+  sortedRowModel: createSortedRowModel(),
+});
+
+export type DataTableFeatures = typeof dataTableFeatures;
+export type DataTableInstance<TData extends RowData> = ReactTable<DataTableFeatures, TData>;
+
+interface UseDataTableProps<TData extends RowData>
   extends Omit<
-    TableOptions<TData>,
+    TableOptions<DataTableFeatures, TData>,
     | "state"
     | "pageCount"
-    | "getCoreRowModel"
+    | "features"
     | "manualFiltering"
     | "manualPagination"
     | "manualSorting"
   > {
-  initialState?: Omit<Partial<TableState>, "sorting"> & {
+  initialState?: Omit<Partial<TableState<DataTableFeatures>>, "sorting"> & {
     sorting?: ExtendedColumnSort<TData>[];
   };
   history?: "push" | "replace";
@@ -60,7 +96,7 @@ interface UseDataTableProps<TData>
   startTransition?: React.TransitionStartFunction;
 }
 
-export function useDataTable<TData>(props: UseDataTableProps<TData>) {
+export function useDataTable<TData extends RowData>(props: UseDataTableProps<TData>) {
   const {
     columns,
     initialState,
@@ -101,7 +137,7 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
     initialState?.rowSelection ?? {},
   );
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>(initialState?.columnVisibility ?? {});
+    React.useState<ColumnVisibilityState>(initialState?.columnVisibility ?? {});
 
   const [page, setPage] = useQueryState(
     PAGE_KEY,
@@ -244,11 +280,10 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
     [debouncedSetFilterValues, filterableColumns],
   );
 
-  // React Compiler cannot memoize around useReactTable: TanStack returns
+  // React Compiler cannot memoize around useTable: TanStack returns
   // functions whose identity it cannot prove stable, so it skips compiling this
   // hook. That is inherent to the library and not something we can restructure.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
+  const table = useTable({
     ...tableProps,
     columns,
     initialState,
@@ -269,13 +304,7 @@ export function useDataTable<TData>(props: UseDataTableProps<TData>) {
     onSortingChange,
     onColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
+    features: dataTableFeatures,
     // Client-side processing: the table receives the full in-memory dataset and
     // react-table performs pagination/sorting/filtering from the URL-controlled
     // state. (Upstream defaults to manual/server-side mode.)
