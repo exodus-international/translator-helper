@@ -224,11 +224,13 @@ export function AudioStatus({
             {stale ? ` (text is now at version ${currentVersion})` : ''}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <a href={audio.url} download target="_blank" rel="noopener noreferrer">
-                <Download className="h-3 w-3 mr-1" />
-                Download
-              </a>
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={audio.url} download target="_blank" rel="noopener noreferrer" />}
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Download
             </Button>
             <Button variant="outline" size="sm" onClick={handleCopyUrl}>
               <Copy className="h-3 w-3 mr-1" />

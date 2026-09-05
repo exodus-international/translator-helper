@@ -439,11 +439,9 @@ export default function DashboardClient({
                     if (!open) resetNewProject();
                   }}
                 >
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-1.5" />
-                      New Project
-                    </Button>
+                  <DialogTrigger render={<Button size="sm" />}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    New Project
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
@@ -491,7 +489,14 @@ export default function DashboardClient({
                   </Badge>
                 </h2>
                 {deployLanguages.length > 1 && (
-                  <Select value={deployLanguageFilter} onValueChange={handleDeployLanguageFilterChange}>
+                  <Select
+                    value={deployLanguageFilter}
+                    onValueChange={(v) => handleDeployLanguageFilterChange(v ?? 'all')}
+                    items={{
+                      all: 'All languages',
+                      ...Object.fromEntries(deployLanguages.map((lang) => [lang.id, lang.name])),
+                    }}
+                  >
                     <SelectTrigger className="w-[180px] h-8 text-sm">
                       <SelectValue placeholder="All languages" />
                     </SelectTrigger>

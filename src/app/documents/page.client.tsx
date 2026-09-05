@@ -196,11 +196,9 @@ export default function DocumentsClient({
         title="Documents Overview"
         description="View translation status across all languages"
         actions={
-          <Button asChild>
-            <Link href="/documents/new">
-              <Plus />
-              New Document
-            </Link>
+          <Button render={<Link href="/documents/new" />}>
+            <Plus />
+            New Document
           </Button>
         }
       >
@@ -287,9 +285,7 @@ export default function DocumentsClient({
                   Clear search and filters
                 </Button>
               ) : (
-                <Button asChild>
-                  <Link href="/documents/new">New Document</Link>
-                </Button>
+                <Button render={<Link href="/documents/new" />}>New Document</Button>
               )}
             </EmptyContent>
           </Empty>
@@ -415,14 +411,16 @@ export default function DocumentsClient({
                             </Button>
                           </Link>
                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            <AlertDialogTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                />
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>

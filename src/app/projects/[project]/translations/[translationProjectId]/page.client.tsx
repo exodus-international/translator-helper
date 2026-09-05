@@ -271,11 +271,9 @@ export default function TranslationProjectClient({
                   if (!open) resetMemberForm();
                 }}
               >
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Member
-                  </Button>
+                <DialogTrigger render={<Button size="sm" />}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Member
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
@@ -285,7 +283,7 @@ export default function TranslationProjectClient({
                     <div>
                       <Label htmlFor="user">User *</Label>
                       <Select
-                        value={selectedUserId || undefined}
+                        value={selectedUserId || null}
                         onValueChange={(userId) => {
                           if (userId && userId.trim() !== '') {
                             setSelectedUserId(userId);
@@ -293,6 +291,15 @@ export default function TranslationProjectClient({
                         }}
                         required
                         disabled={availableUsers.length === 0}
+                        items={Object.fromEntries(
+                          availableUsers.map(
+                            (user) =>
+                              [
+                                user.id,
+                                `${user.name} (${user.email}) - ${user.languages.map((l) => l.language.code).join(', ')}`,
+                              ] as const,
+                          ),
+                        )}
                       >
                         <SelectTrigger>
                           <SelectValue
@@ -376,10 +383,10 @@ export default function TranslationProjectClient({
                       </div>
                     </div>
                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={loading} className="ml-4">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <AlertDialogTrigger
+                        render={<Button variant="outline" size="sm" disabled={loading} className="ml-4" />}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
@@ -424,11 +431,9 @@ export default function TranslationProjectClient({
                   if (!open) resetAssignmentForm();
                 }}
               >
-                <DialogTrigger asChild>
-                  <Button size="sm" disabled={unassignedDocuments.length === 0}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Assign Document
-                  </Button>
+                <DialogTrigger render={<Button size="sm" disabled={unassignedDocuments.length === 0} />}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Assign Document
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
@@ -437,7 +442,12 @@ export default function TranslationProjectClient({
                   <form onSubmit={handleAssignDocument} className="space-y-4">
                     <div>
                       <Label htmlFor="document">Document *</Label>
-                      <Select value={selectedDocumentId} onValueChange={setSelectedDocumentId} required>
+                      <Select
+                        value={selectedDocumentId || null}
+                        onValueChange={(v) => setSelectedDocumentId(v ?? '')}
+                        required
+                        items={Object.fromEntries(unassignedDocuments.map((doc) => [doc.id, doc.title]))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a document" />
                         </SelectTrigger>
@@ -455,8 +465,12 @@ export default function TranslationProjectClient({
                       <Select
                         value={selectedAssigneeId || UNASSIGNED_VALUE}
                         onValueChange={(value) =>
-                          setSelectedAssigneeId(value === UNASSIGNED_VALUE ? null : value)
+                          setSelectedAssigneeId(!value || value === UNASSIGNED_VALUE ? null : value)
                         }
+                        items={{
+                          [UNASSIGNED_VALUE]: 'Unassigned (visible to all)',
+                          ...Object.fromEntries(sortedMembers.map((member) => [member.userId, member.user.name ?? ''])),
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Unassigned (visible to all)" />
@@ -518,10 +532,8 @@ export default function TranslationProjectClient({
                             </div>
                           </div>
                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" disabled={loading}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            <AlertDialogTrigger render={<Button variant="outline" size="sm" disabled={loading} />}>
+                              <Trash2 className="h-4 w-4" />
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>

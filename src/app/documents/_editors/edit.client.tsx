@@ -123,7 +123,11 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="sourceProject">Source Project</Label>
-                  <Select value={sourceProjectId} onValueChange={setSourceProjectId}>
+                  <Select
+                    value={sourceProjectId || null}
+                    onValueChange={(v) => setSourceProjectId(v ?? '')}
+                    items={Object.fromEntries(sourceProjects.map((project) => [project.id, project.name]))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select source project" />
                     </SelectTrigger>
@@ -156,8 +160,8 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
               )}
 
               <div className="flex justify-between">
-                <Button asChild type="button" variant="outline">
-                  <Link href="/documents">Cancel</Link>
+                <Button type="button" variant="outline" render={<Link href="/documents" />}>
+                  Cancel
                 </Button>
                 <Button type="submit" disabled={loading || !title || !!filenameError}>
                   {loading ? 'Saving...' : 'Save Changes'}

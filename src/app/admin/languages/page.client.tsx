@@ -164,7 +164,11 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
             <>
               <div>
                 <Label htmlFor="audioProvider">Speech Provider</Label>
-                <Select value={audioProvider} onValueChange={handleProviderChange}>
+                <Select
+                  value={audioProvider}
+                  onValueChange={(v) => handleProviderChange(v ?? 'NONE')}
+                  items={{ NONE: 'None (no audio)', [AudioProvider.AZURE_SPEECH]: 'Azure Speech' }}
+                >
                   <SelectTrigger id="audioProvider">
                     <SelectValue />
                   </SelectTrigger>

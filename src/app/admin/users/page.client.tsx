@@ -681,11 +681,9 @@ export default function UsersClient({
           return (
             <div className="flex justify-end">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                    <span className="sr-only">Open actions menu</span>
-                  </Button>
+                <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 w-8 p-0" />}>
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Open actions menu</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {!user.banned ? (
@@ -813,11 +811,13 @@ export default function UsersClient({
               <DataTableToolbar table={table}>
                 <TooltipProvider>
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8" onClick={handleExportCsv}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export CSV
-                      </Button>
+                    <TooltipTrigger
+                      render={
+                        <Button variant="outline" size="sm" className="h-8" onClick={handleExportCsv} />
+                      }
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
                     </TooltipTrigger>
                     <TooltipContent>
                       Exports what you see - the current filters, search, and visible columns. <br />
@@ -894,11 +894,11 @@ export default function UsersClient({
                                   Copy Link
                                 </Button>
                                 <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="outline" size="sm" disabled={loading}>
-                                      <X className="h-4 w-4 mr-1" />
-                                      Revoke
-                                    </Button>
+                                  <AlertDialogTrigger
+                                    render={<Button variant="outline" size="sm" disabled={loading} />}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Revoke
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
@@ -1198,7 +1198,8 @@ export default function UsersClient({
               <Label htmlFor="admin-profile-tshirt">T-Shirt Size</Label>
               <Select
                 value={profileTShirtSize || NONE_VALUE}
-                onValueChange={(v) => setProfileTShirtSize(v === NONE_VALUE ? '' : v)}
+                onValueChange={(v) => setProfileTShirtSize(!v || v === NONE_VALUE ? '' : v)}
+                items={{ [NONE_VALUE]: 'Not set', ...Object.fromEntries(T_SHIRT_SIZES.map((s) => [s, s])) }}
               >
                 <SelectTrigger id="admin-profile-tshirt">
                   <SelectValue placeholder="Select size" />

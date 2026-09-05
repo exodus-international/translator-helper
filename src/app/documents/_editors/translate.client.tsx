@@ -371,11 +371,11 @@ function TranslateToolbar({
                 )}
                 {content.trim().length > 0 ? (
                   <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={busy || !targetLanguageId}>
-                        <Sparkles />
-                        {translating ? 'Translating...' : 'Translate'}
-                      </Button>
+                    <AlertDialogTrigger
+                      render={<Button variant="outline" size="sm" disabled={busy || !targetLanguageId} />}
+                    >
+                      <Sparkles />
+                      {translating ? 'Translating...' : 'Translate'}
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
@@ -409,11 +409,11 @@ function TranslateToolbar({
                 </Button>
                 {canDelete && (
                   <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={loading || isAnyLoading}>
-                        <Trash2 />
-                        Delete
-                      </Button>
+                    <AlertDialogTrigger
+                      render={<Button variant="outline" size="sm" disabled={loading || isAnyLoading} />}
+                    >
+                      <Trash2 />
+                      Delete
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>

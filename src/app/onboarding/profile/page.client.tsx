@@ -141,7 +141,11 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
 
           <div>
             <Label htmlFor="onboarding-tshirt">T-Shirt Size</Label>
-            <Select value={tShirtSize} onValueChange={setTShirtSize}>
+            <Select
+              value={tShirtSize || null}
+              onValueChange={(v) => setTShirtSize(v ?? '')}
+              items={Object.fromEntries(T_SHIRT_SIZES.map((size) => [size, size]))}
+            >
               <SelectTrigger id="onboarding-tshirt">
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>

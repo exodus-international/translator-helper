@@ -270,7 +270,8 @@ function ProfileDetailsForm({ profile }: { profile: UserProfile }) {
               <FieldLabel htmlFor="profile-tshirt">T-shirt size</FieldLabel>
               <Select
                 value={form.tShirtSize || NONE_VALUE}
-                onValueChange={(v) => set('tShirtSize')(v === NONE_VALUE ? '' : v)}
+                onValueChange={(v) => set('tShirtSize')(!v || v === NONE_VALUE ? '' : v)}
+                items={{ [NONE_VALUE]: 'Not set', ...Object.fromEntries(T_SHIRT_SIZES.map((size) => [size, size])) }}
               >
                 <SelectTrigger id="profile-tshirt" className="w-full sm:w-48">
                   <SelectValue placeholder="Select size" />

@@ -49,11 +49,9 @@ export function AdminListPage({
         description={description}
         actions={
           <Dialog open={dialogOpen} onOpenChange={onDialogOpenChange}>
-            <DialogTrigger asChild>
-              <Button>
+            <DialogTrigger render={<Button />}>
                 <Plus />
                 {addLabel}
-              </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -91,10 +89,8 @@ interface DeleteConfirmDialogProps {
 export function DeleteConfirmDialog({ title, description, onConfirm }: DeleteConfirmDialogProps) {
   return (
     <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm">
+      <AlertDialogTrigger render={<Button variant="outline" size="sm" />}>
           <Trash2 className="h-4 w-4" />
-        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

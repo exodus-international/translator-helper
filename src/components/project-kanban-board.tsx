@@ -485,7 +485,15 @@ export default function ProjectKanbanBoard({
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-4">
           <span className="hidden sm:inline">Filters:</span>
           <DocumentTypeFilter selected={selectedTypes} onChange={handleTypeFilterChange} />
-          <Select value={selectedUser} onValueChange={setSelectedUser}>
+          <Select
+            value={selectedUser}
+            onValueChange={(v) => setSelectedUser(v ?? 'all')}
+            items={{
+              all: 'All users',
+              me: 'Me',
+              ...Object.fromEntries(availableUsers.map((u) => [u.id, u.name ?? u.email])),
+            }}
+          >
             <SelectTrigger className="min-w-0 flex-1 sm:min-w-[200px]">
               <div className="flex items-center gap-2">
                 <SelectValue placeholder="All users" className="[&_div]:hidden! [&_span:last-child]:inline!" />
@@ -725,7 +733,14 @@ export default function ProjectKanbanBoard({
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Translator</Label>
-              <Select value={assignUserId} onValueChange={setAssignUserId}>
+              <Select
+                value={assignUserId || null}
+                onValueChange={(v) => setAssignUserId(v ?? '')}
+                items={{
+                  [UNASSIGN_VALUE]: 'Unassign translator',
+                  ...Object.fromEntries(projectMembers.map((m) => [m.user.id, m.user.name ?? m.user.email])),
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select translator..." />
                 </SelectTrigger>
@@ -740,7 +755,14 @@ export default function ProjectKanbanBoard({
             </div>
             <div className="space-y-2">
               <Label>Reviewer</Label>
-              <Select value={assignReviewerId} onValueChange={setAssignReviewerId}>
+              <Select
+                value={assignReviewerId || null}
+                onValueChange={(v) => setAssignReviewerId(v ?? '')}
+                items={{
+                  [UNASSIGN_VALUE]: 'Unassign reviewer',
+                  ...Object.fromEntries(projectMembers.map((m) => [m.user.id, m.user.name ?? m.user.email])),
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select reviewer..." />
                 </SelectTrigger>
