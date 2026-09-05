@@ -17,7 +17,7 @@ import { buildDefaultTitle, dayNumberFromFilename, parseDayNumber } from '@/doma
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import { capture } from '@/lib/analytics';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '@/lib/frontmatter';
 import { FileText, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -109,9 +109,9 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      // YAML documents often start with a `---` line, which gray-matter would
-      // misread as frontmatter and strip from the content — so skip it for YAML.
-      const { data: frontmatter } = isYaml ? { data: {} as Record<string, unknown> } : matter(text);
+      // YAML documents often start with a `---` line, which would
+      // be misread as frontmatter and stripped from the content — so skip it for YAML.
+      const { data: frontmatter } = isYaml ? { data: {} as Record<string, unknown> } : parseFrontmatter(text);
 
       setContent(text);
 

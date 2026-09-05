@@ -2,14 +2,14 @@
 // loads from first-party hosting instead of the jsdelivr CDN at runtime.
 // Runs on `postinstall` (dev + production installs) and is gitignored.
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire(import.meta.url);
 
-const src = join(dirname(require.resolve('monaco-editor/package.json')), 'min', 'vs');
+// monaco-editor's exports map does not expose ./package.json, so resolve
+// the vendored copy through the direct-dependency symlink instead.
+const src = join(root, 'node_modules', 'monaco-editor', 'min', 'vs');
 const dest = join(root, 'public', 'monaco', 'vs');
 
 if (!existsSync(src)) {
