@@ -1,10 +1,21 @@
-import type { ColumnSort, RowData } from "@tanstack/react-table";
+import type {
+  CellData,
+  ColumnSort,
+  RowData,
+  TableFeatures,
+} from "@tanstack/react-table";
 
 declare module "@tanstack/react-table" {
   // The generic parameters are unused here but must match TanStack's own
   // ColumnMeta signature for declaration merging to apply.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData extends RowData, TValue> {
+  interface ColumnMeta<
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    in out TFeatures extends TableFeatures,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    in out TData extends RowData,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    TValue extends CellData,
+  > {
     label?: string;
     placeholder?: string;
     variant?: FilterVariant;
