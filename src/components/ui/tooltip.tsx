@@ -32,21 +32,30 @@ function TooltipTrigger({
 
 function TooltipContent({
   className,
+  side,
   sideOffset = 4,
+  align,
+  alignOffset,
   children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Popup> &
-  Pick<TooltipPrimitive.Positioner.Props, "sideOffset">) {
+  Pick<
+    TooltipPrimitive.Positioner.Props,
+    "side" | "sideOffset" | "align" | "alignOffset"
+  >) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner
         className="isolate z-50"
+        side={side}
         sideOffset={sideOffset}
+        align={align}
+        alignOffset={alignOffset}
       >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
           className={cn(
-            "z-50 w-fit origin-(--transform-origin) rounded-md bg-foreground px-3 py-1.5 text-xs text-balance text-background transition-[opacity,transform] data-starting-style:translate-y-2 data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:translate-y-2 data-ending-style:scale-95 data-ending-style:opacity-0 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2",
+            "z-50 w-fit origin-(--transform-origin) rounded-md bg-foreground px-3 py-1.5 text-xs text-balance text-background transition-[opacity,transform] data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2",
             className
           )}
           {...props}
