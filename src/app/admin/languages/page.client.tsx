@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Language } from '@/generated/prisma/client';
+import type { Language } from '@/generated/prisma/client';
 import { AudioProvider } from '@/generated/prisma/enums';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';

@@ -3,7 +3,7 @@
   "version": "1.2.0",
   "private": true,
   "engines": {
-    "node": ">=20.18.1"
+    "node": "^20.19.0 || ^22.12.0 || ^24.0.0"
   },
   "scripts": {
     "dev": "set -a && . ./.env 2>/dev/null; set +a; next dev --port ${PORT:-3000}",
@@ -18,9 +18,6 @@
     "release:prepare": "bash scripts/release.sh",
     "release:tag": "bash scripts/release-tag.sh"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
     "@base-ui/react": "^1.8.0",
@@ -28,7 +25,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@monaco-editor/react": "^4.7.0",
-    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "@radix-ui/react-alert-dialog": "^1.1.23",
     "@radix-ui/react-dialog": "^1.1.23",
