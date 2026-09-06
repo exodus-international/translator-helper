@@ -94,8 +94,25 @@ test('an edited transcript says so and offers a way back to the generated one', 
 
   assert.ok(await screen.findByText('Edited'));
   await user.click(screen.getByRole('button', { name: /Reset to generated/ }));
+  await user.click(await screen.findByRole('button', { name: /Rebuild the audio text/ }));
 
   await waitFor(() => assert.equal(calls.reset, 1));
+});
+
+// Dropping the override cannot be undone and takes every tuned pronunciation
+// with it, so the click that does it is never the first one.
+test('rebuilding is asked about first, and saying no changes nothing', async () => {
+  const user = userEvent.setup();
+  const { actions, calls } = stubActions({ ...editable, state: 'edited' });
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  await user.click(await screen.findByRole('button', { name: /Reset to generated/ }));
+  assert.equal(calls.reset, 0);
+
+  await user.click(await screen.findByRole('button', { name: /Keep the edited version/ }));
+
+  await waitFor(() => assert.equal(screen.queryByRole('button', { name: /Rebuild the audio text/ }), null));
+  assert.equal(calls.reset, 0);
 });
 
 test('a generated transcript has nothing to reset', async () => {
@@ -119,6 +136,63 @@ test('a transcript the translation has moved past asks which one to keep', async
   await waitFor(() => assert.equal(calls.keep, 1));
 });
 
+// "Keep mine" is about the override the server holds. Reloading the box from it
+// would throw away whatever is being typed, which is the opposite of the label.
+test('keeping your version leaves what you are typing alone', async () => {
+  const user = userEvent.setup();
+  const { actions } = stubActions({ ...editable, state: 'edited_outdated' });
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  const box = (await screen.findByLabelText('Audio text')) as HTMLTextAreaElement;
+  await user.clear(box);
+  await user.type(box, '<speak>Nazdar</speak>');
+  await user.click(screen.getByRole('button', { name: /Keep mine/ }));
+
+  await waitFor(() => assert.equal(box.value, '<speak>Nazdar</speak>'));
+  // And it is still unsaved, so Save is still on offer.
+  assert.equal((screen.getByRole('button', { name: /^Save$/ }) as HTMLButtonElement).disabled, false);
+});
+
+test('what the transcript becomes is reported to whoever is showing the badge', async () => {
+  const user = userEvent.setup();
+  const states: string[] = [];
+  const { actions } = stubActions({ ...editable, state: 'edited' });
+  render(
+    <AudioTextPanel
+      documentVersionId="version-1"
+      actions={actions}
+      editor={textareaEditor}
+      onStateChange={(state) => states.push(state)}
+    />,
+  );
+
+  await screen.findByText('Edited');
+  await waitFor(() => assert.deepEqual(states, ['edited']));
+
+  // And again after a save, because the badge is elsewhere and cannot see this.
+  await user.click(screen.getByRole('button', { name: /Save & regenerate/ }));
+  await waitFor(() => assert.deepEqual(states, ['edited', 'edited']));
+});
+
+test('unsaved edits are announced, so leaving the tab can be interrupted', async () => {
+  const user = userEvent.setup();
+  const dirtiness: boolean[] = [];
+  const { actions } = stubActions(editable);
+  render(
+    <AudioTextPanel
+      documentVersionId="version-1"
+      actions={actions}
+      editor={textareaEditor}
+      onDirtyChange={(dirty) => dirtiness.push(dirty)}
+    />,
+  );
+
+  const box = await screen.findByLabelText('Audio text');
+  await user.type(box, 'x');
+
+  await waitFor(() => assert.equal(dirtiness.at(-1), true));
+});
+
 test('rebuilding from the document is the other answer to that question', async () => {
   const user = userEvent.setup();
   const { actions, calls } = stubActions({ ...editable, state: 'edited_outdated' });
@@ -126,6 +200,7 @@ test('rebuilding from the document is the other answer to that question', async 
 
   await screen.findByText(/The translation changed since this audio text was edited/);
   await user.click(screen.getByRole('button', { name: /Rebuild from document/ }));
+  await user.click(await screen.findByRole('button', { name: /Rebuild the audio text/ }));
 
   await waitFor(() => assert.equal(calls.reset, 1));
 });

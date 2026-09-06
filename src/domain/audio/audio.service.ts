@@ -382,6 +382,32 @@ function errorMessage(error: unknown): string {
 }
 
 /**
+ * Whether this version gets audio at all, which is what decides if the editor
+ * offers the Audio text tab. Deliberately not `getTranscript() !== null`: that
+ * loads the document with its project and language, parses the Markdown and
+ * builds the SSML, all to answer a boolean on every page load.
+ */
+export async function isAudioEligible(documentVersionId: string): Promise<boolean> {
+  const version = await prisma.documentVersion.findUnique({
+    where: { id: documentVersionId },
+    select: {
+      language: { select: { audioProvider: true, audioVoice: true } },
+      document: { select: { type: true, sourceProject: { select: { audioDocumentTypes: true } } } },
+    },
+  });
+  if (!version) return false;
+
+  return (
+    audioSkipReason({
+      language: version.language,
+      document: version.document,
+      storageConfigured: isAudioStorageConfigured(),
+      providerConfigured: (provider) => getSpeechProvider(provider).isConfigured(),
+    }) === null
+  );
+}
+
+/**
  * The SSML for a version as the tab should show it: the stored override when
  * there is one, otherwise what generation would derive right now.
  *

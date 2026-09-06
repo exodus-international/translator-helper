@@ -1,6 +1,16 @@
 'use client';
 
 import { RawEditorPane } from '@/components/raw-editor-panel';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,10 +21,10 @@ import {
   saveAudioTranscriptAction,
 } from '@/domain/audio/audio.actions';
 import { formatSsml, validateSsml } from '@/domain/audio/audio.ssml';
-import type { AudioGenerationOutcome, AudioTranscriptView } from '@/domain/audio/audio.types';
+import type { AudioGenerationOutcome, AudioTranscriptState, AudioTranscriptView } from '@/domain/audio/audio.types';
 import { capture } from '@/lib/analytics';
 import { AlertTriangle, IndentIncrease, Loader2, Lock, RotateCcw, Save, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 /**
@@ -65,36 +75,67 @@ export function AudioTextPanel({
   documentVersionId,
   actions = serverActions,
   editor = monacoEditor,
+  onStateChange,
+  onDirtyChange,
 }: {
   documentVersionId: string;
   actions?: AudioTextPanelActions;
   editor?: (props: AudioTextEditorProps) => ReactNode;
+  /** Told after every load and every change, so the audio card's badge can follow along. */
+  onStateChange?: (state: AudioTranscriptState) => void;
+  /** Told whether there are unsaved edits, so whoever unmounts this can ask first. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [transcript, setTranscript] = useState<AudioTranscriptView | null>(null);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRebuild, setConfirmingRebuild] = useState(false);
 
-  const load = useCallback(async () => {
+  // Through refs, so nothing a caller passes inline lands in a dependency
+  // array: `load` runs on every change of its dependencies, and a fresh object
+  // literal each render would mean a fetch each render.
+  const latest = useRef({ actions, onStateChange, onDirtyChange });
+  useEffect(() => {
+    latest.current = { actions, onStateChange, onDirtyChange };
+  });
+
+  /**
+   * `keepDraft` is for the one case where what is on the server changed but
+   * what someone typed did not: answering the conflict prompt with "keep mine"
+   * leaves the override alone, so overwriting the box would be the opposite of
+   * what the button says.
+   */
+  const load = useCallback(async ({ keepDraft = false }: { keepDraft?: boolean } = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const loaded = await actions.load(documentVersionId);
+      const loaded = await latest.current.actions.load(documentVersionId);
       setTranscript(loaded);
-      setDraft(loaded?.ssml ?? '');
+      if (!keepDraft) setDraft(loaded?.ssml ?? '');
+      if (loaded) latest.current.onStateChange?.(loaded.state);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load the audio text.');
     } finally {
       setLoading(false);
     }
-  }, [documentVersionId, actions]);
+  }, [documentVersionId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const dirty = transcript !== null && draft !== transcript.ssml;
+
+  useEffect(() => {
+    latest.current.onDirtyChange?.(dirty);
+  }, [dirty]);
+
+  // Unmounting is not the same as saving: whoever asked for the draft guard
+  // must not be left believing there are still unsaved edits.
+  useEffect(() => () => latest.current.onDirtyChange?.(false), []);
+
   const edited = transcript?.state !== 'generated';
   // Advisory only. Save stays enabled: a rule this validator has not heard of
   // must not stop someone using something the provider actually supports.
@@ -129,7 +170,7 @@ export function AudioTextPanel({
     try {
       await actions.keep(documentVersionId);
       toast.success('Keeping your audio text.');
-      await load();
+      await load({ keepDraft: true });
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : 'Could not keep the audio text.');
     } finally {
@@ -138,6 +179,7 @@ export function AudioTextPanel({
   };
 
   const reset = async () => {
+    setConfirmingRebuild(false);
     setSaving(true);
     try {
       await actions.reset(documentVersionId);
@@ -201,7 +243,7 @@ export function AudioTextPanel({
               Format
             </Button>
             {edited && (
-              <Button variant="ghost" size="sm" onClick={reset} disabled={saving}>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmingRebuild(true)} disabled={saving}>
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                 Reset to generated
               </Button>
@@ -232,7 +274,7 @@ export function AudioTextPanel({
           </p>
           {transcript.canEdit && (
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={reset} disabled={saving}>
+              <Button variant="outline" size="sm" onClick={() => setConfirmingRebuild(true)} disabled={saving}>
                 Rebuild from document
               </Button>
               <Button variant="ghost" size="sm" onClick={keep} disabled={saving}>
@@ -261,6 +303,26 @@ export function AudioTextPanel({
           readOnly: !transcript.canEdit || saving,
         })}
       </div>
+
+      {/* Dropping the override throws away every hand-tuned pronunciation in it
+          and there is no undo, so it is worth one question. Both ways in ask it:
+          "Rebuild from document" sits next to "Keep mine" in the conflict bar,
+          which is an easy place to misclick. */}
+      <AlertDialog open={confirmingRebuild} onOpenChange={(open) => !open && setConfirmingRebuild(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Build the audio text from the document again?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The edited audio text is thrown away, including any pronunciations tuned in it, and this cannot be undone.
+              The document itself is untouched either way.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep the edited version</AlertDialogCancel>
+            <AlertDialogAction onClick={reset}>Rebuild the audio text</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
