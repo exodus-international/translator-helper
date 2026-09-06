@@ -147,7 +147,7 @@ export function AudioTextPanel({
     setSaving(true);
     try {
       await actions.save(documentVersionId, draft);
-      capture('audio_transcript_saved', { regenerate });
+      capture('audio_transcript_edited', { regenerate });
 
       if (regenerate) {
         const outcome = await actions.regenerate(documentVersionId);
@@ -169,6 +169,7 @@ export function AudioTextPanel({
     setSaving(true);
     try {
       await actions.keep(documentVersionId);
+      capture('audio_transcript_kept');
       toast.success('Keeping your audio text.');
       await load({ keepDraft: true });
     } catch (cause) {

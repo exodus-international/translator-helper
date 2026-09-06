@@ -159,7 +159,11 @@ export function validateSsml(ssml: string): SsmlProblem[] {
     problems.push({ line: unclosed.line, message: `<${unclosed.tag}> is never closed.` });
   }
 
-  if (!/^<speak\b/i.test(text)) {
+  // An XML declaration or a comment ahead of the root element is legal XML and
+  // says nothing about whether <speak> is there, so neither counts as not
+  // starting with one.
+  const PROLOGUE = /^(?:\s*(?:<\?xml[^>]*\?>|<!--[\s\S]*?-->))*\s*/;
+  if (!/^<speak\b/i.test(text.replace(PROLOGUE, ''))) {
     problems.push({ line: 1, message: 'The audio text has to start with a <speak> element.' });
   } else if (roots > 1) {
     problems.push({ line: 1, message: 'There is more than one top-level element; the provider expects a single <speak>.' });

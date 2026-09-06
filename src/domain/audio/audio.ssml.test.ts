@@ -125,6 +125,17 @@ test('SSML that does not start with speak is called out', () => {
   assert.ok(problems.some((p) => p.message === 'The audio text has to start with a <speak> element.'));
 });
 
+// Both are legal XML ahead of the root element, and someone who writes one is
+// being careful rather than careless. Warning about it teaches the wrong thing.
+test('an XML declaration or a comment before <speak> is not a missing <speak>', () => {
+  assert.deepEqual(validateSsml('<?xml version="1.0" encoding="UTF-8"?>\n<speak>Ahoj</speak>'), []);
+  assert.deepEqual(validateSsml('<!-- the name is read as two words -->\n<speak>Ahoj</speak>'), []);
+  assert.deepEqual(
+    validateSsml('<?xml version="1.0"?>\n<!-- and both together -->\n<speak>Ahoj</speak>'),
+    [],
+  );
+});
+
 test('a bare ampersand is caught, and an escaped one is not', () => {
   const problems = validateSsml('<speak>Petr & Pavel</speak>');
   assert.ok(problems.some((p) => p.message === 'A bare & has to be written as &amp; or the provider cannot read the text.'));
