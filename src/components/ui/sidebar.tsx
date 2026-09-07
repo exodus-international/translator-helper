@@ -164,6 +164,7 @@ function Sidebar({
   side = "left",
   variant = "sidebar",
   collapsible = "offcanvas",
+  pinned = false,
   className,
   children,
   ...props
@@ -171,6 +172,10 @@ function Sidebar({
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
+  /** Stick to the viewport on desktop so the sidebar stays in view on long
+      pages. Off by default: inset-y-0 alone tracks the page height, which
+      pushes the footer below the fold on scrolling pages. */
+  pinned?: boolean
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
@@ -216,7 +221,10 @@ function Sidebar({
 
   return (
     <div
-      className="group peer hidden text-sidebar-foreground md:block"
+      className={cn(
+        "group peer hidden text-sidebar-foreground md:block",
+        pinned && "sticky top-0 h-svh self-start"
+      )}
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}

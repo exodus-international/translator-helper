@@ -28,6 +28,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
+import { Separator } from '@/components/ui/separator';
 import { capture } from '@/lib/analytics';
 import { signOut } from '@/lib/auth-client';
 import { SessionUser } from '@/lib/session';
@@ -128,17 +129,18 @@ function NavUser({ user }: { user: SessionUser }) {
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-(--anchor-width) min-w-56 rounded-lg" side="right" align="end" sideOffset={4}>
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            {/* GroupLabel (what DropdownMenuLabel wraps) requires Menu.Group context. */}
             <DropdownMenuGroup>
+              <DropdownMenuLabel className="p-0 font-normal">
+                <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                  <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{user.name}</span>
+                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                  </div>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
               <DropdownMenuItem render={<Link href="/profile" />}>
                 <User />
                 Profile
@@ -160,7 +162,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user:
   const { user, ...sidebarProps } = props;
 
   return (
-    <Sidebar collapsible="icon" {...sidebarProps}>
+    <Sidebar collapsible="icon" pinned {...sidebarProps}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -209,6 +211,7 @@ export function AppShell({ user, defaultOpen = true, children }: AppShellProps) 
         <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
           </div>
           {user.role === 'ADMIN' && (
             <div className="ml-auto flex items-center gap-2 px-4">
