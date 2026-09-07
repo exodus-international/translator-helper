@@ -199,11 +199,79 @@ const documentOverviewSelect = {
 
 export type DocumentOverview = Prisma.DocumentGetPayload<{ select: typeof documentOverviewSelect }>;
 
-// Get all versions of documents for overview (showing translation status per language)
-export async function getDocumentsWithAllVersions(): Promise<DocumentOverview[]> {
+export const DOCUMENT_OVERVIEW_SORTS = ['title', 'filename', 'type', 'createdAt', 'updatedAt', 'status'] as const;
+export type DocumentOverviewSort = (typeof DOCUMENT_OVERVIEW_SORTS)[number];
+
+function documentOverviewWhere(filters: {
+  search?: string;
+  sourceProjectId?: string;
+  types?: DocumentType[];
+}): Prisma.DocumentWhereInput {
+  const search = filters.search?.trim();
+  return {
+    ...(filters.sourceProjectId && { sourceProjectId: filters.sourceProjectId }),
+    ...(filters.types && filters.types.length > 0 && { type: { in: filters.types } }),
+    ...(search && {
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+        { originalFilename: { contains: search, mode: 'insensitive' } },
+        { sourceProject: { name: { contains: search, mode: 'insensitive' } } },
+      ],
+    }),
+  };
+}
+
+function documentOverviewOrderBy(sort: DocumentOverviewSort, order: 'asc' | 'desc'): Prisma.DocumentOrderByWithRelationInput[] {
+  // A document has no single status — versions carry it per language. Ordering
+  // by the version count is the closest server-side proxy: fewer versions
+  // means fewer languages started, i.e. less translation progress.
+  if (sort === 'status') {
+    return [{ versions: { _count: order } }, { title: 'asc' }, { id: 'asc' }];
+  }
+  // URL-facing sort keys mapped to Prisma fields. Nulls stay at the bottom
+  // either way: Postgres would otherwise dump every null row on page 1 when
+  // flipping to desc.
+  if (sort === 'filename') {
+    return [{ originalFilename: { sort: order, nulls: 'last' } }, { id: 'asc' }];
+  }
+  // Native Postgres enums sort by declaration order, not by label — the UI
+  // labels this pair "Type ↑ / ↓" rather than "A–Z" to stay honest.
+  if (sort === 'type') {
+    return [{ type: { sort: order, nulls: 'last' } }, { id: 'asc' }];
+  }
+  return [{ [sort]: order } as Prisma.DocumentOrderByWithRelationInput, { id: 'asc' }];
+}
+
+export async function countDocumentsOverview(filters: {
+  search?: string;
+  sourceProjectId?: string;
+  types?: DocumentType[];
+}): Promise<number> {
+  return prisma.document.count({ where: documentOverviewWhere(filters) });
+}
+
+// Server-side pagination, search, and sorting for the Documents Overview
+// (issue #51). Keeps the lean overview select — never the version contents.
+export async function listDocumentsOverviewPaginated(filters: {
+  search?: string;
+  sourceProjectId?: string;
+  types?: DocumentType[];
+  sort?: DocumentOverviewSort;
+  order?: 'asc' | 'desc';
+  skip?: number;
+  take?: number;
+}): Promise<DocumentOverview[]> {
+  const sort: DocumentOverviewSort = filters.sort && DOCUMENT_OVERVIEW_SORTS.includes(filters.sort)
+    ? filters.sort
+    : 'updatedAt';
+  const order = filters.order === 'asc' ? 'asc' : 'desc';
   return prisma.document.findMany({
+    where: documentOverviewWhere(filters),
     select: documentOverviewSelect,
-    orderBy: { updatedAt: 'desc' },
+    orderBy: documentOverviewOrderBy(sort, order),
+    ...(filters.skip !== undefined && { skip: filters.skip }),
+    ...(filters.take !== undefined && { take: filters.take }),
   });
 }
 

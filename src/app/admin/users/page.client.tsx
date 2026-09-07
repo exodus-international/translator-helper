@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -729,6 +730,10 @@ export default function UsersClient({
   const { table } = useDataTable({
     data: searchedUsers,
     columns,
+    // Deliberately client-side (not the server-side list-params stack used by
+    // Documents/Projects): the last-seen / last-edit aggregates need
+    // full-table scans regardless, the admin user count is small, and CSV
+    // export operates on this same filtered/sorted view.
     initialState: {
       pagination: { pageIndex: 0, pageSize: 25 },
       sorting: [{ id: 'languages', desc: false }],
@@ -777,13 +782,8 @@ export default function UsersClient({
   // ─── Render ─────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">User Management</h1>
-          <p className="text-gray-600">Manage users, roles, and invitations</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader title="User Management" description="Manage users, roles, and invitations" />
 
       <div className="container mx-auto px-4 py-4">
         <Tabs defaultValue="users">

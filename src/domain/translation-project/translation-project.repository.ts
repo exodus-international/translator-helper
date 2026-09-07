@@ -1,5 +1,30 @@
 import prisma from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { countVersionsByLanguage } from '../document-version/document-version.repository';
+
+export const TRANSLATION_PROJECT_SORTS = ['name', 'createdAt'] as const;
+export type TranslationProjectSort = (typeof TRANSLATION_PROJECT_SORTS)[number];
+
+function translationProjectListWhere(filters: {
+  sourceProjectId?: string;
+  languageId?: string;
+  search?: string;
+}): Prisma.TranslationProjectWhereInput {
+  const search = filters.search?.trim();
+  return {
+    ...(filters?.sourceProjectId && { sourceProjectId: filters.sourceProjectId }),
+    ...(filters?.languageId && { languageId: filters.languageId }),
+    ...(search && { name: { contains: search, mode: 'insensitive' } }),
+  };
+}
+
+export async function countTranslationProjects(filters: {
+  sourceProjectId?: string;
+  languageId?: string;
+  search?: string;
+}): Promise<number> {
+  return prisma.translationProject.count({ where: translationProjectListWhere(filters) });
+}
 
 /**
  * A translation project's documents are the versions in its language, so the
@@ -7,14 +32,31 @@ import { countVersionsByLanguage } from '../document-version/document-version.re
  * DocumentVersion to hang a Prisma `_count` on.
  */
 export async function listTranslationProjects(filters?: { sourceProjectId?: string; languageId?: string }) {
+  return listTranslationProjectsPaginated(filters ?? {});
+}
+
+/**
+ * Server-side pagination, search, and sorting for the per-project
+ * translation-projects list (issue #51). Translation projects carry no
+ * status of their own, so sorting is by name and creation date.
+ */
+export async function listTranslationProjectsPaginated(filters: {
+  sourceProjectId?: string;
+  languageId?: string;
+  search?: string;
+  sort?: TranslationProjectSort;
+  order?: 'asc' | 'desc';
+  skip?: number;
+  take?: number;
+}) {
+  const sort: TranslationProjectSort =
+    filters.sort && TRANSLATION_PROJECT_SORTS.includes(filters.sort) ? filters.sort : 'name';
+  const order = filters.order === 'desc' ? 'desc' : 'asc';
   const translationProjects = await prisma.translationProject.findMany({
-    where: {
-      ...(filters?.sourceProjectId && { sourceProjectId: filters.sourceProjectId }),
-      ...(filters?.languageId && { languageId: filters.languageId }),
-    },
-    orderBy: {
-      name: 'asc',
-    },
+    where: translationProjectListWhere(filters),
+    orderBy: [{ [sort]: order } as Prisma.TranslationProjectOrderByWithRelationInput, { id: 'asc' }],
+    ...(filters.skip !== undefined && { skip: filters.skip }),
+    ...(filters.take !== undefined && { take: filters.take }),
     include: {
       sourceProject: true,
       language: {

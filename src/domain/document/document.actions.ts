@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus, DocumentType } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import {
@@ -11,13 +11,15 @@ import {
   deleteDocumentVersionsByDocumentId,
 } from '../document-version/document-version.repository';
 import {
+  countDocumentsOverview,
   createDocument,
   deleteDocument,
   getDashboardDocuments,
   getDocumentById,
-  getDocumentsWithAllVersions,
   listDocuments,
+  listDocumentsOverviewPaginated,
   updateDocument,
+  type DocumentOverviewSort,
 } from './document.repository';
 import { createDocumentSchema, updateDocumentSchema } from './document.types';
 
@@ -112,9 +114,30 @@ export async function deleteDocumentActionVoid(id: string): Promise<void> {
   revalidatePath('/documents');
 }
 
-export async function getDocumentsWithAllVersionsAction() {
+/**
+ * Server-side pagination, search, and sorting for the Documents Overview
+ * (issue #51). Returns the page plus the total so the caller can render
+ * "Showing 1–25 of 142".
+ *
+ * The count and the page are two independent queries, so a concurrent
+ * insert can make the total disagree with the page by one row. Fine at
+ * this scale; the pagination range clamps defensively regardless.
+ */
+export async function listDocumentsOverviewAction(filters: {
+  search?: string;
+  sourceProjectId?: string;
+  types?: DocumentType[];
+  sort?: DocumentOverviewSort;
+  order?: 'asc' | 'desc';
+  skip?: number;
+  take?: number;
+}) {
   await authorize('authenticated');
-  return await getDocumentsWithAllVersions();
+  const [documents, total] = await Promise.all([
+    listDocumentsOverviewPaginated(filters),
+    countDocumentsOverview(filters),
+  ]);
+  return { documents, total };
 }
 
 export async function getDashboardDocumentsAction(languageId: string, sourceProjectId?: string) {

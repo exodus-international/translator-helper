@@ -24,8 +24,8 @@ import { assignTranslatorToVersionAction } from '@/domain/document-version/docum
 import { removeLanguageMemberAction, setLanguageMemberRoleAction } from '@/domain/user-language/user-language.actions';
 import { capture } from '@/lib/analytics';
 import { Prisma, ProjectRole } from '@prisma/client';
-import { ArrowLeft, Calendar, FileText, Plus, Trash2, User, Users } from 'lucide-react';
-import Link from 'next/link';
+import { Calendar, FileText, Plus, Trash2, User, Users } from 'lucide-react';
+import { PageHeader } from '@/components/page-header';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -63,6 +63,8 @@ interface TranslationProjectClientProps {
     };
   }>[];
 }
+
+const UNASSIGNED_VALUE = '__unassigned__';
 
 const ROLE_LABELS: Record<ProjectRole, string> = {
   PROJECT_MANAGER: 'Project Manager',
@@ -243,26 +245,15 @@ export default function TranslationProjectClient({
   const unassignedVersions = versions.filter((version) => !version.userId);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Link
-                href={buildProjectTranslationsPath(translationProject.sourceProject.identifier)}
-                className="text-sm text-gray-600 hover:text-gray-900 mb-2 inline-flex items-center gap-1"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Translations
-              </Link>
-              <h1 className="text-2xl font-bold">{translationProject.name}</h1>
-              <p className="text-gray-600">
-                {translationProject.language.name} ({translationProject.language.code})
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader
+        back={{
+          href: buildProjectTranslationsPath(translationProject.sourceProject.identifier),
+          label: 'Back to Translations',
+        }}
+        title={translationProject.name}
+        description={`${translationProject.language.name} (${translationProject.language.code})`}
+      />
 
       <div className="container mx-auto px-4 py-4">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -462,14 +453,16 @@ export default function TranslationProjectClient({
                     <div>
                       <Label htmlFor="assignee">Assign To (optional)</Label>
                       <Select
-                        value={selectedAssigneeId || ''}
-                        onValueChange={(value) => setSelectedAssigneeId(value || null)}
+                        value={selectedAssigneeId || UNASSIGNED_VALUE}
+                        onValueChange={(value) =>
+                          setSelectedAssigneeId(value === UNASSIGNED_VALUE ? null : value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Unassigned (visible to all)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Unassigned (visible to all)</SelectItem>
+                          <SelectItem value={UNASSIGNED_VALUE}>Unassigned (visible to all)</SelectItem>
                           {sortedMembers.map((member) => (
                             <SelectItem key={member.userId} value={member.userId}>
                               {member.user.name}
