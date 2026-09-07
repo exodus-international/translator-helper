@@ -119,7 +119,24 @@ export function validateSsml(ssml: string): SsmlProblem[] {
     return [{ line: 1, message: 'The audio text is empty, so there is nothing to say.' }];
   }
 
-  const lineAt = (index: number) => ssml.slice(0, index).split('\n').length;
+  // Where every newline sits, found once. The obvious version of `lineAt`
+  // slices and splits the whole document for each problem it reports, which is
+  // quadratic in the length of the SSML, and this runs on every keystroke in
+  // the editor.
+  const newlines: number[] = [];
+  for (let at = ssml.indexOf('\n'); at !== -1; at = ssml.indexOf('\n', at + 1)) newlines.push(at);
+
+  /** The 1-based line the character at `index` is on. */
+  const lineAt = (index: number) => {
+    let low = 0;
+    let high = newlines.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (newlines[mid] < index) low = mid + 1;
+      else high = mid;
+    }
+    return low + 1;
+  };
   const stack: { tag: string; line: number }[] = [];
   let roots = 0;
 

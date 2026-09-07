@@ -136,6 +136,27 @@ test('an XML declaration or a comment before <speak> is not a missing <speak>', 
   );
 });
 
+// The line a problem sits on comes from a table of newline offsets built once,
+// which is the part a rewrite of this for speed would get subtly wrong: an
+// off-by-one shows up only far from the top of the document.
+test('lines are counted correctly deep into a long document', () => {
+  const lines = ['<speak>'];
+  for (let i = 0; i < 500; i++) lines.push(`  <s>veta cislo ${i}</s>`);
+  lines[200] = '  <prosody rate="0.8">veta bez konce';
+  lines[400] = '  <s>Petr & Pavel</s>';
+  lines.push('</speak>');
+
+  const problems = validateSsml(lines.join('\n'));
+
+  // Line numbers are 1-based, so the entry at index 200 is on line 201.
+  assert.ok(problems.some((p) => p.message === '<prosody> is never closed.' && p.line === 201));
+  assert.ok(
+    problems.some(
+      (p) => p.line === 401 && p.message === 'A bare & has to be written as &amp; or the provider cannot read the text.',
+    ),
+  );
+});
+
 test('a bare ampersand is caught, and an escaped one is not', () => {
   const problems = validateSsml('<speak>Petr & Pavel</speak>');
   assert.ok(problems.some((p) => p.message === 'A bare & has to be written as &amp; or the provider cannot read the text.'));
