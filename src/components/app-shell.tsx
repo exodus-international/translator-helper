@@ -2,6 +2,14 @@
 
 import { Logo } from '@/components/logo';
 import { UserAvatar } from '@/components/user-avatar';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -33,6 +41,7 @@ import { capture } from '@/lib/analytics';
 import { signOut } from '@/lib/auth-client';
 import { SessionUser } from '@/lib/session';
 import {
+  ChevronsUpDown,
   FilePlus,
   FileText,
   FolderKanban,
@@ -47,6 +56,49 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+
+// Labels for the breadcrumb trail. Segments without an entry here (project
+// slugs and other dynamic ids) are left out of the trail.
+const SEGMENT_LABELS: Record<string, string> = {
+  dashboard: 'Dashboard',
+  documents: 'Documents',
+  projects: 'Projects',
+  admin: 'Admin',
+  settings: 'Settings',
+  profile: 'Profile',
+};
+
+function HeaderBreadcrumb() {
+  const pathname = usePathname();
+  const segments = pathname.split('/').filter(Boolean);
+  const crumbs = segments
+    .map((segment, index) => ({
+      href: '/' + segments.slice(0, index + 1).join('/'),
+      label: SEGMENT_LABELS[segment],
+    }))
+    .filter((crumb) => crumb.label);
+  const last = crumbs[crumbs.length - 1];
+
+  if (!last) {
+    return null;
+  }
+
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        {crumbs.slice(0, -1).map((crumb) => (
+          <BreadcrumbItem key={crumb.href} className="hidden md:block">
+            <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
+          </BreadcrumbItem>
+        ))}
+        {crumbs.length > 1 && <BreadcrumbSeparator className="hidden md:block" />}
+        <BreadcrumbItem>
+          <BreadcrumbPage>{last.label}</BreadcrumbPage>
+        </BreadcrumbItem>
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}
 
 interface NavItem {
   href: string;
@@ -127,6 +179,7 @@ function NavUser({ user }: { user: SessionUser }) {
               <span className="truncate font-medium">{user.name}</span>
               <span className="truncate text-xs text-muted-foreground">{user.email}</span>
             </div>
+            <ChevronsUpDown className="ml-auto" />
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-(--anchor-width) min-w-56 rounded-lg" side="right" align="end" sideOffset={4}>
             {/* GroupLabel (what DropdownMenuLabel wraps) requires Menu.Group context. */}
@@ -212,6 +265,7 @@ export function AppShell({ user, defaultOpen = true, children }: AppShellProps) 
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+            <HeaderBreadcrumb />
           </div>
           {user.role === 'ADMIN' && (
             <div className="ml-auto flex items-center gap-2 px-4">
