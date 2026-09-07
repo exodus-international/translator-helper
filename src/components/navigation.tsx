@@ -26,6 +26,7 @@ import {
   Megaphone,
   Menu,
   ScrollText,
+  Sparkles,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -39,7 +40,10 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
+const NAV_ITEMS: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/releases', label: "What's New", icon: Sparkles },
+];
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: FileText },
