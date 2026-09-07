@@ -19,8 +19,7 @@ import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
 import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MarkdownPreview } from '@/components/markdown-preview';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
@@ -722,9 +721,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   }}
                 />
               ) : !isYaml && sourceViewMode === 'formatted' ? (
-                <div className="prose max-w-none h-full overflow-y-auto p-3">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
-                </div>
+                <MarkdownPreview
+                  content={sourceFormattedContent}
+                  className="prose max-w-none h-full overflow-y-auto p-3"
+                />
               ) : (
                 <RawEditorPane
                   value={sourceContent}
@@ -929,11 +929,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     )}
                   </div>
                 ) : (
-                  <div className="prose max-w-none h-full overflow-y-auto p-3">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {translationPreview || translationPreviewEmptyText}
-                    </ReactMarkdown>
-                  </div>
+                  <MarkdownPreview
+                    content={translationPreview || translationPreviewEmptyText}
+                    className="prose max-w-none h-full overflow-y-auto p-3"
+                  />
                 )
               ) : isReviewEditing ? (
                 <div className="h-full flex flex-col space-y-2">
@@ -968,9 +967,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   }}
                 />
               ) : !isYaml && reviewViewMode === 'formatted' ? (
-                <div className="prose max-w-none h-full overflow-y-auto p-3">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
-                </div>
+                <MarkdownPreview
+                  content={translationPreview}
+                  className="prose max-w-none h-full overflow-y-auto p-3"
+                />
               ) : (
                 <div ref={translationContainerRef} className="relative h-full">
                   {selectedUserId ? (
