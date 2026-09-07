@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { cookies } from 'next/headers';
 import './globals.css';
 import { getCurrentUser } from '@/lib/session';
-import { Navigation } from '@/components/navigation';
+import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackButton } from '@/components/feedback-button';
 import { PostHogProvider } from '@/components/posthog-provider';
@@ -54,14 +55,18 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
+  // Same cookie ui/sidebar.tsx writes on toggle: reading it server-side means
+  // the sidebar's first paint already has the width the user last chose.
+  const sidebarOpen = (await cookies()).get('sidebar_state')?.value !== 'false';
 
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <PostHogProvider user={user}>
           <NuqsAdapter>
-            <Navigation user={user} />
-            {children}
+            <AppShell user={user} defaultOpen={sidebarOpen}>
+              {children}
+            </AppShell>
             <FeedbackButton />
             <Toaster />
           </NuqsAdapter>

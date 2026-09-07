@@ -112,6 +112,11 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     return (
       <SidebarProvider
         defaultOpen={hasSidebar || !!props.sidebarHeader}
+        // Nested inside the app shell's own provider: keep this one from
+        // stealing ⌘B (which would toggle both sidebars at once) and from
+        // overwriting the shell's persisted state cookie.
+        keyboardShortcut={false}
+        cookieName="editor_sidebar_state"
         className={cn(props.className, props.layout === 'zen' && 'h-full')}
       >
         <SourceTranslationViewerInner ref={ref} {...props} />
