@@ -70,7 +70,7 @@ importers:
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.4))(@types/react@19.2.4)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       dompurify:
         specifier: ^3.4.14
-        version: 3.4.14
+        version: 3.4.15
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -3208,8 +3208,8 @@ packages:
   dompurify@3.1.7:
     resolution: {integrity: sha512-VaTstWtsneJY8xzy7DekmYWEOZcmzIe3Qb3zPd4STve1OBTa+e+WmS1ITQec1fZYXI3HCsOZZiSMpG6oxoWMWQ==}
 
-  dompurify@3.4.14:
-    resolution: {integrity: sha512-dVoH9z+MY+C9IilgGCk3YfFqjLi3fChm2OiKJMzh6axrJ5qwxqWaZamgmHrpv22CN/KdbZJuGEGgfQoL00LTdg==}
+  dompurify@3.4.15:
+    resolution: {integrity: sha512-EUBjM+B+lkDE41iE82DDSCfkoPGfXx8IxFxPMjNzm/Uk4xDet77rTN9wqlxlVg71kK7XGuUMv6wUxJUwwv+Xyw==}
 
   dot-prop@5.3.0:
     resolution: {integrity: sha512-QM8q3zDe58hqUqjraQOmzZ1LIH9SWQJTlEKCH4kJ2oQvLZk7RbQXvtDM2XEq3fwkV9CCvvH4LA0AV+ogFsBM2Q==}
@@ -8287,7 +8287,7 @@ snapshots:
 
   dompurify@3.1.7: {}
 
-  dompurify@3.4.14:
+  dompurify@3.4.15:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -9495,7 +9495,7 @@ snapshots:
       '@posthog/core': 1.42.0
       '@posthog/types': 1.395.0
       core-js: 3.49.0
-      dompurify: 3.4.14
+      dompurify: 3.4.15
       fflate: 0.4.8
       preact: 10.29.7
       query-selector-shadow-dom: 1.0.1
