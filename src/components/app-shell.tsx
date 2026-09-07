@@ -10,7 +10,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +41,6 @@ import { signOut } from '@/lib/auth-client';
 import { SessionUser } from '@/lib/session';
 import {
   ChevronsUpDown,
-  FilePlus,
   FileText,
   FolderKanban,
   Languages,
@@ -267,14 +265,6 @@ export function AppShell({ user, defaultOpen = true, children }: AppShellProps) 
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
             <HeaderBreadcrumb />
           </div>
-          {user.role === 'ADMIN' && (
-            <div className="ml-auto flex items-center gap-2 px-4">
-              <Button size="sm" nativeButton={false} render={<Link href="/documents/new" />}>
-                <FilePlus />
-                New
-              </Button>
-            </div>
-          )}
         </header>
         {children}
       </SidebarInset>
