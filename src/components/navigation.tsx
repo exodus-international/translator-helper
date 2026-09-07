@@ -40,10 +40,7 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/releases', label: "What's New", icon: Sparkles },
-];
+const NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
 
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: FileText },
@@ -53,6 +50,10 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
   { href: '/settings/language-instructions', label: 'Language Instructions', icon: ScrollText },
 ];
+
+// Rendered after NAV_ITEMS and ADMIN_NAV_ITEMS (for admins), so it sits last
+// regardless of role.
+const TRAILING_NAV_ITEM: NavItem = { href: '/releases', label: "What's New", icon: Sparkles };
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -178,6 +179,14 @@ export function Navigation({ user }: NavigationProps) {
                     </Link>
                   </>
                 )}
+                <Separator className="my-3" />
+                <div className="flex flex-col gap-0.5">
+                  <MobileNavLink
+                    item={TRAILING_NAV_ITEM}
+                    active={isActive(pathname, TRAILING_NAV_ITEM.href)}
+                    onNavigate={closeMobileMenu}
+                  />
+                </div>
               </nav>
               <div className="border-t p-3">
                 <Link href="/profile" onClick={closeMobileMenu} className="flex items-center gap-2.5 rounded-md px-1 py-1.5 hover:opacity-80">
@@ -215,6 +224,7 @@ export function Navigation({ user }: NavigationProps) {
               ADMIN_NAV_ITEMS.map((item) => (
                 <DesktopNavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
               ))}
+            <DesktopNavLink item={TRAILING_NAV_ITEM} active={isActive(pathname, TRAILING_NAV_ITEM.href)} />
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
