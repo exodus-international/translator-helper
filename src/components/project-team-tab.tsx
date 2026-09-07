@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserAvatar } from '@/components/user-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -42,7 +42,7 @@ type Member = {
   id: string;
   userId: string;
   role: ProjectRole;
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; image: string | null };
 };
 
 const ALL_ROLES = [
@@ -272,14 +272,12 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
                 <TableRow key={member.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <Avatar size="sm" name={member.user.name || undefined}>
-                        <AvatarFallback name={member.user.name || undefined}>
-                          {member.user.name
-                            .split(' ')
-                            .map((n: string) => n.charAt(0))
-                            .join('')}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={member.user.name}
+                        image={member.user.image}
+                        email={member.user.email}
+                        size="sm"
+                      />
                       <div>
                         <p className="font-medium text-sm">{member.user.name}</p>
                         <p className="text-xs text-gray-500">{member.user.email}</p>
@@ -348,9 +346,7 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
           <div className="mt-4">
             <Label>Role</Label>
             <RoleSelect value={editRole} onChange={setEditRole} />
-            <p className="text-xs text-gray-500 mt-1">
-              Applies to all {selectedLanguageName} translation projects.
-            </p>
+            <p className="text-xs text-gray-500 mt-1">Applies to all {selectedLanguageName} translation projects.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingMember(null)}>

@@ -1,5 +1,5 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getAudioStorageConfig } from './audio-storage-config';
+import { getAudioStorageConfig, isAudioStorageConfigured } from './audio-storage-config';
 
 /**
  * Thin wrapper over S3-compatible object storage. One operation, because
@@ -43,6 +43,15 @@ export async function putObject(params: {
     }),
   );
   return { key, url: publicUrlFor(key) };
+}
+
+/**
+ * Whether object storage is usable. The environment variables are named
+ * `AUDIO_S3_*` because audio was the first thing stored in the bucket; it now
+ * holds every file the app keeps, avatars included.
+ */
+export function isObjectStorageConfigured(): boolean {
+  return isAudioStorageConfigured();
 }
 
 export function publicUrlFor(key: string): string {

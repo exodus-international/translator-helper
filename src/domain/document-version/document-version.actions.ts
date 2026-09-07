@@ -1,5 +1,6 @@
 'use server';
 
+import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { type SessionUser } from '@/lib/session';
@@ -68,8 +69,8 @@ export async function assignReviewerToVersionAction(versionId: string, reviewerI
     data: { reviewerId },
     include: {
       language: true,
-      user: { select: { id: true, name: true, email: true } },
-      reviewer: { select: { id: true, name: true, email: true } },
+      user: userBrief,
+      reviewer: userBrief,
     },
   });
 
@@ -420,11 +421,7 @@ export async function assignDocumentVersionAction(input: unknown) {
         document: true,
         language: true,
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          ...userBrief,
         },
       },
     });

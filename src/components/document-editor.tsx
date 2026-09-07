@@ -55,8 +55,8 @@ export function DocumentEditorHeader({
   actions: ReactNode;
 }) {
   return (
-    <div className="border-b bg-white">
-      <div className="px-3 py-1.5 flex items-center justify-between gap-3">
+    <div className="border-b bg-background">
+      <div className="flex flex-col gap-2 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {document.sourceProject && (
             <>
@@ -70,11 +70,11 @@ export function DocumentEditorHeader({
             </>
           )}
           <h1 className="text-sm font-semibold truncate">{document.title}</h1>
-          <span className="text-xs text-gray-500 shrink-0">
+          <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
             {sourceLanguageName} → {targetLanguageName}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
       </div>
     </div>
   );
@@ -101,6 +101,8 @@ interface ViewerConfig {
   };
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /** Version id when this document is eligible for audio; enables the Audio text tab. */
+  audioTextVersionId?: string | null;
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
   sidebarSummary?: ReactNode;
   sidebarDetails?: ReactNode;
@@ -124,6 +126,7 @@ function EditorViewer({
   reviewConfig,
   translationPlaceholder,
   translationPreviewEmptyText,
+  audioTextVersionId,
   onEditSuggestion,
   sidebarSummary,
   sidebarDetails,
@@ -148,6 +151,9 @@ function EditorViewer({
   const isApplyingSuggestion = useEditorStore((s) => s.loading.has('applySuggestion'));
   const isDismissingSuggestion = useEditorStore((s) => s.loading.has('dismissSuggestion'));
   const translationProjectId = useEditorStore((s) => s.translationProjectId);
+  const requestedTranslationView = useEditorStore((s) => s.requestedTranslationView);
+  const requestTranslationView = useEditorStore((s) => s.requestTranslationView);
+  const setAudioTranscriptState = useEditorStore((s) => s.setAudioTranscriptState);
   const openAssignTranslatorDialog = useEditorStore((s) => s.openAssignTranslatorDialog);
   const openAssignReviewerDialog = useEditorStore((s) => s.openAssignReviewerDialog);
   const unassignTranslator = useEditorStore((s) => s.unassignTranslator);
@@ -195,6 +201,10 @@ function EditorViewer({
       translationFormattedContent={translationFormattedContent}
       translationPlaceholder={translationPlaceholder}
       translationPreviewEmptyText={translationPreviewEmptyText}
+      audioTextVersionId={audioTextVersionId}
+      requestedView={requestedTranslationView}
+      onRequestedViewShown={() => requestTranslationView(null)}
+      onAudioTranscriptStateChange={setAudioTranscriptState}
       onTranslationChange={setContent}
       sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
       translationBadge={<Badge variant="secondary">{targetVersion?.language?.name || 'New Translation'}</Badge>}
@@ -355,6 +365,8 @@ interface DocumentEditorProps {
   viewerRef?: Ref<SourceTranslationViewerHandle>;
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /** Version id when this document is eligible for audio; enables the Audio text tab. */
+  audioTextVersionId?: string | null;
 
   // Capabilities (value or function of live targetVersion from store)
   canEditSource: CapFn;
@@ -397,6 +409,7 @@ export function DocumentEditor({
   viewerRef,
   translationPlaceholder,
   translationPreviewEmptyText,
+  audioTextVersionId,
   canEditSource,
   canCreateSuggestions,
   disableReopen,
@@ -414,6 +427,11 @@ export function DocumentEditor({
   const viewerHeight = fullscreen ? 'h-full' : 'h-[calc(100vh-7.5rem)]';
   const viewerWrapper = fullscreen ? 'h-[calc(100vh-3.5rem)] p-4' : 'border-0';
   const contentLanguage = getEditorLanguage(document.originalFilename ?? '');
+  // The Audio text tab lives in the tab strip a YAML document does not get, so
+  // on one it would be a pane with no way back out. Deciding it once here keeps
+  // the tab, the sidebar card's link to it, and the panel itself answering the
+  // same question.
+  const audioTextTarget = contentLanguage === 'yaml' ? null : (audioTextVersionId ?? null);
 
   return (
     <EditorProvider
@@ -422,6 +440,7 @@ export function DocumentEditor({
       sourceContent={sourceVersion.content}
       initialSuggestions={initialSuggestions}
       translationProjectId={translationProjectId}
+      audioTextVersionId={audioTextTarget}
     >
       {autoSaveDelayMs ? <AutoSaveTrigger delayMs={autoSaveDelayMs} /> : null}
       <ReloadSuggestionsOnVersionChange />
@@ -444,6 +463,7 @@ export function DocumentEditor({
               reviewConfig={reviewConfig}
               translationPlaceholder={translationPlaceholder}
               translationPreviewEmptyText={translationPreviewEmptyText}
+              audioTextVersionId={audioTextTarget}
               onEditSuggestion={onEditSuggestion}
               sidebarSummary={sidebarSummary}
               sidebarDetails={sidebarDetails}
