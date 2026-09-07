@@ -6,13 +6,12 @@ import { AnnouncementModal, AnnouncementModalData } from '@/components/announcem
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { buildDocumentPath } from '@/domain/document/document-url';
 import ProjectCard from '@/components/project-card';
-import { PageHeader } from '@/components/page-header';
 import { UserAvatar } from '@/components/user-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
@@ -403,32 +402,23 @@ export default function DashboardClient({
       {announcements.banner && <AnnouncementBanner announcement={announcements.banner} />}
       {announcements.modal && <AnnouncementModal announcement={announcements.modal} />}
       <div className="min-h-screen bg-background">
-        <PageHeader
-          title="Dashboard"
-          description={
-            <div className="flex items-center gap-2">
-              <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
-              <span>Welcome back, {user.name}</span>
-            </div>
-          }
-        >
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </PageHeader>
-
         <div className="container mx-auto px-4 py-6 space-y-8">
           {/* Projects section */}
           <section>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-lg font-semibold">My Projects</h2>
-              {isAdminClient(user) && (
+              <div className="flex items-center gap-2">
+                <InputGroup className="w-64">
+                  <InputGroupInput
+                    placeholder="Search projects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <InputGroupAddon>
+                    <Search />
+                  </InputGroupAddon>
+                </InputGroup>
+                {isAdminClient(user) && (
                 <Dialog
                   open={createDialogOpen}
                   onOpenChange={(open) => {
@@ -461,6 +451,7 @@ export default function DashboardClient({
                   </DialogContent>
                 </Dialog>
               )}
+              </div>
             </div>
             {filteredProjects.length === 0 ? (
               <div className="text-center py-12">
