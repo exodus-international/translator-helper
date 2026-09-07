@@ -26,7 +26,9 @@ const textareaEditor = ({ value, onChange, readOnly }: AudioTextEditorProps) => 
   />
 );
 
-const GENERATED = '<speak version="1.0" xml:lang="cs-CZ"><voice name="cs-CZ-AntoninNeural">Ahoj</voice></speak>';
+const GENERATED =
+  '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">' +
+  '<voice name="cs-CZ-AntoninNeural">Ahoj</voice></speak>';
 
 function stubActions(transcript: AudioTranscriptView | null, overrides: Partial<AudioTextPanelActions> = {}) {
   const calls = { save: [] as string[], reset: 0, keep: 0, regenerate: 0 };
@@ -315,7 +317,8 @@ test('Format indents what is in the box, and goes quiet once there is nothing to
   const box = (await screen.findByLabelText('Audio text')) as HTMLTextAreaElement;
   assert.equal(
     box.value,
-    '<speak version="1.0" xml:lang="cs-CZ">\n  <voice name="cs-CZ-AntoninNeural">Ahoj</voice>\n</speak>',
+    '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">\n' +
+      '  <voice name="cs-CZ-AntoninNeural">Ahoj</voice>\n</speak>',
   );
   await waitFor(() => assert.equal((format as HTMLButtonElement).disabled, true));
 });

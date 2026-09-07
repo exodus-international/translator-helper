@@ -98,23 +98,26 @@ test('default prosody is the listening-test pick', () => {
 // Warnings, never refusals: these messages are read by whoever hand-wrote the
 // SSML, so the wording is pinned.
 
+/** The root element generation emits. Fixtures below are about what is inside it. */
+const SPEAK = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">';
+
 test('valid SSML has nothing to complain about', () => {
   const ssml = speechScriptToSsml({ segments: [{ kind: 'text', text: 'Ahoj' }] }, opts);
   assert.deepEqual(validateSsml(ssml), []);
 });
 
 test('an unclosed tag is reported with the line it was opened on', () => {
-  const problems = validateSsml('<speak>\n  <prosody rate="0.8">Ahoj\n</speak>');
+  const problems = validateSsml(`${SPEAK}\n  <prosody rate="0.8">Ahoj\n</speak>`);
   assert.ok(problems.some((p) => p.message === '<prosody> is never closed.' && p.line === 2));
 });
 
 test('a close with no opening is called out on its own line', () => {
-  const problems = validateSsml('<speak>\nAhoj</prosody>\n</speak>');
+  const problems = validateSsml(`${SPEAK}\nAhoj</prosody>\n</speak>`);
   assert.ok(problems.some((p) => p.message === '</prosody> closes a tag that was never opened.' && p.line === 2));
 });
 
 test('a tag the provider does not know is named, not refused', () => {
-  const problems = validateSsml('<speak><breakk/></speak>');
+  const problems = validateSsml(`${SPEAK}<breakk/></speak>`);
   assert.deepEqual(problems, [
     { line: 1, message: '<breakk> is not a tag the speech provider is known to understand.' },
   ]);
@@ -128,19 +131,69 @@ test('SSML that does not start with speak is called out', () => {
 // Both are legal XML ahead of the root element, and someone who writes one is
 // being careful rather than careless. Warning about it teaches the wrong thing.
 test('an XML declaration or a comment before <speak> is not a missing <speak>', () => {
-  assert.deepEqual(validateSsml('<?xml version="1.0" encoding="UTF-8"?>\n<speak>Ahoj</speak>'), []);
-  assert.deepEqual(validateSsml('<!-- the name is read as two words -->\n<speak>Ahoj</speak>'), []);
+  assert.deepEqual(validateSsml(`<?xml version="1.0" encoding="UTF-8"?>\n${SPEAK}Ahoj</speak>`), []);
+  assert.deepEqual(validateSsml(`<!-- the name is read as two words -->\n${SPEAK}Ahoj</speak>`), []);
   assert.deepEqual(
-    validateSsml('<?xml version="1.0"?>\n<!-- and both together -->\n<speak>Ahoj</speak>'),
+    validateSsml(`<?xml version="1.0"?>\n<!-- and both together -->\n${SPEAK}Ahoj</speak>`),
     [],
   );
+});
+
+// Azure answers SSML without these with an error that names none of them, which
+// is the same reason the bare-& check exists. `<speak>Ahoj</speak>` is the
+// natural thing to type and the natural thing to get wrong.
+test('a <speak> without what the provider requires on it is warned about', () => {
+  assert.deepEqual(validateSsml('<speak>Ahoj</speak>'), [
+    {
+      line: 1,
+      message: '<speak> is missing xmlns="http://www.w3.org/2001/10/synthesis", which the speech provider requires.',
+    },
+    { line: 1, message: '<speak> is missing xml:lang, the language it is read in, such as xml:lang="cs-CZ".' },
+    { line: 1, message: '<speak> is missing version="1.0", which the speech provider requires.' },
+  ]);
+
+  // One at a time, and the rest stays quiet.
+  assert.deepEqual(validateSsml('<speak version="1.0" xml:lang="cs-CZ">Ahoj</speak>'), [
+    {
+      line: 1,
+      message: '<speak> is missing xmlns="http://www.w3.org/2001/10/synthesis", which the speech provider requires.',
+    },
+  ]);
+});
+
+// The Microsoft extension namespace is not the default one, and SSML that
+// declares only it is exactly the case a looser check would wave through.
+test('xmlns:mstts on its own does not count as the namespace the provider wants', () => {
+  const ssml = '<speak version="1.0" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="cs-CZ">Ahoj</speak>';
+  assert.deepEqual(validateSsml(ssml), [
+    {
+      line: 1,
+      message: '<speak> is missing xmlns="http://www.w3.org/2001/10/synthesis", which the speech provider requires.',
+    },
+  ]);
+});
+
+// Validation runs on every keystroke, so it meets the SSML halfway through
+// being typed. `<speak` satisfies the "starts with <speak>" test while being no
+// element at all yet.
+test('a root element still being typed is not a crash and not a complaint', () => {
+  assert.deepEqual(validateSsml('<speak'), []);
+  assert.deepEqual(validateSsml('<speak version="1.0"'), []);
+});
+
+// The prologue can push the root element off line 1, and the warning has to
+// point at where it actually is.
+test('a missing attribute is reported on the line <speak> sits on', () => {
+  const problems = validateSsml('<?xml version="1.0"?>\n<!-- hi -->\n<speak>Ahoj</speak>');
+  assert.ok(problems.every((p) => p.line === 3));
+  assert.equal(problems.length, 3);
 });
 
 // The line a problem sits on comes from a table of newline offsets built once,
 // which is the part a rewrite of this for speed would get subtly wrong: an
 // off-by-one shows up only far from the top of the document.
 test('lines are counted correctly deep into a long document', () => {
-  const lines = ['<speak>'];
+  const lines = [SPEAK];
   for (let i = 0; i < 500; i++) lines.push(`  <s>veta cislo ${i}</s>`);
   lines[200] = '  <prosody rate="0.8">veta bez konce';
   lines[400] = '  <s>Petr & Pavel</s>';
@@ -158,9 +211,9 @@ test('lines are counted correctly deep into a long document', () => {
 });
 
 test('a bare ampersand is caught, and an escaped one is not', () => {
-  const problems = validateSsml('<speak>Petr & Pavel</speak>');
+  const problems = validateSsml(`${SPEAK}Petr & Pavel</speak>`);
   assert.ok(problems.some((p) => p.message === 'A bare & has to be written as &amp; or the provider cannot read the text.'));
-  assert.deepEqual(validateSsml('<speak>Petr &amp; Pavel &#233; &#x41;</speak>'), []);
+  assert.deepEqual(validateSsml(`${SPEAK}Petr &amp; Pavel &#233; &#x41;</speak>`), []);
 });
 
 test('an empty box says so rather than listing everything that is missing', () => {
@@ -170,7 +223,7 @@ test('an empty box says so rather than listing everything that is missing', () =
 });
 
 test('a self-closing break is not mistaken for something left open', () => {
-  assert.deepEqual(validateSsml('<speak>Ahoj<break time="1000ms"/>a jeste jednou</speak>'), []);
+  assert.deepEqual(validateSsml(`${SPEAK}Ahoj<break time="1000ms"/>a jeste jednou</speak>`), []);
 });
 
 // ─── Formatting ──────────────────────────────────────────────
@@ -235,7 +288,7 @@ test('formatted SSML still passes validation', () => {
 });
 
 test('problems in formatted SSML are reported on the line they sit on', () => {
-  const problems = validateSsml('<speak>\n  <voice name="v">\n    <p>Petr & Pavel</p>\n  </voice>\n</speak>');
+  const problems = validateSsml(`${SPEAK}\n  <voice name="v">\n    <p>Petr & Pavel</p>\n  </voice>\n</speak>`);
   assert.deepEqual(problems, [
     { line: 3, message: 'A bare & has to be written as &amp; or the provider cannot read the text.' },
   ]);

@@ -99,6 +99,26 @@ const KNOWN_SSML_TAGS = new Set([
 
 const VOID_SSML_TAGS = new Set(['break', 'bookmark', 'mstts:silence', 'mstts:viseme', 'mstts:audioduration', 'lexicon']);
 
+/**
+ * What Azure wants on the root element. All three are what generation emits,
+ * and leaving one out is the easiest way to hand-write SSML the provider
+ * rejects: the error it answers with names none of them.
+ *
+ * `\bxmlns\s*=` deliberately does not accept `xmlns:mstts=`. That declares the
+ * Microsoft extension namespace and says nothing about the default one.
+ */
+const SPEAK_ATTRIBUTES: { present: RegExp; message: string }[] = [
+  {
+    present: /\bxmlns\s*=/i,
+    message: '<speak> is missing xmlns="http://www.w3.org/2001/10/synthesis", which the speech provider requires.',
+  },
+  {
+    present: /\bxml:lang\s*=/i,
+    message: '<speak> is missing xml:lang, the language it is read in, such as xml:lang="cs-CZ".',
+  },
+  { present: /\bversion\s*=/i, message: '<speak> is missing version="1.0", which the speech provider requires.' },
+];
+
 export interface SsmlProblem {
   /** 1-indexed line the problem sits on, for pointing at it. */
   line: number;
@@ -182,8 +202,21 @@ export function validateSsml(ssml: string): SsmlProblem[] {
   const PROLOGUE = /^(?:\s*(?:<\?xml[^>]*\?>|<!--[\s\S]*?-->))*\s*/;
   if (!/^<speak\b/i.test(text.replace(PROLOGUE, ''))) {
     problems.push({ line: 1, message: 'The audio text has to start with a <speak> element.' });
-  } else if (roots > 1) {
-    problems.push({ line: 1, message: 'There is more than one top-level element; the provider expects a single <speak>.' });
+  } else {
+    if (roots > 1) {
+      problems.push({
+        line: 1,
+        message: 'There is more than one top-level element; the provider expects a single <speak>.',
+      });
+    }
+
+    // Null while the opening tag is still being typed: `<speak` starts the text
+    // but is not yet an element to read attributes off. Nothing to say until it
+    // is closed, rather than three warnings about a tag half written.
+    const root = /<speak\b[^>]*>/i.exec(ssml);
+    for (const { present, message } of SPEAK_ATTRIBUTES) {
+      if (root && !present.test(root[0])) problems.push({ line: lineAt(root.index), message });
+    }
   }
 
   // An ampersand that starts no entity is the most common way hand-written
