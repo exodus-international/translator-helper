@@ -21,7 +21,12 @@ import {
   saveAudioTranscriptAction,
 } from '@/domain/audio/audio.actions';
 import { formatSsml, validateSsml } from '@/domain/audio/audio.ssml';
-import type { AudioGenerationOutcome, AudioTranscriptState, AudioTranscriptView } from '@/domain/audio/audio.types';
+import type {
+  AudioGenerationOutcome,
+  AudioTranscriptState,
+  AudioTranscriptView,
+  AudioTranscriptWriteOutcome,
+} from '@/domain/audio/audio.types';
 import { capture } from '@/lib/analytics';
 import { AlertTriangle, IndentIncrease, Loader2, Lock, RotateCcw, Save, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -46,8 +51,9 @@ import { toast } from 'sonner';
  */
 export interface AudioTextPanelActions {
   load: (documentVersionId: string) => Promise<AudioTranscriptView | null>;
-  save: (documentVersionId: string, ssml: string) => Promise<void>;
-  reset: (documentVersionId: string) => Promise<void>;
+  /** `expectedOverride` is the stored SSML this tab was last shown, null when it was derived. */
+  save: (documentVersionId: string, ssml: string, expectedOverride: string | null) => Promise<AudioTranscriptWriteOutcome>;
+  reset: (documentVersionId: string, expectedOverride: string | null) => Promise<AudioTranscriptWriteOutcome>;
   keep: (documentVersionId: string) => Promise<void>;
   regenerate: (documentVersionId: string) => Promise<AudioGenerationOutcome>;
 }
@@ -91,7 +97,16 @@ export function AudioTextPanel({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmingRebuild, setConfirmingRebuild] = useState(false);
+  const [confirming, setConfirming] = useState<'rebuild' | 'loadTheirs' | null>(null);
+  /**
+   * The override this tab believes is stored, sent with every write so one that
+   * would overwrite someone else's is refused instead. Set only by `load`: a
+   * conflict deliberately does not advance it, so the next write is refused
+   * again unless the person answers the bar below.
+   */
+  const [storedOverride, setStoredOverride] = useState<string | null>(null);
+  /** What somebody else stored while this tab was editing. */
+  const [conflict, setConflict] = useState<AudioTranscriptView | null>(null);
 
   // Through refs, so nothing a caller passes inline lands in a dependency
   // array: `load` runs on every change of its dependencies, and a fresh object
@@ -113,6 +128,8 @@ export function AudioTextPanel({
     try {
       const loaded = await latest.current.actions.load(documentVersionId);
       setTranscript(loaded);
+      setStoredOverride(loaded?.source === 'override' ? loaded.ssml : null);
+      setConflict(null);
       if (!keepDraft) setDraft(loaded?.ssml ?? '');
       if (loaded) latest.current.onStateChange?.(loaded.state);
     } catch (cause) {
@@ -143,16 +160,36 @@ export function AudioTextPanel({
   // Generated SSML arrives indented; this is for what a person pastes in.
   const formatted = useMemo(() => formatSsml(draft), [draft]);
 
-  const save = async ({ regenerate }: { regenerate: boolean }) => {
+  /**
+   * A refused write, reported rather than thrown: someone else changed the
+   * transcript, and what they wrote came back with the refusal. Nothing is
+   * lost here, the draft stays in the box and the bar asks which one wins.
+   */
+  const handleConflict = async (current: AudioTranscriptView | null, action: 'save' | 'reset') => {
+    capture('audio_transcript_conflicted', { action });
+    // No transcript to compare against: the document stopped getting audio
+    // while this tab was open, which the reload explains for us.
+    if (!current) {
+      await load();
+      return;
+    }
+    setConflict(current);
+  };
+
+  const save = async ({ regenerate, expected = storedOverride }: { regenerate: boolean; expected?: string | null }) => {
     setSaving(true);
     try {
-      await actions.save(documentVersionId, draft);
+      const outcome = await actions.save(documentVersionId, draft, expected);
+      if (outcome.status === 'conflict') {
+        await handleConflict(outcome.current, 'save');
+        return;
+      }
       capture('audio_transcript_edited', { regenerate });
 
       if (regenerate) {
-        const outcome = await actions.regenerate(documentVersionId);
-        if (outcome.status === 'failed') toast.error(outcome.error);
-        else if (outcome.status === 'skipped') toast.warning('Saved, but this document gets no audio.');
+        const generation = await actions.regenerate(documentVersionId);
+        if (generation.status === 'failed') toast.error(generation.error);
+        else if (generation.status === 'skipped') toast.warning('Saved, but this document gets no audio.');
         else toast.success('Saved. The audio is being generated from it.');
       } else {
         toast.success('Audio text saved. The next generation will use it.');
@@ -179,11 +216,35 @@ export function AudioTextPanel({
     }
   };
 
+  /**
+   * Take what the other person stored. Local: the conflict came back carrying
+   * their transcript, so there is nothing to ask the server for.
+   */
+  const applyTheirs = () => {
+    if (!conflict) return;
+    setConfirming(null);
+    setTranscript(conflict);
+    setDraft(conflict.ssml);
+    setStoredOverride(conflict.source === 'override' ? conflict.ssml : null);
+    setConflict(null);
+  };
+
+  /** Overwrite theirs on purpose: the same save, told what is actually stored now. */
+  const saveOverTheirs = () => {
+    const theirs = conflict?.source === 'override' ? conflict.ssml : null;
+    setConflict(null);
+    return save({ regenerate: false, expected: theirs });
+  };
+
   const reset = async () => {
-    setConfirmingRebuild(false);
+    setConfirming(null);
     setSaving(true);
     try {
-      await actions.reset(documentVersionId);
+      const outcome = await actions.reset(documentVersionId, storedOverride);
+      if (outcome.status === 'conflict') {
+        await handleConflict(outcome.current, 'reset');
+        return;
+      }
       capture('audio_transcript_reset');
       toast.success('Back to the audio text built from the document.');
       await load();
@@ -244,7 +305,7 @@ export function AudioTextPanel({
               Format
             </Button>
             {edited && (
-              <Button variant="ghost" size="sm" onClick={() => setConfirmingRebuild(true)} disabled={saving}>
+              <Button variant="ghost" size="sm" onClick={() => setConfirming('rebuild')} disabled={saving}>
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                 Reset to generated
               </Button>
@@ -264,6 +325,30 @@ export function AudioTextPanel({
           </div>
         )}
       </div>
+      {conflict && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
+          <p className="flex items-start gap-1.5 text-xs text-amber-900">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span>
+              Somebody else saved a different audio text while you were editing this one. Nothing you typed was sent,
+              and nothing of theirs was overwritten.
+            </span>
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => (dirty ? setConfirming('loadTheirs') : applyTheirs())}
+              disabled={saving}
+            >
+              Show theirs
+            </Button>
+            <Button variant="ghost" size="sm" onClick={saveOverTheirs} disabled={saving}>
+              Save mine anyway
+            </Button>
+          </div>
+        </div>
+      )}
       {transcript.state === 'edited_outdated' && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
           <p className="flex items-start gap-1.5 text-xs text-amber-900">
@@ -275,7 +360,7 @@ export function AudioTextPanel({
           </p>
           {transcript.canEdit && (
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setConfirmingRebuild(true)} disabled={saving}>
+              <Button variant="outline" size="sm" onClick={() => setConfirming('rebuild')} disabled={saving}>
                 Rebuild from document
               </Button>
               <Button variant="ghost" size="sm" onClick={keep} disabled={saving}>
@@ -305,22 +390,32 @@ export function AudioTextPanel({
         })}
       </div>
 
-      {/* Dropping the override throws away every hand-tuned pronunciation in it
-          and there is no undo, so it is worth one question. Both ways in ask it:
-          "Rebuild from document" sits next to "Keep mine" in the conflict bar,
-          which is an easy place to misclick. */}
-      <AlertDialog open={confirmingRebuild} onOpenChange={(open) => !open && setConfirmingRebuild(false)}>
+      {/* Both questions here are the same one: something in the box is about to
+          go, and there is no undo. Rebuilding throws away every hand-tuned
+          pronunciation; taking the other person's version throws away what you
+          typed. "Rebuild from document" also sits next to "Keep mine", which is
+          an easy place to misclick. */}
+      <AlertDialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Build the audio text from the document again?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {confirming === 'loadTheirs'
+                ? 'Replace what you have typed with theirs?'
+                : 'Build the audio text from the document again?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The edited audio text is thrown away, including any pronunciations tuned in it, and this cannot be undone.
-              The document itself is untouched either way.
+              {confirming === 'loadTheirs'
+                ? 'Your unsaved audio text is thrown away and the box shows the version somebody else saved.'
+                : 'The edited audio text is thrown away, including any pronunciations tuned in it, and this cannot be undone. The document itself is untouched either way.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep the edited version</AlertDialogCancel>
-            <AlertDialogAction onClick={reset}>Rebuild the audio text</AlertDialogAction>
+            <AlertDialogCancel>
+              {confirming === 'loadTheirs' ? 'Keep what I typed' : 'Keep the edited version'}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirming === 'loadTheirs' ? applyTheirs : reset}>
+              {confirming === 'loadTheirs' ? 'Use theirs' : 'Rebuild the audio text'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

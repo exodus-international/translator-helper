@@ -23,6 +23,7 @@ import type {
   AudioReadiness,
   AudioTranscriptState,
   AudioTranscriptView,
+  AudioTranscriptWriteOutcome,
 } from './audio.types';
 
 export async function getLatestAudioFileAction(documentVersionId: string): Promise<AudioFileView | null> {
@@ -61,7 +62,10 @@ export async function regenerateAudioAction(documentVersionId: string): Promise<
  */
 export async function getAudioTranscriptAction(documentVersionId: string): Promise<AudioTranscriptView | null> {
   const { user } = await authorize('authenticated');
+  return transcriptView(documentVersionId, user);
+}
 
+async function transcriptView(documentVersionId: string, user: SessionUser): Promise<AudioTranscriptView | null> {
   const transcript = await getTranscript(documentVersionId);
   if (!transcript) return null;
 
@@ -69,6 +73,7 @@ export async function getAudioTranscriptAction(documentVersionId: string): Promi
   return {
     ssml: transcript.ssml,
     state: transcript.state,
+    source: transcript.source,
     canEdit: permission.canEdit,
     readOnlyReason: permission.reason,
   };
@@ -80,18 +85,34 @@ export async function getAudioTranscriptStateAction(documentVersionId: string): 
   return getTranscriptState(documentVersionId);
 }
 
-/** Stores hand-edited SSML. The next generation sends exactly this. */
-export async function saveAudioTranscriptAction(documentVersionId: string, ssml: string): Promise<void> {
+/**
+ * Stores hand-edited SSML. The next generation sends exactly this.
+ *
+ * `expectedOverride` is what the tab was last shown: null when it was showing
+ * a transcript derived from the document, the stored SSML when it was showing
+ * an override. The write is refused when that is no longer what is stored,
+ * because there is one override per version and no history of it, so a second
+ * writer would erase the first without either of them seeing it happen.
+ */
+export async function saveAudioTranscriptAction(
+  documentVersionId: string,
+  ssml: string,
+  expectedOverride: string | null,
+): Promise<AudioTranscriptWriteOutcome> {
   const { user } = await authorize('authenticated');
   await assertCanEditDocumentVersion(documentVersionId, user);
 
-  await saveTranscript(documentVersionId, ssml);
+  if (!(await saveTranscript(documentVersionId, ssml, expectedOverride))) {
+    return { status: 'conflict', current: await transcriptView(documentVersionId, user) };
+  }
+
   await createActivityLog({
     documentVersionId,
     userId: user.id,
     action: 'audio_transcript_edited',
     details: { characters: ssml.length },
   });
+  return { status: 'saved' };
 }
 
 /**
@@ -111,17 +132,28 @@ export async function keepAudioTranscriptAction(documentVersionId: string): Prom
   });
 }
 
-/** Drops the override so the transcript goes back to being derived from the document. */
-export async function resetAudioTranscriptAction(documentVersionId: string): Promise<void> {
+/**
+ * Drops the override so the transcript goes back to being derived from the
+ * document. Guarded the same way a save is: dropping an override someone else
+ * wrote while this tab was open is the worst of the two ways to lose it.
+ */
+export async function resetAudioTranscriptAction(
+  documentVersionId: string,
+  expectedOverride: string | null,
+): Promise<AudioTranscriptWriteOutcome> {
   const { user } = await authorize('authenticated');
   await assertCanEditDocumentVersion(documentVersionId, user);
 
-  await saveTranscript(documentVersionId, null);
+  if (!(await saveTranscript(documentVersionId, null, expectedOverride))) {
+    return { status: 'conflict', current: await transcriptView(documentVersionId, user) };
+  }
+
   await createActivityLog({
     documentVersionId,
     userId: user.id,
     action: 'audio_transcript_reset',
   });
+  return { status: 'saved' };
 }
 
 /**

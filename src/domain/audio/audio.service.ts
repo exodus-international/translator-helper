@@ -491,13 +491,32 @@ export async function getTranscriptState(documentVersionId: string): Promise<Aud
  * Stores hand-edited SSML for a version, or clears it with null so the
  * transcript goes back to being derived. The caller is responsible for the
  * permission check; this only writes.
+ *
+ * `expectedOverride` is the override the caller was last shown, and the write
+ * happens only while that is still what is stored. Two people with the tab
+ * open on the same version would otherwise overwrite each other with no sign
+ * of it, and the loser's work is gone: there is one override per version and
+ * no history of it. Returns false when the write was refused, which is not a
+ * failure but a question for whoever asked.
+ *
+ * `updateMany`, not `update`, because it reports how many rows matched instead
+ * of throwing when none did. That row count is the whole mechanism.
  */
-export async function saveTranscript(documentVersionId: string, ssml: string | null): Promise<void> {
+export async function saveTranscript(
+  documentVersionId: string,
+  ssml: string | null,
+  expectedOverride: string | null,
+): Promise<boolean> {
   const stored = ssml?.trim() ? ssml : null;
-  await prisma.documentVersion.update({
-    where: { id: documentVersionId },
-    data: { audioSsml: stored, audioSsmlBase: stored ? await currentBaseline(documentVersionId) : null },
+  const audioSsmlBase = stored ? await currentBaseline(documentVersionId) : null;
+
+  const { count } = await prisma.documentVersion.updateMany({
+    // A null here means IS NULL, which is exactly the case of someone else
+    // having reset the transcript while this tab held an override.
+    where: { id: documentVersionId, audioSsml: expectedOverride },
+    data: { audioSsml: stored, audioSsmlBase },
   });
+  return count > 0;
 }
 
 /**

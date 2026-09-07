@@ -31,15 +31,26 @@ const GENERATED =
   '<voice name="cs-CZ-AntoninNeural">Ahoj</voice></speak>';
 
 function stubActions(transcript: AudioTranscriptView | null, overrides: Partial<AudioTextPanelActions> = {}) {
-  const calls = { save: [] as string[], reset: 0, keep: 0, regenerate: 0 };
+  const calls = {
+    save: [] as string[],
+    reset: 0,
+    keep: 0,
+    regenerate: 0,
+    /** What each write claimed was stored, in order. Null means "it was derived". */
+    expected: [] as (string | null)[],
+  };
 
   const actions: AudioTextPanelActions = {
     load: async () => transcript,
-    save: async (_id, ssml) => {
+    save: async (_id, ssml, expected) => {
       calls.save.push(ssml);
+      calls.expected.push(expected);
+      return { status: 'saved' };
     },
-    reset: async () => {
+    reset: async (_id, expected) => {
       calls.reset += 1;
+      calls.expected.push(expected);
+      return { status: 'saved' };
     },
     keep: async () => {
       calls.keep += 1;
@@ -54,7 +65,9 @@ function stubActions(transcript: AudioTranscriptView | null, overrides: Partial<
   return { actions, calls };
 }
 
-const editable: AudioTranscriptView = { ssml: GENERATED, state: 'generated', canEdit: true };
+const editable: AudioTranscriptView = { ssml: GENERATED, state: 'generated', source: 'derived', canEdit: true };
+/** A transcript somebody has already hand-edited, which is what a stored override looks like. */
+const overridden: AudioTranscriptView = { ...editable, state: 'edited', source: 'override' };
 
 afterEach(() => {
   cleanup();
@@ -91,7 +104,7 @@ test('save and regenerate stores the transcript and asks for a new recording', a
 
 test('an edited transcript says so and offers a way back to the generated one', async () => {
   const user = userEvent.setup();
-  const { actions, calls } = stubActions({ ...editable, state: 'edited' });
+  const { actions, calls } = stubActions(overridden);
   render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
 
   assert.ok(await screen.findByText('Edited'));
@@ -105,7 +118,7 @@ test('an edited transcript says so and offers a way back to the generated one', 
 // with it, so the click that does it is never the first one.
 test('rebuilding is asked about first, and saying no changes nothing', async () => {
   const user = userEvent.setup();
-  const { actions, calls } = stubActions({ ...editable, state: 'edited' });
+  const { actions, calls } = stubActions(overridden);
   render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
 
   await user.click(await screen.findByRole('button', { name: /Reset to generated/ }));
@@ -127,7 +140,7 @@ test('a generated transcript has nothing to reset', async () => {
 
 test('a transcript the translation has moved past asks which one to keep', async () => {
   const user = userEvent.setup();
-  const { actions, calls } = stubActions({ ...editable, state: 'edited_outdated' });
+  const { actions, calls } = stubActions({ ...overridden, state: 'edited_outdated' });
   render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
 
   assert.ok(await screen.findByText(/The translation changed since this audio text was edited/));
@@ -142,7 +155,7 @@ test('a transcript the translation has moved past asks which one to keep', async
 // would throw away whatever is being typed, which is the opposite of the label.
 test('keeping your version leaves what you are typing alone', async () => {
   const user = userEvent.setup();
-  const { actions } = stubActions({ ...editable, state: 'edited_outdated' });
+  const { actions } = stubActions({ ...overridden, state: 'edited_outdated' });
   render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
 
   const box = (await screen.findByLabelText('Audio text')) as HTMLTextAreaElement;
@@ -158,7 +171,7 @@ test('keeping your version leaves what you are typing alone', async () => {
 test('what the transcript becomes is reported to whoever is showing the badge', async () => {
   const user = userEvent.setup();
   const states: string[] = [];
-  const { actions } = stubActions({ ...editable, state: 'edited' });
+  const { actions } = stubActions(overridden);
   render(
     <AudioTextPanel
       documentVersionId="version-1"
@@ -197,7 +210,7 @@ test('unsaved edits are announced, so leaving the tab can be interrupted', async
 
 test('rebuilding from the document is the other answer to that question', async () => {
   const user = userEvent.setup();
-  const { actions, calls } = stubActions({ ...editable, state: 'edited_outdated' });
+  const { actions, calls } = stubActions({ ...overridden, state: 'edited_outdated' });
   render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
 
   await screen.findByText(/The translation changed since this audio text was edited/);
@@ -207,10 +220,138 @@ test('rebuilding from the document is the other answer to that question', async 
   await waitFor(() => assert.equal(calls.reset, 1));
 });
 
+// ─── Two people, one transcript ──────────────────────────────
+//
+// There is one override per version and no history of it, so a write that
+// lands on top of somebody else's is gone for good. Every write says what it
+// believes is stored and is refused when that is no longer true.
+
+test('a write says which stored version it is replacing', async () => {
+  const user = userEvent.setup();
+  const { actions, calls } = stubActions(overridden);
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  await user.click(await screen.findByRole('button', { name: /Save & regenerate/ }));
+
+  await waitFor(() => assert.deepEqual(calls.expected, [GENERATED]));
+});
+
+// Nothing is stored yet, so the write may only land while that is still true.
+test('a write against a derived transcript claims no stored version', async () => {
+  const user = userEvent.setup();
+  const { actions, calls } = stubActions(editable);
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  await user.click(await screen.findByRole('button', { name: /Save & regenerate/ }));
+
+  await waitFor(() => assert.deepEqual(calls.expected, [null]));
+});
+
+const THEIRS = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">Jejich verze.</speak>';
+
+/** Stubs a save that is refused once, then accepted, the way a real race resolves. */
+function conflictingActions() {
+  const { actions, calls } = stubActions(overridden);
+  let refused = false;
+  return {
+    calls,
+    actions: {
+      ...actions,
+      save: async (id: string, ssml: string, expected: string | null) => {
+        if (!refused) {
+          refused = true;
+          calls.expected.push(expected);
+          return { status: 'conflict' as const, current: { ...overridden, ssml: THEIRS } };
+        }
+        return actions.save(id, ssml, expected);
+      },
+    },
+  };
+}
+
+test('a refused save keeps what you typed and says what happened', async () => {
+  const user = userEvent.setup();
+  const { actions, calls } = conflictingActions();
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  const box = (await screen.findByLabelText('Audio text')) as HTMLTextAreaElement;
+  await user.clear(box);
+  await user.type(box, '<speak>Moje verze.</speak>');
+  await user.click(screen.getByRole('button', { name: /^Save$/ }));
+
+  assert.ok(await screen.findByText(/Somebody else saved a different audio text/));
+  // Refused, so nothing was stored, and what was typed is still there to store.
+  assert.equal(calls.save.length, 0);
+  assert.equal(box.value, '<speak>Moje verze.</speak>');
+});
+
+test('saving over theirs is a second write that says so', async () => {
+  const user = userEvent.setup();
+  const { actions, calls } = conflictingActions();
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  const box = await screen.findByLabelText('Audio text');
+  await user.clear(box);
+  await user.type(box, '<speak>Moje verze.</speak>');
+  await user.click(screen.getByRole('button', { name: /^Save$/ }));
+
+  await screen.findByText(/Somebody else saved a different audio text/);
+  await user.click(screen.getByRole('button', { name: /Save mine anyway/ }));
+
+  // The first write claimed the version this tab loaded; the second claims
+  // theirs, which is what is actually stored now.
+  await waitFor(() => assert.deepEqual(calls.save, ['<speak>Moje verze.</speak>']));
+  assert.deepEqual(calls.expected, [GENERATED, THEIRS]);
+});
+
+test('taking their version asks first, because it costs you yours', async () => {
+  const user = userEvent.setup();
+  const { actions } = conflictingActions();
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  const box = (await screen.findByLabelText('Audio text')) as HTMLTextAreaElement;
+  await user.clear(box);
+  await user.type(box, '<speak>Moje verze.</speak>');
+  await user.click(screen.getByRole('button', { name: /^Save$/ }));
+
+  await screen.findByText(/Somebody else saved a different audio text/);
+  await user.click(screen.getByRole('button', { name: /^Show theirs$/ }));
+  // Asked, not done: what was typed is still in the box.
+  assert.ok(await screen.findByText(/Replace what you have typed with theirs\?/));
+  assert.equal(box.value, '<speak>Moje verze.</speak>');
+
+  await user.click(screen.getByRole('button', { name: /^Use theirs$/ }));
+
+  await waitFor(() => assert.equal(box.value, THEIRS));
+});
+
+// A reset that lands on an override somebody else wrote in the meantime is the
+// worse half of this: there would be nothing left to recover it from.
+test('a refused reset does not drop what somebody else stored', async () => {
+  const user = userEvent.setup();
+  let attempted = 0;
+  const { actions } = stubActions(overridden, {
+    reset: async () => {
+      attempted += 1;
+      return { status: 'conflict', current: { ...overridden, ssml: THEIRS } };
+    },
+  });
+  render(<AudioTextPanel documentVersionId="version-1" actions={actions} editor={textareaEditor} />);
+
+  await user.click(await screen.findByRole('button', { name: /Reset to generated/ }));
+  await user.click(await screen.findByRole('button', { name: /Rebuild the audio text/ }));
+
+  assert.ok(await screen.findByText(/Somebody else saved a different audio text/));
+  assert.equal(attempted, 1);
+  // Theirs is what the box offers to show, so it is still there to be read.
+  assert.ok(screen.getByRole('button', { name: /^Show theirs$/ }));
+});
+
 test('someone without permission reads it and is told why', async () => {
   const { actions } = stubActions({
     ssml: GENERATED,
     state: 'generated',
+    source: 'derived',
     canEdit: false,
     readOnlyReason: 'You are not assigned to Czech. Ask an admin to add the language to your profile.',
   });
@@ -244,6 +385,7 @@ test('a reader who cannot edit is not shown validation warnings', async () => {
   const { actions } = stubActions({
     ssml: '<speak>\n  <prosody rate="0.8">Ahoj\n</speak>',
     state: 'edited',
+    source: 'override',
     canEdit: false,
     readOnlyReason: 'You cannot edit this document, so its audio text is read-only.',
   });
