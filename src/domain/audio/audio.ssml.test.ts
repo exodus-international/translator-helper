@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_PROSODY, escapeXml, formatSsml, renderPause, speechScriptToSsml, validateSsml } from './audio.ssml';
+import {
+  DEFAULT_PROSODY,
+  escapeXml,
+  formatSsml,
+  renderPause,
+  speechScriptToSsml,
+  validateSsml,
+  voiceFromSsml,
+} from './audio.ssml';
 
 const opts = { voice: 'cs-CZ-AntoninNeural', locale: 'cs-CZ', maxBreakMs: 20_000 };
 
@@ -91,6 +99,27 @@ test('rate alone yields a prosody element with only a rate attribute', () => {
 
 test('default prosody is the listening-test pick', () => {
   assert.deepEqual(DEFAULT_PROSODY, { rate: '0.8', pitch: '-6%' });
+});
+
+// ─── Reading a voice back ────────────────────────────────────
+
+test('the voice SSML names is read back off it', () => {
+  assert.equal(voiceFromSsml('<speak><voice name="cs-CZ-JitkaNeural">Ahoj</voice></speak>'), 'cs-CZ-JitkaNeural');
+  assert.equal(voiceFromSsml("<speak><voice name='cs-CZ-JitkaNeural'>Ahoj</voice></speak>"), 'cs-CZ-JitkaNeural');
+  assert.equal(voiceFromSsml('<speak>\n  <voice  name = "cs-CZ-AntoninNeural" >Ahoj</voice>\n</speak>'), 'cs-CZ-AntoninNeural');
+});
+
+// SSML may switch voices part way through. Naming the first one is a record of
+// what the recording mostly is, not a description of every voice in it.
+test('the first voice wins when the SSML switches part way through', () => {
+  const ssml = '<speak><voice name="cs-CZ-AntoninNeural">Ahoj</voice><voice name="cs-CZ-JitkaNeural">Nazdar</voice></speak>';
+  assert.equal(voiceFromSsml(ssml), 'cs-CZ-AntoninNeural');
+});
+
+test('SSML with no voice, or an empty one, names nothing', () => {
+  assert.equal(voiceFromSsml('<speak>Ahoj</speak>'), null);
+  assert.equal(voiceFromSsml(''), null);
+  assert.equal(voiceFromSsml('<speak><voice name="">Ahoj</voice></speak>'), null);
 });
 
 // ─── Validation ──────────────────────────────────────────────

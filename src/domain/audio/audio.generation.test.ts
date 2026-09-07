@@ -54,6 +54,7 @@ function audioFileFixture(): AudioFile {
 function harness(version: VersionForGeneration) {
   const submitted: string[] = [];
   const logged: { action: string; details?: unknown }[] = [];
+  const created: { voice: string }[] = [];
 
   const provider = {
     id: AudioProvider.AZURE_SPEECH,
@@ -70,7 +71,10 @@ function harness(version: VersionForGeneration) {
     loadVersion: async () => version,
     storageConfigured: () => true,
     getProvider: () => provider,
-    createAudioFile: async () => audioFileFixture(),
+    createAudioFile: async (input: { voice: string }) => {
+      created.push({ voice: input.voice });
+      return audioFileFixture();
+    },
     setAudioFileJob: async () => audioFileFixture(),
     claimForProcessing: async () => true,
     markFailed: async () => audioFileFixture(),
@@ -81,7 +85,7 @@ function harness(version: VersionForGeneration) {
     finish: async () => audioFileFixture(),
   };
 
-  return { submitted, logged, start: createStartGeneration(deps) };
+  return { submitted, logged, created, start: createStartGeneration(deps) };
 }
 
 test('with no override, the provider is sent the script derived from the document', async () => {
@@ -106,6 +110,41 @@ test('with an override, the provider is sent exactly that, wrapper and voice inc
   assert.equal(submitted[0], override);
   // The document's own words are not in there; the override replaced them.
   assert.doesNotMatch(submitted[0], /modlit/);
+});
+
+// Pinning a voice in the override is the point of sending it verbatim, so the
+// record kept about the recording has to name the voice that actually spoke,
+// not the language's default. The card prints this under the player.
+test('the record names the voice the override pinned, not the language default', async () => {
+  const override =
+    '<speak version="1.0" xml:lang="cs-CZ"><voice name="cs-CZ-JitkaNeural">Rucne napsany text.</voice></speak>';
+  const { created, logged, start } = harness(versionFixture({ audioSsml: override }));
+
+  await start('version-1', 'user-1');
+
+  assert.deepEqual(created, [{ voice: 'cs-CZ-JitkaNeural' }]);
+  const started = logged.find((entry) => entry.action === 'audio_generation_started');
+  assert.deepEqual(started?.details, {
+    audioFileId: 'audio-1',
+    voice: 'cs-CZ-JitkaNeural',
+    ssmlSource: 'override',
+  });
+});
+
+test('an override that names no voice leaves the language default on the record', async () => {
+  const { created, start } = harness(versionFixture({ audioSsml: '<speak>Bez hlasu.</speak>' }));
+
+  await start('version-1', 'user-1');
+
+  assert.deepEqual(created, [{ voice: VOICE }]);
+});
+
+test('with no override the record names the language voice, which is the one derived', async () => {
+  const { created, start } = harness(versionFixture());
+
+  await start('version-1', 'user-1');
+
+  assert.deepEqual(created, [{ voice: VOICE }]);
 });
 
 test('the activity log records which of the two produced a recording', async () => {

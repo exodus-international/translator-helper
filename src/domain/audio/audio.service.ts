@@ -27,7 +27,7 @@ import {
   type AudioTranscriptState,
 } from './audio.rules';
 import { markdownToSpeechScript } from './audio.script';
-import { DEFAULT_PROSODY, speechScriptToSsml } from './audio.ssml';
+import { DEFAULT_PROSODY, speechScriptToSsml, voiceFromSsml } from './audio.ssml';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
@@ -141,10 +141,17 @@ export function createStartGeneration(deps: GenerationDeps = defaultGenerationDe
   const provider = deps.getProvider(language.audioProvider!);
   const voice = language.audioVoice!;
 
+  // What derivation would use is the language's voice. What an override says is
+  // whatever it names, and an override is sent verbatim — that is what lets an
+  // edited document keep its voice after the language default changes. The
+  // record has to say which one is doing the speaking, or the card names one
+  // voice under a recording made in another.
+  const spokenVoice = voiceFromSsml(version.audioSsml ?? '') ?? voice;
+
   const audioFile = await deps.createAudioFile({
     documentVersionId,
     provider: provider.id,
-    voice,
+    voice: spokenVoice,
     sourceVersion: version.version,
     triggeredByUserId: userId,
   });
@@ -152,7 +159,11 @@ export function createStartGeneration(deps: GenerationDeps = defaultGenerationDe
     documentVersionId,
     userId,
     action: options.trigger === 'regeneration' ? 'audio_regeneration_requested' : 'audio_generation_started',
-    details: { audioFileId: audioFile.id, voice, ssmlSource: version.audioSsml ? 'override' : 'derived' },
+    details: {
+      audioFileId: audioFile.id,
+      voice: spokenVoice,
+      ssmlSource: version.audioSsml ? 'override' : 'derived',
+    },
   });
 
   // Anything thrown before the provider is asked is our problem (content or

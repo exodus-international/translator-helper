@@ -119,6 +119,21 @@ const SPEAK_ATTRIBUTES: { present: RegExp; message: string }[] = [
   { present: /\bversion\s*=/i, message: '<speak> is missing version="1.0", which the speech provider requires.' },
 ];
 
+/**
+ * The voice SSML names, or null when it names none. Reading it back matters
+ * because an override is sent verbatim: what speaks is the voice written in
+ * the SSML, which need not be the language's default.
+ *
+ * The first `<voice>` wins. SSML may switch voices part way through, and
+ * nothing here has to describe that faithfully; this answers "which voice is
+ * this recording in" for a record kept about it.
+ */
+export function voiceFromSsml(ssml: string): string | null {
+  const match = /<voice\b[^>]*\bname\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(ssml);
+  const name = (match?.[1] ?? match?.[2] ?? '').trim();
+  return name || null;
+}
+
 export interface SsmlProblem {
   /** 1-indexed line the problem sits on, for pointing at it. */
   line: number;
