@@ -26,6 +26,8 @@ import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
 import { ThreadSidebar } from './thread-sidebar';
+import { AudioTextPanel } from '@/components/audio-text-panel';
+import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 // SuggestionType enum values
 const SuggestionType = {
   COMMENT: 'COMMENT' as const,
@@ -40,6 +42,9 @@ export interface SourceTranslationViewerHandle {
   exitTranslationEditMode: () => void;
 }
 
+/** Formatted and Review are the old pair; Audio text is offered only where audio applies. */
+type TranslationViewMode = 'formatted' | 'review' | 'audio';
+
 interface SourceTranslationViewerProps {
   variant: ViewerVariant;
   className?: string;
@@ -50,6 +55,15 @@ interface SourceTranslationViewerProps {
   translationFormattedContent?: string;
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /**
+   * Offers the Audio text tab. Resolved on the server from the same eligibility
+   * check that decides whether audio is generated at all, so the tab never
+   * appears on a document that will never have any.
+   */
+  audioTextVersionId?: string | null;
+  /** Set by something outside the viewer (the audio card) asking for a tab. */
+  requestedView?: 'audio' | null;
+  onRequestedViewShown?: () => void;
   onTranslationChange?: (value: string) => void;
   sourceBadge?: ReactNode;
   translationBadge?: ReactNode;
@@ -100,6 +114,8 @@ interface SourceTranslationViewerProps {
   sidebarDetailsDefaultOpen?: boolean;
   /** Monaco language for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
+  /** Passed through to the Audio text tab so the sidebar card's badge follows what happens in it. */
+  onAudioTranscriptStateChange?: (state: AudioTranscriptState) => void;
 }
 
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
@@ -131,6 +147,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       translationFormattedContent,
       translationPlaceholder = 'Enter your translation here...',
       translationPreviewEmptyText = '*No content yet...*',
+      audioTextVersionId = null,
+      requestedView = null,
+      onRequestedViewShown,
       onTranslationChange,
       sourceBadge,
       translationBadge,
@@ -160,6 +179,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       sidebarDetails,
       sidebarDetailsDefaultOpen = false,
       contentLanguage = 'markdown',
+      onAudioTranscriptStateChange,
     },
     ref,
   ) {
@@ -176,7 +196,21 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
-    const [reviewViewMode, setReviewViewMode] = useState<'formatted' | 'review'>('review');
+    const [reviewViewMode, setReviewViewMode] = useState<TranslationViewMode>('review');
+
+    // The tab strip is not rendered for a YAML document, so an Audio text pane
+    // there would be one with no way back out. Everything that opens the tab
+    // and everything that renders it reads this, not the prop.
+    const audioTabVersionId = isYaml ? null : audioTextVersionId;
+
+    // A request is consumed, not mirrored: the tab strip stays the one place
+    // that knows which tab is open.
+    useEffect(() => {
+      if (requestedView === 'audio' && audioTabVersionId) {
+        setReviewViewMode('audio');
+        onRequestedViewShown?.();
+      }
+    }, [requestedView, audioTabVersionId, onRequestedViewShown]);
     const [isReviewEditing, setIsReviewEditing] = useState(reviewConfig?.editingDefault ?? false);
     const [showSuggestionForm, setShowSuggestionForm] = useState(false);
     const [suggestionFormType, setSuggestionFormType] = useState<SuggestionType>(SuggestionType.COMMENT);
@@ -188,7 +222,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     } | null>(null);
     const [selectedText, setSelectedText] = useState<string>(''); // Store selected text for pre-filling
     const suggestionFormDirtyRef = useRef(false);
+    // The Audio text tab is unmounted the moment another tab is chosen, taking
+    // an unsaved draft with it. Same guard the suggestion form gets.
+    const audioDraftDirtyRef = useRef(false);
     const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+    const [discardKind, setDiscardKind] = useState<'suggestion' | 'audioText'>('suggestion');
     const pendingDiscardActionRef = useRef<(() => void) | null>(null);
     const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
     const translationEditorRef = useRef<any>(null);
@@ -358,8 +396,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
     const enterReviewEditMode = () => {
       if (!reviewConfig?.canEdit) return;
-      setIsReviewEditing(true);
-      setTranslateTab('edit');
+      // Editing the translation replaces the Audio text pane with the editor,
+      // so ask before it takes an unsaved draft with it.
+      requestLeaveAudioText(() => {
+        setIsReviewEditing(true);
+        setTranslateTab('edit');
+      });
     };
 
     const translationEditActions = useMemo(() => {
@@ -403,17 +445,32 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           return;
         }
         pendingDiscardActionRef.current = onConfirmed ?? null;
+        setDiscardKind('suggestion');
         setShowDiscardDialog(true);
       },
       [doCloseSuggestionForm],
     );
 
+    /** Leaving the Audio text tab, once whoever is in it has agreed to lose the draft. */
+    const requestLeaveAudioText = useCallback((proceed: () => void) => {
+      if (!audioDraftDirtyRef.current) {
+        proceed();
+        return;
+      }
+      pendingDiscardActionRef.current = () => {
+        audioDraftDirtyRef.current = false;
+        proceed();
+      };
+      setDiscardKind('audioText');
+      setShowDiscardDialog(true);
+    }, []);
+
     const handleDiscardConfirm = useCallback(() => {
-      doCloseSuggestionForm();
+      if (discardKind === 'suggestion') doCloseSuggestionForm();
       setShowDiscardDialog(false);
       pendingDiscardActionRef.current?.();
       pendingDiscardActionRef.current = null;
-    }, [doCloseSuggestionForm]);
+    }, [doCloseSuggestionForm, discardKind]);
 
     const handleDiscardCancel = useCallback(() => {
       setShowDiscardDialog(false);
@@ -743,7 +800,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   mounted ? (
                     <Tabs
                       value={reviewViewMode}
-                      onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'review')}
+                      onValueChange={(value) => {
+                        const next = value as TranslationViewMode;
+                        if (reviewViewMode === 'audio' && next !== 'audio') {
+                          requestLeaveAudioText(() => setReviewViewMode(next));
+                          return;
+                        }
+                        setReviewViewMode(next);
+                      }}
                     >
                       <TabsList>
                         <TabsTrigger value="formatted">Formatted</TabsTrigger>
@@ -758,6 +822,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                             </Badge>
                           )}
                         </TabsTrigger>
+                        {audioTabVersionId && <TabsTrigger value="audio">Audio text</TabsTrigger>}
                       </TabsList>
                     </Tabs>
                   ) : (
@@ -894,6 +959,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                   {translationEditActions}
                 </div>
+              ) : audioTabVersionId && reviewViewMode === 'audio' ? (
+                <AudioTextPanel
+                  documentVersionId={audioTabVersionId}
+                  onStateChange={onAudioTranscriptStateChange}
+                  onDirtyChange={(dirty) => {
+                    audioDraftDirtyRef.current = dirty;
+                  }}
+                />
               ) : !isYaml && reviewViewMode === 'formatted' ? (
                 <div className="prose max-w-none h-full overflow-y-auto p-3">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
@@ -969,9 +1042,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           >
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Discard unsaved suggestion?</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {discardKind === 'audioText' ? 'Discard unsaved audio text?' : 'Discard unsaved suggestion?'}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  You have unsaved changes in your suggestion. Are you sure you want to discard them?
+                  {discardKind === 'audioText'
+                    ? 'The audio text has changes that have not been saved. Leaving this tab loses them.'
+                    : 'You have unsaved changes in your suggestion. Are you sure you want to discard them?'}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

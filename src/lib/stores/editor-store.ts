@@ -20,6 +20,8 @@ import {
   listTranslationProjectMembersAction,
 } from '@/domain/user-language/user-language.actions';
 import { deleteDocumentAction } from '@/domain/document/document.actions';
+import { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions';
+import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 import { DocumentStatus, SuggestionType } from '@prisma/client';
 import { toast } from 'sonner';
 import { capture } from '@/lib/analytics';
@@ -57,6 +59,8 @@ export interface EditorStoreConfig {
   sourceContent: string;
   initialSuggestions: any[];
   translationProjectId: string | null;
+  /** Version id when the Audio text tab is reachable here, null when it is not. */
+  audioTextVersionId: string | null;
 }
 
 // ─── State ───────────────────────────────────────────────────
@@ -73,14 +77,37 @@ interface EditorState {
   loading: Set<LoadingKey>;
   dialog: DialogState;
 
+  /**
+   * Set when something outside the viewer asks it to show a particular tab —
+   * the audio card linking to the Audio text tab. The viewer clears it once it
+   * has switched, so it reads as a request rather than a second source of
+   * truth for which tab is open.
+   */
+  requestedTranslationView: 'audio' | null;
+
+  /**
+   * Whether this version's transcript is generated or hand-edited. Kept here
+   * rather than in the audio card because the card is not the only thing that
+   * changes it: saving or resetting in the Audio text tab has to move the
+   * badge too, and the two are in different parts of the tree.
+   */
+  audioTranscriptState: AudioTranscriptState | null;
+
   // Config (set once at init)
   documentId: string;
   translationProjectId: string | null;
+  audioTextVersionId: string | null;
 }
 
 // ─── Actions ─────────────────────────────────────────────────
 
 interface EditorActions {
+  requestTranslationView: (view: 'audio' | null) => void;
+
+  // Audio transcript
+  setAudioTranscriptState: (state: AudioTranscriptState) => void;
+  loadAudioTranscriptState: (documentVersionId: string) => Promise<void>;
+
   // Content
   setContent: (content: string) => void;
   setSourceEditContent: (content: string) => void;
@@ -160,6 +187,10 @@ function removeLoading(state: EditorState, key: LoadingKey): Partial<EditorState
 
 export function createEditorStore(config: EditorStoreConfig) {
   const initialContent = config.targetVersion?.content || '';
+  // Both audio cards (the sidebar summary and the details panel) mount at once
+  // and both want this. Fetch it for whoever asks first and hand the same
+  // promise to the second.
+  let transcriptStateRequest: Promise<void> | null = null;
 
   return createStore<EditorStore>()((set, get) => ({
     // ─── Initial state ─────────────────────────────────
@@ -170,8 +201,11 @@ export function createEditorStore(config: EditorStoreConfig) {
     sourceEditContent: config.sourceContent,
     loading: new Set<LoadingKey>(),
     dialog: { type: 'closed' },
+    requestedTranslationView: null,
+    audioTranscriptState: null,
     documentId: config.documentId,
     translationProjectId: config.translationProjectId,
+    audioTextVersionId: config.audioTextVersionId,
 
     // ─── Content ───────────────────────────────────────
     setContent: (content) => set({ content }),
@@ -361,7 +395,21 @@ export function createEditorStore(config: EditorStoreConfig) {
       }
     },
 
+    // ─── Audio transcript ──────────────────────────────
+    setAudioTranscriptState: (audioTranscriptState) => set({ audioTranscriptState }),
+
+    loadAudioTranscriptState: (documentVersionId) => {
+      transcriptStateRequest ??= getAudioTranscriptStateAction(documentVersionId)
+        .then((state) => set({ audioTranscriptState: state }))
+        // Nothing here is worth interrupting someone over: the badge just does
+        // not appear, and the transcript itself is unaffected.
+        .catch(() => set({ audioTranscriptState: 'generated' }));
+      return transcriptStateRequest;
+    },
+
     // ─── Dialogs ───────────────────────────────────────
+    requestTranslationView: (view) => set({ requestedTranslationView: view }),
+
     closeDialog: () => set({ dialog: { type: 'closed' } }),
 
     openReviewDialog: async () => {

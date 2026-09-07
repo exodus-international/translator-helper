@@ -1,4 +1,7 @@
 import type { AudioProvider, AudioStatus } from '@prisma/client';
+import type { AudioSsmlSource, AudioTranscriptState } from './audio.rules';
+
+export type { AudioSsmlSource, AudioTranscriptState };
 
 export type { AudioProvider, AudioStatus };
 
@@ -46,3 +49,29 @@ export interface AudioFileView {
   createdAt: string;
   updatedAt: string;
 }
+
+/** What the Audio text tab needs to render itself. */
+export interface AudioTranscriptView {
+  ssml: string;
+  state: AudioTranscriptState;
+  /**
+   * Whether `ssml` is a stored override or was derived from the document just
+   * now. The tab sends it back when it saves, so a write can be refused when
+   * someone else has changed the transcript in the meantime.
+   */
+  source: AudioSsmlSource;
+  /** False when the reader may look but not change it. */
+  canEdit: boolean;
+  /** Why they may not, in words meant for them. */
+  readOnlyReason?: string;
+}
+
+/**
+ * The result of writing a transcript. A conflict is not an error: it means the
+ * stored override is no longer the one the tab was editing, and it comes back
+ * with what is there now so the person can compare without a second round trip.
+ */
+export type AudioTranscriptWriteOutcome =
+  | { status: 'saved' }
+  /** `current` is null when the document stopped getting audio altogether. */
+  | { status: 'conflict'; current: AudioTranscriptView | null };
