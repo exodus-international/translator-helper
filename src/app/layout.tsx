@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { getCurrentUser } from '@/lib/session';
+import { SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackButton } from '@/components/feedback-button';
@@ -57,7 +58,7 @@ export default async function RootLayout({
   const user = await getCurrentUser();
   // Same cookie ui/sidebar.tsx writes on toggle: reading it server-side means
   // the sidebar's first paint already has the width the user last chose.
-  const sidebarOpen = (await cookies()).get('sidebar_state')?.value !== 'false';
+  const sidebarOpen = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value !== 'false';
 
   return (
     <html lang="en">
