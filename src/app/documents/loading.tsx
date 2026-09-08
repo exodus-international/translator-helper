@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 // mirrors page.client.tsx so nothing shifts when the real table arrives.
 export default function DocumentsLoading() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted/40">
       <div className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">

@@ -43,7 +43,7 @@ export function AdminListPage({
   children,
 }: AdminListPageProps) {
   return (
-    <div className="min-h-screen bg-background">
+    <div  >
       <PageHeader
         title={title}
         description={description}

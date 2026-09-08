@@ -1,5 +1,7 @@
 'use client';
 
+import * as React from 'react';
+
 import { Logo } from '@/components/logo';
 import { UserAvatar } from '@/components/user-avatar';
 import {
@@ -106,11 +108,13 @@ function HeaderBreadcrumb() {
     <Breadcrumb>
       <BreadcrumbList>
         {crumbs.slice(0, -1).map((crumb) => (
-          <BreadcrumbItem key={crumb.href} className="hidden md:block">
-            <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
-          </BreadcrumbItem>
+          <React.Fragment key={crumb.href}>
+            <BreadcrumbItem className="hidden md:block">
+              <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="hidden md:block" />
+          </React.Fragment>
         ))}
-        {crumbs.length > 1 && <BreadcrumbSeparator className="hidden md:block" />}
         <BreadcrumbItem>
           <BreadcrumbPage>{last.label}</BreadcrumbPage>
         </BreadcrumbItem>

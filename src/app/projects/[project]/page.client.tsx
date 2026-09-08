@@ -155,7 +155,7 @@ export default function ProjectDetailClient({
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
         back={{ href: '/dashboard', label: 'Dashboard' }}
         title={sourceProject.name}
@@ -327,6 +327,6 @@ export default function ProjectDetailClient({
           )}
         </Tabs>
       </div>
-    </div>
+    </>
   );
 }

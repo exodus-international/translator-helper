@@ -90,7 +90,7 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div  >
       <PageHeader
         back={{ href: '/documents', label: 'Documents' }}
         title="Edit Document"
