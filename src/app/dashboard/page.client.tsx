@@ -419,38 +419,38 @@ export default function DashboardClient({
                   </InputGroupAddon>
                 </InputGroup>
                 {isAdminClient(user) && (
-                <Dialog
-                  open={createDialogOpen}
-                  onOpenChange={(open) => {
-                    setCreateDialogOpen(open);
-                    if (open) {
-                      capture('dialog_opened', { dialog: 'create_source_project' });
-                    }
-                    if (!open) resetNewProject();
-                  }}
-                >
-                  <DialogTrigger render={<Button size="sm" />}>
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    New Project
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New Project</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateProject} className="space-y-4">
-                      <ProjectFormFields values={newProject} onChange={setNewProject} idPrefix="new-project" />
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button type="submit" disabled={createLoading || !isProjectFormComplete(newProject)}>
-                          {createLoading ? 'Creating...' : 'Create Project'}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
+                  <Dialog
+                    open={createDialogOpen}
+                    onOpenChange={(open) => {
+                      setCreateDialogOpen(open);
+                      if (open) {
+                        capture('dialog_opened', { dialog: 'create_source_project' });
+                      }
+                      if (!open) resetNewProject();
+                    }}
+                  >
+                    <DialogTrigger render={<Button size="sm" />}>
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      New Project
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create New Project</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleCreateProject} className="space-y-4">
+                        <ProjectFormFields values={newProject} onChange={setNewProject} idPrefix="new-project" />
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={createLoading || !isProjectFormComplete(newProject)}>
+                            {createLoading ? 'Creating...' : 'Create Project'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
             </div>
             {filteredProjects.length === 0 ? (
