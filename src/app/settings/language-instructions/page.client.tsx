@@ -54,7 +54,7 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div  >
       <PageHeader
         title="Language Instructions"
         description="Define custom guidance for the AI translator per language."

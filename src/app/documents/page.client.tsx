@@ -191,7 +191,7 @@ export default function DocumentsClient({
     navigate({ sort: nextSort, order: nextOrder });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div  >
       <PageHeader
         title="Documents Overview"
         description="View translation status across all languages"

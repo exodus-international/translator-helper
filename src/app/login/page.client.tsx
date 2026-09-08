@@ -45,7 +45,7 @@ export default function LoginClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-4">
         <div className="text-center mb-4">
           <Logo size={48} className="mx-auto mb-2 block" />

@@ -147,7 +147,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
       : `New ${type === 'BANNER' ? 'Banner' : 'Modal'}`;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div  >
       <PageHeader
         title="Announcements"
         description="Notify users about new functionality or ask for their input"

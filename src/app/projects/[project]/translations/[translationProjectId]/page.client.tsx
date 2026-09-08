@@ -245,7 +245,7 @@ export default function TranslationProjectClient({
   const unassignedVersions = versions.filter((version) => !version.userId);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div  >
       <PageHeader
         back={{
           href: buildProjectTranslationsPath(translationProject.sourceProject.identifier),

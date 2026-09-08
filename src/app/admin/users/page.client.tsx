@@ -780,7 +780,7 @@ export default function UsersClient({
   // ─── Render ─────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background">
+    <div  >
       <PageHeader title="User Management" description="Manage users, roles, and invitations" />
 
       <div className="container mx-auto px-4 py-4">

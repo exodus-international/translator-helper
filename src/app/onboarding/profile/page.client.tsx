@@ -64,7 +64,7 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <Card className="w-full max-w-lg p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
