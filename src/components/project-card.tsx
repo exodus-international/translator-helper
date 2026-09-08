@@ -48,10 +48,10 @@ export default function ProjectCard({ project }: ProjectCardProps) {
               </Badge>
             )}
           </div>
-          {project.description && <p className="text-sm text-gray-500 line-clamp-2">{project.description}</p>}
+          {project.description && <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>}
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <FileText className="h-4 w-4" />
               <span>{project._count.documents} documents</span>
