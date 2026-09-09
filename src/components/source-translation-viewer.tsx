@@ -14,17 +14,19 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@prisma/client';
-import { Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MarkdownPreview } from '@/components/markdown-preview';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
 import { ThreadSidebar } from './thread-sidebar';
+import { AudioTextPanel } from '@/components/audio-text-panel';
+import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 // SuggestionType enum values
 const SuggestionType = {
   COMMENT: 'COMMENT' as const,
@@ -39,6 +41,9 @@ export interface SourceTranslationViewerHandle {
   exitTranslationEditMode: () => void;
 }
 
+/** Formatted and Review are the old pair; Audio text is offered only where audio applies. */
+type TranslationViewMode = 'formatted' | 'review' | 'audio';
+
 interface SourceTranslationViewerProps {
   variant: ViewerVariant;
   className?: string;
@@ -49,6 +54,15 @@ interface SourceTranslationViewerProps {
   translationFormattedContent?: string;
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /**
+   * Offers the Audio text tab. Resolved on the server from the same eligibility
+   * check that decides whether audio is generated at all, so the tab never
+   * appears on a document that will never have any.
+   */
+  audioTextVersionId?: string | null;
+  /** Set by something outside the viewer (the audio card) asking for a tab. */
+  requestedView?: 'audio' | null;
+  onRequestedViewShown?: () => void;
   onTranslationChange?: (value: string) => void;
   sourceBadge?: ReactNode;
   translationBadge?: ReactNode;
@@ -91,8 +105,16 @@ interface SourceTranslationViewerProps {
   onCreateGeneralThread?: (comment: string) => void;
   disableReopen?: boolean;
   sidebarHeader?: ReactNode;
+  /** Compact one-line rows shown under the header (audio, deploy). */
+  sidebarSummary?: ReactNode;
+  /** Full panels shown in place of the feedback list when the user opens details. */
+  sidebarDetails?: ReactNode;
+  /** Start with the details panels open instead of the feedback list. */
+  sidebarDetailsDefaultOpen?: boolean;
   /** Monaco language for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
+  /** Passed through to the Audio text tab so the sidebar card's badge follows what happens in it. */
+  onAudioTranscriptStateChange?: (state: AudioTranscriptState) => void;
 }
 
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
@@ -124,6 +146,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       translationFormattedContent,
       translationPlaceholder = 'Enter your translation here...',
       translationPreviewEmptyText = '*No content yet...*',
+      audioTextVersionId = null,
+      requestedView = null,
+      onRequestedViewShown,
       onTranslationChange,
       sourceBadge,
       translationBadge,
@@ -149,18 +174,42 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       onCreateGeneralThread,
       disableReopen = false,
       sidebarHeader,
+      sidebarSummary,
+      sidebarDetails,
+      sidebarDetailsDefaultOpen = false,
       contentLanguage = 'markdown',
+      onAudioTranscriptStateChange,
     },
     ref,
   ) {
+    const [sidebarView, setSidebarView] = useState<'threads' | 'details'>(
+      sidebarDetailsDefaultOpen ? 'details' : 'threads',
+    );
     const isZen = layout === 'zen';
     const isYaml = contentLanguage === 'yaml';
-    const { open: sidebarOpen, setOpen: setSidebarOpen, toggleSidebar } = useSidebar();
+    const { open: sidebarOpen, openMobile, setOpenMobile, toggleSidebar } = useSidebar();
+    const isMobile = useIsMobile();
+    // Mobile shows one pane at a time; translation is the working pane, so start there.
+    const [mobilePane, setMobilePane] = useState<'source' | 'translation'>('translation');
     const [mounted, setMounted] = useState(false);
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
     const [sourceViewMode, setSourceViewMode] = useState<'formatted' | 'raw'>('raw');
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
-    const [reviewViewMode, setReviewViewMode] = useState<'formatted' | 'review'>('review');
+    const [reviewViewMode, setReviewViewMode] = useState<TranslationViewMode>('review');
+
+    // The tab strip is not rendered for a YAML document, so an Audio text pane
+    // there would be one with no way back out. Everything that opens the tab
+    // and everything that renders it reads this, not the prop.
+    const audioTabVersionId = isYaml ? null : audioTextVersionId;
+
+    // A request is consumed, not mirrored: the tab strip stays the one place
+    // that knows which tab is open.
+    useEffect(() => {
+      if (requestedView === 'audio' && audioTabVersionId) {
+        setReviewViewMode('audio');
+        onRequestedViewShown?.();
+      }
+    }, [requestedView, audioTabVersionId, onRequestedViewShown]);
     const [isReviewEditing, setIsReviewEditing] = useState(reviewConfig?.editingDefault ?? false);
     const [showSuggestionForm, setShowSuggestionForm] = useState(false);
     const [suggestionFormType, setSuggestionFormType] = useState<SuggestionType>(SuggestionType.COMMENT);
@@ -172,7 +221,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     } | null>(null);
     const [selectedText, setSelectedText] = useState<string>(''); // Store selected text for pre-filling
     const suggestionFormDirtyRef = useRef(false);
+    // The Audio text tab is unmounted the moment another tab is chosen, taking
+    // an unsaved draft with it. Same guard the suggestion form gets.
+    const audioDraftDirtyRef = useRef(false);
     const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+    const [discardKind, setDiscardKind] = useState<'suggestion' | 'audioText'>('suggestion');
     const pendingDiscardActionRef = useRef<(() => void) | null>(null);
     const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
     const translationEditorRef = useRef<any>(null);
@@ -276,6 +329,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
       setActiveThreadId(suggestion.id);
+      if (isMobile) {
+        // The thread list lives in the mobile Sheet; jump back to the
+        // translation pane so the selected suggestion is actually visible.
+        setOpenMobile(false);
+        setMobilePane('translation');
+      }
       try {
         // Only scroll editor for anchored suggestions
         if (
@@ -320,9 +379,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     };
 
     const cardClassName = isZen
-      ? 'p-3 h-full flex flex-col min-w-0 min-h-0'
-      : 'p-0 gap-0 shadow-none h-full flex flex-col min-w-0 min-h-0';
+      ? 'p-3 flex flex-1 flex-col min-w-0 min-h-0'
+      : 'p-0 gap-0 shadow-none flex flex-1 flex-col min-w-0 min-h-0';
     const bodyClassName = isZen ? 'flex-1 min-h-0 overflow-hidden relative' : 'flex-1 min-h-0 overflow-hidden';
+    // Mobile: only the active pane is displayed; desktop keeps both side by side.
+    const paneVisibility = (visible: boolean) => (visible ? 'flex' : 'hidden md:flex');
+    const sourcePaneVisible = !isMobile || mobilePane === 'source';
+    const translationPaneVisible = !isMobile || mobilePane === 'translation';
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -332,8 +395,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
     const enterReviewEditMode = () => {
       if (!reviewConfig?.canEdit) return;
-      setIsReviewEditing(true);
-      setTranslateTab('edit');
+      // Editing the translation replaces the Audio text pane with the editor,
+      // so ask before it takes an unsaved draft with it.
+      requestLeaveAudioText(() => {
+        setIsReviewEditing(true);
+        setTranslateTab('edit');
+      });
     };
 
     const translationEditActions = useMemo(() => {
@@ -377,17 +444,32 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           return;
         }
         pendingDiscardActionRef.current = onConfirmed ?? null;
+        setDiscardKind('suggestion');
         setShowDiscardDialog(true);
       },
       [doCloseSuggestionForm],
     );
 
+    /** Leaving the Audio text tab, once whoever is in it has agreed to lose the draft. */
+    const requestLeaveAudioText = useCallback((proceed: () => void) => {
+      if (!audioDraftDirtyRef.current) {
+        proceed();
+        return;
+      }
+      pendingDiscardActionRef.current = () => {
+        audioDraftDirtyRef.current = false;
+        proceed();
+      };
+      setDiscardKind('audioText');
+      setShowDiscardDialog(true);
+    }, []);
+
     const handleDiscardConfirm = useCallback(() => {
-      doCloseSuggestionForm();
+      if (discardKind === 'suggestion') doCloseSuggestionForm();
       setShowDiscardDialog(false);
       pendingDiscardActionRef.current?.();
       pendingDiscardActionRef.current = null;
-    }, [doCloseSuggestionForm]);
+    }, [doCloseSuggestionForm, discardKind]);
 
     const handleDiscardCancel = useCallback(() => {
       setShowDiscardDialog(false);
@@ -504,6 +586,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     };
 
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
+    // On mobile the panel is the offcanvas Sheet (openMobile); on desktop it's
+    // the docked sidebar (open). "Show panel" must appear whenever it's closed,
+    // otherwise mobile users with a pre-opened desktop state can't reach it.
+    const panelHidden = isMobile ? !openMobile : !sidebarOpen;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
@@ -511,11 +597,31 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
     return (
       <>
-        <div className={cn('grid grid-cols-2 border-0 flex-1 min-w-0', isZen && 'h-full')}>
-          <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
+        <div className={cn('flex min-w-0 flex-1 flex-col border-0 md:grid md:grid-cols-2', isZen && 'h-full')}>
+          {/* Mobile: one pane at a time, toggled by this switcher. Desktop: both panes side by side. */}
+          <Tabs
+            value={mobilePane}
+            onValueChange={(value) => setMobilePane(value as 'source' | 'translation')}
+            className="shrink-0 px-2 pt-2 md:hidden"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="source">Source</TabsTrigger>
+              <TabsTrigger value="translation">Translation</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Card
+            className={cn(
+              cardClassName,
+              'rounded-none border-t-0 border-r-0 pt-1',
+              paneVisibility(sourcePaneVisible),
+            )}
+          >
             <div className="flex h-12 items-center justify-between px-2">
-              <h2 className="text-sm font-semibold">Source (English)</h2>
-              <div className="flex items-center gap-2">
+              {/* The mobile switcher above already names this pane; the language
+                  badge below still travels with the header. */}
+              <h2 className="hidden min-w-0 truncate text-sm font-semibold md:block">Source (English)</h2>
+              <div className="flex flex-1 items-center gap-2 md:flex-none md:justify-end">
                 {!isSourceEditing &&
                   !isYaml &&
                   (mounted ? (
@@ -556,13 +662,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {canEditSource && !isSourceEditing && (
                   <>
                     <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
-                      <Edit className="h-4 w-4 mr-2" />
+                      <Edit />
                       Edit
                     </Button>
                     {/* <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 />
                         Delete
                       </Button>
                     </AlertDialogTrigger>
@@ -584,11 +690,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {isSourceEditing && (
                   <>
                     <Button variant="outline" size="sm" onClick={handleSourceSave} disabled={sourceSaving}>
-                      <Save className="h-4 w-4 mr-2" />
+                      <Save />
                       {sourceSaving ? 'Saving...' : 'Save'}
                     </Button>
                     <Button variant="outline" size="sm" onClick={handleSourceCancel} disabled={sourceSaving}>
-                      <X className="h-4 w-4 mr-2" />
+                      <X />
                       Cancel
                     </Button>
                   </>
@@ -615,9 +721,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   }}
                 />
               ) : !isYaml && sourceViewMode === 'formatted' ? (
-                <div className="prose max-w-none h-full overflow-y-auto p-3">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{sourceFormattedContent}</ReactMarkdown>
-                </div>
+                <MarkdownPreview
+                  content={sourceFormattedContent}
+                  className="prose max-w-none h-full overflow-y-auto p-3"
+                />
               ) : (
                 <RawEditorPane
                   value={sourceContent}
@@ -639,20 +746,26 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             </div>
           </Card>
 
-          <Card className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1')}>
+          <Card
+            className={cn(
+              cardClassName,
+              'rounded-none border-t-0 border-r-0 pt-1',
+              paneVisibility(translationPaneVisible),
+            )}
+          >
             <div className="flex h-12 items-center justify-between px-2">
-              <h2 className="text-sm font-semibold">Translation</h2>
-              <div className="flex items-center gap-2">
+              <h2 className="hidden min-w-0 truncate text-sm font-semibold md:block">Translation</h2>
+              <div className="flex flex-1 items-center gap-2 md:flex-none md:justify-end">
                 {variant === 'translate' ? (
                   isYaml ? null : mounted ? (
                     <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
                       <TabsList>
                         <TabsTrigger value="edit">
-                          <FileEdit className="h-4 w-4 mr-2" />
+                          <FileEdit />
                           Edit
                         </TabsTrigger>
                         <TabsTrigger value="preview">
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Eye />
                           Preview
                         </TabsTrigger>
                       </TabsList>
@@ -667,7 +780,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           translateTab === 'edit' && 'bg-background shadow-sm',
                         )}
                       >
-                        <FileEdit className="h-4 w-4 mr-2" />
+                        <FileEdit />
                         Edit
                       </button>
                       <button
@@ -678,7 +791,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           translateTab === 'preview' && 'bg-background shadow-sm',
                         )}
                       >
-                        <Eye className="h-4 w-4 mr-2" />
+                        <Eye />
                         Preview
                       </button>
                     </div>
@@ -687,7 +800,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   mounted ? (
                     <Tabs
                       value={reviewViewMode}
-                      onValueChange={(value) => setReviewViewMode(value as 'formatted' | 'review')}
+                      onValueChange={(value) => {
+                        const next = value as TranslationViewMode;
+                        if (reviewViewMode === 'audio' && next !== 'audio') {
+                          requestLeaveAudioText(() => setReviewViewMode(next));
+                          return;
+                        }
+                        setReviewViewMode(next);
+                      }}
                     >
                       <TabsList>
                         <TabsTrigger value="formatted">Formatted</TabsTrigger>
@@ -702,6 +822,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                             </Badge>
                           )}
                         </TabsTrigger>
+                        {audioTabVersionId && <TabsTrigger value="audio">Audio text</TabsTrigger>}
                       </TabsList>
                     </Tabs>
                   ) : (
@@ -740,12 +861,18 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {translationBadge}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
-                {hasSidebar && !sidebarOpen && (
-                  <Button variant="outline" size="sm" onClick={toggleSidebar} className="h-7 text-xs">
-                    <PanelRightOpen className="h-3.5 w-3.5 mr-1" />
-                    Show panel
+                {hasSidebar && panelHidden && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSidebar}
+                    className="h-7 text-xs"
+                    aria-label="Show panel"
+                  >
+                    <PanelRightOpen />
+                    <span className="hidden sm:inline">Show panel</span>
                     {openSuggestionsCount > 0 && (
-                      <Badge variant="primary" className="ml-1 h-4 min-w-4 px-1 text-[10px]">
+                      <Badge variant="primary" className="h-4 min-w-4 px-1 text-[10px]">
                         {openSuggestionsCount}
                       </Badge>
                     )}
@@ -788,7 +915,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       />
                     )}
                     {showSuggestionForm && selectedRange && (
-                      <div className="absolute right-4 w-96 bg-green-400 border rounded-lg shadow-lg p-4 z-50">
+                      <div className="absolute inset-x-2 z-50 rounded-lg border bg-background p-4 shadow-lg sm:inset-x-auto sm:right-4 sm:w-96">
                         <SuggestionForm
                           type={suggestionFormType}
                           initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
@@ -802,11 +929,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     )}
                   </div>
                 ) : (
-                  <div className="prose max-w-none h-full overflow-y-auto p-3">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {translationPreview || translationPreviewEmptyText}
-                    </ReactMarkdown>
-                  </div>
+                  <MarkdownPreview
+                    content={translationPreview || translationPreviewEmptyText}
+                    className="prose max-w-none h-full overflow-y-auto p-3"
+                  />
                 )
               ) : isReviewEditing ? (
                 <div className="h-full flex flex-col space-y-2">
@@ -832,10 +958,19 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                   {translationEditActions}
                 </div>
+              ) : audioTabVersionId && reviewViewMode === 'audio' ? (
+                <AudioTextPanel
+                  documentVersionId={audioTabVersionId}
+                  onStateChange={onAudioTranscriptStateChange}
+                  onDirtyChange={(dirty) => {
+                    audioDraftDirtyRef.current = dirty;
+                  }}
+                />
               ) : !isYaml && reviewViewMode === 'formatted' ? (
-                <div className="prose max-w-none h-full overflow-y-auto p-3">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{translationPreview}</ReactMarkdown>
-                </div>
+                <MarkdownPreview
+                  content={translationPreview}
+                  className="prose max-w-none h-full overflow-y-auto p-3"
+                />
               ) : (
                 <div ref={translationContainerRef} className="relative h-full">
                   {selectedUserId ? (
@@ -878,7 +1013,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         />
                       )}
                       {showSuggestionForm && selectedRange && (
-                        <div className="absolute top-4 right-4 w-[75%] bg-white border rounded-lg shadow-lg p-4 z-50">
+                        <div className="absolute inset-x-2 top-2 z-50 rounded-lg border bg-background p-4 shadow-lg sm:inset-x-auto sm:top-4 sm:right-4 sm:w-[75%]">
                           <SuggestionForm
                             type={suggestionFormType}
                             initialProposedText={
@@ -907,9 +1042,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           >
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Discard unsaved suggestion?</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {discardKind === 'audioText' ? 'Discard unsaved audio text?' : 'Discard unsaved suggestion?'}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  You have unsaved changes in your suggestion. Are you sure you want to discard them?
+                  {discardKind === 'audioText'
+                    ? 'The audio text has changes that have not been saved. Leaving this tab loses them.'
+                    : 'You have unsaved changes in your suggestion. Are you sure you want to discard them?'}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -920,21 +1059,54 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </AlertDialog>
         </div>
 
-        {(hasSidebar || sidebarHeader) && (
+        {(hasSidebar || sidebarHeader || sidebarSummary) && (
           <Sidebar side="right" collapsible="offcanvas">
             <SidebarHeader className="p-0 gap-0">
               <div className="px-3 py-2 flex items-center justify-between border-b">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Document info
                 </span>
-                <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)} className="h-7 w-7 p-0">
-                  <PanelRightClose className="h-4 w-4" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleSidebar}
+                  className="h-7 w-7 p-0"
+                  aria-label="Close panel"
+                >
+                  <PanelRightClose />
                 </Button>
               </div>
               {sidebarHeader}
+              {sidebarSummary && (
+                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-white">
+                  {sidebarSummary}
+                  {sidebarDetails && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-full justify-start px-1 text-xs text-muted-foreground"
+                      onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
+                    >
+                      {sidebarView === 'details' ? (
+                        <>
+                          <ChevronDown />
+                          Hide details
+                        </>
+                      ) : (
+                        <>
+                          <ChevronRight />
+                          Open details
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
             </SidebarHeader>
-            {hasSidebar && (
-              <SidebarContent className="p-0">
+            <SidebarContent className="p-0 gap-0">
+              {sidebarView === 'details' && sidebarDetails && <div className="shrink-0">{sidebarDetails}</div>}
+              {hasSidebar && (
+                <div className="flex-1 min-h-[16rem] flex flex-col">
                 <ThreadSidebar
                   suggestions={suggestions}
                   currentUserId={currentUserId || ''}
@@ -950,8 +1122,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   activeThreadId={activeThreadId}
                   disableReopen={disableReopen}
                 />
-              </SidebarContent>
-            )}
+                </div>
+              )}
+            </SidebarContent>
           </Sidebar>
         )}
       </>

@@ -412,7 +412,14 @@ export const KanbanProvider = <
         sensors={sensors}
         {...props}
       >
-        <div className={cn('grid size-full auto-cols-fr grid-flow-col gap-4', className)}>
+        {/* Mobile: fixed-width columns with horizontal scroll (TouchSensor's
+            200ms hold keeps quick swipes scrolling instead of dragging). */}
+        <div
+          className={cn(
+            'grid size-full auto-cols-[min(280px,80vw)] grid-flow-col gap-4 overflow-x-auto md:auto-cols-fr md:overflow-visible',
+            className,
+          )}
+        >
           {columns.map((column) => children(column))}
         </div>
         {typeof window !== 'undefined' &&

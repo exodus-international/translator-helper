@@ -59,6 +59,11 @@ test('Markdown system prompt injects the resolved target language with no leftov
   assert.ok(!system.content.includes('[target language]'), 'no unresolved placeholders');
 });
 
+test('Markdown system prompt requires HTML comments to be kept verbatim so pause markers survive', () => {
+  const [system] = buildTranslationMessages({ ...promptBase, originalFilename: 'reflection.md' });
+  assert.ok(system.content.includes('HTML comments (<!-- ... -->) reproduced verbatim'));
+});
+
 test('Markdown system prompt appends custom language instructions when provided', () => {
   const [system] = buildTranslationMessages({
     ...promptBase,

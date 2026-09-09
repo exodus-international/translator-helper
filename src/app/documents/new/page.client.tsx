@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,13 +13,15 @@ import { LabelsField } from '@/components/document-form/labels-field';
 import { OriginalFilenameField } from '@/components/document-form/original-filename-field';
 import { getContentFormat } from '@/components/document-form/content-format';
 import { validateFilename } from '@/domain/document/validate-filename';
+import { buildDefaultTitle, dayNumberFromFilename, parseDayNumber } from '@/domain/document/document-title';
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import { capture } from '@/lib/analytics';
 import matter from 'gray-matter';
 import { FileText, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import type { DocumentType } from '@prisma/client';
 import { toast } from 'sonner';
 
 interface NewDocumentClientProps {
@@ -26,6 +29,7 @@ interface NewDocumentClientProps {
     id: string;
     name: string;
     status: string;
+    acronym?: string | null;
   }>;
 }
 
@@ -37,6 +41,12 @@ function generateSlug(title: string): string {
   const suffix = Math.random().toString(36).substring(2, 7);
   return base ? `${base}-${suffix}` : '';
 }
+
+// Mirrors `sourceProjectIdentifier` in source-project.types.ts. Checked here
+// because the Create button is not a submit, so the input's `pattern` never
+// runs, and a server action's zod error reaches production as a generic
+// failure rather than something the user can act on.
+const IDENTIFIER_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function extractLabelsFromFrontmatter(frontmatter: Record<string, unknown>): string[] {
   const labels: string[] = [];
@@ -53,10 +63,17 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [mode, setMode] = useState<'upload' | 'create'>('upload');
 
   const [title, setTitle] = useState('');
+  // The file's own title, kept apart from `title` because the composed default
+  // ("SML - DAY 03 - ...") is built from it and the slug stays derived from it.
+  const [baseTitle, setBaseTitle] = useState('');
+  const [dayNumber, setDayNumber] = useState<number | null>(null);
+  // Once the title has been typed in, it stops following the project and type.
+  const [titleEdited, setTitleEdited] = useState(false);
   const [slug, setSlug] = useState('');
   const [content, setContent] = useState('');
   const [sourceProjectId, setSourceProjectId] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectIdentifier, setNewProjectIdentifier] = useState('');
   const [showNewProjectInput, setShowNewProjectInput] = useState(false);
   const [labels, setLabels] = useState<string[]>([]);
   const [deadline, setDeadline] = useState('');
@@ -68,6 +85,22 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
   const filenameError = validateFilename(documentType, originalFilename);
   const contentFormat = getContentFormat(originalFilename);
+  const selectedProjectAcronym = sourceProjects.find((project) => project.id === sourceProjectId)?.acronym ?? null;
+
+  // The acronym belongs to the project and the rule only applies to days, and
+  // both of those are chosen after the file is dropped. So the default title is
+  // recomputed as they change rather than being set once when the file is read.
+  useEffect(() => {
+    if (titleEdited || !baseTitle) return;
+    setTitle(
+      buildDefaultTitle({
+        baseTitle,
+        type: (documentType || null) as DocumentType | null,
+        acronym: selectedProjectAcronym,
+        day: dayNumber,
+      }),
+    );
+  }, [baseTitle, documentType, dayNumber, selectedProjectAcronym, titleEdited]);
 
   const processFile = useCallback((file: File) => {
     setOriginalFilename(file.name);
@@ -82,9 +115,17 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
       setContent(text);
 
-      const extractedTitle = frontmatter.title || file.name.replace(/\.(md|ya?ml)$/i, '');
-      setTitle(String(extractedTitle));
-      setSlug(generateSlug(String(extractedTitle)));
+      const extractedTitle = String(frontmatter.title || file.name.replace(/\.(md|ya?ml)$/i, ''));
+      setBaseTitle(extractedTitle);
+      setTitle(extractedTitle);
+      // Deliberately from the file's own title, not the composed one: the slug
+      // is the document URL and cannot be changed after creation, so it should
+      // not carry the acronym and day prefix.
+      setSlug(generateSlug(extractedTitle));
+      // Frontmatter first, then a bare "13.md". The composed title needs the
+      // number itself, which the `day13` label throws away.
+      setDayNumber(parseDayNumber(frontmatter.day) ?? dayNumberFromFilename(file.name));
+      setTitleEdited(false);
       setLabels(extractLabelsFromFrontmatter(frontmatter));
       if (isYaml) setDocumentType('ROOT_FILE');
       setMode('create');
@@ -130,6 +171,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   };
 
   const handleTitleChange = (value: string) => {
+    setTitleEdited(true);
     setTitle(value);
     setSlug(generateSlug(value));
   };
@@ -139,11 +181,21 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       toast.warning('Please enter a project name');
       return;
     }
+    const identifier = newProjectIdentifier.trim();
+    if (!identifier) {
+      toast.warning('Please enter a project identifier');
+      return;
+    }
+    if (!IDENTIFIER_PATTERN.test(identifier)) {
+      toast.warning('Identifier can only contain lowercase letters, numbers and single dashes');
+      return;
+    }
 
     setCreatingProject(true);
     try {
       const project = await createSourceProjectAction({
         name: newProjectName.trim(),
+        identifier,
       });
       setSourceProjects([
         ...sourceProjects,
@@ -152,6 +204,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       setSourceProjectId(project.id);
       setShowNewProjectInput(false);
       setNewProjectName('');
+      setNewProjectIdentifier('');
       capture('source_project_created', { location: 'document_new' });
     } catch (error: any) {
       console.error('Error creating project:', error);
@@ -159,6 +212,14 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
     } finally {
       setCreatingProject(false);
     }
+  };
+
+  // These inputs sit inside the document form, so Enter would otherwise submit
+  // that instead of creating the project.
+  const handleNewProjectKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    handleCreateProject();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -195,13 +256,8 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">New Document</h1>
-          <p className="text-gray-600">Upload a markdown or YAML file, or create a new document</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader title="New Document" description="Upload a markdown or YAML file, or create a new document" />
 
       <div className="container mx-auto px-4 py-4">
         <Card className="p-4">
@@ -294,22 +350,28 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                         </>
                       ) : (
                         <div className="space-y-2">
+                          <Input
+                            value={newProjectName}
+                            onChange={(e) => setNewProjectName(e.target.value)}
+                            placeholder="Enter project name"
+                            onKeyDown={handleNewProjectKeyDown}
+                          />
+                          <Input
+                            value={newProjectIdentifier}
+                            onChange={(e) => setNewProjectIdentifier(e.target.value)}
+                            placeholder="e.g., exodus90, lent2026"
+                            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                            onKeyDown={handleNewProjectKeyDown}
+                          />
+                          <p className="text-xs text-gray-500">
+                            The identifier is used in document URLs and as the folder name in the content repository.
+                            Lowercase letters, numbers and dashes.
+                          </p>
                           <div className="flex gap-2">
-                            <Input
-                              value={newProjectName}
-                              onChange={(e) => setNewProjectName(e.target.value)}
-                              placeholder="Enter project name"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleCreateProject();
-                                }
-                              }}
-                            />
                             <Button
                               type="button"
                               onClick={handleCreateProject}
-                              disabled={creatingProject || !newProjectName.trim()}
+                              disabled={creatingProject || !newProjectName.trim() || !newProjectIdentifier.trim()}
                             >
                               {creatingProject ? 'Creating...' : 'Create'}
                             </Button>
@@ -319,12 +381,12 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                               onClick={() => {
                                 setShowNewProjectInput(false);
                                 setNewProjectName('');
+                                setNewProjectIdentifier('');
                               }}
                             >
                               Cancel
                             </Button>
                           </div>
-                          <p className="text-xs text-gray-500">Press Enter or click Create to add the project</p>
                         </div>
                       )}
                     </div>

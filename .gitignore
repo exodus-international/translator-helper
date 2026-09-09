@@ -47,3 +47,12 @@ next-env.d.ts
 # Sentry Config File
 .env.sentry-build-plugin
 .fallow/
+
+# Monaco is vendored into public/ by scripts/copy-monaco.mjs on postinstall
+/public/monaco/
+
+# Playwright MCP session artifacts
+.playwright-mcp/
+
+# Staging area for uploaded brand artwork; derived files are committed instead
+generated-images/

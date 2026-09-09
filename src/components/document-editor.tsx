@@ -22,11 +22,12 @@ import {
   StepperTrigger,
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
-import { getCanonicalEditorPath, getStatusStep, isStepCompleted } from '@/lib/document-status';
+import { getStatusStep, isDraftPhase, isStepCompleted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import { useAutoSave } from '@/lib/stores/hooks';
+import { buildProjectPath } from '@/domain/source-project/source-project-url';
 
 function getContentWithoutFrontmatter(text: string) {
   try {
@@ -54,13 +55,13 @@ export function DocumentEditorHeader({
   actions: ReactNode;
 }) {
   return (
-    <div className="border-b bg-white">
-      <div className="px-3 py-1.5 flex items-center justify-between gap-3">
+    <div className="border-b bg-background">
+      <div className="flex flex-col gap-2 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {document.sourceProject && (
             <>
               <Link
-                href={`/projects/${document.sourceProject.id}`}
+                href={buildProjectPath(document.sourceProject.identifier)}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors truncate shrink-0"
               >
                 {document.sourceProject.name}
@@ -69,11 +70,11 @@ export function DocumentEditorHeader({
             </>
           )}
           <h1 className="text-sm font-semibold truncate">{document.title}</h1>
-          <span className="text-xs text-gray-500 shrink-0">
+          <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
             {sourceLanguageName} → {targetLanguageName}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
       </div>
     </div>
   );
@@ -100,7 +101,12 @@ interface ViewerConfig {
   };
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /** Version id when this document is eligible for audio; enables the Audio text tab. */
+  audioTextVersionId?: string | null;
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
+  sidebarSummary?: ReactNode;
+  sidebarDetails?: ReactNode;
+  sidebarDetailsDefaultOpen?: boolean;
   contentLanguage?: 'markdown' | 'yaml';
 }
 
@@ -120,7 +126,11 @@ function EditorViewer({
   reviewConfig,
   translationPlaceholder,
   translationPreviewEmptyText,
+  audioTextVersionId,
   onEditSuggestion,
+  sidebarSummary,
+  sidebarDetails,
+  sidebarDetailsDefaultOpen,
   contentLanguage,
 }: ViewerConfig) {
   const router = useRouter();
@@ -141,6 +151,9 @@ function EditorViewer({
   const isApplyingSuggestion = useEditorStore((s) => s.loading.has('applySuggestion'));
   const isDismissingSuggestion = useEditorStore((s) => s.loading.has('dismissSuggestion'));
   const translationProjectId = useEditorStore((s) => s.translationProjectId);
+  const requestedTranslationView = useEditorStore((s) => s.requestedTranslationView);
+  const requestTranslationView = useEditorStore((s) => s.requestTranslationView);
+  const setAudioTranscriptState = useEditorStore((s) => s.setAudioTranscriptState);
   const openAssignTranslatorDialog = useEditorStore((s) => s.openAssignTranslatorDialog);
   const openAssignReviewerDialog = useEditorStore((s) => s.openAssignReviewerDialog);
   const unassignTranslator = useEditorStore((s) => s.unassignTranslator);
@@ -188,6 +201,10 @@ function EditorViewer({
       translationFormattedContent={translationFormattedContent}
       translationPlaceholder={translationPlaceholder}
       translationPreviewEmptyText={translationPreviewEmptyText}
+      audioTextVersionId={audioTextVersionId}
+      requestedView={requestedTranslationView}
+      onRequestedViewShown={() => requestTranslationView(null)}
+      onAudioTranscriptStateChange={setAudioTranscriptState}
       onTranslationChange={setContent}
       sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
       translationBadge={<Badge variant="secondary">{targetVersion?.language?.name || 'New Translation'}</Badge>}
@@ -212,6 +229,9 @@ function EditorViewer({
       onReply={replySuggestion}
       onCreateGeneralThread={createGeneralThread}
       disableReopen={resolvedDisableReopen}
+      sidebarSummary={sidebarSummary}
+      sidebarDetails={sidebarDetails}
+      sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
       sidebarHeader={
         <DocumentInfoCard
           status={targetVersion?.status}
@@ -299,28 +319,20 @@ function ReloadSuggestionsOnVersionChange() {
   return null;
 }
 
-// Route guard: when the live status drifts out of the current page's responsibility,
-// replace the URL to the canonical editor path. Server-side guards in page.tsx prevent
-// the wrong-page-on-load flash; this handles in-page status transitions.
-function RouteGuardOnStatusChange({
-  documentId,
-  variant,
-}: {
-  documentId: string;
-  variant: 'review' | 'translate';
-}) {
+// The canonical URL carries no editor verb, so a status change never invalidates
+// the address — it invalidates what the server renders at it. Refresh and let the
+// page pick the other editor.
+function RouteGuardOnStatusChange({ variant }: { variant: 'review' | 'translate' }) {
   const router = useRouter();
   const status = useEditorStore((s) => s.targetVersion?.status);
-  const versionId = useEditorStore((s) => s.targetVersion?.id);
-  const languageId = useEditorStore((s) => s.targetVersion?.languageId);
 
   useEffect(() => {
     if (!status) return;
-    const canonical = getCanonicalEditorPath(documentId, status, { versionId, lang: languageId });
-    if (!canonical.startsWith(`/documents/${documentId}/${variant}`)) {
-      router.replace(canonical);
+    const belongsHere = isDraftPhase(status) ? variant === 'translate' : variant === 'review';
+    if (!belongsHere) {
+      router.refresh();
     }
-  }, [router, documentId, variant, status, versionId, languageId]);
+  }, [router, variant, status]);
 
   return null;
 }
@@ -336,7 +348,6 @@ interface DocumentEditorProps {
   targetVersion: any | null;
   initialSuggestions?: any[];
   translationProjectId: string | null;
-  assignmentId: string | null;
 
   // User
   user: SessionUser;
@@ -354,6 +365,8 @@ interface DocumentEditorProps {
   viewerRef?: Ref<SourceTranslationViewerHandle>;
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
+  /** Version id when this document is eligible for audio; enables the Audio text tab. */
+  audioTextVersionId?: string | null;
 
   // Capabilities (value or function of live targetVersion from store)
   canEditSource: CapFn;
@@ -366,6 +379,11 @@ interface DocumentEditorProps {
 
   // Suggestion handler (review-only edit)
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
+
+  // Sidebar summary + details (audio, deploy)
+  sidebarSummary?: ReactNode;
+  sidebarDetails?: ReactNode;
+  sidebarDetailsDefaultOpen?: boolean;
 
   // Details panel
   extraDetails?: ReactNode;
@@ -382,7 +400,6 @@ export function DocumentEditor({
   targetVersion,
   initialSuggestions = [],
   translationProjectId,
-  assignmentId,
   user,
   header,
   fullscreen,
@@ -392,20 +409,29 @@ export function DocumentEditor({
   viewerRef,
   translationPlaceholder,
   translationPreviewEmptyText,
+  audioTextVersionId,
   canEditSource,
   canCreateSuggestions,
   disableReopen,
   reviewConfig,
   onEditSuggestion,
+  sidebarSummary,
+  sidebarDetails,
+  sidebarDetailsDefaultOpen,
   extraDetails,
   activityLogs,
   hideDetails,
   autoSaveDelayMs,
 }: DocumentEditorProps) {
-  const outer = outerClassName ?? (fullscreen ? 'fixed inset-0 bg-white z-50' : 'min-h-screen bg-gray-50');
+  const outer = outerClassName ?? (fullscreen ? 'fixed inset-0 bg-white z-50' : 'bg-gray-50');
   const viewerHeight = fullscreen ? 'h-full' : 'h-[calc(100vh-7.5rem)]';
   const viewerWrapper = fullscreen ? 'h-[calc(100vh-3.5rem)] p-4' : 'border-0';
   const contentLanguage = getEditorLanguage(document.originalFilename ?? '');
+  // The Audio text tab lives in the tab strip a YAML document does not get, so
+  // on one it would be a pane with no way back out. Deciding it once here keeps
+  // the tab, the sidebar card's link to it, and the panel itself answering the
+  // same question.
+  const audioTextTarget = contentLanguage === 'yaml' ? null : (audioTextVersionId ?? null);
 
   return (
     <EditorProvider
@@ -414,11 +440,11 @@ export function DocumentEditor({
       sourceContent={sourceVersion.content}
       initialSuggestions={initialSuggestions}
       translationProjectId={translationProjectId}
-      assignmentId={assignmentId}
+      audioTextVersionId={audioTextTarget}
     >
       {autoSaveDelayMs ? <AutoSaveTrigger delayMs={autoSaveDelayMs} /> : null}
       <ReloadSuggestionsOnVersionChange />
-      <RouteGuardOnStatusChange documentId={document.id} variant={variant} />
+      <RouteGuardOnStatusChange variant={variant} />
 
       <div className={outer}>
         {header}
@@ -437,7 +463,11 @@ export function DocumentEditor({
               reviewConfig={reviewConfig}
               translationPlaceholder={translationPlaceholder}
               translationPreviewEmptyText={translationPreviewEmptyText}
+              audioTextVersionId={audioTextTarget}
               onEditSuggestion={onEditSuggestion}
+              sidebarSummary={sidebarSummary}
+              sidebarDetails={sidebarDetails}
+              sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
               contentLanguage={contentLanguage}
             />
           </div>

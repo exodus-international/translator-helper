@@ -1,5 +1,6 @@
 'use client';
 
+import { UserAvatar } from '@/components/user-avatar';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -165,10 +167,7 @@ const ROLE_OPTIONS = [
   { label: 'User', value: Role.USER },
 ];
 
-function lastActivityColumn(
-  id: 'lastSeenAt' | 'lastDocumentEditAt',
-  label: string,
-): ColumnDef<User> {
+function lastActivityColumn(id: 'lastSeenAt' | 'lastDocumentEditAt', label: string): ColumnDef<User> {
   return {
     id,
     accessorFn: (row) => (row[id] ? new Date(row[id]).getTime() : 0),
@@ -202,10 +201,7 @@ export default function UsersClient({
   );
   // The input stays responsive (nuqs updates its state immediately); only the
   // URL writes are throttled.
-  const [search, setSearch] = useQueryState(
-    'search',
-    parseAsString.withDefault('').withOptions({ throttleMs: 300 }),
-  );
+  const [search, setSearch] = useQueryState('search', parseAsString.withDefault('').withOptions({ throttleMs: 300 }));
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
@@ -573,7 +569,12 @@ export default function UsersClient({
         id: 'name',
         accessorKey: 'name',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
-        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">
+            <UserAvatar name={row.original.name} image={row.original.image} email={row.original.email} size="sm" />
+            <span className="font-medium">{row.original.name}</span>
+          </div>
+        ),
         meta: { label: 'Name' },
       },
       {
@@ -729,6 +730,10 @@ export default function UsersClient({
   const { table } = useDataTable({
     data: searchedUsers,
     columns,
+    // Deliberately client-side (not the server-side list-params stack used by
+    // Documents/Projects): the last-seen / last-edit aggregates need
+    // full-table scans regardless, the admin user count is small, and CSV
+    // export operates on this same filtered/sorted view.
     initialState: {
       pagination: { pageIndex: 0, pageSize: 25 },
       sorting: [{ id: 'languages', desc: false }],
@@ -777,13 +782,8 @@ export default function UsersClient({
   // ─── Render ─────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">User Management</h1>
-          <p className="text-gray-600">Manage users, roles, and invitations</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <PageHeader title="User Management" description="Manage users, roles, and invitations" />
 
       <div className="container mx-auto px-4 py-4">
         <Tabs defaultValue="users">

@@ -73,13 +73,69 @@ export const FOLDERS = ['Exodus90 - 2026', 'Advent 2025'];
 // English is the source language, not a target: nobody is assigned it. The admin
 // UI only ever offers target languages, so an `en` assignment is a state the app
 // cannot produce or manage — seeding one made the users table crash on save.
-export const USERS = [
-  { key: 'admin1', email: 'admin@example.org', name: 'Fr. Thomas More', role: Role.ADMIN, langCodes: ['cs', 'sk'] },
-  { key: 'admin2', email: 'admin2@example.org', name: 'Sarah Mitchell', role: Role.ADMIN, langCodes: ['de', 'fr'] },
-  { key: 'translator1', email: 'translator@example.org', name: 'Jan Novak', role: Role.USER, langCodes: ['cs', 'sk'] },
-  { key: 'translator2', email: 'translator2@example.org', name: 'Maria Schmidt', role: Role.USER, langCodes: ['de'] },
-  { key: 'reviewer1', email: 'reviewer@example.org', name: 'Ivan Horvat', role: Role.USER, langCodes: ['hr', 'sk'] },
-  { key: 'banned1', email: 'banned@example.org', name: 'Peter Zilka', role: Role.USER, langCodes: ['cs'] },
+// A language assignment is also a project role: it grants that role on every
+// translation project in the language.
+export const USERS: {
+  key: string;
+  email: string;
+  name: string;
+  role: Role;
+  languages: { code: string; role: ProjectRole }[];
+}[] = [
+  {
+    key: 'admin1',
+    email: 'admin@example.org',
+    name: 'Fr. Thomas More',
+    role: Role.ADMIN,
+    languages: [
+      { code: 'cs', role: ProjectRole.PROJECT_MANAGER },
+      { code: 'sk', role: ProjectRole.PROJECT_MANAGER },
+    ],
+  },
+  {
+    key: 'admin2',
+    email: 'admin2@example.org',
+    name: 'Sarah Mitchell',
+    role: Role.ADMIN,
+    languages: [
+      { code: 'de', role: ProjectRole.PROJECT_MANAGER },
+      { code: 'fr', role: ProjectRole.PROJECT_MANAGER },
+    ],
+  },
+  {
+    key: 'translator1',
+    email: 'translator@example.org',
+    name: 'Jan Novak',
+    role: Role.USER,
+    languages: [
+      { code: 'cs', role: ProjectRole.EDITOR },
+      { code: 'sk', role: ProjectRole.TRANSLATOR },
+    ],
+  },
+  {
+    key: 'translator2',
+    email: 'translator2@example.org',
+    name: 'Maria Schmidt',
+    role: Role.USER,
+    languages: [{ code: 'de', role: ProjectRole.TRANSLATOR }],
+  },
+  {
+    key: 'reviewer1',
+    email: 'reviewer@example.org',
+    name: 'Ivan Horvat',
+    role: Role.USER,
+    languages: [
+      { code: 'hr', role: ProjectRole.REVIEWER },
+      { code: 'sk', role: ProjectRole.REVIEWER },
+    ],
+  },
+  {
+    key: 'banned1',
+    email: 'banned@example.org',
+    name: 'Peter Zilka',
+    role: Role.USER,
+    languages: [{ code: 'cs', role: ProjectRole.TRANSLATOR }],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -115,60 +171,6 @@ export const SOURCE_PROJECTS = [
     identifier: 'summer2025',
     status: SourceProjectStatus.COMPLETE,
   },
-];
-
-// ---------------------------------------------------------------------------
-// Project Members
-// ---------------------------------------------------------------------------
-
-export const PROJECT_MEMBERS: { tp: string; user: string; role: ProjectRole }[] = [
-  // Exodus90 Czech
-  { tp: 'exodus:cs', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'exodus:cs', user: 'translator1', role: ProjectRole.TRANSLATOR },
-  { tp: 'exodus:cs', user: 'translator1', role: ProjectRole.EDITOR },
-  { tp: 'exodus:cs', user: 'reviewer1', role: ProjectRole.REVIEWER },
-  // Exodus90 Slovak
-  { tp: 'exodus:sk', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'exodus:sk', user: 'translator1', role: ProjectRole.TRANSLATOR },
-  { tp: 'exodus:sk', user: 'reviewer1', role: ProjectRole.REVIEWER },
-  // Exodus90 Croatian
-  { tp: 'exodus:hr', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'exodus:hr', user: 'reviewer1', role: ProjectRole.TRANSLATOR },
-  { tp: 'exodus:hr', user: 'reviewer1', role: ProjectRole.REVIEWER },
-  // Exodus90 German
-  { tp: 'exodus:de', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'exodus:de', user: 'translator2', role: ProjectRole.TRANSLATOR },
-  // Exodus90 French
-  { tp: 'exodus:fr', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
-  // Lent Czech
-  { tp: 'lent:cs', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'lent:cs', user: 'translator1', role: ProjectRole.TRANSLATOR },
-  // Lent Slovak
-  { tp: 'lent:sk', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'lent:sk', user: 'reviewer1', role: ProjectRole.REVIEWER },
-  // Lent German
-  { tp: 'lent:de', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'lent:de', user: 'translator2', role: ProjectRole.TRANSLATOR },
-  // Lent remaining
-  { tp: 'lent:hr', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'lent:fr', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
-  // Advent
-  { tp: 'advent:cs', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'advent:cs', user: 'translator1', role: ProjectRole.TRANSLATOR },
-  { tp: 'advent:sk', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'advent:sk', user: 'reviewer1', role: ProjectRole.TRANSLATOR },
-  { tp: 'advent:hr', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'advent:de', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'advent:fr', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
-  // Retreat
-  { tp: 'retreat:cs', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'retreat:cs', user: 'translator1', role: ProjectRole.TRANSLATOR },
-  { tp: 'retreat:sk', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'retreat:sk', user: 'reviewer1', role: ProjectRole.TRANSLATOR },
-  { tp: 'retreat:hr', user: 'admin1', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'retreat:hr', user: 'reviewer1', role: ProjectRole.TRANSLATOR },
-  { tp: 'retreat:de', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
-  { tp: 'retreat:fr', user: 'admin2', role: ProjectRole.PROJECT_MANAGER },
 ];
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { DocumentType } from '@prisma/client';
 import { z } from 'zod';
+import { isReservedSlug } from './document-url';
 import { validateFilename } from './validate-filename';
 
 /**
@@ -23,7 +24,10 @@ export const createDocumentSchema = z
     slug: z
       .string()
       .min(1)
-      .regex(/^[a-z0-9\-]+$/),
+      .regex(/^[a-z0-9\-]+$/)
+      // A static route claims these at the same position, so a document with
+      // one of them as its slug would be unreachable at its own URL.
+      .refine((slug) => !isReservedSlug(slug), 'This slug is reserved'),
     title: z.string().min(1),
     content: z.string(),
     sourceProjectId: z.string().uuid('Source project is required'),

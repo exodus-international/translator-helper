@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import { applyTextEditAtRange, isRangeWithinBounds } from '@/lib/text-range';
 import { DiffEditor } from '@monaco-editor/react';
+import './monaco-selfhost';
 import { useEffect, useRef, useState } from 'react';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
 

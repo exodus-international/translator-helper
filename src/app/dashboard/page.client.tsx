@@ -3,23 +3,30 @@
 import { useActiveLanguage } from '@/components/analytics-project-group';
 import { AnnouncementBanner, AnnouncementBannerData } from '@/components/announcement-banner';
 import { AnnouncementModal, AnnouncementModalData } from '@/components/announcement-modal';
+import { DocumentTypeBadge } from '@/components/document-type-badge';
+import { buildDocumentPath } from '@/domain/document/document-url';
 import ProjectCard from '@/components/project-card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { PageHeader } from '@/components/page-header';
+import { UserAvatar } from '@/components/user-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import {
+  ProjectFormFields,
+  isProjectFormComplete,
+  toCreateProjectInput,
+  useProjectForm,
+} from '@/components/project-form';
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus, DocumentType } from '@prisma/client';
 import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -30,13 +37,16 @@ type VersionWithDetails = {
   id: string;
   status: DocumentStatus;
   updatedAt: string | Date;
+  deadline: string | Date | null;
   document: {
     id: string;
     title: string;
     slug: string;
+    type: DocumentType | null;
     sourceProject: {
       id: string;
       name: string;
+      identifier: string;
     } | null;
   };
   language: {
@@ -48,11 +58,13 @@ type VersionWithDetails = {
     id: string;
     name: string | null;
     email: string;
+    image: string | null;
   } | null;
   reviewer: {
     id: string;
     name: string | null;
     email: string;
+    image: string | null;
   } | null;
 };
 
@@ -60,6 +72,7 @@ interface DashboardClientProps {
   user: SessionUser;
   projects: {
     id: string;
+    identifier: string;
     name: string;
     description: string | null;
     status: string;
@@ -74,71 +87,19 @@ interface DashboardClientProps {
         id: string;
         name: string;
         code: string;
+        users: {
+          userId: string;
+        }[];
       };
-      members: {
-        userId: string;
-      }[];
     }[];
   }[];
-  assignments: {
-    id: string;
-    documentId: string;
-    deadline: string | Date | null;
-    document: {
-      id: string;
-      title: string;
-      slug: string;
-      sourceProject: {
-        id: string;
-        name: string;
-      } | null;
-      versions: {
-        id: string;
-        status: DocumentStatus;
-        languageId: string;
-        language: {
-          id: string;
-          name: string;
-          code: string;
-        };
-      }[];
-    };
-    translationProject: {
-      id: string;
-      language: {
-        id: string;
-        name: string;
-        code: string;
-      };
-      sourceProject: {
-        id: string;
-        name: string;
-      };
-    };
-  }[];
+  /** The user's active work — versions they translate or review, minus terminal statuses. */
+  workVersions: VersionWithDetails[];
   approvedVersions: VersionWithDetails[];
-  reviewAssignments: VersionWithDetails[];
-  translatingVersions: VersionWithDetails[];
   announcements: {
     banner: AnnouncementBannerData | null;
     modal: AnnouncementModalData | null;
   };
-}
-
-function getDocumentUrl(assignment: DashboardClientProps['assignments'][number]): string {
-  const doc = assignment.document;
-  const langId = assignment.translationProject.language.id;
-  const version = doc.versions.find((v) => v.languageId === langId);
-
-  if (!version) {
-    return `/documents/${doc.id}/translate?lang=${langId}`;
-  }
-
-  if (version.status === DocumentStatus.PENDING_TRANSLATION || version.status === DocumentStatus.IN_PROGRESS) {
-    return `/documents/${doc.id}/translate?lang=${langId}&version=${version.id}`;
-  }
-
-  return `/documents/${doc.id}/review?version=${version.id}`;
 }
 
 const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -147,102 +108,114 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
 });
 
 function getVersionUrl(version: VersionWithDetails): string {
-  if (version.status === DocumentStatus.PENDING_TRANSLATION || version.status === DocumentStatus.IN_PROGRESS) {
-    return `/documents/${version.document.id}/translate?lang=${version.language.id}&version=${version.id}`;
-  }
-  return `/documents/${version.document.id}/review?version=${version.id}`;
+  return buildDocumentPath({
+    projectIdentifier: version.document.sourceProject?.identifier,
+    slug: version.document.slug,
+    languageCode: version.language.code,
+    documentId: version.document.id,
+  });
 }
 
 type WorkItem = {
   key: string;
   documentId: string;
   documentTitle: string;
+  documentType: DocumentType | null;
   projectName: string | null;
   languageName: string;
   role: 'Translator' | 'Reviewer';
   status: DocumentStatus | null;
+  /** Whether this status is actionable by the user in their role right now. */
+  isMyTurn: boolean;
   deadline: Date | string | null;
   url: string;
-  translatorName: string | null;
-  reviewerName: string | null;
+  translator: Person | null;
+  reviewer: Person | null;
+  /** Whether the current user is the translator / reviewer, to flag the "you" cell. */
+  translatorIsYou: boolean;
+  reviewerIsYou: boolean;
 };
 
-function buildWorkItems(
-  translatingVersions: VersionWithDetails[],
-  reviewAssignments: VersionWithDetails[],
-  assignments: DashboardClientProps['assignments'],
-): WorkItem[] {
-  const itemMap = new Map<string, WorkItem>();
+/** Just enough of someone to show their face and their name. */
+type Person = { name: string | null; email: string; image: string | null };
 
-  // 1. Add translating versions as Translator entries
-  for (const v of translatingVersions) {
-    const key = `${v.document.id}:${v.language.id}`;
-    itemMap.set(key, {
-      key,
-      documentId: v.document.id,
-      documentTitle: v.document.title,
-      projectName: v.document.sourceProject?.name ?? null,
-      languageName: v.language.name,
-      role: 'Translator',
-      status: v.status,
-      deadline: null,
-      url: getVersionUrl(v),
-      translatorName: v.user?.name ?? null,
-      reviewerName: v.reviewer?.name ?? null,
-    });
+function toPerson(
+  user: { name: string | null; email: string; image?: string | null } | null | undefined,
+): Person | null {
+  return user ? { name: user.name, email: user.email, image: user.image ?? null } : null;
+}
+
+/** A person in a table cell, with the badge that marks the reader as that person. */
+function PersonCell({ person, isYou }: { person: Person | null; isYou?: boolean }) {
+  if (!person) return <span className="text-sm text-muted-foreground">{'\u2014'}</span>;
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <UserAvatar name={person.name} image={person.image} email={person.email} size="xs" />
+      <span className="text-sm text-muted-foreground">{person.name}</span>
+      {isYou && (
+        <Badge variant="primary" appearance="light" size="xs">
+          You
+        </Badge>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Whether the work sits with the user right now. A translator acts while the
+ * document is being translated; a reviewer acts once it is submitted. Terminal
+ * statuses never reach here — they are filtered out server-side.
+ */
+function isActionable(role: WorkItem['role'], status: DocumentStatus): boolean {
+  if (role === 'Reviewer') {
+    return status === DocumentStatus.PENDING_REVIEW;
   }
+  return status === DocumentStatus.PENDING_TRANSLATION || status === DocumentStatus.IN_PROGRESS;
+}
 
-  // 2. Add review assignments as Reviewer entries
-  for (const v of reviewAssignments) {
-    const key = `${v.document.id}:${v.language.id}:reviewer`;
-    itemMap.set(key, {
-      key,
-      documentId: v.document.id,
-      documentTitle: v.document.title,
-      projectName: v.document.sourceProject?.name ?? null,
-      languageName: v.language.name,
-      role: 'Reviewer',
-      status: v.status,
-      deadline: null,
-      url: `/documents/${v.document.id}/review?version=${v.id}`,
-      translatorName: v.user?.name ?? null,
-      reviewerName: v.reviewer?.name ?? null,
-    });
-  }
+/** A version is all a work item needs now that assignment lives on it. */
+function toWorkItem(version: VersionWithDetails, role: WorkItem['role'], key: string, userId: string): WorkItem {
+  return {
+    key,
+    documentId: version.document.id,
+    documentTitle: version.document.title,
+    documentType: version.document.type,
+    projectName: version.document.sourceProject?.name ?? null,
+    languageName: version.language.name,
+    role,
+    status: version.status,
+    isMyTurn: isActionable(role, version.status),
+    deadline: version.deadline,
+    url: getVersionUrl(version),
+    translator: toPerson(version.user),
+    reviewer: toPerson(version.reviewer),
+    translatorIsYou: version.user?.id === userId,
+    reviewerIsYou: version.reviewer?.id === userId,
+  };
+}
 
-  // 3. Merge assignments — enrich existing or add new
-  for (const a of assignments) {
-    const langId = a.translationProject.language.id;
-    const key = `${a.document.id}:${langId}`;
-    const existing = itemMap.get(key);
+/**
+ * Turns the user's active versions into work items. A single version can be both
+ * translated and reviewed by the same person, so each role it matches becomes its
+ * own row.
+ */
+function buildWorkItems(versions: VersionWithDetails[], userId: string): WorkItem[] {
+  const items: WorkItem[] = [];
 
-    if (existing) {
-      // Enrich with deadline from assignment
-      existing.deadline = a.deadline;
-    } else {
-      // Not yet present — add as new translator entry
-      const version = a.document.versions.find((v) => v.languageId === langId);
-      const status = version?.status ?? null;
-      const url = getDocumentUrl(a);
-
-      itemMap.set(key, {
-        key,
-        documentId: a.document.id,
-        documentTitle: a.document.title,
-        projectName: a.translationProject.sourceProject?.name ?? null,
-        languageName: a.translationProject.language.name,
-        role: 'Translator',
-        status,
-        deadline: a.deadline,
-        url,
-        translatorName: null,
-        reviewerName: null,
-      });
+  for (const v of versions) {
+    if (v.user?.id === userId) {
+      const key = `${v.document.id}:${v.language.id}`;
+      items.push(toWorkItem(v, 'Translator', key, userId));
+    }
+    if (v.reviewer?.id === userId) {
+      const key = `${v.document.id}:${v.language.id}:reviewer`;
+      items.push(toWorkItem(v, 'Reviewer', key, userId));
     }
   }
 
   // Sort: deadline first (earliest), then nulls last
-  return Array.from(itemMap.values()).sort((a, b) => {
+  return items.sort((a, b) => {
     if (a.deadline && b.deadline) {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     }
@@ -254,13 +227,100 @@ function buildWorkItems(
 
 const headClass = 'text-[11px] uppercase tracking-wider text-muted-foreground font-medium';
 
+/** The "My Work" table, shared by the "needs you" and "waiting on others" groups. */
+function WorkTable({ items, onNavigate }: { items: WorkItem[]; onNavigate: (url: string) => void }) {
+  return (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className={headClass}>Document</TableHead>
+            <TableHead className={headClass}>Type</TableHead>
+            <TableHead className={headClass}>Project</TableHead>
+            <TableHead className={headClass}>Language</TableHead>
+            <TableHead className={headClass}>Translator</TableHead>
+            <TableHead className={headClass}>Reviewer</TableHead>
+            <TableHead className={headClass}>Status</TableHead>
+            <TableHead className={headClass}>Deadline</TableHead>
+            <TableHead className="w-[60px]" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => {
+            const statusConfig = item.status ? DOCUMENT_STATUS_CONFIGS[item.status] : null;
+
+            return (
+              <TableRow key={item.key} className="group cursor-pointer" onClick={() => onNavigate(item.url)}>
+                <TableCell>
+                  <span className="font-medium text-sm">{item.documentTitle}</span>
+                </TableCell>
+                <TableCell>
+                  {item.documentType ? (
+                    <DocumentTypeBadge type={item.documentType} />
+                  ) : (
+                    <span className="text-sm text-muted-foreground">{'—'}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm text-muted-foreground">{item.projectName ?? '—'}</span>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm font-medium">{item.languageName}</span>
+                </TableCell>
+                <TableCell>
+                  <PersonCell person={item.translator} isYou={item.translatorIsYou} />
+                </TableCell>
+                <TableCell>
+                  <PersonCell person={item.reviewer} isYou={item.reviewerIsYou} />
+                </TableCell>
+                <TableCell>
+                  {statusConfig ? (
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: statusConfig.color.hex }} />
+                      {statusConfig.name}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border border-gray-200 bg-gray-50 text-gray-500">
+                      Not started
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {item.deadline ? (
+                    <span className="text-sm text-muted-foreground">
+                      {shortDateFormatter.format(new Date(item.deadline))}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">{'—'}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Link href={item.url} onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {item.role === 'Reviewer' ? <Eye className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                    </Button>
+                  </Link>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
 export default function DashboardClient({
   user,
   projects,
-  assignments,
+  workVersions,
   approvedVersions,
-  reviewAssignments,
-  translatingVersions,
   announcements,
 }: DashboardClientProps) {
   const router = useRouter();
@@ -282,10 +342,9 @@ export default function DashboardClient({
       }
     }
   };
-  const workItems = useMemo(
-    () => buildWorkItems(translatingVersions, reviewAssignments, assignments),
-    [translatingVersions, reviewAssignments, assignments],
-  );
+  const workItems = useMemo(() => buildWorkItems(workVersions, user.id), [workVersions, user.id]);
+  const needsYouItems = useMemo(() => workItems.filter((item) => item.isMyTurn), [workItems]);
+  const waitingItems = useMemo(() => workItems.filter((item) => !item.isMyTurn), [workItems]);
 
   const deployLanguages = useMemo(() => {
     const langMap = new Map<string, { name: string; code: string }>();
@@ -309,26 +368,18 @@ export default function DashboardClient({
 
   // Create project dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDescription, setNewProjectDescription] = useState('');
-  const [newProjectIdentifier, setNewProjectIdentifier] = useState('');
+  const { values: newProject, set: setNewProject, reset: resetNewProject } = useProjectForm();
   const [createLoading, setCreateLoading] = useState(false);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateLoading(true);
     try {
-      await createSourceProjectAction({
-        name: newProjectName,
-        description: newProjectDescription || null,
-        identifier: newProjectIdentifier || null,
-      });
+      await createSourceProjectAction(toCreateProjectInput(newProject));
       capture('source_project_created', { location: 'dashboard' });
       toast.success('Project created');
       setCreateDialogOpen(false);
-      setNewProjectName('');
-      setNewProjectDescription('');
-      setNewProjectIdentifier('');
+      resetNewProject();
       router.refresh();
     } catch (error: any) {
       console.error('Error creating project:', error);
@@ -351,41 +402,26 @@ export default function DashboardClient({
     <>
       {announcements.banner && <AnnouncementBanner announcement={announcements.banner} />}
       {announcements.modal && <AnnouncementModal announcement={announcements.modal} />}
-      <div className="min-h-screen bg-gray-50">
-        <div className="border-b bg-white">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div>
-                  <h1 className="text-2xl font-bold">Dashboard</h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Avatar size="sm" name={user.name || undefined}>
-                      <AvatarFallback name={user.name || undefined}>
-                        {user.name
-                          .split(' ')
-                          .map((name) => name.charAt(0))
-                          .join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <p className="text-gray-600">Welcome back, {user.name}</p>
-                  </div>
-                </div>
-              </div>
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          title="Dashboard"
+          description={
+            <div className="flex items-center gap-2">
+              <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
+              <span>Welcome back, {user.name}</span>
             </div>
-
-            <div className="mt-4">
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
+          }
+        >
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        </div>
+        </PageHeader>
 
         <div className="container mx-auto px-4 py-6 space-y-8">
           {/* Projects section */}
@@ -400,11 +436,7 @@ export default function DashboardClient({
                     if (open) {
                       capture('dialog_opened', { dialog: 'create_source_project' });
                     }
-                    if (!open) {
-                      setNewProjectName('');
-                      setNewProjectDescription('');
-                      setNewProjectIdentifier('');
-                    }
+                    if (!open) resetNewProject();
                   }}
                 >
                   <DialogTrigger asChild>
@@ -418,46 +450,12 @@ export default function DashboardClient({
                       <DialogTitle>Create New Project</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleCreateProject} className="space-y-4">
-                      <div>
-                        <Label htmlFor="new-project-name">Project Name *</Label>
-                        <Input
-                          id="new-project-name"
-                          value={newProjectName}
-                          onChange={(e) => setNewProjectName(e.target.value)}
-                          placeholder="e.g., Exodus90, Daily Readings"
-                          required
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new-project-description">Description</Label>
-                        <Textarea
-                          id="new-project-description"
-                          value={newProjectDescription}
-                          onChange={(e) => setNewProjectDescription(e.target.value)}
-                          placeholder="Optional description of the project"
-                          rows={3}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="new-project-identifier">Repository Identifier</Label>
-                        <Input
-                          id="new-project-identifier"
-                          value={newProjectIdentifier}
-                          onChange={(e) => setNewProjectIdentifier(e.target.value)}
-                          placeholder="e.g., exodus90, lent2026"
-                          className="mt-1"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          GITHUB: Folder name in the content repository
-                        </p>
-                      </div>
+                      <ProjectFormFields values={newProject} onChange={setNewProject} idPrefix="new-project" />
                       <div className="flex justify-end gap-2">
                         <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={createLoading || !newProjectName.trim()}>
+                        <Button type="submit" disabled={createLoading || !isProjectFormComplete(newProject)}>
                           {createLoading ? 'Creating...' : 'Create Project'}
                         </Button>
                       </div>
@@ -513,6 +511,7 @@ export default function DashboardClient({
                   <TableHeader>
                     <TableRow>
                       <TableHead className={headClass}>Document</TableHead>
+                      <TableHead className={headClass}>Type</TableHead>
                       <TableHead className={headClass}>Project</TableHead>
                       <TableHead className={headClass}>Language</TableHead>
                       <TableHead className={headClass}>Translator</TableHead>
@@ -523,12 +522,19 @@ export default function DashboardClient({
                   </TableHeader>
                   <TableBody>
                     {filteredApprovedVersions.map((version) => {
-                      const url = `/documents/${version.document.id}/review?version=${version.id}`;
+                      const url = getVersionUrl(version);
                       const statusConfig = DOCUMENT_STATUS_CONFIGS[version.status];
                       return (
                         <TableRow key={version.id} className="group cursor-pointer" onClick={() => router.push(url)}>
                           <TableCell>
                             <span className="font-medium text-sm">{version.document.title}</span>
+                          </TableCell>
+                          <TableCell>
+                            {version.document.type ? (
+                              <DocumentTypeBadge type={version.document.type} />
+                            ) : (
+                              <span className="text-sm text-muted-foreground">{'\u2014'}</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-muted-foreground">
@@ -539,10 +545,10 @@ export default function DashboardClient({
                             <span className="text-sm font-medium">{version.language.name}</span>
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-muted-foreground">{version.user?.name ?? '\u2014'}</span>
+                            <PersonCell person={toPerson(version.user)} />
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm text-muted-foreground">{version.reviewer?.name ?? '\u2014'}</span>
+                            <PersonCell person={toPerson(version.reviewer)} />
                           </TableCell>
                           <TableCell>
                             <span
@@ -591,88 +597,32 @@ export default function DashboardClient({
                 <p className="text-gray-500">No active work assigned to you</p>
               </div>
             ) : (
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className={headClass}>Document</TableHead>
-                      <TableHead className={headClass}>Project</TableHead>
-                      <TableHead className={headClass}>Language</TableHead>
-                      <TableHead className={headClass}>Translator</TableHead>
-                      <TableHead className={headClass}>Reviewer</TableHead>
-                      <TableHead className={headClass}>Status</TableHead>
-                      <TableHead className={headClass}>Deadline</TableHead>
-                      <TableHead className="w-[60px]" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {workItems.map((item) => {
-                      const statusConfig = item.status ? DOCUMENT_STATUS_CONFIGS[item.status] : null;
-
-                      return (
-                        <TableRow key={item.key} className="group cursor-pointer" onClick={() => router.push(item.url)}>
-                          <TableCell>
-                            <span className="font-medium text-sm">{item.documentTitle}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">{item.projectName ?? '\u2014'}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm font-medium">{item.languageName}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">{item.translatorName ?? '\u2014'}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">{item.reviewerName ?? '\u2014'}</span>
-                          </TableCell>
-                          <TableCell>
-                            {statusConfig ? (
-                              <span
-                                className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 ${statusConfig.color.badgeClass}`}
-                              >
-                                <span
-                                  className="h-1.5 w-1.5 rounded-full"
-                                  style={{ backgroundColor: statusConfig.color.hex }}
-                                />
-                                {statusConfig.name}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border border-gray-200 bg-gray-50 text-gray-500">
-                                Not started
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {item.deadline ? (
-                              <span className="text-sm text-muted-foreground">
-                                {shortDateFormatter.format(new Date(item.deadline))}
-                              </span>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">{'\u2014'}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Link href={item.url} onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                {item.role === 'Reviewer' ? (
-                                  <Eye className="h-4 w-4" />
-                                ) : (
-                                  <ArrowRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </Link>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </Card>
+              <div className="space-y-6">
+                {needsYouItems.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">
+                      Needs you
+                      <Badge variant="secondary" size="sm" className="ml-2">
+                        {needsYouItems.length}
+                      </Badge>
+                    </h3>
+                    <WorkTable items={needsYouItems} onNavigate={(url) => router.push(url)} />
+                  </div>
+                )}
+                {waitingItems.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                      Waiting on others
+                      <Badge variant="secondary" size="sm" className="ml-2">
+                        {waitingItems.length}
+                      </Badge>
+                    </h3>
+                    <div className="opacity-60">
+                      <WorkTable items={waitingItems} onNavigate={(url) => router.push(url)} />
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </section>
         </div>

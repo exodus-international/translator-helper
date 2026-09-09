@@ -1,5 +1,6 @@
 'use client';
 
+import { UserAvatar } from '@/components/user-avatar';
 import { SuggestionStatus, SuggestionType } from '@prisma/client';
 import { Check, MessageSquare, Pencil, PencilLine, RotateCcw, X } from 'lucide-react';
 import { useState } from 'react';
@@ -118,6 +119,7 @@ export function ThreadCard({
         ) : (
           <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
         )}
+        <UserAvatar name={suggestion.user.name} image={suggestion.user.image} email={suggestion.user.email} size="xs" />
         <span className="font-medium truncate">{suggestion.user.name}</span>
         <span className="text-muted-foreground">·</span>
         <span
@@ -180,7 +182,8 @@ export function ThreadCard({
         <div className="mt-2 space-y-1.5 pl-3 border-l-2 border-gray-200">
           {replies.map((reply) => (
             <div key={reply.id} className="text-xs">
-              <div className="flex items-baseline gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <UserAvatar name={reply.user.name} image={reply.user.image} email={reply.user.email} size="xs" />
                 <span className="font-medium">{reply.user.name}</span>
                 <span className="text-muted-foreground">{formatTimeAgo(reply.createdAt)}</span>
               </div>

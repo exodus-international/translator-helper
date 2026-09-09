@@ -2,6 +2,7 @@
 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DOCUMENT_TYPE_CONFIGS, DOCUMENT_TYPE_SEQUENCE } from '@/constants/document-type';
 
 interface DocumentTypeSelectProps {
   value: string;
@@ -17,11 +18,11 @@ export function DocumentTypeSelect({ value, onChange }: DocumentTypeSelectProps)
           <SelectValue placeholder="Select type (optional)" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="DAY">Day</SelectItem>
-          <SelectItem value="FIELD_GUIDE">Field Guide</SelectItem>
-          <SelectItem value="DAILY_CONTENT">Daily Content</SelectItem>
-          <SelectItem value="ROOT_FILE">Root File</SelectItem>
-          <SelectItem value="MEETING">Meeting</SelectItem>
+          {DOCUMENT_TYPE_SEQUENCE.map((type) => (
+            <SelectItem key={type} value={type}>
+              {DOCUMENT_TYPE_CONFIGS[type].name}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

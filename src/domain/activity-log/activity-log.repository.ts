@@ -1,3 +1,4 @@
+import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 
 export async function createActivityLog(data: {
@@ -15,12 +16,7 @@ export async function createActivityLog(data: {
     },
     include: {
       user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-        },
+        ...userBrief,
       },
     },
   });
@@ -52,12 +48,7 @@ export async function coalesceEditLog(data: {
       },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
+          ...userBrief,
         },
       },
     });

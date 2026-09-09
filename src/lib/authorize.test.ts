@@ -163,6 +163,39 @@ describe('authorize', () => {
     });
   });
 
+  describe('language-based access', () => {
+    it('the same language role applies to every project in that language', async () => {
+      // getUserRolesInProject resolves the role from the project's language, so a
+      // Czech Reviewer is a reviewer on every Czech project — including ones created
+      // after they were assigned the language.
+      const authorize = createAuthorize(createDeps({
+        getUserRolesInProject: async () => [ProjectRole.REVIEWER],
+      }));
+      for (const project of ['czech-exodus', 'czech-lectio', 'czech-brand-new']) {
+        const result = await authorize({ project, role: 'reviewer' });
+        assert.deepStrictEqual(result.projectRoles, [ProjectRole.REVIEWER]);
+      }
+    });
+
+    it('a user resolves to at most one role per project', async () => {
+      const authorize = createAuthorize(createDeps({
+        getUserRolesInProject: async () => [ProjectRole.EDITOR],
+      }));
+      const result = await authorize({ project: 'proj-1', role: 'reviewer' });
+      assert.equal(result.projectRoles?.length, 1);
+    });
+
+    it('a user without the project language is denied', async () => {
+      const authorize = createAuthorize(createDeps({
+        getUserRolesInProject: async () => [],
+      }));
+      await assert.rejects(
+        () => authorize({ project: 'german-exodus', role: 'translator' }),
+        { message: "Forbidden: requires 'translator' permission in project" },
+      );
+    });
+  });
+
   describe('role hierarchy correctness', () => {
     it('PROJECT_MANAGER passes all permission roles', async () => {
       const authorize = createAuthorize(createDeps({

@@ -1,10 +1,12 @@
 'use server';
 
+import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { type SessionUser } from '@/lib/session';
-import { DocumentStatus, ProjectRole, Role } from '@prisma/client';
+import { DocumentStatus, Role } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import type { AudioGenerationOutcome } from '../audio/audio.types';
 
 /**
  * Load a version + its language and assert the caller may edit/delete a source
@@ -30,25 +32,30 @@ async function loadVersionAndGateSourceEdits(id: string, user: SessionUser) {
 }
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
+import { assertCanEditDocumentVersion } from './document-version.permissions';
 import { validateTransition } from './document-version.transitions';
-import { getDocumentAssignmentByDocumentAndProject } from '../document-assignment/document-assignment.repository';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
-import { createProjectMember } from '../project-member/project-member.repository';
+import { getUserRoleForLanguage } from '../user-language/user-language.repository';
 import { getSourceProjectById } from '../source-project/source-project.repository';
 import {
   createTranslationProject,
   getTranslationProjectBySourceAndLanguage,
 } from '../translation-project/translation-project.repository';
 import {
+  assignDocumentVersion,
+  assignmentSelect,
   createDocumentVersion,
   deleteDocumentVersion,
+  getWorkVersionsForUser,
   getDocumentVersionByDocumentAndLanguage,
   getDocumentVersionById,
+  listVersionsForTranslationProject,
   updateDocumentVersion,
   updateDocumentVersionStatus,
 } from './document-version.repository';
 import {
+  assignTranslatorToVersionSchema,
   createDocumentVersionSchema,
   submitForReviewSchema,
   updateDocumentVersionSchema,
@@ -62,13 +69,70 @@ export async function assignReviewerToVersionAction(versionId: string, reviewerI
     data: { reviewerId },
     include: {
       language: true,
-      user: { select: { id: true, name: true, email: true } },
-      reviewer: { select: { id: true, name: true, email: true } },
+      user: userBrief,
+      reviewer: userBrief,
     },
   });
 
-  revalidatePath(`/documents/${version.documentId}`, 'layout');
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   return version;
+}
+
+/**
+ * Assigns a translator and deadline for a document in a translation project's
+ * language, creating the version if the document has none yet. Replaces the
+ * former create/update DocumentAssignment actions.
+ */
+export async function assignTranslatorToVersionAction(input: unknown) {
+  const validated = assignTranslatorToVersionSchema.parse(input);
+
+  const { user } = await authorize({ project: validated.translationProjectId, role: 'manager' });
+
+  const translationProject = await prisma.translationProject.findUnique({
+    where: { id: validated.translationProjectId },
+    select: { languageId: true },
+  });
+  if (!translationProject) {
+    throw new Error('Translation project not found');
+  }
+
+  const version = await assignDocumentVersion({
+    documentId: validated.documentId,
+    languageId: translationProject.languageId,
+    userId: validated.userId ?? null,
+    deadline: validated.deadline ?? null,
+    assignedById: user.id,
+  });
+
+  revalidatePath('/dashboard');
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
+  return version;
+}
+
+/** Everything the signed-in user is assigned to translate. */
+/**
+ * The current user's active work — versions they translate or review, minus
+ * terminal statuses. The dashboard splits these into "needs you" and "waiting
+ * on others" from each row's role and status.
+ */
+export async function getWorkVersionsForUserAction() {
+  const { user } = await authorize('authenticated');
+  return await getWorkVersionsForUser(user.id);
+}
+
+/** The versions that make up a translation project — one per document. */
+export async function listVersionsForTranslationProjectAction(translationProjectId: string) {
+  await authorize({ project: translationProjectId, role: 'member' });
+
+  const translationProject = await prisma.translationProject.findUnique({
+    where: { id: translationProjectId },
+    select: { sourceProjectId: true, languageId: true },
+  });
+  if (!translationProject) {
+    throw new Error('Translation project not found');
+  }
+
+  return await listVersionsForTranslationProject(translationProject.sourceProjectId, translationProject.languageId);
 }
 
 export async function createDocumentVersionAction(input: unknown) {
@@ -97,32 +161,7 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = updateDocumentVersionSchema.parse(input);
 
-  const { version: existingVersion, isSourceEnglish } = await loadVersionAndGateSourceEdits(id, user);
-
-  if (!isSourceEnglish) {
-    // For translation versions, use existing permission logic
-    const document = await getDocumentById(existingVersion.documentId);
-    if (!document) {
-      throw new Error('Document not found');
-    }
-    if (!document.sourceProject?.id) {
-      throw new Error(
-        'This document is not associated with a source project. Please assign a source project to the document before editing translations.',
-      );
-    }
-
-    const translationProject = await getTranslationProjectBySourceAndLanguage(
-      document.sourceProject.id,
-      existingVersion.languageId,
-    );
-
-    if (translationProject) {
-      // Only the owner of the version or users with higher permissions can edit
-      if (existingVersion.userId !== user.id) {
-        await authorize({ project: translationProject.id, role: 'translator' });
-      }
-    }
-  }
+  await assertCanEditDocumentVersion(id, user);
 
   const version = await updateDocumentVersion(id, validated.content, user.id);
 
@@ -201,6 +240,7 @@ export async function updateDocumentVersionStatusAction(
 ): Promise<{
   version: Awaited<ReturnType<typeof updateDocumentVersionStatus>>;
   github?: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string };
+  audio?: AudioGenerationOutcome;
 }> {
   const { user } = await authorize('authenticated');
 
@@ -250,7 +290,7 @@ export async function updateDocumentVersionStatusAction(
           action: 'github_deployed',
           details: {},
         });
-        revalidatePath(`/documents/${version.documentId}/review`);
+        revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
         github = { status: 'success', prUrl: result?.prUrl };
       } else {
         console.log('[GitHub] GitHub is not configured, skipping deploy');
@@ -265,12 +305,26 @@ export async function updateDocumentVersionStatusAction(
         action: 'github_deploy_failed',
         details: { error: error.message },
       });
-      revalidatePath(`/documents/${version.documentId}/review`);
+      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
       github = { status: 'failed', error: error.message };
     }
   }
 
-  return { version, github };
+  // If transitioning to APPROVED, start audio generation. Same shape as the
+  // GitHub deploy above: never throws, the outcome is reported to the caller.
+  let audio: AudioGenerationOutcome | undefined;
+  if (status === DocumentStatus.APPROVED) {
+    try {
+      const { startGeneration } = await import('../audio/audio.service');
+      audio = await startGeneration(version.id, user.id);
+      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
+    } catch (error: unknown) {
+      console.error('[Audio] Generation failed:', error);
+      audio = { status: 'failed', error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  return { version, github, audio };
 }
 
 export async function assignDocumentVersionAction(input: unknown) {
@@ -295,6 +349,12 @@ export async function assignDocumentVersionAction(input: unknown) {
   );
 
   if (!translationProject) {
+    // Creating the project must not become a way to gain access to the language:
+    // check the caller's language assignment before anything is written.
+    if (user.role !== Role.ADMIN && !(await getUserRoleForLanguage(user.id, validated.languageId))) {
+      throw new Error('You are not assigned to this language');
+    }
+
     // Auto-create the translation project if it doesn't exist
     const sourceProject = await getSourceProjectById(document.sourceProject.id);
     if (!sourceProject) {
@@ -313,24 +373,10 @@ export async function assignDocumentVersionAction(input: unknown) {
       languageId: validated.languageId,
     });
 
-    // If user is not an admin, add them as a member with TRANSLATOR role
-    // (Deployers have access to all projects automatically)
-    if (user.role !== Role.ADMIN) {
-      // Fetch the created project to get its ID
-      const createdProject = await getTranslationProjectBySourceAndLanguage(
-        document.sourceProject.id,
-        validated.languageId,
-      );
-      if (createdProject) {
-        await createProjectMember({
-          translationProjectId: createdProject.id,
-          userId: user.id,
-          role: ProjectRole.TRANSLATOR,
-        });
-      }
-    }
+    // No membership is granted here: the caller's language assignment, checked
+    // above, already carries their role on every project in this language.
 
-    // Fetch the translation project again to get the full structure with members
+    // Fetch the translation project again to get the full structure
     translationProject = await getTranslationProjectBySourceAndLanguage(
       document.sourceProject.id,
       validated.languageId,
@@ -344,28 +390,21 @@ export async function assignDocumentVersionAction(input: unknown) {
 
   await authorize({ project: translationProject.id, role: 'translator' });
 
-  // Check document assignment
-  const assignment = await getDocumentAssignmentByDocumentAndProject(validated.documentId, translationProject.id);
-
-  if (assignment) {
-    // If document is assigned to a specific user, only that user can translate
-    if (assignment.userId && assignment.userId !== user.id) {
-      throw new Error('This document is assigned to another user');
-    }
-    // If unassigned (userId is null), any project member can translate
-  }
-
   // Check if version already exists
   const existingVersion = await getDocumentVersionByDocumentAndLanguage(validated.documentId, validated.languageId);
 
   if (existingVersion) {
-    // If version is already IN_PROGRESS and assigned to current user, return it
-    if (existingVersion.status === DocumentStatus.IN_PROGRESS && existingVersion.userId === user.id) {
-      return existingVersion;
+    // The version carries the assignment now: a translator set on it reserves the
+    // document, an empty one leaves it open to the whole language team.
+    if (existingVersion.userId && existingVersion.userId !== user.id) {
+      throw new Error('This document is assigned to another user');
     }
 
-    // If version is IN_PROGRESS but assigned to different user, don't reassign
-    if (existingVersion.status === DocumentStatus.IN_PROGRESS && existingVersion.userId !== user.id) {
+    if (existingVersion.status === DocumentStatus.IN_PROGRESS) {
+      // Already claimed by this user — hand back the same version.
+      if (existingVersion.userId === user.id) {
+        return existingVersion;
+      }
       throw new Error('This translation is already assigned to another user');
     }
 
@@ -382,11 +421,7 @@ export async function assignDocumentVersionAction(input: unknown) {
         document: true,
         language: true,
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          ...userBrief,
         },
       },
     });
@@ -433,78 +468,7 @@ export async function getApprovedVersionsAction() {
       status: DocumentStatus.APPROVED,
       language: { code: { not: 'en' } },
     },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      language: true,
-      user: {
-        select: { id: true, name: true, email: true },
-      },
-      reviewer: {
-        select: { id: true, name: true, email: true },
-      },
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  });
-}
-
-export async function getVersionsTranslatingByUserAction() {
-  const { user } = await authorize('authenticated');
-
-  return prisma.documentVersion.findMany({
-    where: {
-      userId: user.id,
-      status: {
-        in: [DocumentStatus.PENDING_TRANSLATION, DocumentStatus.IN_PROGRESS],
-      },
-    },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      language: true,
-      user: {
-        select: { id: true, name: true, email: true },
-      },
-      reviewer: {
-        select: { id: true, name: true, email: true },
-      },
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  });
-}
-
-export async function getVersionsForReviewByUserAction() {
-  const { user } = await authorize('authenticated');
-
-  return prisma.documentVersion.findMany({
-    where: {
-      reviewerId: user.id,
-      status: DocumentStatus.PENDING_REVIEW,
-    },
-    include: {
-      document: {
-        include: {
-          sourceProject: true,
-        },
-      },
-      language: true,
-      user: {
-        select: { id: true, name: true, email: true },
-      },
-      reviewer: {
-        select: { id: true, name: true, email: true },
-      },
-    },
+    select: assignmentSelect,
     orderBy: {
       updatedAt: 'desc',
     },

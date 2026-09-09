@@ -46,12 +46,12 @@ enum DocumentStatus {
 
 enum SuggestionType {
   COMMENT // Pouze komentář
-  CHANGE  // Návrh změny s proposedText
+  CHANGE // Návrh změny s proposedText
 }
 
 enum SuggestionStatus {
-  OPEN      // Otevřený návrh
-  APPLIED   // Aplikován překladatelem
+  OPEN // Otevřený návrh
+  APPLIED // Aplikován překladatelem
   DISMISSED // Odmítnut
 }
 
@@ -79,44 +79,54 @@ enum GitHubPRStatus {
   CLOSED
 }
 
+enum AudioProvider {
+  AZURE_SPEECH
+}
+
+enum AudioStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
 enum AnnouncementType {
   BANNER
   MODAL
 }
 
 model User {
-  id                  String               @id @default(uuid())
-  email               String               @unique
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  name                String
-  emailVerified       Boolean              @default(false)
-  image               String?
-  role                Role                 @default(USER)
-  banned              Boolean              @default(false)
-  banReason           String?
-  banExpires          DateTime?
-  streetAddress       String?
-  city                String?
-  state               String?
-  zipCode             String?
-  country             String?
-  tShirtSize          TShirtSize?
-  exodus90AppId       String?
-  onboarded           Boolean              @default(false)
-  sessions            Session[]
-  accounts            Account[]
-  documentVersions    DocumentVersion[]
-  reviewedVersions    DocumentVersion[] @relation("ReviewedBy")
-  comments            Comment[]
-  activityLogs        ActivityLog[]
-  projectMembers      ProjectMember[]
-  assignedDocuments   DocumentAssignment[] @relation("AssignedTo")
-  assignedByDocuments DocumentAssignment[] @relation("AssignedBy")
-  languages           UserLanguage[]
-  suggestions         Suggestion[]
-  suggestionReplies   SuggestionReply[]
-  invitationsCreated  Invitation[]     @relation("InvitationsCreated")
+  id                     String                  @id @default(uuid())
+  email                  String                  @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  name                   String
+  emailVerified          Boolean                 @default(false)
+  image                  String?
+  role                   Role                    @default(USER)
+  banned                 Boolean                 @default(false)
+  banReason              String?
+  banExpires             DateTime?
+  streetAddress          String?
+  city                   String?
+  state                  String?
+  zipCode                String?
+  country                String?
+  tShirtSize             TShirtSize?
+  exodus90AppId          String?
+  onboarded              Boolean                 @default(false)
+  sessions               Session[]
+  accounts               Account[]
+  documentVersions       DocumentVersion[]
+  reviewedVersions       DocumentVersion[]       @relation("ReviewedBy")
+  comments               Comment[]
+  activityLogs           ActivityLog[]
+  assignedVersions       DocumentVersion[]       @relation("AssignedBy")
+  languages              UserLanguage[]
+  suggestions            Suggestion[]
+  triggeredAudioFiles    AudioFile[]
+  suggestionReplies      SuggestionReply[]
+  invitationsCreated     Invitation[]            @relation("InvitationsCreated")
   announcementDismissals AnnouncementDismissal[]
 
   @@map("user")
@@ -156,6 +166,8 @@ model Account {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  // better-auth looks accounts up by user on every credential sign-in.
+  @@index([userId])
   @@map("account")
 }
 
@@ -176,6 +188,8 @@ model Language {
   name                    String // e.g., "English", "Czech", "German"
   translationInstructions String?              @db.Text
   branchName              String?
+  audioProvider           AudioProvider?
+  audioVoice              String? // provider voice id, e.g. "cs-CZ-AntoninNeural"
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   documentVersions        DocumentVersion[]
@@ -200,8 +214,10 @@ model SourceProject {
   id                  String               @id @default(uuid())
   name                String               @unique
   description         String?              @db.Text
-  identifier          String?
+  identifier          String               @unique // URL segment: /documents/{identifier}/...
+  acronym             String? // Short prefix for auto-named DAY titles, e.g. "SML" in "SML - DAY 03 - ..."
   status              SourceProjectStatus  @default(ACTIVE)
+  audioDocumentTypes  DocumentType[]       @default([DAY, DAILY_CONTENT])
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   documents           Document[]
@@ -211,95 +227,86 @@ model SourceProject {
 }
 
 model TranslationProject {
-  id                  String               @id @default(uuid())
-  name                String
-  sourceProjectId     String
-  sourceProject       SourceProject        @relation(fields: [sourceProjectId], references: [id], onDelete: Cascade)
-  languageId          String
-  language            Language             @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  members             ProjectMember[]
-  documentAssignments DocumentAssignment[]
+  id              String        @id @default(uuid())
+  name            String
+  sourceProjectId String
+  sourceProject   SourceProject @relation(fields: [sourceProjectId], references: [id], onDelete: Cascade)
+  languageId      String
+  language        Language      @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@unique([sourceProjectId, languageId])
+  // Language-based access resolution walks this the other way round, so the
+  // composite unique's sourceProjectId-first ordering does not serve it.
+  @@index([languageId])
   @@map("translation_project")
 }
 
-model ProjectMember {
-  id                   String             @id @default(uuid())
-  translationProjectId String
-  translationProject   TranslationProject @relation(fields: [translationProjectId], references: [id], onDelete: Cascade)
-  userId               String
-  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role                 ProjectRole
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-
-  @@unique([translationProjectId, userId, role])
-  @@map("project_member")
-}
-
-model DocumentAssignment {
-  id                   String             @id @default(uuid())
-  documentId           String
-  document             Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  translationProjectId String
-  translationProject   TranslationProject @relation(fields: [translationProjectId], references: [id], onDelete: Cascade)
-  userId               String? // null = unassigned (visible to all project members)
-  user                 User?              @relation("AssignedTo", fields: [userId], references: [id], onDelete: SetNull)
-  deadline             DateTime?
-  assignedAt           DateTime           @default(now())
-  assignedById         String
-  assignedBy           User               @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-
-  @@unique([documentId, translationProjectId])
-  @@map("document_assignment")
-}
-
 model Document {
-  id               String               @id @default(uuid())
-  slug             String               @unique
+  id               String            @id @default(uuid())
+  slug             String // unique within the source project, see @@unique below
   title            String
   labels           String[] // Array of labels for categorization
   deadline         DateTime? // Optional deadline for translation completion
   type             DocumentType?
   folderId         String? // Deprecated - kept for migration
-  folder           Folder?              @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder           Folder?           @relation(fields: [folderId], references: [id], onDelete: SetNull)
   sourceProjectId  String?
-  sourceProject    SourceProject?       @relation(fields: [sourceProjectId], references: [id], onDelete: SetNull)
+  sourceProject    SourceProject?    @relation(fields: [sourceProjectId], references: [id], onDelete: SetNull)
   originalFilename String? // Original filename when uploaded (e.g., "1.md")
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   versions         DocumentVersion[]
-  assignments      DocumentAssignment[]
 
+  @@unique([sourceProjectId, slug])
+  // Every document list orders by this.
+  @@index([updatedAt])
   @@map("document")
 }
 
 model DocumentVersion {
-  id           String         @id @default(uuid())
-  documentId   String
-  document     Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  languageId   String
-  language     Language       @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  content      String         @db.Text // Markdown content
-  status       DocumentStatus @default(PENDING_TRANSLATION)
-  version      Int            @default(1)
-  userId       String?
-  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  reviewerId   String?
-  reviewer     User?          @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id            String         @id @default(uuid())
+  documentId    String
+  document      Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  languageId    String
+  language      Language       @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  content       String         @db.Text // Markdown content
+  status        DocumentStatus @default(PENDING_TRANSLATION)
+  version       Int            @default(1)
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reviewerId    String?
+  reviewer      User?          @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
+  // Assignment lives here rather than in a separate record, so a document's
+  // translator, reviewer, deadline and status can never drift apart.
+  deadline      DateTime?
+  assignedById  String?
+  assignedBy    User?          @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt    DateTime?
+  // Hand-edited SSML for the speech provider, sent verbatim in place of the
+  // script derived from `content`. Null means "derive it", which is what every
+  // version does until someone edits the Audio text tab.
+  audioSsml     String?        @db.Text
+  // Fingerprint of the SSML that would have been derived when `audioSsml` was
+  // saved. Comparing it against a fresh derivation is how an edited transcript
+  // learns that the words moved on without it.
+  audioSsmlBase String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   comments      Comment[]
   activityLogs  ActivityLog[]
   suggestions   Suggestion[]
   githubCommits GitHubCommit[]
+  audioFiles    AudioFile[]
 
   @@unique([documentId, languageId])
+  // The dashboard's "My Work" filters on OR(userId, reviewerId); the
+  // translation-project list filters on languageId; the deploy queue on status.
+  @@index([userId])
+  @@index([reviewerId])
+  @@index([languageId])
+  @@index([status])
   @@map("document_version")
 }
 
@@ -313,6 +320,7 @@ model Comment {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
+  @@index([documentVersionId])
   @@map("comment")
 }
 
@@ -332,50 +340,57 @@ model ActivityLog {
   @@map("activity_log")
 }
 
+/// Grants a user access to every translation project in this language, with the
+/// given role. Replaces the former per-project ProjectMember records.
 model UserLanguage {
-  id         String   @id @default(uuid())
+  id         String      @id @default(uuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   languageId String
-  language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  language   Language    @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  role       ProjectRole @default(TRANSLATOR)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
   @@unique([userId, languageId])
+  // Supports the reviewer/manager lookups that resolve project access by language.
+  @@index([languageId, role])
   @@map("user_language")
 }
 
 model Suggestion {
-  id                String           @id @default(uuid())
+  id                String          @id @default(uuid())
   documentVersionId String
-  documentVersion   DocumentVersion  @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
   userId            String
-  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Range v textu (Monaco formát) - optional for general (unanchored) threads
-  startLine         Int?
-  startColumn       Int?
-  endLine           Int?
-  endColumn         Int?
-  
+  startLine   Int?
+  startColumn Int?
+  endLine     Int?
+  endColumn   Int?
+
   // Typ suggestion
-  type              SuggestionType   @default(COMMENT)
-  
+  type SuggestionType @default(COMMENT)
+
   // Obsah
-  comment           String           @db.Text
-  proposedText      String?          @db.Text // null pro COMMENT, vyplněno pro CHANGE
-  originalText      String?          @db.Text // Original text before CHANGE was applied, used for revert on reopen
+  comment      String  @db.Text
+  proposedText String? @db.Text // null pro COMMENT, vyplněno pro CHANGE
+  originalText String? @db.Text // Original text before CHANGE was applied, used for revert on reopen
 
   // Stav
-  status            SuggestionStatus @default(OPEN)
-  dismissedReason  String?          @db.Text
-  
-  // Metadata
-  version           Int              // Verze dokumentu, na které vznikl návrh
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  replies           SuggestionReply[]
+  status          SuggestionStatus @default(OPEN)
+  dismissedReason String?          @db.Text
 
+  // Metadata
+  version   Int // Verze dokumentu, na které vznikl návrh
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  replies   SuggestionReply[]
+
+  // Serves countOpenSuggestions and the open-suggestion groupBy.
+  @@index([documentVersionId, status])
   @@map("suggestion")
 }
 
@@ -406,13 +421,42 @@ model GitHubCommit {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
+  @@index([documentVersionId])
   @@map("github_commit")
+}
+
+/// One row per audio generation attempt. Never overwritten: a regeneration
+/// creates a new row and a new object, so a copied URL keeps pointing at the
+/// file it pointed at when it was copied.
+model AudioFile {
+  id                String          @id @default(uuid())
+  documentVersionId String
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  status            AudioStatus     @default(PENDING)
+  provider          AudioProvider
+  voice             String
+  sourceVersion     Int // DocumentVersion.version the audio was generated from
+  providerJobId     String?
+  objectKey         String?
+  url               String?
+  durationMs        Int?
+  sizeBytes         Int?
+  billedCharacters  Int?
+  errorMessage      String?         @db.Text
+  triggeredByUserId String?
+  triggeredBy       User?           @relation(fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([documentVersionId, createdAt])
+  @@index([status, updatedAt])
+  @@map("audio_file")
 }
 
 model Invitation {
   id          String               @id @default(uuid())
   token       String               @unique
-  maxUses     Int?                 // null = unlimited, 1 = single-use, N = max registrations
+  maxUses     Int? // null = unlimited, 1 = single-use, N = max registrations
   usedCount   Int                  @default(0)
   expiresAt   DateTime
   status      InvitationStatus     @default(ACTIVE)

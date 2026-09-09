@@ -2,7 +2,19 @@ import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    // Avatars are cropped and downscaled in the browser before they are sent,
+    // so uploads land far below this. The headroom is for the server action's
+    // own multipart overhead, not for bigger pictures.
+    serverActions: { bodySizeLimit: '3mb' },
+  },
+  // The /releases page reads release-notes/*.md from disk at request time.
+  // File tracing only picks up files reachable through static imports/requires,
+  // so a directory read like this needs to be listed explicitly or it's
+  // silently dropped from the deployed serverless bundle.
+  outputFileTracingIncludes: {
+    '/releases': ['./release-notes/**/*.md'],
+  },
 };
 
 export default withSentryConfig(nextConfig, {

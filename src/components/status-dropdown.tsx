@@ -3,10 +3,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
+import { useDeployConfirm } from '@/components/deploy-confirm';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { capture } from '@/lib/analytics';
-import { getCanonicalEditorPath } from '@/lib/document-status';
 import { canDeployClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -23,7 +23,6 @@ interface StatusDropdownProps {
   versionId: string;
   user: SessionUser;
   documentId?: string; // For navigation after status change
-  languageId?: string; // For navigation after status change
   onStatusChange?: (newStatus: DocumentStatus) => void;
   onReviewRequested?: () => void; // Called instead of direct transition when moving to PENDING_REVIEW
   allowedStatuses?: DocumentStatus[]; // For future permission filtering
@@ -36,7 +35,6 @@ export function StatusDropdown({
   versionId,
   user,
   documentId,
-  languageId,
   onStatusChange,
   onReviewRequested,
   allowedStatuses,
@@ -44,6 +42,7 @@ export function StatusDropdown({
   openSuggestionsCount = 0,
 }: StatusDropdownProps) {
   const router = useRouter();
+  const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
@@ -131,6 +130,10 @@ export function StatusDropdown({
       return;
     }
 
+    if (newStatus === DocumentStatus.DEPLOYED && !(await confirmDeploy(versionId))) {
+      return;
+    }
+
     setLoading(true);
 
     // Show a loading toast for deploy (GitHub takes a few seconds)
@@ -159,6 +162,13 @@ export function StatusDropdown({
         toast.dismiss(deployToastId);
       }
 
+      if (result.audio?.status === 'success') {
+        capture('audio_generation_triggered', { documentVersionId: versionId });
+      } else if (result.audio?.status === 'failed') {
+        capture('audio_generation_failed', { documentVersionId: versionId, kind: 'unknown' });
+        toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
+      }
+
       capture('document_status_changed', { from: displayedStatus, to: newStatus, via: 'dropdown' });
       if (newStatus === DocumentStatus.DEPLOYED) {
         capture('document_deployed');
@@ -170,16 +180,10 @@ export function StatusDropdown({
       onStatusChange?.(newStatus);
       setOpen(false);
 
-      // Navigate to the canonical page for the new status, or refresh if we're already there
+      // The URL does not encode which editor is showing, so a status change never
+      // moves the page — it only changes what the server renders there.
       if (documentId) {
-        const canonical = getCanonicalEditorPath(documentId, newStatus, { versionId, lang: languageId });
-        const canonicalPath = canonical.split('?')[0];
-        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-        if (currentPath !== canonicalPath) {
-          router.push(canonical);
-        } else {
-          router.refresh();
-        }
+        router.refresh();
       } else if (typeof window !== 'undefined') {
         window.location.reload();
       }
@@ -195,45 +199,37 @@ export function StatusDropdown({
   const translatorCannotChangeDeployedDocumentStatus =
     user.role === 'USER' && displayedStatus === DocumentStatus.DEPLOYED;
 
+  const triggerButton = (
+    <Button
+      variant="outline"
+      disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
+      className={cn(
+        'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
+        currentStatusConfig.color.badgeClass,
+        'border',
+        'hover:opacity-90',
+        'font-medium',
+      )}
+    >
+      <CurrentStatusIcon className={cn('shrink-0', currentStatusConfig.color.textClass)} />
+      <span className={cn('min-w-0 truncate font-medium', currentStatusConfig.color.textClass)}>
+        {currentStatusConfig.name}
+      </span>
+      <ChevronDown className="shrink-0 opacity-50" />
+    </Button>
+  );
+
   // Prevent hydration mismatch by only rendering after mount
   if (!mounted) {
-    return (
-      <Button
-        variant="outline"
-        disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
-        className={cn(
-          'gap-2 h-auto py-1.5 px-3',
-          currentStatusConfig.color.badgeClass,
-          'border',
-          'hover:opacity-90',
-          'font-medium',
-        )}
-      >
-        <CurrentStatusIcon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
-        <span className={cn('font-medium', currentStatusConfig.color.textClass)}>{currentStatusConfig.name}</span>
-        <ChevronDown className="h-3.5 w-3.5 opacity-50" />
-      </Button>
-    );
+    return triggerButton;
   }
 
   return (
-    <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
+    <>
+      {deployDialog}
+      <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
       <DropdownMenuPrimitive.Trigger asChild>
-        <Button
-          variant="outline"
-          disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
-          className={cn(
-            'gap-2 h-auto py-1.5 px-3',
-            currentStatusConfig.color.badgeClass,
-            'border',
-            'hover:opacity-90',
-            'font-medium',
-          )}
-        >
-          <CurrentStatusIcon className={cn('h-3.5 w-3.5', currentStatusConfig.color.textClass)} />
-          <span className={cn('font-medium', currentStatusConfig.color.textClass)}>{currentStatusConfig.name}</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-50" />
-        </Button>
+        {triggerButton}
       </DropdownMenuPrimitive.Trigger>
 
       <DropdownMenuPrimitive.Portal>
@@ -303,5 +299,6 @@ export function StatusDropdown({
         </DropdownMenuPrimitive.Content>
       </DropdownMenuPrimitive.Portal>
     </DropdownMenuPrimitive.Root>
+    </>
   );
 }

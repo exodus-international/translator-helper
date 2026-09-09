@@ -446,225 +446,225 @@ Find a quiet place outside. Sit for 15 minutes. Do nothing. Simply notice what y
 };
 
 const CZECH_CONTENT: Record<string, string> = {
-  'ex-d1': `# Den 1 - Povolani
+  'ex-d1': `# Den 1 – Povolání
 
-> "Pojdte za mnou a ucinim z vas rybare lidi." — Matous 4,19
+> "Pojďte za mnou a učiním z vás rybáře lidí." — Matouš 4,19
 
-## Ranni rozjimani
+## Ranní rozjímání
 
-Dnes zacinite svou 90denni cestu. Stejne jako apostolove, kteri zanechali sve site, jste volani k necemu vetsimu. Toto neni pouhé cviceni v sebeodrikani — je to pozvani k setkani s zivym Bohem.
+Dnes začínáte svou 90denní cestu. Stejně jako apoštolové, kteří zanechali své sítě, jste voláni k něčemu většímu. Toto není pouhé cvičení v sebeodříkání — je to pozvání k setkání s živým Bohem.
 
-### Tri pilire pro dnesek
+### Tři pilíře pro dnešek
 
-1. **Modlitba**: Stravte 20 minut v tiche modlitbe. Najdete klidne misto a budte jednoduze pritomni Bohu.
-2. **Askeze**: Zacnete svuj pust od alkoholu a sladkosti. Pamatujte, ze tato obet vytvari prostor pro milost.
-3. **Bratrstvo**: Oslovte sveho partnera zodpovednosti. Sdílejte sve umysly pro techto 90 dni.
+1. **Modlitba**: Strávte 20 minut v tiché modlitbě. Najděte klidné místo a buďte jednoduše přítomni Bohu.
+2. **Askeze**: Začněte svůj půst od alkoholu a sladkostí. Pamatujte, že tato oběť vytváří prostor pro milost.
+3. **Bratrstvo**: Oslovte svého partnera zodpovědnosti. Sdílejte své úmysly pro těchto 90 dní.
 
-## Pismo k rozjimani
+## Písmo k rozjímání
 
-> Hospodin je muj pastyr, nebudu mit nedostatek.
-> Doprava mi odpocinek na travnatych pastvinach,
-> vodi me ke klidnym vodam.
-> Obcerstvuje mou dusi.
-> — Zalm 23,1-3
+> Hospodin je můj pastýř, nebudu mít nedostatek.
+> Dopřává mi odpočinek na travnatých pastvinách,
+> vodí mě ke klidným vodám.
+> Občerstvuje mou duši.
+> — Žalm 23,1-3
 
-*Pamatujte: tato cesta neni o dokonalosti. Je o vernosti.*`,
+*Pamatujte: tato cesta není o dokonalosti. Je o věrnosti.*`,
 
-  'ex-d2': `# Den 2 - Disciplina modlitby
+  'ex-d2': `# Den 2 – Disciplína modlitby
 
-> "Kdyz se vsak modlis ty, vejdi do sveho pokojiku, zavri dvere a modli se ke svemu Otci, ktery je skryty." — Matous 6,6
+> "Když se však modlíš ty, vejdi do svého pokojíku, zavři dveře a modli se ke svému Otci, který je skrytý." — Matouš 6,6
 
-## Ranni rozjimani
+## Ranní rozjímání
 
-Modlitba je zakladem duchovniho zivota. Bez ni vsechny ostatni discipliny ztraceji svuj smysl. Dnes se zamerujeme na vytvoreni rytmu modlitby, ktery vas ponese v nadchazejicich tydnech.
+Modlitba je základem duchovního života. Bez ní všechny ostatní disciplíny ztrácejí svůj smysl. Dnes se zaměřujeme na vytvoření rytmu modlitby, který vás ponese v nadcházejících týdnech.
 
 ### Praxe
 
-Vyhradte si **20 minut** pro vnitrni modlitbu. Pouzijte nasledujici strukturu:
+Vyhraďte si **20 minut** pro vnitřní modlitbu. Použijte následující strukturu:
 
-1. **Priprava** (2 min): Postavte se do Bozi pritomnosti. Udelejte znameni krize.
-2. **Cteni** (3 min): Prectete dnesni urivek Pisma pomalu, dvakrat.
-3. **Rozjimani** (10 min): Premyslejte o tom, co vas oslovuje. Mluvte o tom s Bohem.
-4. **Predsevzeti** (5 min): Zvolte si jeden konkretni cin pro dnesek na zaklade sve modlitby.
+1. **Příprava** (2 min): Postavte se do Boží přítomnosti. Udělejte znamení kříže.
+2. **Čtení** (3 min): Přečtěte dnešní úryvek Písma pomalu, dvakrát.
+3. **Rozjímání** (10 min): Přemýšlejte o tom, co vás oslovuje. Mluvte o tom s Bohem.
+4. **Předsevzetí** (5 min): Zvolte si jeden konkrétní čin pro dnešek na základě své modlitby.
 
-## Pismo k rozjimani
+## Písmo k rozjímání
 
-> Ztisete se a vedzte, ze ja jsem Buh.
-> — Zalm 46,10`,
+> Ztište se a vězte, že já jsem Bůh.
+> — Žalm 46,10`,
 
-  'ex-d3': `# Den 3 - Pust a svoboda
+  'ex-d3': `# Den 3 – Půst a svoboda
 
-> "Neni prave toto posteni, jez jsem vyvolil: rozevrit okovy svevole?" — Izajas 58,6
+> "Není právě toto postění, jež jsem vyvolil: rozevřít okovy svévole?" — Izajáš 58,6
 
-## Ranni rozjimani
+## Ranní rozjímání
 
-Posteni neni trest — je to osvobozeni. Kdyz si odepirame pohodli, zjistujeme, ze nas nejhlubsi hlad neni po jidle ani piti, ale po Bohu.
+Postění není trest — je to osvobození. Když si odepíráme pohodlí, zjišťujeme, že náš nejhlubší hlad není po jídle ani pití, ale po Bohu.
 
-### Proc se postime
+### Proč se postíme
 
-Pousetni otcove chapali, ze **posteni brisi mysl** a otevira srdce. Zvazme tri rozmery:
+Pouštní otcové chápali, že **postění brousí mysl** a otevírá srdce. Zvažme tři rozměry:
 
-- **Fyzicky**: Vase telo se uci rikat "ne" okamzitemu uspokojeni
-- **Duchovni**: Kazdy zaludecni stah se stava modlitbou
-- **Spolecny**: Vase obet vas spojuje s temi, kteri hladoveji nedobrovolne
+- **Fyzický**: Vaše tělo se učí říkat "ne" okamžitému uspokojení
+- **Duchovní**: Každý žaludeční stah se stává modlitbou
+- **Společný**: Vaše oběť vás spojuje s těmi, kteří hladovějí nedobrovolně
 
-*Svoboda, kterou hledate, se nenachazi v tom, ze budete mit vice, ale v tom, ze budete potrebovat mene.*`,
+*Svoboda, kterou hledáte, se nenachází v tom, že budete mít více, ale v tom, že budete potřebovat méně.*`,
 
-  'ex-fg': `# Pruvodce: Metody modlitby
+  'ex-fg': `# Průvodce: Metody modlitby
 
-Tento pruvodce predstavuje nekolik metod modlitby pouzivanych v programu Exodus90.
+Tento průvodce představuje několik metod modlitby používaných v programu Exodus90.
 
 ## 1. Lectio Divina
 
-Ctyrstupnova metoda modlitby s Pismem:
+Čtyřstupňová metoda modlitby s Písmem:
 
-1. **Lectio** (Cteni): Prectete pasaz pomalu
-2. **Meditatio** (Rozjimani): Premyslejte o slove ci frazi, ktera vas oslovuje
-3. **Oratio** (Modlitba): Mluvte s Bohem o tom, co jste precetli
-4. **Contemplatio** (Nazirání): Odpocinete v tichosti v Bozi pritomnosti
+1. **Lectio** (Čtení): Přečtěte pasáž pomalu
+2. **Meditatio** (Rozjímání): Přemýšlejte o slově či frázi, která vás oslovuje
+3. **Oratio** (Modlitba): Mluvte s Bohem o tom, co jste přečetli
+4. **Contemplatio** (Nazírání): Odpočiňte si v tichosti v Boží přítomnosti
 
 ## 2. Examen
 
-Denni modlitba sebereflexe sv. Ignace:
+Denní modlitba sebereflexe sv. Ignáce:
 
-- **Diky** za uplynuly den
-- **Prosba o svetlo** k jasnemu videni
-- **Prehled** udalosti dne
-- **Odpoved** litosti nebo vdecnosti
-- **Predsevzeti** na zitrek`,
+- **Díky** za uplynulý den
+- **Prosba o světlo** k jasnému vidění
+- **Přehled** událostí dne
+- **Odpověď** lítostí nebo vděčností
+- **Předsevzetí** na zítřek`,
 
-  'ex-dc': `# Sablona pro tydenni kontrolu
+  'ex-dc': `# Šablona pro týdenní kontrolu
 
-Pouzijte tuto sablonu kazdy tyden k zamysleni nad svym pokrokem.
+Použijte tuto šablonu každý týden k zamyšlení nad svým pokrokem.
 
-## Prehled uplynuleho tydne
+## Přehled uplynulého týdne
 
 ### Modlitba
-- Dny, kdy jsem dokoncil cely cas modlitby: ___ / 7
+- Dny, kdy jsem dokončil celý čas modlitby: ___ / 7
 - Kvalita modlitby (1-5): ___
 
 ### Askeze
-- Dny, kdy jsem dodrzoval pust: ___ / 7
-- Nejvetsi pokuseni tohoto tydne:
+- Dny, kdy jsem dodržoval půst: ___ / 7
+- Největší pokušení tohoto týdne:
 
 ### Bratrstvo
-- Kolikrat jsem se spojil se svou skupinou: ___`,
+- Kolikrát jsem se spojil se svou skupinou: ___`,
 
-  'le-aw': `# Popelecni streda
+  'le-aw': `# Popeleční středa
 
-> "Pamatuj, ze jsi prach a v prach se obratís." — Genesis 3,19
+> "Pamatuj, že jsi prach a v prach se obrátíš." — Genesis 3,19
 
-## Zacatek postniho obdobi
+## Začátek postního období
 
-Dnes vstupujeme do svateho postniho obdobi — 40 dni modlitby, postu a almuzny, které nas pripravuji na velikonocni radost.
+Dnes vstupujeme do svatého postního období — 40 dní modlitby, postu a almužny, které nás připravují na velikonoční radost.
 
-### Tri postni praxe
+### Tři postní praxe
 
-1. **Modlitba**: Zavazat se k dennímu cteni Pisma a 15 minutam tiche modlitby
-2. **Pust**: Dnes je den postu a zdrzenlivosti. Jezte pouze jedno plne jidlo.
-3. **Almuzna**: Zvolte si charitu nebo potrebneho cloveka, ktereho budete behem postu podporovat
+1. **Modlitba**: Zavázat se k dennímu čtení Písma a 15 minutám tiché modlitby
+2. **Půst**: Dnes je den postu a zdrženlivosti. Jezte pouze jedno plné jídlo.
+3. **Almužna**: Zvolte si charitu nebo potřebného člověka, kterého budete během postu podporovat
 
-## Vecerni modlitba
+## Večerní modlitba
 
-Pane, kdyz zacinam tuto postni cestu, daruj mi milost praveho obraceni. Amen.`,
+Pane, když začínám tuto postní cestu, daruj mi milost pravého obrácení. Amen.`,
 
-  'le-d5': `# Patek prvniho tydne
+  'le-d5': `# Pátek prvního týdne
 
-> "Coz neni toto posteni, ktere jsem vyvolil: rozevrit okovy svevole?" — Izajas 58,6
+> "Což není toto postění, které jsem vyvolil: rozevřít okovy svévole?" — Izajáš 58,6
 
-## Ranni rozjimani
+## Ranní rozjímání
 
-Prvni patek v poste. Kazdy patek behem tohoto obdobi jsme volani zdrzet se masa...`,
+První pátek v postě. Každý pátek během tohoto období jsme voláni zdržet se masa...`,
 
-  'le-d20': `# Treti nedele postni
+  'le-d20': `# Třetí neděle postní
 
-> "Pane, dej mi tu vodu, abych uz nemela zizen." — Jan 4,15
+> "Pane, dej mi tu vodu, abych už neměla žízeň." — Jan 4,15
 
-## Zena u studny
+## Žena u studny
 
-Dnesni evangelium vypravi pribeh Jezise a Samaritanky u Jakubovy studny. Prisla hledat vodu; odesla, kdyz nasla pramen zive vody.
+Dnešní evangelium vypráví příběh Ježíše a Samaritánky u Jákobovy studny. Přišla hledat vodu; odešla, když našla pramen živé vody.
 
-### Tri lekce
+### Tři lekce
 
-1. **Jezis nas potkava tam, kde jsme**: Neceka, az budeme dokonali
-2. **Prava zizen je duchovni**: Nase nejhlubsi touha je po Bohu
-3. **Setkani vede k poslani**: Zena se stala evangelistkou pro cele mesto`,
+1. **Ježíš nás potkává tam, kde jsme**: Nečeká, až budeme dokonalí
+2. **Pravá žízeň je duchovní**: Naše nejhlubší touha je po Bohu
+3. **Setkání vede k poslání**: Žena se stala evangelistkou pro celé město`,
 
-  'le-fg': `# Pruvodce: Krizova cesta
+  'le-fg': `# Průvodce: Křížová cesta
 
-Krizova cesta je poboznost, ktera nasleduje Jezise na jeho ceste od odsouzeni k pohrbeni.
+Křížová cesta je pobožnost, která následuje Ježíše na jeho cestě od odsouzení k pohřbení.
 
-## Ctrnact zastaveni
+## Čtrnáct zastavení
 
-### I. zastaveni: Jezis je odsouzen k smrti
-*Klanime se ti, Kriste, a chvalime te, nebot svym svatym krizem jsi vykoupil svet.*
+### I. zastavení: Ježíš je odsouzen k smrti
+*Klaníme se ti, Kriste, a chválíme tě, neboť svým svatým křížem jsi vykoupil svět.*
 
-Pilat si myje ruce. Nevinny muz je odsouzen. Jak casto mlcime tvari v tvar nespravedlnosti?
+Pilát si myje ruce. Nevinný muž je odsouzen. Jak často mlčíme tváří v tvář nespravedlnosti?
 
-### II. zastaveni: Jezis bere na sebe kriz
-Tiha hrichu sveta spociva na jeho ramenou.
+### II. zastavení: Ježíš bere na sebe kříž
+Tíha hříchu světa spočívá na jeho ramenou.
 
-### III. zastaveni: Jezis pada poprve
-Pada, ale zase vstava. V nasich selhanich nam Kristus ukazuje, ze pad neni konec.`,
+### III. zastavení: Ježíš padá poprvé
+Padá, ale zase vstává. V našich selháních nám Kristus ukazuje, že pád není konec.`,
 
-  'ad-w1': `# Prvni tyden adventu: Nadeje
+  'ad-w1': `# První týden adventu: Naděje
 
-> "Lid, ktery chodil v temnote, uvidel velke svetlo." — Izajas 9,2
+> "Lid, který chodil v temnotě, uviděl velké světlo." — Izajáš 9,2
 
-## Zapaleni prvni svice
+## Zapálení první svíce
 
-Dnes zapalujeme prvni svici adventniho vence — svici **Nadeje**. V rostouci prosincove tme nam tento maly plamen pripomina, ze svetlo prichazi do sveta.
+Dnes zapalujeme první svíci adventního věnce — svíci **Naděje**. V rostoucí prosincové tmě nám tento malý plamen připomíná, že světlo přichází do světa.
 
-### Denni praxe
+### Denní praxe
 
-Kazdy den tento tyden:
-1. Zapalte prvni svici pri veceri
-2. Prectete si spolecne denni urivek z Pisma
-3. Pomodlete se adventni modlitbu`,
+Každý den tento týden:
+1. Zapalte první svíci při večeři
+2. Přečtěte si společně denní úryvek z Písma
+3. Pomodlete se adventní modlitbu`,
 
-  'ad-w2': `# Druhy tyden adventu: Pokoj
+  'ad-w2': `# Druhý týden adventu: Pokoj
 
-> "Nebot se nam narodi dite, syn je nam dan a na jeho ramenou spocine vladnuti. A bude nazvan: Podivuhodny radce, Mocny Buh, Vecny otec, Kníze pokoje." — Izajas 9,6
+> "Neboť se nám narodí dítě, syn je nám dán a na jeho ramenou spočine vládnutí. A bude nazván: Podivuhodný rádce, Mocný Bůh, Věčný otec, Kníže pokoje." — Izajáš 9,6
 
-## Zapaleni druhe svice
+## Zapálení druhé svíce
 
-Tento tyden pridavame druhou svici — svici **Pokoje**. Kristus neprichazi s mecem pozemske moci, ale s pokojem, ktery prevysuje vsechno chápání.`,
+Tento týden přidáváme druhou svíci — svíci **Pokoje**. Kristus nepřichází s mečem pozemské moci, ale s pokojem, který převyšuje všechno chápání.`,
 
-  'ad-fg': `# Pruvodce adventnim vencem
+  'ad-fg': `# Průvodce adventním věncem
 
-Adventni venec je krasna tradice, ktera oznacuje ctyri tydny pripravy pred Vanocemi.
+Adventní věnec je krásná tradice, která označuje čtyři týdny přípravy před Vánocemi.
 
-## Potrebny material
+## Potřebný materiál
 
-- Vecne zeleny venec
-- 3 fialove svice a 1 ruzova svice
-- 1 bila svice (volitelne, na Stedry den)
+- Věčně zelený věnec
+- 3 fialové svíce a 1 růžová svíce
+- 1 bílá svíce (volitelné, na Štědrý den)
 
-## Ctyri svice
+## Čtyři svíce
 
-| Tyden | Barva | Tema | Nazev |
+| Týden | Barva | Téma | Název |
 |-------|-------|------|-------|
-| 1 | Fialova | Nadeje | Svice proroka |
-| 2 | Fialova | Pokoj | Betlemska svice |
-| 3 | Ruzova | Radost | Pastyrska svice |
-| 4 | Fialova | Laska | Andelska svice |`,
+| 1 | Fialová | Naděje | Svíce proroka |
+| 2 | Fialová | Pokoj | Betlémská svíce |
+| 3 | Růžová | Radost | Pastýřská svíce |
+| 4 | Fialová | Láska | Andělská svíce |`,
 
-  're-t1': `# Uvodni prednaška: Nalezeni ticha
+  're-t1': `# Úvodní přednáška: Nalezení ticha
 
-> "Ztisete se a vedzte, ze ja jsem Buh." — Zalm 46,10
+> "Ztište se a vězte, že já jsem Bůh." — Žalm 46,10
 
-## Vitejte
+## Vítejte
 
-Bratri, vitejte na tomto rekolekci. Na nasledujici tri dny vystupujeme z hluku kazdodenniho zivota, abychom naslouchali Bozimu hlasu.
+Bratři, vítejte na těchto rekolekcích. Na následující tři dny vystupujeme z hluku každodenního života, abychom naslouchali Božímu hlasu.
 
-### Problem hluku
+### Problém hluku
 
-Nase zivoty jsou prosyceny hlukem:
-- Neustaly bzukot notifikaci
-- Tlak terminu a zodpovednosti
-- Vnitrni monolog uzkosti a sebekritiky
+Naše životy jsou prosyceny hlukem:
+- Neustálý bzukot notifikací
+- Tlak termínů a zodpovědností
+- Vnitřní monolog úzkosti a sebekritiky
 
-**Ticho neni neprítomnost zvuku. Je to pritomnost pozornosti.**`,
+**Ticho není nepřítomnost zvuku. Je to přítomnost pozornosti.**`,
 };
 
 const SLOVAK_CONTENT: Record<string, string> = {

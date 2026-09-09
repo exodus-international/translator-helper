@@ -85,7 +85,7 @@ export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position, co
         }}
         className="h-8 px-2"
       >
-        <MessageSquare className="h-4 w-4 mr-1" />
+        <MessageSquare />
         Comment
       </Button>
       <Button
@@ -97,7 +97,7 @@ export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position, co
         }}
         className="h-8 px-2"
       >
-        <Pencil className="h-4 w-4 mr-1" />
+        <Pencil />
         Suggest edit
       </Button>
     </div>

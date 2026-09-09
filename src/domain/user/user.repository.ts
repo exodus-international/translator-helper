@@ -65,6 +65,16 @@ export async function updateUserProfile(userId: string, data: ProfileData) {
   });
 }
 
+/** Sets or clears the profile picture URL. Kept apart from the profile form so a
+ * failed upload can never blank out the rest of someone's profile. */
+export async function updateUserImage(userId: string, image: string | null) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { image },
+    select: { id: true, image: true },
+  });
+}
+
 export async function completeOnboarding(userId: string, data: ProfileData) {
   return prisma.user.update({
     where: { id: userId },

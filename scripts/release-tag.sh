@@ -54,12 +54,14 @@ git push origin "$VERSION"
 # CHANGELOG section for this version when extractable, otherwise auto-generated.
 if command -v gh >/dev/null 2>&1; then
   notes_file="$(mktemp)"
-  # Extract the "## [X.Y.Z]" (or "## X.Y.Z") section from CHANGELOG.md.
-  # Stop at the next "## " version heading only — "###" subsection headings
-  # (e.g. "### Bug Fixes") are part of the section and must not end capture.
+  # Extract the "[X.Y.Z]" (or "X.Y.Z") section from CHANGELOG.md. The heading
+  # level varies: conventional-changelog's angular preset writes minor/major
+  # releases as "# " and patches as "## ", so match any run of "#".
+  # Stop at the next *version* heading — a heading is only a version heading if
+  # a digit (or "[") follows, so "### Bug Fixes" stays part of the section.
   awk -v ver="${VERSION#v}" '
-    $0 ~ "^## \\[?" ver "\\]?" {capture=1; next}
-    capture && /^## / {exit}
+    $0 ~ "^#+ \\[?" ver "\\]?" {capture=1; next}
+    capture && /^#+ \[?[0-9]+\.[0-9]+\.[0-9]+/ {exit}
     capture {print}
   ' CHANGELOG.md > "$notes_file" || true
 

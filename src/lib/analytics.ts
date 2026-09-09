@@ -1,6 +1,28 @@
 'use client';
 
-import posthog from 'posthog-js';
+type PostHog = typeof import('posthog-js').default;
+
+/**
+ * posthog-js is 218 KB, and a static import puts it in the chunk every page
+ * downloads before it can be interactive — for a library whose whole job is to
+ * run *after* the page is usable. It is loaded on demand instead.
+ *
+ * The provider warms this on mount, so by the time a person can click anything
+ * the module is already there. Calls made before it resolves are queued rather
+ * than dropped: each one waits on the same promise, and posthog-js itself
+ * buffers events fired before `init`.
+ */
+let posthogPromise: Promise<PostHog> | null = null;
+
+export function loadPostHog(): Promise<PostHog> {
+  posthogPromise ??= import('posthog-js').then((m) => m.default);
+  return posthogPromise;
+}
+
+/** Fire-and-forget: analytics must never delay or break what the user is doing. */
+function withPostHog(use: (posthog: PostHog) => void): void {
+  void loadPostHog().then(use).catch(() => {});
+}
 
 /**
  * Whether PostHog is configured for this build. We gate on the presence of the
@@ -32,6 +54,8 @@ export type AnalyticsEvent =
   // ── Profile / account ────────────────────────────────────────────────
   | 'profile_updated'
   | 'password_changed'
+  | 'avatar_uploaded'
+  | 'avatar_removed'
   // ── Feedback / support ───────────────────────────────────────────────
   | 'support_link_clicked'
   | 'bug_report_clicked'
@@ -58,6 +82,16 @@ export type AnalyticsEvent =
   | 'document_status_changed'
   | 'document_deployed'
   | 'github_deploy_retried'
+  // ── Audio ────────────────────────────────────────────────────────────
+  | 'audio_generation_triggered'
+  | 'audio_regeneration_triggered'
+  | 'audio_playback_started'
+  | 'audio_url_copied'
+  | 'audio_generation_failed'
+  | 'audio_transcript_edited'
+  | 'audio_transcript_reset'
+  | 'audio_transcript_kept'
+  | 'audio_transcript_conflicted'
   // ── Suggestions / review threads ─────────────────────────────────────
   | 'suggestion_created'
   | 'suggestion_applied'
@@ -81,8 +115,9 @@ export type AnalyticsEvent =
   | 'source_project_status_toggled'
   | 'translation_project_created'
   | 'project_settings_saved'
-  | 'project_member_added'
-  | 'project_member_removed'
+  | 'language_member_added'
+  | 'language_member_role_changed'
+  | 'language_member_removed'
   // ── Admin ────────────────────────────────────────────────────────────
   | 'user_role_changed'
   | 'user_banned'
@@ -99,6 +134,7 @@ export type AnalyticsEvent =
   | 'language_instructions_saved'
   // ── Generic UI ───────────────────────────────────────────────────────
   | 'dialog_opened'
+  | 'document_type_filter_changed'
   | 'language_switched';
 
 export type AnalyticsProperties = Record<string, unknown>;
@@ -115,7 +151,7 @@ export function capture(
   properties?: AnalyticsProperties,
 ): void {
   if (!POSTHOG_ENABLED) return;
-  posthog.capture(event, properties);
+  withPostHog((posthog) => posthog.capture(event, properties));
 }
 
 /**
@@ -132,7 +168,7 @@ export function setProjectGroup(
   properties?: AnalyticsProperties,
 ): void {
   if (!POSTHOG_ENABLED) return;
-  posthog.group('project', projectId, properties);
+  withPostHog((posthog) => posthog.group('project', projectId, properties));
 }
 
 /**
@@ -148,7 +184,7 @@ export function setProjectGroup(
 export function setActiveLanguage(code: string, name?: string): void {
   if (!POSTHOG_ENABLED) return;
   if (!code) return;
-  posthog.register({ language: code, ...(name ? { language_name: name } : {}) });
+  withPostHog((posthog) => posthog.register({ language: code, ...(name ? { language_name: name } : {}) }));
 }
 
 /**
@@ -160,5 +196,5 @@ export function captureException(
   properties?: AnalyticsProperties,
 ): void {
   if (!POSTHOG_ENABLED) return;
-  posthog.captureException(error, properties);
+  withPostHog((posthog) => posthog.captureException(error, properties));
 }

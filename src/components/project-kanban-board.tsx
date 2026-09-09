@@ -1,6 +1,5 @@
 'use client';
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,19 +16,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import {
-  createDocumentAssignmentAction,
-  updateDocumentAssignmentAction,
-} from '@/domain/document-assignment/document-assignment.actions';
+  DocumentTypeFilterValue,
+  matchesDocumentTypeFilter,
+  parseDocumentTypeFilter,
+  serializeDocumentTypeFilter,
+} from '@/domain/document/document-type-filter';
+
 import {
   assignReviewerToVersionAction,
+  assignTranslatorToVersionAction,
   updateDocumentVersionStatusAction,
 } from '@/domain/document-version/document-version.actions';
 import { getDashboardDocumentsAction } from '@/domain/document/document.actions';
-import { listProjectMembersAction } from '@/domain/project-member/project-member.actions';
+import { listTranslationProjectMembersAction } from '@/domain/user-language/user-language.actions';
 import { DocumentSearchInput } from '@/components/document-search-input';
+import { UserAvatar } from '@/components/user-avatar';
+import { DocumentTypeBadge } from '@/components/document-type-badge';
+import { DocumentTypeFilter } from '@/components/document-type-filter';
 import { useActiveLanguage } from '@/components/analytics-project-group';
+import { useDeployConfirm } from '@/components/deploy-confirm';
 import { capture } from '@/lib/analytics';
-import { getCanonicalEditorPath } from '@/lib/document-status';
+import { buildDocumentPath } from '@/domain/document/document-url';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { toast } from 'sonner';
@@ -41,27 +48,22 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 // Radix Select doesn't allow empty string values, so we use a sentinel for "unassign"
 const UNASSIGN_VALUE = '__none__';
 
-const getInitials = (name: string | null | undefined) =>
-  (name ?? '')
-    .split(' ')
-    .map((n) => n.charAt(0))
-    .join('');
+const TYPE_FILTER_STORAGE_KEY = 'kanban:documentTypeFilter';
 
-type MemberLike = { id: string; name: string | null };
+type MemberLike = { id: string; name: string | null; email?: string | null; image?: string | null };
 
 function MemberAvatarStack({ users }: { users: MemberLike[] }) {
   return (
     <>
       {users.map((u) => (
-        <Avatar
+        <UserAvatar
           key={u.id}
+          name={u.name}
+          image={u.image}
+          email={u.email}
           size="sm"
-          name={u.name || undefined}
           className="border-2 border-background"
-          title={u.name || undefined}
-        >
-          <AvatarFallback name={u.name || undefined}>{getInitials(u.name)}</AvatarFallback>
-        </Avatar>
+        />
       ))}
     </>
   );
@@ -72,7 +74,7 @@ function MemberSelectItems({
   showUnassign,
   unassignLabel,
 }: {
-  members: { user: { id: string; name: string | null; email: string } }[];
+  members: { user: { id: string; name: string | null; email: string; image?: string | null } }[];
   showUnassign: boolean;
   unassignLabel: string;
 }) {
@@ -193,14 +195,15 @@ export default function ProjectKanbanBoard({
   sourceProjectId,
   translationProjectId,
 }: ProjectKanbanBoardProps) {
+  const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState('all');
+  const [selectedTypes, setSelectedTypes] = useState<DocumentTypeFilterValue[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignDocId, setAssignDocId] = useState<string | null>(null);
-  const [assignExistingId, setAssignExistingId] = useState<string | null>(null);
   const [assignVersionId, setAssignVersionId] = useState<string | null>(null);
   const [assignUserId, setAssignUserId] = useState('');
   const [assignReviewerId, setAssignReviewerId] = useState('');
@@ -220,6 +223,18 @@ export default function ProjectKanbanBoard({
     loadDocuments();
   }, [selectedLanguage, sourceProjectId]);
 
+  // Restored after mount rather than in the initial state so server and client
+  // render the same markup.
+  useEffect(() => {
+    setSelectedTypes(parseDocumentTypeFilter(localStorage.getItem(TYPE_FILTER_STORAGE_KEY)));
+  }, []);
+
+  function handleTypeFilterChange(types: DocumentTypeFilterValue[]) {
+    setSelectedTypes(types);
+    localStorage.setItem(TYPE_FILTER_STORAGE_KEY, serializeDocumentTypeFilter(types));
+    capture('document_type_filter_changed', { context: 'kanban', types, count: types.length });
+  }
+
   async function loadDocuments() {
     setLoading(true);
     try {
@@ -234,27 +249,17 @@ export default function ProjectKanbanBoard({
 
   useEffect(() => {
     if (translationProjectId && isAdmin) {
-      listProjectMembersAction(translationProjectId)
-        .then((members) => {
-          const seen = new Map<string, (typeof members)[number]>();
-          for (const m of members) {
-            if (!seen.has(m.user.id)) seen.set(m.user.id, m);
-          }
-          setProjectMembers(Array.from(seen.values()));
-        })
-        .catch(console.error);
+      listTranslationProjectMembersAction(translationProjectId).then(setProjectMembers).catch(console.error);
     }
   }, [translationProjectId, isAdmin]);
 
   function openAssignDialog(params: {
     docId: string;
-    existingAssignmentId: string | null;
     versionId?: string | null;
     currentTranslatorId?: string | null;
     currentReviewerId?: string | null;
   }) {
     setAssignDocId(params.docId);
-    setAssignExistingId(params.existingAssignmentId);
     setAssignVersionId(params.versionId ?? null);
     setAssignUserId(params.currentTranslatorId ?? '');
     setAssignReviewerId(params.currentReviewerId ?? '');
@@ -272,35 +277,33 @@ export default function ProjectKanbanBoard({
       const translatorId = !wantsUnassignTranslator && assignUserId ? assignUserId : null;
       const reviewerId = !wantsUnassignReviewer && assignReviewerId ? assignReviewerId : null;
 
-      if (wantsUnassignTranslator && assignExistingId) {
-        await updateDocumentAssignmentAction(assignExistingId, { userId: null });
-        toast.success('Translator unassigned');
-      } else if (wantsUnassignTranslator && !assignExistingId) {
-        await createDocumentAssignmentAction({
+      const changesTranslator = wantsUnassignTranslator || Boolean(translatorId) || Boolean(assignDeadline);
+      const changesReviewer = wantsUnassignReviewer || Boolean(reviewerId);
+
+      // Both sides live on the version now, and assigning creates it if the
+      // document has none yet — so no separate create/update paths. A
+      // reviewer-only change still goes through here first when the document has
+      // no version, since there would otherwise be nothing to set the reviewer on.
+      let versionId = assignVersionId;
+      if (changesTranslator || !versionId) {
+        const version = await assignTranslatorToVersionAction({
           documentId: assignDocId,
           translationProjectId,
-          userId: null,
+          userId: translatorId,
+          deadline: assignDeadline ? new Date(assignDeadline) : null,
         });
-        toast.success('Translator unassigned');
-      } else if (translatorId) {
-        if (assignExistingId) {
-          await updateDocumentAssignmentAction(assignExistingId, {
-            userId: translatorId,
-            deadline: assignDeadline ? new Date(assignDeadline) : null,
-          });
-        } else {
-          await createDocumentAssignmentAction({
-            documentId: assignDocId,
-            translationProjectId,
-            userId: translatorId,
-            deadline: assignDeadline ? new Date(assignDeadline) : null,
-          });
+        versionId = version.id;
+        if (wantsUnassignTranslator) {
+          toast.success('Translator unassigned');
+        } else if (translatorId) {
+          toast.success('Translator assigned!');
+        } else if (assignDeadline) {
+          toast.success('Deadline updated');
         }
-        toast.success('Translator assigned!');
       }
 
-      if (assignVersionId && (wantsUnassignReviewer || reviewerId)) {
-        await assignReviewerToVersionAction(assignVersionId, reviewerId);
+      if (changesReviewer) {
+        await assignReviewerToVersionAction(versionId, reviewerId);
         toast.success(wantsUnassignReviewer ? 'Reviewer unassigned' : 'Reviewer assigned!');
       }
 
@@ -322,25 +325,16 @@ export default function ProjectKanbanBoard({
   }
 
   const availableUsers = useMemo(() => {
-    const userMap = new Map<string, { id: string; name: string; email: string }>();
+    const userMap = new Map<string, { id: string; name: string; email: string; image: string | null }>();
 
     documents.forEach((doc) => {
-      doc.assignments?.forEach((assignment: any) => {
-        if (assignment?.user) {
-          userMap.set(assignment.user.id, {
-            id: assignment.user.id,
-            name: assignment.user.name,
-            email: assignment.user.email,
-          });
-        }
-      });
-
       doc.versions?.forEach((version: any) => {
         if (version?.user) {
           userMap.set(version.user.id, {
             id: version.user.id,
             name: version.user.name,
             email: version.user.email,
+            image: version.user.image ?? null,
           });
         }
       });
@@ -350,6 +344,10 @@ export default function ProjectKanbanBoard({
   }, [documents]);
 
   const filteredDocuments = documents.filter((doc) => {
+    if (!matchesDocumentTypeFilter(doc.type, selectedTypes)) {
+      return false;
+    }
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       if (!doc.title.toLowerCase().includes(query) && !doc.slug.toLowerCase().includes(query)) {
@@ -361,15 +359,8 @@ export default function ProjectKanbanBoard({
       return true;
     }
 
-    if (selectedUser === 'me') {
-      const hasAssignment = doc.assignments?.some((assignment: any) => assignment?.user?.id === user.id);
-      const hasVersion = doc.versions?.some((version: any) => version?.user?.id === user.id);
-      return hasAssignment || hasVersion;
-    }
-
-    const hasAssignment = doc.assignments?.some((assignment: any) => assignment?.user?.id === selectedUser);
-    const hasVersion = doc.versions?.some((version: any) => version?.user?.id === selectedUser);
-    return hasAssignment || hasVersion;
+    const matchUserId = selectedUser === 'me' ? user.id : selectedUser;
+    return doc.versions?.some((version: any) => version?.user?.id === matchUserId) ?? false;
   });
 
   const getDeployedTimestamp = (version: any): Date | null => {
@@ -444,8 +435,28 @@ export default function ProjectKanbanBoard({
         const versionId = hasVersion ? doc.versions[0].id : null;
 
         if (newStatus && versionId) {
+          if (newStatus === DocumentStatus.DEPLOYED && !(await confirmDeploy(versionId))) {
+            await loadDocuments();
+            continue;
+          }
           try {
-            await updateDocumentVersionStatusAction(versionId, newStatus);
+            const result = await updateDocumentVersionStatusAction(versionId, newStatus);
+            if (result.github?.status === 'success') {
+              toast.success(
+                result.github.prUrl ? 'GitHub PR created successfully' : 'Deployed to GitHub successfully',
+                {
+                  action: result.github.prUrl
+                    ? { label: 'Open PR', onClick: () => window.open(result.github!.prUrl, '_blank') }
+                    : undefined,
+                  duration: 8000,
+                },
+              );
+            } else if (result.github?.status === 'failed') {
+              toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
+            }
+            if (result.audio?.status === 'failed') {
+              toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
+            }
             capture('document_status_changed', {
               from: getStatusForColumn(oldCard.column),
               to: newStatus,
@@ -468,12 +479,14 @@ export default function ProjectKanbanBoard({
 
   return (
     <div>
-      <div className="flex gap-4 items-center mb-4">
+      {deployDialog}
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <DocumentSearchInput value={searchQuery} onChange={setSearchQuery} />
-        <div className="flex gap-4 items-center text-sm text-gray-600">
-          <span>Filters:</span>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-4">
+          <span className="hidden sm:inline">Filters:</span>
+          <DocumentTypeFilter selected={selectedTypes} onChange={handleTypeFilterChange} />
           <Select value={selectedUser} onValueChange={setSelectedUser}>
-            <SelectTrigger className="min-w-[200px]">
+            <SelectTrigger className="min-w-0 flex-1 sm:min-w-[200px]">
               <div className="flex items-center gap-2">
                 <SelectValue placeholder="All users" className="[&_div]:hidden! [&_span:last-child]:inline!" />
               </div>
@@ -482,9 +495,13 @@ export default function ProjectKanbanBoard({
               <SelectItem value="all">All users</SelectItem>
               <SelectItem value="me">
                 <div className="flex items-center gap-2">
-                  <Avatar size="sm" name={user.name || undefined} className="pointer-events-none">
-                    <AvatarFallback name={user.name || undefined}>{getInitials(user.name)}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={user.name}
+                    image={user.image}
+                    email={user.email}
+                    size="sm"
+                    className="pointer-events-none"
+                  />
                   <span>Me</span>
                 </div>
               </SelectItem>
@@ -493,9 +510,13 @@ export default function ProjectKanbanBoard({
                 .map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     <div className="flex items-center gap-2">
-                      <Avatar size="sm" name={u.name || undefined} className="pointer-events-none">
-                        <AvatarFallback name={u.name || undefined}>{getInitials(u.name)}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        name={u.name}
+                        image={u.image}
+                        email={u.email}
+                        size="sm"
+                        className="pointer-events-none"
+                      />
                       <span>{u.name}</span>
                     </div>
                   </SelectItem>
@@ -513,6 +534,11 @@ export default function ProjectKanbanBoard({
         <div className="text-center py-12">
           <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
           <p className="text-gray-500">No documents found</p>
+          {selectedTypes.length > 0 && documents.length > 0 && (
+            <Button variant="link" size="sm" onClick={() => handleTypeFilterChange([])}>
+              Clear type filter
+            </Button>
+          )}
         </div>
       ) : (
         <div className="h-[calc(100vh-350px)]">
@@ -530,17 +556,18 @@ export default function ProjectKanbanBoard({
                     const doc = card.document;
                     const hasVersion = doc.versions && doc.versions.length > 0;
                     const version = hasVersion ? doc.versions[0] : null;
-                    const assignment = doc.assignments?.[0];
                     const language = version?.language || languages.find((l) => l.id === selectedLanguage);
-                    const deadline = assignment?.deadline || doc.deadline;
+                    const deadline = version?.deadline || doc.deadline;
                     const hasWaitingForFinalLabel =
                       version?.status === DocumentStatus.PENDING_REVIEW &&
                       doc.labels?.includes('Waiting for final label');
 
                     const getDocumentUrl = () =>
-                      getCanonicalEditorPath(doc.id, hasVersion ? (version?.status ?? null) : null, {
-                        versionId: hasVersion ? version?.id : undefined,
-                        lang: selectedLanguage,
+                      buildDocumentPath({
+                        projectIdentifier: doc.sourceProject?.identifier,
+                        slug: doc.slug,
+                        languageCode: language?.code ?? '',
+                        documentId: doc.id,
                       });
 
                     const cardsInColumn = kanbanData.filter((c) => c.column === column.id);
@@ -584,16 +611,16 @@ export default function ProjectKanbanBoard({
                                 )}
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   {(() => {
-                                    // Show relevant user based on document status
-                                    // If assignment exists with userId=null, treat as unassigned
-                                    const translator = assignment ? (assignment.userId ? assignment.user : null) : version?.user;
+                                    // Show relevant user based on document status.
+                                    // A version with no translator is unassigned.
+                                    const translator = version?.user ?? null;
                                     const reviewer = version?.reviewer;
                                     const isUnassigned = !translator;
 
                                     // For PENDING_REVIEW: show reviewer
                                     // For IN_PROGRESS: show translator
                                     // For APPROVED/DEPLOYED: show both
-                                    const usersToShow: { name: string; id: string }[] = [];
+                                    const usersToShow: { name: string; id: string; image?: string | null }[] = [];
 
                                     if (version?.status === DocumentStatus.PENDING_REVIEW && reviewer) {
                                       usersToShow.push(reviewer);
@@ -614,9 +641,8 @@ export default function ProjectKanbanBoard({
                                             e.stopPropagation();
                                             openAssignDialog({
                                               docId: doc.id,
-                                              existingAssignmentId: assignment?.id || null,
                                               versionId: version?.id || null,
-                                              currentTranslatorId: assignment?.userId || version?.user?.id || null,
+                                              currentTranslatorId: version?.user?.id || null,
                                               currentReviewerId: version?.reviewer?.id || null,
                                             });
                                           }}
@@ -638,9 +664,8 @@ export default function ProjectKanbanBoard({
                                             e.stopPropagation();
                                             openAssignDialog({
                                               docId: doc.id,
-                                              existingAssignmentId: assignment?.id || null,
                                               versionId: version?.id || null,
-                                              currentTranslatorId: assignment?.userId || version?.user?.id || null,
+                                              currentTranslatorId: version?.user?.id || null,
                                               currentReviewerId: version?.reviewer?.id || null,
                                             });
                                           }}
@@ -661,6 +686,7 @@ export default function ProjectKanbanBoard({
                                 </div>
                               </div>
                               <div className="flex flex-wrap gap-1 items-center">
+                                <DocumentTypeBadge type={doc.type} />
                                 {doc.sourceProject && (
                                   <Badge variant="secondary" size="xs">
                                     {doc.sourceProject.name}
@@ -706,25 +732,23 @@ export default function ProjectKanbanBoard({
                 <SelectContent>
                   <MemberSelectItems
                     members={projectMembers}
-                    showUnassign={Boolean(assignExistingId || assignUserId)}
+                    showUnassign={Boolean(assignUserId)}
                     unassignLabel="Unassign translator"
                   />
                 </SelectContent>
               </Select>
             </div>
-            {assignVersionId && (
-              <div className="space-y-2">
-                <Label>Reviewer</Label>
-                <Select value={assignReviewerId} onValueChange={setAssignReviewerId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select reviewer..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <MemberSelectItems members={projectMembers} showUnassign unassignLabel="Unassign reviewer" />
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>Reviewer</Label>
+              <Select value={assignReviewerId} onValueChange={setAssignReviewerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select reviewer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <MemberSelectItems members={projectMembers} showUnassign unassignLabel="Unassign reviewer" />
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Deadline (optional)</Label>
               <Input type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} />
@@ -734,7 +758,10 @@ export default function ProjectKanbanBoard({
             <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAssign} disabled={(!assignUserId && !assignReviewerId) || assignSaving}>
+            <Button
+              onClick={handleAssign}
+              disabled={(!assignUserId && !assignReviewerId && !assignDeadline) || assignSaving}
+            >
               {assignSaving ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>

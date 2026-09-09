@@ -404,16 +404,18 @@ Both translators and deployers can create, translate, review, and approve docume
 
 ### Project Roles
 
-Within each Translation Project, members can be assigned roles. These roles primarily control **document assignment** and **project management** capabilities. Note that review and approval permissions are currently open to all users at the global level.
+Roles are assigned **per language**, not per project. Being a Czech Reviewer makes you a reviewer on every Czech translation project — including projects created later. Adding a new source project therefore needs no per-project team setup: each language team can work on it right away.
 
-_Note: This is still in progress and it will be changed. We will move from "language" permissions to project permissions._
+Each person has one role per language, and can hold different roles in different languages (for example Czech Reviewer and Slovak Translator). These roles primarily control **document assignment** and **project management** capabilities. Note that review and approval permissions are currently open to all users at the global level.
 
-| Project Role        | Primary Purpose                                                            |
-| ------------------- | -------------------------------------------------------------------------- |
-| **Project Manager** | Assign documents to team members, manage project membership, set deadlines |
-| **Reviewer**        | Designated reviewer for assigned translations                              |
-| **Editor**          | Edit translations directly                                                 |
-| **Translator**      | Translate assigned documents                                               |
+| Project Role        | Primary Purpose                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| **Project Manager** | Assign documents to team members, manage the language team, set deadlines          |
+| **Reviewer**        | Designated reviewer for assigned translations                                      |
+| **Editor**          | Edit translations directly                                                         |
+| **Translator**      | Translate assigned documents                                                       |
+
+Manage a language team from any translation project in that language, on its **Team** tab. Removing someone there removes their access to every project in that language.
 
 ---
 

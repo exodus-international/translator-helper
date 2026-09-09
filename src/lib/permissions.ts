@@ -3,13 +3,13 @@ import { SessionUser } from './session';
 import {
   isUserProjectManagerForSourceProject as isUserProjectManagerForSourceProjectRepo,
   isUserMemberOfSourceProject as isUserMemberOfSourceProjectRepo,
-} from '@/domain/project-member/project-member.repository';
+} from '@/domain/user-language/user-language.repository';
 
 // ─── Source-project-scoped permissions ───────────────────────
-// These check membership across translation projects within a source project.
-// They use different DB queries than the authorize() gateway (which operates
-// on translation project IDs), so they remain here until source-project
-// permissions are integrated into the gateway.
+// These check whether any of the user's languages has a translation project
+// under the source project. They use different DB queries than the authorize()
+// gateway (which operates on translation project IDs), so they remain here
+// until source-project permissions are integrated into the gateway.
 
 export async function canAccessSourceProject(user: SessionUser, sourceProjectId: string): Promise<boolean> {
   if (user.role === Role.ADMIN) {

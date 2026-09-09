@@ -37,7 +37,7 @@ export async function createSuggestionAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = createSuggestionSchema.parse(input);
 
-  const { version: documentVersion, translationProject } = await resolveTranslationProject(validated.documentVersionId);
+  const { translationProject } = await resolveTranslationProject(validated.documentVersionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'reviewer' });
@@ -79,7 +79,7 @@ export async function createSuggestionAction(input: unknown) {
     },
   });
 
-  revalidatePath(`/documents/${documentVersion.documentId}/review`);
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
 
   return suggestion;
 }
@@ -161,7 +161,7 @@ export async function applySuggestionAction(input: unknown) {
     },
   });
 
-  revalidatePath(`/documents/${documentVersion.documentId}/review`);
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
 
   return updatedVersion;
 }
@@ -180,7 +180,7 @@ export async function dismissSuggestionAction(input: unknown) {
     throw new Error('Only open suggestions can be dismissed');
   }
 
-  const { version: documentVersion, translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
+  const { translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'translator' });
@@ -208,7 +208,7 @@ export async function dismissSuggestionAction(input: unknown) {
     },
   });
 
-  revalidatePath(`/documents/${documentVersion.documentId}/review`);
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
 
   return updated;
 }
@@ -261,7 +261,7 @@ export async function reopenSuggestionAction(input: unknown) {
         },
       });
 
-      revalidatePath(`/documents/${documentVersion.documentId}/review`);
+      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
 
       return { suggestion: await getSuggestionById(validated.suggestionId), updatedVersion };
     }
@@ -280,7 +280,7 @@ export async function reopenSuggestionAction(input: unknown) {
     },
   });
 
-  revalidatePath(`/documents/${documentVersion.documentId}/review`);
+  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
 
   return { suggestion: await getSuggestionById(validated.suggestionId) };
 }
@@ -320,7 +320,7 @@ export async function editSuggestionAction(input: unknown) {
   });
 
   if (documentVersion) {
-    revalidatePath(`/documents/${documentVersion.documentId}/review`);
+    revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   }
 
   return updated;
