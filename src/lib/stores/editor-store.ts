@@ -50,7 +50,7 @@ interface MemberInfo {
 type DialogState =
   | { type: 'closed' }
   | { type: 'submitReview'; reviewers: MemberInfo[] }
-  | { type: 'assignTranslator'; members: MemberInfo[] }
+  | { type: 'assignTranslator'; members: MemberInfo[]; deadline: Date | string | null }
   | { type: 'assignReviewer'; candidates: MemberInfo[] };
 
 export interface EditorStoreConfig {
@@ -448,11 +448,11 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     openAssignTranslatorDialog: async () => {
-      const { translationProjectId } = get();
+      const { translationProjectId, targetVersion } = get();
       if (!translationProjectId) return;
       try {
         const members = await listTranslationProjectMembersAction(translationProjectId);
-        set({ dialog: { type: 'assignTranslator', members } });
+        set({ dialog: { type: 'assignTranslator', members, deadline: targetVersion?.deadline ?? null } });
         capture('dialog_opened', { dialog: 'assign_translator' });
       } catch (error) {
         toast.error('Failed to load team members');
