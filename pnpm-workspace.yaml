@@ -1,5 +1,13 @@
 minimumReleaseAgeExclude:
   - dompurify@3.4.15
+  # Both were published within the release-age cooldown, so a fresh resolution
+  # rolls the lockfile back to lucide-react@1.43.0 / fallow@3.23.0 rather than
+  # failing — a silent downgrade nobody reviews. The fallow entries have no
+  # version because its platform binaries ship in lockstep with the CLI.
+  - lucide-react@1.44.0
+  - fallow@3.24.1
+  - fallow-type-aware
+  - "@fallow-cli/*"
 
 overrides:
   "@monaco-editor/loader": ^1.7.0
