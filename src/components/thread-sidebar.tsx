@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@/generated/prisma/enums';
 import { ChevronDown, ChevronRight, MessageSquarePlus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { SuggestionWithUser } from './monaco-suggestion-decorations';
+import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import { ThreadCard } from './thread-card';
 
 interface ThreadSidebarProps {

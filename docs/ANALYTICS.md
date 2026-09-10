@@ -45,7 +45,7 @@ groups: it reflects the user's most-recently-worked language until changed or lo
    ensure a group type named `project` exists (it's created automatically once events
    with `$groups.project` arrive).
 2. **Enable Session Replay** (optional, recommended): Project → Settings → *Replay*.
-   ⚠️ Before enabling, add masking for translation content (Monaco editor, rendered
+   ⚠️ Before enabling, add masking for translation content (the code editor, rendered
    markdown, suggestion text) so real user content isn't recorded. Ask before turning
    this on.
 3. **Enable Error Tracking:** Project → Settings → *Error Tracking* (the SDK already
