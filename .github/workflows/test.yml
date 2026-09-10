@@ -11,6 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # fallow --changed-since diffs against the base branch, which shallow
+          # clones do not contain.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -35,3 +39,10 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # Scoped to the files this PR touches: tsc and eslint see neither an
+      # export nobody imports nor a Server Action nobody calls, and unscoped it
+      # would fail on debt the PR did not introduce.
+      - name: Dead code
+        if: github.event_name == 'pull_request'
+        run: pnpm exec fallow dead-code --changed-since "origin/${{ github.base_ref }}"
