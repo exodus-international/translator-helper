@@ -30,7 +30,7 @@ import { buildListSearchParams, DEFAULT_PAGE_SIZE } from '@/lib/list-params';
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { Language } from '@/generated/prisma/client';
+import type { Language } from '@/generated/prisma/client';
 import { DocumentStatus, DocumentType } from '@/generated/prisma/enums';
 import { ArrowDown, ArrowUp, ArrowUpDown, FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';

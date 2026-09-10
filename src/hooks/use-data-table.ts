@@ -280,9 +280,9 @@ export function useDataTable<TData extends RowData>(props: UseDataTableProps<TDa
     [debouncedSetFilterValues, filterableColumns],
   );
 
-  // React Compiler cannot memoize around useTable: TanStack returns
-  // functions whose identity it cannot prove stable, so it skips compiling this
-  // hook. That is inherent to the library and not something we can restructure.
+  // v9's useTable is compiler-safe (the react-hooks/incompatible-library
+  // rule no longer fires on it), but the hook is still excluded from
+  // compilation because the table instance mutates between renders.
   const table = useTable({
     ...tableProps,
     columns,

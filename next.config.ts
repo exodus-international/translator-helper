@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
     // own multipart overhead, not for bigger pictures.
     serverActions: { bodySizeLimit: '3mb' },
   },
+  // The /releases page reads release-notes/*.md from disk at request time.
+  // File tracing only picks up files reachable through static imports/requires,
+  // so a directory read like this needs to be listed explicitly or it's
+  // silently dropped from the deployed serverless bundle.
+  outputFileTracingIncludes: {
+    '/releases': ['./release-notes/**/*.md'],
+  },
 };
 
 export default withSentryConfig(nextConfig, {
