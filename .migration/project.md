@@ -34,7 +34,7 @@ label, separator, button, badge, checkbox, tabs, tooltip, scroll-area, popover, 
 
 ## FLAG (whole-project, legacy style)
 
-- **components.json still says `"style": "new-york"` (no explicit `base` key; the CLI resolves it as radix).** Future `shadcn add` runs will deliver radix-flavored wrappers that conflict with these migrated files. Options: switch style/base when a base-new-york equivalent exists, adopt a `base-*` style intentionally (restyle risk), or add components manually. User decision — not changed.
+- **components.json `style` was `new-york` (no `base` key exists in the schema; the CLI resolved that as radix).** RESOLVED 2026-09-10: set to `base-vega`, chosen because it is the base successor that keeps this project's shape language (`rounded-md`, `shadow-xs`, `h-9`/`h-8`/`h-10`) where `base-nova` moves to `rounded-lg` and `base-maia`/`base-luma` to pill shapes. `npx shadcn@latest info` now reports `base: base` and `docs` resolves to base-ui.com. This only affects what the CLI adds/diffs going forward; no existing file was restyled. Note upstream base-vega has since evolved variant styling (tinted `destructive`, `data-icon` slots) versus these hand-migrated files, so `add --diff` will show those as upstream drift.
 - Base UI Portal renders a wrapping `<div>` (radix rendered none) — spot-check nested dialog/portaled z-index stacking.
 - Default collision padding is 5 (radix 0) and collision boundary defaults to clipping ancestors — edge-anchored popovers may sit a few px differently.
 

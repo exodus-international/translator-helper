@@ -1,5 +1,6 @@
 'use client';
 
+import type * as React from 'react';
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { SidebarSection } from '@/components/sidebar-section';
@@ -32,10 +33,16 @@ interface GitHubCommitData {
   createdAt: string | Date;
 }
 
-const PR_STATUS_COLORS: Record<string, string> = {
-  OPEN: 'bg-green-100 text-green-800',
-  MERGED: 'bg-purple-100 text-purple-800',
-  CLOSED: 'bg-red-100 text-red-800',
+/**
+ * Badge's variants already carry both themes, so the chips only pick one.
+ * Merged has no variant of its own — purple is GitHub's own convention for it,
+ * so it borrows the violet status hue in the same soft-fill shape the other
+ * three use.
+ */
+const PR_STATUS_BADGE: Record<string, React.ComponentProps<typeof Badge>> = {
+  OPEN: { variant: 'success' },
+  MERGED: { variant: 'secondary', className: 'bg-hue-violet/10 text-hue-violet dark:bg-hue-violet/20' },
+  CLOSED: { variant: 'destructive' },
 };
 
 export function GitHubStatus({ documentVersionId, isDeployed, compact = false, frame = 'card' }: GitHubStatusProps) {
@@ -91,18 +98,18 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false, f
         <span className="flex items-center gap-1.5 text-xs font-medium">
           {loading && <Loader2 className="h-3 w-3 animate-spin" />}
           {!loading && !latest && <span className="text-muted-foreground">Not deployed</span>}
-          {!loading && latest?.errorMessage && <span className="text-red-600">Deploy failed</span>}
+          {!loading && latest?.errorMessage && <span className="text-destructive">Deploy failed</span>}
           {!loading && latest && !latest.errorMessage && latest.prNumber && (
             <>
               {latest.prUrl ? (
-                <a href={latest.prUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                <a href={latest.prUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-4 hover:underline">
                   PR #{latest.prNumber}
                 </a>
               ) : (
                 <span>PR #{latest.prNumber}</span>
               )}
               {latest.prStatus && (
-                <Badge className={`${PR_STATUS_COLORS[latest.prStatus] || ''} px-1.5 py-0 text-[10px]`}>{latest.prStatus}</Badge>
+                <Badge {...PR_STATUS_BADGE[latest.prStatus]}>{latest.prStatus}</Badge>
               )}
             </>
           )}
@@ -118,16 +125,16 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false, f
 
 
       {loading && (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading GitHub status...
         </div>
       )}
 
       {!loading && commits.length === 0 && (
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-muted-foreground">
           <p>No GitHub deployment found for this version.</p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={handleRetry} disabled={retrying}>
+          <Button variant="outline" className="mt-2" onClick={handleRetry} disabled={retrying}>
             <RefreshCw className={`h-3 w-3 mr-1 ${retrying ? 'animate-spin' : ''}`} />
             {retrying ? 'Deploying...' : 'Deploy to GitHub'}
           </Button>
@@ -139,12 +146,12 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false, f
           {commits.map((commit) => (
             <div key={commit.id} className={frame === 'section' ? 'space-y-1.5 min-w-0' : 'border rounded p-3 space-y-1.5 min-w-0'}>
               {commit.errorMessage ? (
-                <div className="flex items-start gap-2 text-red-600">
+                <div className="flex items-start gap-2 text-destructive">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-medium">Deploy failed</p>
                     <p className="text-sm">{commit.errorMessage}</p>
-                    <Button variant="outline" size="sm" className="mt-2" onClick={handleRetry} disabled={retrying}>
+                    <Button variant="outline" className="mt-2" onClick={handleRetry} disabled={retrying}>
                       <RefreshCw className={`h-3 w-3 mr-1 ${retrying ? 'animate-spin' : ''}`} />
                       {retrying ? 'Retrying...' : 'Retry Deploy'}
                     </Button>
@@ -153,29 +160,29 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false, f
               ) : (
                 <>
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-500">Commit:</span>
-                    <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">{commit.commitSha.substring(0, 7)}</code>
+                    <span className="text-muted-foreground">Commit:</span>
+                    <code className="bg-muted px-2 py-0.5 rounded text-xs">{commit.commitSha.substring(0, 7)}</code>
                   </div>
 
                   <div className="flex items-start gap-2 text-sm min-w-0">
-                    <span className="text-gray-500 shrink-0">Branch:</span>
+                    <span className="text-muted-foreground shrink-0">Branch:</span>
                     <span className="break-all">{commit.branchName}</span>
                   </div>
 
                   <div className="flex items-start gap-2 text-sm min-w-0">
-                    <span className="text-gray-500 shrink-0">File:</span>
-                    <code className="bg-gray-100 px-2 py-0.5 rounded text-xs break-all">{commit.filePath}</code>
+                    <span className="text-muted-foreground shrink-0">File:</span>
+                    <code className="bg-muted px-2 py-0.5 rounded text-xs break-all">{commit.filePath}</code>
                   </div>
 
                   {commit.prNumber && (
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-500">PR:</span>
+                      <span className="text-muted-foreground">PR:</span>
                       {commit.prUrl ? (
                         <a
                           href={commit.prUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline flex items-center gap-1"
+                          className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
                         >
                           #{commit.prNumber}
                           <ExternalLink className="h-3 w-3" />
@@ -184,7 +191,7 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false, f
                         <span>#{commit.prNumber}</span>
                       )}
                       {commit.prStatus && (
-                        <Badge className={PR_STATUS_COLORS[commit.prStatus] || ''}>{commit.prStatus}</Badge>
+                        <Badge {...PR_STATUS_BADGE[commit.prStatus]}>{commit.prStatus}</Badge>
                       )}
                     </div>
                   )}

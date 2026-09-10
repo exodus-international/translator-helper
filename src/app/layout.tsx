@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { cookies } from 'next/headers';
 import './globals.css';
 import { getCurrentUser } from '@/lib/session';
-import { Navigation } from '@/components/navigation';
+import { SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
+import { AppShell } from '@/components/app-shell';
+import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackButton } from '@/components/feedback-button';
 import { PostHogProvider } from '@/components/posthog-provider';
@@ -54,18 +57,24 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
+  // First paint already has the width the user last chose.
+  const sidebarOpen = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value !== 'false';
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <PostHogProvider user={user}>
-          <NuqsAdapter>
-            <Navigation user={user} />
-            {children}
-            <FeedbackButton />
-            <Toaster />
-          </NuqsAdapter>
-        </PostHogProvider>
+        <ThemeProvider>
+          <PostHogProvider user={user}>
+            <NuqsAdapter>
+              <AppShell user={user} defaultOpen={sidebarOpen}>
+                {children}
+              </AppShell>
+              {/* Signed-in users get these two links in the sidebar footer instead. */}
+              {!user && <FeedbackButton />}
+              <Toaster />
+            </NuqsAdapter>
+          </PostHogProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -6,13 +6,19 @@ import { AnnouncementModal, AnnouncementModalData } from '@/components/announcem
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { buildDocumentPath } from '@/domain/document/document-url';
 import ProjectCard from '@/components/project-card';
-import { PageHeader } from '@/components/page-header';
 import { UserAvatar } from '@/components/user-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
@@ -151,10 +157,10 @@ function PersonCell({ person, isYou }: { person: Person | null; isYou?: boolean 
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      <UserAvatar name={person.name} image={person.image} email={person.email} size="xs" />
+      <UserAvatar name={person.name} image={person.image} email={person.email} />
       <span className="text-sm text-muted-foreground">{person.name}</span>
       {isYou && (
-        <Badge variant="primary" appearance="light" size="xs">
+        <Badge variant="default">
           You
         </Badge>
       )}
@@ -282,7 +288,7 @@ function WorkTable({ items, onNavigate }: { items: WorkItem[]; onNavigate: (url:
                       {statusConfig.name}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border border-gray-200 bg-gray-50 text-gray-500">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-0.5 border bg-muted text-muted-foreground">
                       Not started
                     </span>
                   )}
@@ -381,9 +387,9 @@ export default function DashboardClient({
       setCreateDialogOpen(false);
       resetNewProject();
       router.refresh();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating project:', error);
-      toast.error(error.message || 'Failed to create project');
+      toast.error(error instanceof Error ? error.message : 'Failed to create project');
     } finally {
       setCreateLoading(false);
     }
@@ -402,73 +408,69 @@ export default function DashboardClient({
     <>
       {announcements.banner && <AnnouncementBanner announcement={announcements.banner} />}
       {announcements.modal && <AnnouncementModal announcement={announcements.modal} />}
-      <div className="min-h-screen bg-background">
-        <PageHeader
-          title="Dashboard"
-          description={
-            <div className="flex items-center gap-2">
-              <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" eager />
-              <span>Welcome back, {user.name}</span>
-            </div>
-          }
-        >
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </PageHeader>
-
-        <div className="container mx-auto px-4 py-6 space-y-8">
+      <div className="px-4 py-6 space-y-8">
           {/* Projects section */}
           <section>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
               <h2 className="text-lg font-semibold">My Projects</h2>
-              {isAdminClient(user) && (
-                <Dialog
-                  open={createDialogOpen}
-                  onOpenChange={(open) => {
-                    setCreateDialogOpen(open);
-                    if (open) {
-                      capture('dialog_opened', { dialog: 'create_source_project' });
-                    }
-                    if (!open) resetNewProject();
-                  }}
-                >
-                  <DialogTrigger render={<Button size="sm" />}>
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    New Project
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create New Project</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateProject} className="space-y-4">
-                      <ProjectFormFields values={newProject} onChange={setNewProject} idPrefix="new-project" />
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button type="submit" disabled={createLoading || !isProjectFormComplete(newProject)}>
-                          {createLoading ? 'Creating...' : 'Create Project'}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
+              <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
+                <InputGroup className="w-full sm:w-64">
+                  <InputGroupInput
+                    placeholder="Search projects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <InputGroupAddon>
+                    <Search />
+                  </InputGroupAddon>
+                </InputGroup>
+                {isAdminClient(user) && (
+                  <Dialog
+                    open={createDialogOpen}
+                    onOpenChange={(open) => {
+                      setCreateDialogOpen(open);
+                      if (open) {
+                        capture('dialog_opened', { dialog: 'create_source_project' });
+                      }
+                      if (!open) resetNewProject();
+                    }}
+                  >
+                    <DialogTrigger render={<Button />}>
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      New Project
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create New Project</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleCreateProject} className="space-y-4">
+                        <ProjectFormFields values={newProject} onChange={setNewProject} idPrefix="new-project" />
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={createLoading || !isProjectFormComplete(newProject)}>
+                            {createLoading ? 'Creating...' : 'Create Project'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </div>
             {filteredProjects.length === 0 ? (
-              <div className="text-center py-12">
-                <FolderOpen className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">
-                  {searchQuery ? 'No projects match your search' : 'No projects available'}
-                </p>
-              </div>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <FolderOpen />
+                  </EmptyMedia>
+                  <EmptyTitle>No projects yet</EmptyTitle>
+                  <EmptyDescription>
+                    {searchQuery ? 'No projects match your search.' : 'Create a project to start translating documents.'}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredProjects.map((project) => (
@@ -484,7 +486,7 @@ export default function DashboardClient({
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">
                   Waiting for Deploy
-                  <Badge variant="secondary" size="sm" className="ml-2">
+                  <Badge variant="secondary" className="ml-2">
                     {filteredApprovedVersions.length}
                   </Badge>
                 </h2>
@@ -591,23 +593,28 @@ export default function DashboardClient({
             <h2 className="text-lg font-semibold mb-4">
               My Work
               {workItems.length > 0 && (
-                <Badge variant="secondary" size="sm" className="ml-2">
+                <Badge variant="secondary" className="ml-2">
                   {workItems.length}
                 </Badge>
               )}
             </h2>
             {workItems.length === 0 ? (
-              <div className="text-center py-12">
-                <ClipboardList className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-500">No active work assigned to you</p>
-              </div>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <ClipboardList />
+                  </EmptyMedia>
+                  <EmptyTitle>No active work</EmptyTitle>
+                  <EmptyDescription>No translations or reviews are assigned to you right now.</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               <div className="space-y-6">
                 {needsYouItems.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium mb-2">
                       Needs you
-                      <Badge variant="secondary" size="sm" className="ml-2">
+                      <Badge variant="secondary" className="ml-2">
                         {needsYouItems.length}
                       </Badge>
                     </h3>
@@ -618,7 +625,7 @@ export default function DashboardClient({
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-2">
                       Waiting on others
-                      <Badge variant="secondary" size="sm" className="ml-2">
+                      <Badge variant="secondary" className="ml-2">
                         {waitingItems.length}
                       </Badge>
                     </h3>
@@ -631,7 +638,6 @@ export default function DashboardClient({
             )}
           </section>
         </div>
-      </div>
     </>
   );
 }

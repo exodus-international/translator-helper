@@ -159,7 +159,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
               onChange={(e) => setBranchName(e.target.value)}
               placeholder="e.g., hr-croatian-translation"
             />
-            <p className="text-xs text-gray-500 mt-1">Branch in the content repo for this language</p>
+            <p className="text-xs text-muted-foreground mt-1">Branch in the content repo for this language</p>
           </div>
           {editingLanguage && (
             <>
@@ -178,7 +178,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
                     <SelectItem value={AudioProvider.AZURE_SPEECH}>Azure Speech</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-500 mt-1">Approved translations in this language get generated audio</p>
+                <p className="text-xs text-muted-foreground mt-1">Approved translations in this language get generated audio</p>
               </div>
               {audioProvider !== 'NONE' && (
                 <div>
@@ -190,7 +190,7 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
                     placeholder="e.g., cs-CZ-AntoninNeural"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Provider voice id. Team policy is the male voice per locale.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Provider voice id. Team policy is the male voice per locale.</p>
                 </div>
               )}
             </>
@@ -203,9 +203,9 @@ export default function LanguagesClient({ languages: initialLanguages }: Languag
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-lg">{language.name}</h3>
-              <p className="text-sm text-gray-600">Code: {language.code}</p>
-              {language.branchName && <p className="text-xs text-gray-500">Branch: {language.branchName}</p>}
-              {language.audioVoice && <p className="text-xs text-gray-500">Voice: {language.audioVoice}</p>}
+              <p className="text-sm text-muted-foreground">Code: {language.code}</p>
+              {language.branchName && <p className="text-xs text-muted-foreground">Branch: {language.branchName}</p>}
+              {language.audioVoice && <p className="text-xs text-muted-foreground">Voice: {language.audioVoice}</p>}
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => handleEdit(language)}>

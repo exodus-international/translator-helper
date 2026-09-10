@@ -4,19 +4,23 @@ import { Skeleton } from '@/components/ui/skeleton';
 // mirrors page.client.tsx so nothing shifts when the real table arrives.
 export default function DocumentsLoading() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+    <>
+      <div className="px-4 py-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
             <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-9 w-28" />
+            <Skeleton className="h-4 w-64" />
           </div>
-          <Skeleton className="mt-4 h-10 w-full max-w-md" />
+          <Skeleton className="h-9 w-28" />
+        </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+          <Skeleton className="h-10 w-full sm:max-w-md" />
+          <Skeleton className="h-10 w-full sm:ml-auto sm:w-48" />
         </div>
       </div>
-      <div className="container mx-auto px-4 py-6">
+      <div className="px-4 py-6">
         <Skeleton className="h-[32rem] w-full" />
       </div>
-    </div>
+    </>
   );
 }

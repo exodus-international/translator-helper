@@ -256,10 +256,10 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader title="New Document" description="Upload a markdown or YAML file, or create a new document" />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <Card className="p-4">
           <Tabs value={mode} onValueChange={(value) => setMode(value as 'upload' | 'create')}>
             <div className="flex justify-center mb-6">
@@ -283,19 +283,19 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                   onDrop={handleDrop}
                   className={`
                     border-2 border-dashed rounded-lg p-12 text-center
-                    ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
+                    ${isDragging ? 'border-info bg-info/10' : 'border-border'}
                   `}
                 >
-                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-lg font-medium mb-2">Drag and drop your markdown or YAML file here</p>
-                  <p className="text-gray-600 mb-4">or</p>
+                  <p className="text-muted-foreground mb-4">or</p>
                   <label>
                     <input type="file" accept=".md,.yml,.yaml" onChange={handleFileSelect} className="hidden" />
                     <Button type="button" variant="outline" render={<span />} nativeButton={false}>
                       Browse Files
                     </Button>
                   </label>
-                  <p className="text-xs text-gray-500 mt-4">Supported files: .md, .yml, .yaml</p>
+                  <p className="text-xs text-muted-foreground mt-4">Supported files: .md, .yml, .yaml</p>
                 </div>
               </div>
             </TabsContent>
@@ -350,7 +350,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                             </Button>
                           </div>
                           {sourceProjects.length === 0 && (
-                            <p className="text-sm text-gray-500 mt-1">No projects available. Create a new one.</p>
+                            <p className="text-sm text-muted-foreground mt-1">No projects available. Create a new one.</p>
                           )}
                         </>
                       ) : (
@@ -368,7 +368,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                             pattern="[a-z0-9]+(-[a-z0-9]+)*"
                             onKeyDown={handleNewProjectKeyDown}
                           />
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted-foreground">
                             The identifier is used in document URLs and as the folder name in the content repository.
                             Lowercase letters, numbers and dashes.
                           </p>
@@ -409,7 +409,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
                   <div>
                     <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
-                    <p className="text-xs text-gray-500 mt-1">Determines the file path in the content repository</p>
+                    <p className="text-xs text-muted-foreground mt-1">Determines the file path in the content repository</p>
                   </div>
 
                   <LabelsField labels={labels} onChange={setLabels} />
@@ -456,6 +456,6 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
           </Tabs>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

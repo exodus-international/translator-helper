@@ -162,6 +162,8 @@ function truncateToken(token: string) {
 }
 
 const INVITATIONS_PER_PAGE = 10;
+/** Language chips shown per row before the rest collapse into a +N chip. */
+const LANGUAGES_SHOWN = 2;
 
 const ROLE_OPTIONS = [
   { label: 'Admin', value: Role.ADMIN },
@@ -176,7 +178,7 @@ function lastActivityColumn(id: 'lastSeenAt' | 'lastDocumentEditAt', label: stri
     cell: ({ row }) => {
       const value = row.original[id];
       return (
-        <span className="text-sm text-gray-600" title={value ? formatExactDateTime(value) : undefined}>
+        <span className="text-sm text-muted-foreground" title={value ? formatExactDateTime(value) : undefined}>
           {formatLastActive(value)}
         </span>
       );
@@ -572,7 +574,7 @@ export default function UsersClient({
         header: ({ column }) => <DataTableColumnHeader column={column} label="Name" />,
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <UserAvatar name={row.original.name} image={row.original.image} email={row.original.email} size="sm" />
+            <UserAvatar name={row.original.name} image={row.original.image} email={row.original.email} />
             <span className="font-medium">{row.original.name}</span>
           </div>
         ),
@@ -582,7 +584,7 @@ export default function UsersClient({
         id: 'email',
         accessorKey: 'email',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Email" />,
-        cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.email}</span>,
+        cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.email}</span>,
         meta: { label: 'Email' },
       },
       {
@@ -591,15 +593,28 @@ export default function UsersClient({
         header: ({ column }) => <DataTableColumnHeader column={column} label="Languages" />,
         cell: ({ row }) =>
           row.original.languages.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {row.original.languages.map((ul) => (
-                <Badge key={ul.language.id} variant="outline" size="xs">
+            <div className="flex flex-wrap items-center gap-1">
+              {/* Capped so a polyglot's row stays the same height as everyone
+                  else's; the full list is one hover away. */}
+              {row.original.languages.slice(0, LANGUAGES_SHOWN).map((ul) => (
+                <Badge key={ul.language.id} variant="outline">
                   {ul.language.name}
                 </Badge>
               ))}
+              {row.original.languages.length > LANGUAGES_SHOWN && (
+                <Badge
+                  variant="secondary"
+                  title={row.original.languages
+                    .slice(LANGUAGES_SHOWN)
+                    .map((ul) => ul.language.name)
+                    .join(', ')}
+                >
+                  +{row.original.languages.length - LANGUAGES_SHOWN}
+                </Badge>
+              )}
             </div>
           ) : (
-            <span className="text-xs text-gray-400">—</span>
+            <span className="text-xs text-muted-foreground">—</span>
           ),
         filterFn: 'arrIncludesSome',
         sortFn: (rowA, rowB) => compareByLanguageThenName(rowA.original, rowB.original),
@@ -615,7 +630,7 @@ export default function UsersClient({
         accessorKey: 'role',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Role" />,
         cell: ({ row }) => (
-          <Badge variant={row.original.role === Role.ADMIN ? 'primary' : 'secondary'} size="sm">
+          <Badge variant={row.original.role === Role.ADMIN ? 'default' : 'secondary'}>
             {row.original.role === Role.ADMIN ? <Shield className="h-3 w-3 mr-1" /> : null}
             {row.original.role}
           </Badge>
@@ -630,7 +645,7 @@ export default function UsersClient({
         accessorKey: 'createdAt',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Joined" />,
         cell: ({ row }) => (
-          <span className="text-sm text-gray-600">{formatUnambiguousDate(row.original.createdAt)}</span>
+          <span className="text-sm text-muted-foreground">{formatUnambiguousDate(row.original.createdAt)}</span>
         ),
         meta: { label: 'Joined' },
       },
@@ -643,7 +658,7 @@ export default function UsersClient({
         header: ({ column }) => <DataTableColumnHeader column={column} label="Address" />,
         cell: ({ getValue }) => {
           const address = getValue<string>();
-          return <span className="text-sm text-gray-600">{address || '—'}</span>;
+          return <span className="text-sm text-muted-foreground">{address || '—'}</span>;
         },
         meta: { label: 'Address' },
       },
@@ -651,14 +666,14 @@ export default function UsersClient({
         id: 'tShirtSize',
         accessorKey: 'tShirtSize',
         header: ({ column }) => <DataTableColumnHeader column={column} label="T-Shirt" />,
-        cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.tShirtSize ?? '—'}</span>,
+        cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.tShirtSize ?? '—'}</span>,
         meta: { label: 'T-Shirt' },
       },
       {
         id: 'exodus90AppId',
         accessorKey: 'exodus90AppId',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Exodus90" />,
-        cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.exodus90AppId ?? '—'}</span>,
+        cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.exodus90AppId ?? '—'}</span>,
         meta: { label: 'Exodus90 App ID' },
       },
       {
@@ -666,7 +681,7 @@ export default function UsersClient({
         accessorKey: 'onboarded',
         header: ({ column }) => <DataTableColumnHeader column={column} label="Onboarded" />,
         cell: ({ row }) => (
-          <Badge variant={row.original.onboarded ? 'success' : 'secondary'} size="xs">
+          <Badge variant={row.original.onboarded ? 'success' : 'secondary'}>
             {row.original.onboarded ? 'Yes' : 'No'}
           </Badge>
         ),
@@ -682,7 +697,7 @@ export default function UsersClient({
           return (
             <div className="flex justify-end">
               <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-8 w-8 p-0" />}>
+                <DropdownMenuTrigger render={<Button variant="ghost" className="h-8 w-8 p-0" />}>
                   <MoreHorizontal className="h-4 w-4" />
                   <span className="sr-only">Open actions menu</span>
                 </DropdownMenuTrigger>
@@ -781,10 +796,10 @@ export default function UsersClient({
   // ─── Render ─────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader title="User Management" description="Manage users, roles, and invitations" />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <Tabs defaultValue="users">
           <TabsList variant="line">
             <TabsTrigger value="users">Users</TabsTrigger>
@@ -793,31 +808,34 @@ export default function UsersClient({
 
           {/* ── Users Tab ──────────────────────────────────── */}
           <TabsContent value="users">
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <Tabs value={userFilter} onValueChange={(v) => setUserFilter(v as 'active' | 'banned')}>
-                <TabsList>
-                  <TabsTrigger value="active">Active</TabsTrigger>
-                  <TabsTrigger value="banned">Banned</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <Input
-                placeholder="Search name, email, language…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value || null)}
-                className="h-9 w-72"
-              />
-            </div>
-
             <DataTable table={table}>
-              <DataTableToolbar table={table}>
+              <DataTableToolbar
+                table={table}
+                leading={
+                  <>
+                    <Tabs value={userFilter} onValueChange={(v) => setUserFilter(v as 'active' | 'banned')}>
+                      <TabsList className="h-8">
+                        <TabsTrigger value="active">Active</TabsTrigger>
+                        <TabsTrigger value="banned">Banned</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    <Input
+                      placeholder="Search name, email, language…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value || null)}
+                      className="h-8 w-56"
+                    />
+                  </>
+                }
+              >
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger
                       render={
-                        <Button variant="outline" size="sm" className="h-8" onClick={handleExportCsv} />
+                        <Button variant="outline" className="h-8" onClick={handleExportCsv} />
                       }
                     >
-                      <Download className="h-4 w-4 mr-2" />
+                      <Download />
                       Export CSV
                     </TooltipTrigger>
                     <TooltipContent>
@@ -839,14 +857,14 @@ export default function UsersClient({
                   <TabsTrigger value="inactive">Inactive</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+              <Button onClick={() => setCreateDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Invitation
               </Button>
             </div>
 
             {filteredInvitations.length === 0 ? (
-              <Card className="p-6 text-center text-gray-500">
+              <Card className="p-6 text-center text-muted-foreground">
                 {invitationFilter === 'active'
                   ? 'No active invitations. Create one to invite translators.'
                   : 'No inactive invitations.'}
@@ -861,12 +879,12 @@ export default function UsersClient({
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3">
-                              <code className="text-sm bg-gray-100 px-2 py-0.5 rounded font-mono">
+                              <code className="text-sm bg-muted px-2 py-0.5 rounded font-mono">
                                 {truncateToken(inv.token)}
                               </code>
                               {invitationStatusBadge(displayStatus)}
                             </div>
-                            <div className="flex gap-4 mt-2 text-sm text-gray-600">
+                            <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
                               <span>
                                 Uses: {inv.usedCount}/{inv.maxUses ?? '\u221e'}
                               </span>
@@ -876,7 +894,7 @@ export default function UsersClient({
                             {inv.languages.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-2">
                                 {inv.languages.map((il) => (
-                                  <Badge key={il.language.id} variant="outline" size="xs">
+                                  <Badge key={il.language.id} variant="outline">
                                     {il.language.name}
                                   </Badge>
                                 ))}
@@ -888,7 +906,6 @@ export default function UsersClient({
                               <>
                                 <Button
                                   variant="outline"
-                                  size="sm"
                                   onClick={() => handleCopyUrl(`${baseUrl}/register/${inv.token}`)}
                                 >
                                   <Copy className="h-4 w-4 mr-1" />
@@ -896,7 +913,7 @@ export default function UsersClient({
                                 </Button>
                                 <AlertDialog>
                                   <AlertDialogTrigger
-                                    render={<Button variant="outline" size="sm" disabled={loading} />}
+                                    render={<Button variant="outline" disabled={loading} />}
                                   >
                                     <X className="h-4 w-4 mr-1" />
                                     Revoke
@@ -927,24 +944,22 @@ export default function UsersClient({
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {filteredInvitations.length} invitation{filteredInvitations.length !== 1 ? 's' : ''}
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
-                        size="sm"
                         disabled={clampedPage <= 1}
                         onClick={() => setInvitationPage(clampedPage - 1)}
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-muted-foreground">
                         {clampedPage} / {totalPages}
                       </span>
                       <Button
                         variant="outline"
-                        size="sm"
                         disabled={clampedPage >= totalPages}
                         onClick={() => setInvitationPage(clampedPage + 1)}
                       >
@@ -1025,8 +1040,8 @@ export default function UsersClient({
 
           {passwordResetInfo ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">Password updated. Copy this message and send it to the user:</p>
-              <Textarea readOnly value={passwordResetMessage} rows={3} className="text-sm bg-gray-100" />
+              <p className="text-sm text-muted-foreground">Password updated. Copy this message and send it to the user:</p>
+              <Textarea readOnly value={passwordResetMessage} rows={3} className="text-sm bg-muted" />
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -1104,15 +1119,15 @@ export default function UsersClient({
           <form onSubmit={handleSaveLanguages} className="space-y-4">
             <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-1">
               {availableLanguages.map((lang) => (
-                <label key={lang.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded">
+                <label key={lang.id} className="flex items-center gap-2 cursor-pointer hover:bg-accent p-1.5 rounded">
                   <input
                     type="checkbox"
                     checked={selectedLanguageIds.includes(lang.id)}
                     onChange={() => toggleLanguageSelection(lang.id)}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="h-4 w-4 rounded border-border"
                   />
                   <span className="text-sm font-medium">{lang.name}</span>
-                  <span className="text-xs text-gray-500">({lang.code})</span>
+                  <span className="text-xs text-muted-foreground">({lang.code})</span>
                 </label>
               ))}
             </div>
@@ -1290,10 +1305,10 @@ export default function UsersClient({
 
           {createdInviteUrl ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">Share this link with the person you want to invite:</p>
+              <p className="text-sm text-muted-foreground">Share this link with the person you want to invite:</p>
               <div className="flex items-center gap-2">
                 <Input value={createdInviteUrl} readOnly className="font-mono text-sm" />
-                <Button type="button" variant="outline" size="sm" onClick={() => handleCopyUrl(createdInviteUrl)}>
+                <Button type="button" variant="outline" onClick={() => handleCopyUrl(createdInviteUrl)}>
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
@@ -1315,7 +1330,7 @@ export default function UsersClient({
                   onChange={(e) => setMaxUses(e.target.value)}
                   placeholder="Leave empty for unlimited"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   How many people can register with this link. Empty = unlimited.
                 </p>
               </div>
@@ -1337,20 +1352,20 @@ export default function UsersClient({
                     {availableLanguages.map((lang) => (
                       <label
                         key={lang.id}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                        className="flex items-center gap-2 cursor-pointer hover:bg-accent p-1 rounded"
                       >
                         <input
                           type="checkbox"
                           checked={inviteLanguageIds.includes(lang.id)}
                           onChange={() => toggleInviteLanguage(lang.id)}
-                          className="h-4 w-4 rounded border-gray-300"
+                          className="h-4 w-4 rounded border-border"
                         />
                         <span className="text-sm">{lang.name}</span>
-                        <span className="text-xs text-gray-500">({lang.code})</span>
+                        <span className="text-xs text-muted-foreground">({lang.code})</span>
                       </label>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Users registering with this link will be assigned these languages.
                   </p>
                 </div>
@@ -1368,6 +1383,6 @@ export default function UsersClient({
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

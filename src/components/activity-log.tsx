@@ -55,37 +55,37 @@ interface ActionConfig {
 }
 
 const ACTION_MAP: Record<string, ActionConfig> = {
-  created: { label: 'Created document', icon: FilePlus, colorClass: 'text-gray-500' },
-  created_translation: { label: 'Started translation', icon: Languages, colorClass: 'text-blue-500' },
-  assigned_translation: { label: 'Assigned translation', icon: UserPlus, colorClass: 'text-blue-500' },
-  started_translation: { label: 'Resumed translation', icon: Play, colorClass: 'text-blue-500' },
-  edited: { label: 'Edited content', icon: PenLine, colorClass: 'text-gray-500' },
-  submitted_for_review: { label: 'Submitted for review', icon: Send, colorClass: 'text-yellow-500' },
-  approved: { label: 'Approved', icon: CheckCircle2, colorClass: 'text-green-500' },
-  requested_changes: { label: 'Requested changes', icon: MessageSquareWarning, colorClass: 'text-orange-500' },
-  deployed: { label: 'Deployed', icon: Rocket, colorClass: 'text-violet-500' },
-  status_updated: { label: 'Changed status', icon: ArrowRightLeft, colorClass: 'text-gray-500' },
-  github_deployed: { label: 'Deployed to GitHub', icon: GithubIcon, colorClass: 'text-violet-500' },
-  github_deploy_failed: { label: 'GitHub deploy failed', icon: AlertTriangle, colorClass: 'text-red-500' },
-  audio_generation_started: { label: 'Started audio generation', icon: Volume2, colorClass: 'text-blue-500' },
-  audio_regeneration_requested: { label: 'Requested audio regeneration', icon: RotateCcw, colorClass: 'text-blue-500' },
-  audio_generated: { label: 'Audio generated', icon: Volume2, colorClass: 'text-green-500' },
-  audio_generation_failed: { label: 'Audio generation failed', icon: AlertTriangle, colorClass: 'text-red-500' },
-  audio_transcript_edited: { label: 'Edited the audio text', icon: PenLine, colorClass: 'text-blue-500' },
-  audio_transcript_kept: { label: 'Kept the edited audio text', icon: FileText, colorClass: 'text-blue-500' },
-  audio_transcript_reset: { label: 'Reset the audio text', icon: RotateCcw, colorClass: 'text-gray-500' },
-  applied_suggestion: { label: 'Applied suggestion', icon: CheckCheck, colorClass: 'text-green-500' },
-  reopened_suggestion: { label: 'Reopened suggestion', icon: RotateCcw, colorClass: 'text-orange-500' },
-  dismissed_suggestion: { label: 'Dismissed suggestion', icon: XCircle, colorClass: 'text-gray-500' },
-  created_suggestion: { label: 'Created suggestion', icon: MessageSquarePlus, colorClass: 'text-blue-500' },
-  edited_suggestion: { label: 'Edited suggestion', icon: PenLine, colorClass: 'text-gray-500' },
-  deleted_suggestion: { label: 'Deleted suggestion', icon: Trash2, colorClass: 'text-red-500' },
+  created: { label: 'Created document', icon: FilePlus, colorClass: 'text-muted-foreground' },
+  created_translation: { label: 'Started translation', icon: Languages, colorClass: 'text-info' },
+  assigned_translation: { label: 'Assigned translation', icon: UserPlus, colorClass: 'text-info' },
+  started_translation: { label: 'Resumed translation', icon: Play, colorClass: 'text-info' },
+  edited: { label: 'Edited content', icon: PenLine, colorClass: 'text-muted-foreground' },
+  submitted_for_review: { label: 'Submitted for review', icon: Send, colorClass: 'text-warning' },
+  approved: { label: 'Approved', icon: CheckCircle2, colorClass: 'text-success' },
+  requested_changes: { label: 'Requested changes', icon: MessageSquareWarning, colorClass: 'text-warning' },
+  deployed: { label: 'Deployed', icon: Rocket, colorClass: 'text-hue-violet' },
+  status_updated: { label: 'Changed status', icon: ArrowRightLeft, colorClass: 'text-muted-foreground' },
+  github_deployed: { label: 'Deployed to GitHub', icon: GithubIcon, colorClass: 'text-hue-violet' },
+  github_deploy_failed: { label: 'GitHub deploy failed', icon: AlertTriangle, colorClass: 'text-destructive' },
+  audio_generation_started: { label: 'Started audio generation', icon: Volume2, colorClass: 'text-info' },
+  audio_regeneration_requested: { label: 'Requested audio regeneration', icon: RotateCcw, colorClass: 'text-info' },
+  audio_generated: { label: 'Audio generated', icon: Volume2, colorClass: 'text-success' },
+  audio_generation_failed: { label: 'Audio generation failed', icon: AlertTriangle, colorClass: 'text-destructive' },
+  audio_transcript_edited: { label: 'Edited the audio text', icon: PenLine, colorClass: 'text-info' },
+  audio_transcript_kept: { label: 'Kept the edited audio text', icon: FileText, colorClass: 'text-info' },
+  audio_transcript_reset: { label: 'Reset the audio text', icon: RotateCcw, colorClass: 'text-muted-foreground' },
+  applied_suggestion: { label: 'Applied suggestion', icon: CheckCheck, colorClass: 'text-success' },
+  reopened_suggestion: { label: 'Reopened suggestion', icon: RotateCcw, colorClass: 'text-warning' },
+  dismissed_suggestion: { label: 'Dismissed suggestion', icon: XCircle, colorClass: 'text-muted-foreground' },
+  created_suggestion: { label: 'Created suggestion', icon: MessageSquarePlus, colorClass: 'text-info' },
+  edited_suggestion: { label: 'Edited suggestion', icon: PenLine, colorClass: 'text-muted-foreground' },
+  deleted_suggestion: { label: 'Deleted suggestion', icon: Trash2, colorClass: 'text-destructive' },
 };
 
 const DEFAULT_CONFIG: ActionConfig = {
   label: 'Unknown action',
   icon: ArrowRightLeft,
-  colorClass: 'text-gray-400',
+  colorClass: 'text-muted-foreground',
 };
 
 function formatRelativeTime(date: Date): string {
@@ -232,19 +232,19 @@ function CollapsedGroupRow({ group }: { group: CollapsedEntry }) {
               <button
                 type="button"
                 onClick={() => setExpanded(!expanded)}
-                className="inline-flex items-center gap-0.5 text-gray-400 text-xs hover:text-gray-600 transition-colors"
+                className="inline-flex items-center gap-0.5 text-muted-foreground text-xs hover:text-foreground transition-colors"
               >
                 {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 &times;{group.count}
               </button>
             ) : (
-              detailText && <span className="text-gray-500">{detailText}</span>
+              detailText && <span className="text-muted-foreground">{detailText}</span>
             )}
-            <span className="text-gray-400 text-xs ml-auto shrink-0" title={fullDate}>
+            <span className="text-muted-foreground text-xs ml-auto shrink-0" title={fullDate}>
               {formatRelativeTime(group.lastTime)}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <UserAvatar
               name={representative.user.name}
               image={representative.user.image}
@@ -256,14 +256,14 @@ function CollapsedGroupRow({ group }: { group: CollapsedEntry }) {
         </div>
       </div>
       {isCollapsible && expanded && (
-        <div className="ml-7 mt-1 mb-1 space-y-1 border-l-2 border-gray-100 pl-3">
+        <div className="ml-7 mt-1 mb-1 space-y-1 border-l-2 border-border pl-3">
           {group.entries.map((entry) => {
             const entryDetail = getDetailText(group.action, entry.details);
             const entryTime = new Date(entry.createdAt);
             return (
-              <div key={entry.id} className="flex items-baseline gap-2 text-xs text-gray-500">
+              <div key={entry.id} className="flex items-baseline gap-2 text-xs text-muted-foreground">
                 {entryDetail && <span>{entryDetail}</span>}
-                <span className="text-gray-400 ml-auto shrink-0" title={entryTime.toLocaleString()}>
+                <span className="text-muted-foreground ml-auto shrink-0" title={entryTime.toLocaleString()}>
                   {formatRelativeTime(entryTime)}
                 </span>
               </div>

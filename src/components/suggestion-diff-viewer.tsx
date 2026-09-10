@@ -6,6 +6,7 @@ import { DiffEditor } from '@monaco-editor/react';
 import './monaco-selfhost';
 import { useEffect, useRef, useState } from 'react';
 import { SuggestionWithUser } from './monaco-suggestion-decorations';
+import { defineTranslationThemes, useMonacoTheme } from './monaco-theme';
 
 interface SuggestionDiffViewerProps {
   originalContent: string;
@@ -23,6 +24,7 @@ export function SuggestionDiffViewer({
 }: SuggestionDiffViewerProps) {
   const diffEditorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
+  const theme = useMonacoTheme(monacoRef);
 
   // Filter suggestions by user if selectedUserId is provided
   const filteredSuggestions = selectedUserId
@@ -67,25 +69,8 @@ export function SuggestionDiffViewer({
     diffEditorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Define custom theme
-    monaco.editor.defineTheme('translation-theme', {
-      base: 'vs',
-      inherit: true,
-      rules: [{ token: '', foreground: '0a0a0a' }],
-      colors: {
-        'editor.background': '#ffffff',
-        'editor.foreground': '#0a0a0a',
-        'diffEditor.insertedTextBackground': '#e6ffed',
-        'diffEditor.insertedTextBorder': '#81c784',
-        'diffEditor.removedTextBackground': '#ffebee',
-        'diffEditor.removedTextBorder': '#e57373',
-        'diffEditor.unchangedCodeBackground': '#f5f5f5',
-        'diffEditor.unchangedRegionBackground': '#f5f5f5',
-        'diffEditor.unchangedRegionForeground': '#9e9e9e',
-      },
-    });
-
-    monaco.editor.setTheme('translation-theme');
+    defineTranslationThemes(monaco, { diff: true });
+    monaco.editor.setTheme(theme);
   };
 
   return (
@@ -107,7 +92,7 @@ export function SuggestionDiffViewer({
           wrappingStrategy: 'advanced',
           automaticLayout: true,
         }}
-        theme="translation-theme"
+        theme={theme}
       />
     </div>
   );
