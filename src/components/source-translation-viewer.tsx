@@ -125,9 +125,13 @@ const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number)
 export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle, SourceTranslationViewerProps>(
   function SourceTranslationViewerOuter(props, ref) {
     const hasSidebar = (props.suggestions?.length ?? 0) > 0 || props.canCreateSuggestions;
+    // Same condition the inner component renders the panel on -- keep the two
+    // in step, or a document with only a summary renders a panel that starts
+    // closed.
+    const hasPanel = hasSidebar || !!props.sidebarHeader || !!props.sidebarSummary;
     return (
       <SidebarProvider
-        defaultOpen={hasSidebar || !!props.sidebarHeader}
+        defaultOpen={hasPanel}
         // Nested inside the app shell's own provider: keep this one from
         // stealing ⌘B (which would toggle both sidebars at once) and from
         // overwriting the shell's persisted state cookie.
@@ -596,6 +600,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // the docked sidebar (open). "Show panel" must appear whenever it's closed,
     // otherwise mobile users with a pre-opened desktop state can't reach it.
     const panelHidden = isMobile ? !openMobile : !sidebarOpen;
+    // The panel exists whenever it has anything to show; Document info alone is
+    // enough. `hasSidebar` is narrower -- it gates the thread list -- so using
+    // it for the reopen button made the panel a trapdoor on documents without
+    // suggestions, and hid it outright on mobile, where it starts closed.
+    const hasPanel = hasSidebar || !!sidebarHeader || !!sidebarSummary;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
@@ -867,7 +876,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {translationBadge}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
-                {hasSidebar && panelHidden && (
+                {hasPanel && panelHidden && (
                   <Button
                     variant="outline"
                     onClick={toggleSidebar}
@@ -1064,7 +1073,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </AlertDialog>
         </div>
 
-        {(hasSidebar || sidebarHeader || sidebarSummary) && (
+        {hasPanel && (
           <Sidebar side="right" collapsible="offcanvas">
             <SidebarHeader className="p-0 gap-0">
               <div className="px-3 py-2 flex items-center justify-between border-b">
