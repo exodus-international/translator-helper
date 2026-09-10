@@ -43,7 +43,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           <div className="flex items-start justify-between">
             <CardTitle className="text-lg">{project.name}</CardTitle>
             {project.status === 'COMPLETE' && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="secondary">
                 Complete
               </Badge>
             )}
@@ -72,7 +72,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
               {project.translationProjects.map((tp) => {
                 const uniqueMembers = tp.language.users.length;
                 return (
-                  <Badge key={tp.id} variant="secondary" size="xs" className="gap-1">
+                  <Badge key={tp.id} variant="secondary" className="gap-1">
                     {tp.language.name}
                     {uniqueMembers > 0 && (
                       <span className="text-muted-foreground">

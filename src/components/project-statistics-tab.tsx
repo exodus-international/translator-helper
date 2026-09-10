@@ -44,7 +44,7 @@ export default function ProjectStatisticsTab({
   if (loading) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Loading statistics...</p>
+        <p className="text-muted-foreground">Loading statistics...</p>
       </div>
     );
   }
@@ -76,7 +76,7 @@ export default function ProjectStatisticsTab({
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Total Documents
             </CardTitle>
@@ -88,7 +88,7 @@ export default function ProjectStatisticsTab({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Users className="h-4 w-4" />
               Team Members
             </CardTitle>
@@ -100,14 +100,14 @@ export default function ProjectStatisticsTab({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Deployed
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{progressPercent}%</p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {deployedCount} of {totalDocuments} documents
             </p>
           </CardContent>
@@ -122,10 +122,10 @@ export default function ProjectStatisticsTab({
         <CardContent>
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Overall completion (approved + deployed)</span>
+              <span className="text-muted-foreground">Overall completion (approved + deployed)</span>
               <span className="font-medium">{completedPercent}%</span>
             </div>
-            <div className="h-3 bg-gray-100 rounded-full overflow-hidden flex">
+            <div className="h-3 bg-muted rounded-full overflow-hidden flex">
               {DOCUMENT_STATUS_SEQUENCE.map((status) => {
                 const count = statusCounts[status] || 0;
                 if (count === 0 || totalDocuments === 0) return null;
@@ -163,10 +163,10 @@ export default function ProjectStatisticsTab({
                 <div key={status} className="flex items-center gap-3">
                   <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: config.color.hex }} />
                   <span className="text-sm flex-1">{config.name}</span>
-                  <Badge variant="secondary" size="sm">
+                  <Badge variant="secondary">
                     {count}
                   </Badge>
-                  <span className="text-sm text-gray-500 w-12 text-right">{percent}%</span>
+                  <span className="text-sm text-muted-foreground w-12 text-right">{percent}%</span>
                 </div>
               );
             })}

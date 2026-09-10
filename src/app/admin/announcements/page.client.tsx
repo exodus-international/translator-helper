@@ -182,7 +182,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                 <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                 <span>
                   <span className="block font-semibold">Banner</span>
-                  <span className="block text-sm text-gray-600">
+                  <span className="block text-sm text-muted-foreground">
                     One-line bar at the top of the dashboard. Shows just the title — good for short nudges.
                   </span>
                 </span>
@@ -195,7 +195,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                 <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                 <span>
                   <span className="block font-semibold">Modal</span>
-                  <span className="block text-sm text-gray-600">
+                  <span className="block text-sm text-muted-foreground">
                     Dialog on dashboard load with a full markdown body — for bigger news that needs explanation.
                   </span>
                 </span>
@@ -216,7 +216,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                   }
                   required
                 />
-                {type === 'BANNER' && <p className="text-xs text-gray-500 mt-1">Banners show only this one line</p>}
+                {type === 'BANNER' && <p className="text-xs text-muted-foreground mt-1">Banners show only this one line</p>}
               </div>
               {type === 'MODAL' && (
                 <div>
@@ -259,10 +259,10 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                   value={expiresAt}
                   onChange={(e) => setExpiresAt(e.target.value)}
                 />
-                <p className="text-xs text-gray-500 mt-1">Optional — stops showing automatically after this time</p>
+                <p className="text-xs text-muted-foreground mt-1">Optional — stops showing automatically after this time</p>
               </div>
               <div className="flex items-center justify-between">
-                <Button type="button" variant="ghost" size="sm" onClick={() => setStep('type')}>
+                <Button type="button" variant="ghost" onClick={() => setStep('type')}>
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Change type
                 </Button>
@@ -287,9 +287,9 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
         </DialogContent>
       </Dialog>
 
-      <div className="container mx-auto px-4 py-4 space-y-6">
+      <div className="px-4 py-4 space-y-6">
         {announcements.length === 0 && (
-          <p className="text-sm text-gray-500">No announcements yet. Create one to notify users.</p>
+          <p className="text-sm text-muted-foreground">No announcements yet. Create one to notify users.</p>
         )}
         {[
           { heading: 'Active', items: announcements.filter((a) => a.isActive) },
@@ -298,7 +298,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
           ({ heading, items }) =>
             items.length > 0 && (
               <section key={heading}>
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-2">{heading}</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">{heading}</h2>
                 <div className="grid gap-4">
                   {items.map((announcement) => (
                     <Card key={announcement.id} className="p-4">
@@ -319,11 +319,11 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                             )}
                           </div>
                           {announcement.body && (
-                            <p className="text-sm text-gray-600 mt-1 line-clamp-2 whitespace-pre-line">
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2 whitespace-pre-line">
                               {announcement.body}
                             </p>
                           )}
-                          <div className="flex flex-wrap gap-3 text-xs text-gray-500 mt-2">
+                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-2">
                             {announcement.ctaLabel && announcement.ctaUrl && <span>CTA: {announcement.ctaLabel}</span>}
                             {announcement.expiresAt && (
                               <span>Expires: {new Date(announcement.expiresAt).toLocaleString()}</span>
@@ -337,12 +337,11 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
                         <div className="flex shrink-0 gap-2">
                           <Button
                             variant={announcement.isActive ? 'outline' : 'default'}
-                            size="sm"
                             onClick={() => handleToggleActive(announcement)}
                           >
                             {announcement.isActive ? 'Deactivate' : 'Activate'}
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleEdit(announcement)}>
+                          <Button variant="outline" onClick={() => handleEdit(announcement)}>
                             <Edit className="h-4 w-4" />
                           </Button>
                           <DeleteConfirmDialog

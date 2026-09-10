@@ -282,7 +282,7 @@ export function AudioTextPanel({
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className={edited ? 'bg-amber-50 text-amber-700 border-amber-200' : undefined}>
+          <Badge variant={edited ? 'warning' : 'secondary'}>
             {edited ? 'Edited' : 'Generated'}
           </Badge>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -296,7 +296,6 @@ export function AudioTextPanel({
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
-              size="sm"
               onClick={() => setDraft(formatted)}
               disabled={saving || formatted === draft}
               title="Indent the tags so the structure is readable. Nothing about what is spoken changes."
@@ -305,16 +304,16 @@ export function AudioTextPanel({
               Format
             </Button>
             {edited && (
-              <Button variant="ghost" size="sm" onClick={() => setConfirming('rebuild')} disabled={saving}>
+              <Button variant="ghost" onClick={() => setConfirming('rebuild')} disabled={saving}>
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                 Reset to generated
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => save({ regenerate: false })} disabled={!dirty || saving}>
+            <Button variant="outline" onClick={() => save({ regenerate: false })} disabled={!dirty || saving}>
               <Save className="mr-1.5 h-3.5 w-3.5" />
               Save
             </Button>
-            <Button size="sm" onClick={() => save({ regenerate: true })} disabled={saving}>
+            <Button onClick={() => save({ regenerate: true })} disabled={saving}>
               {saving ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               ) : (
@@ -326,8 +325,8 @@ export function AudioTextPanel({
         )}
       </div>
       {conflict && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
-          <p className="flex items-start gap-1.5 text-xs text-amber-900">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2">
+          <p className="flex items-start gap-1.5 text-xs text-warning">
             <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
             <span>
               Somebody else saved a different audio text while you were editing this one. Nothing you typed was sent,
@@ -337,21 +336,20 @@ export function AudioTextPanel({
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              size="sm"
               onClick={() => (dirty ? setConfirming('loadTheirs') : applyTheirs())}
               disabled={saving}
             >
               Show theirs
             </Button>
-            <Button variant="ghost" size="sm" onClick={saveOverTheirs} disabled={saving}>
+            <Button variant="ghost" onClick={saveOverTheirs} disabled={saving}>
               Save mine anyway
             </Button>
           </div>
         </div>
       )}
       {transcript.state === 'edited_outdated' && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2">
-          <p className="flex items-start gap-1.5 text-xs text-amber-900">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2">
+          <p className="flex items-start gap-1.5 text-xs text-warning">
             <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
             <span>
               The translation changed since this audio text was edited, so the recording may not say what the document
@@ -360,10 +358,10 @@ export function AudioTextPanel({
           </p>
           {transcript.canEdit && (
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setConfirming('rebuild')} disabled={saving}>
+              <Button variant="outline" onClick={() => setConfirming('rebuild')} disabled={saving}>
                 Rebuild from document
               </Button>
-              <Button variant="ghost" size="sm" onClick={keep} disabled={saving}>
+              <Button variant="ghost" onClick={keep} disabled={saving}>
                 Keep mine
               </Button>
             </div>
@@ -371,7 +369,7 @@ export function AudioTextPanel({
         </div>
       )}
       {problems.length > 0 && (
-        <ul className="max-h-28 overflow-y-auto border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <ul className="max-h-28 overflow-y-auto border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
           {problems.map((problem, index) => (
             <li key={`${problem.line}-${index}`} className="flex items-start gap-1.5">
               <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />

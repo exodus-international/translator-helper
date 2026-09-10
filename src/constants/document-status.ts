@@ -48,10 +48,10 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
     icon: AlertCircle,
     color: {
       hex: '#BABABA',
-      textClass: 'text-gray-600',
-      indicatorClass: '!border-gray-500 !bg-gray-500 !text-white',
-      indicatorInactiveClass: '!border-gray-200 !bg-gray-50 !text-gray-400',
-      badgeClass: 'border border-gray-200 bg-gray-50 text-gray-700',
+      textClass: 'text-muted-foreground',
+      indicatorClass: '!border-muted-foreground !bg-muted-foreground !text-background',
+      indicatorInactiveClass: '!border-border !bg-muted !text-muted-foreground',
+      badgeClass: 'border border-border bg-muted text-muted-foreground',
     },
   },
   [DocumentStatus.IN_PROGRESS]: {
@@ -60,10 +60,10 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
     icon: PenLine,
     color: {
       hex: '#0063ed',
-      textClass: 'text-blue-800',
-      indicatorClass: '!border-blue-800 !bg-blue-800 !text-white',
-      indicatorInactiveClass: '!border-blue-200 !bg-blue-50 !text-blue-400',
-      badgeClass: 'border border-blue-200 bg-blue-50 text-blue-700',
+      textClass: 'text-hue-blue',
+      indicatorClass: '!border-hue-blue !bg-hue-blue !text-background',
+      indicatorInactiveClass: '!border-hue-blue/25 !bg-hue-blue/10 !text-hue-blue/60',
+      badgeClass: 'border border-hue-blue/25 bg-hue-blue/10 text-hue-blue',
     },
   },
   [DocumentStatus.PENDING_REVIEW]: {
@@ -72,10 +72,10 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
     icon: Clock3,
     color: {
       hex: '#FACC15',
-      textClass: 'text-yellow-600',
-      indicatorClass: '!border-yellow-500 !bg-yellow-500 !text-white',
-      indicatorInactiveClass: '!border-yellow-200 !bg-yellow-50 !text-yellow-400',
-      badgeClass: 'border border-yellow-200 bg-yellow-50 text-yellow-700',
+      textClass: 'text-hue-amber',
+      indicatorClass: '!border-hue-amber !bg-hue-amber !text-background',
+      indicatorInactiveClass: '!border-hue-amber/25 !bg-hue-amber/10 !text-hue-amber/60',
+      badgeClass: 'border border-hue-amber/25 bg-hue-amber/10 text-hue-amber',
     },
   },
   [DocumentStatus.APPROVED]: {
@@ -84,10 +84,10 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
     icon: CheckCircle2,
     color: {
       hex: '#10B981',
-      textClass: 'text-emerald-600',
-      indicatorClass: '!border-emerald-500 !bg-emerald-500 !text-white',
-      indicatorInactiveClass: '!border-emerald-200 !bg-emerald-50 !text-emerald-400',
-      badgeClass: 'border border-emerald-200 bg-emerald-50 text-emerald-700',
+      textClass: 'text-hue-emerald',
+      indicatorClass: '!border-hue-emerald !bg-hue-emerald !text-background',
+      indicatorInactiveClass: '!border-hue-emerald/25 !bg-hue-emerald/10 !text-hue-emerald/60',
+      badgeClass: 'border border-hue-emerald/25 bg-hue-emerald/10 text-hue-emerald',
     },
   },
   [DocumentStatus.DEPLOYED]: {
@@ -96,10 +96,10 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
     icon: Rocket,
     color: {
       hex: '#8B5CF6',
-      textClass: 'text-violet-600',
-      indicatorClass: '!border-violet-500 !bg-violet-500 !text-white',
-      indicatorInactiveClass: '!border-violet-200 !bg-violet-50 !text-violet-400',
-      badgeClass: 'border border-violet-200 bg-violet-50 text-violet-700',
+      textClass: 'text-hue-violet',
+      indicatorClass: '!border-hue-violet !bg-hue-violet !text-background',
+      indicatorInactiveClass: '!border-hue-violet/25 !bg-hue-violet/10 !text-hue-violet/60',
+      badgeClass: 'border border-hue-violet/25 bg-hue-violet/10 text-hue-violet',
     },
   },
 };
@@ -110,10 +110,10 @@ const NO_STATUS_CONFIG: DocumentStatusConfig = {
   icon: Circle,
   color: {
     hex: '#9CA3AF',
-    textClass: 'text-gray-400',
-    indicatorClass: 'border-gray-400 bg-gray-400 text-white',
-    indicatorInactiveClass: 'border-gray-200 bg-gray-50 text-gray-400',
-    badgeClass: 'border border-gray-200 bg-gray-50 text-gray-600',
+    textClass: 'text-muted-foreground',
+    indicatorClass: 'border-muted-foreground bg-muted-foreground text-background',
+    indicatorInactiveClass: 'border-border bg-muted text-muted-foreground',
+    badgeClass: 'border border-border bg-muted text-muted-foreground',
   },
 };
 

@@ -51,7 +51,7 @@ export default function ProfileClient({ profile, avatarUploadEnabled }: ProfileC
     <>
       <PageHeader title="Profile" description="Your picture, contact details and password." />
 
-      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <IdentityCard profile={profile} avatarUploadEnabled={avatarUploadEnabled} />
         <ProfileDetailsForm profile={profile} />
         <ChangePasswordSection />
@@ -74,7 +74,7 @@ function IdentityCard({ profile, avatarUploadEnabled }: ProfileClientProps) {
             <span className="break-all">{profile.email}</span>
           </Detail>
           <Detail label="Role">
-            <Badge variant={profile.role === 'ADMIN' ? 'primary' : 'secondary'} size="sm">
+            <Badge variant={profile.role === 'ADMIN' ? 'default' : 'secondary'}>
               {profile.role}
             </Badge>
           </Detail>
@@ -82,7 +82,7 @@ function IdentityCard({ profile, avatarUploadEnabled }: ProfileClientProps) {
             {profile.languages.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {profile.languages.map((ul) => (
-                  <Badge key={ul.language.id} variant="outline" size="sm">
+                  <Badge key={ul.language.id} variant="outline">
                     {ul.language.name}
                   </Badge>
                 ))}

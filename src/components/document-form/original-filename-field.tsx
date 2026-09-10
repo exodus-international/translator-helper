@@ -32,12 +32,12 @@ export function OriginalFilenameField({ value, onChange, documentType, error }: 
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={filenamePlaceholder(documentType)}
-        className={error ? 'border-red-500' : ''}
+        className={error ? 'border-destructive' : ''}
       />
       {error ? (
-        <p className="text-xs text-red-500 mt-1">{error}</p>
+        <p className="text-xs text-destructive mt-1">{error}</p>
       ) : (
-        <p className="text-xs text-gray-500 mt-1">Used for GitHub deploy path</p>
+        <p className="text-xs text-muted-foreground mt-1">Used for GitHub deploy path</p>
       )}
     </div>
   );

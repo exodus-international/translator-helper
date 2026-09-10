@@ -94,8 +94,8 @@ export function ThreadCard({
         className={cn(
           'text-[10px] px-1.5 py-0.5 rounded border',
           suggestion.status === SuggestionStatus.APPLIED
-            ? 'border-green-200 text-green-700 bg-green-50'
-            : 'border-gray-200 text-gray-500 bg-gray-50',
+            ? 'border-success/30 text-success bg-success/10'
+            : 'border-border text-muted-foreground bg-muted',
         )}
       >
         {suggestion.status === SuggestionStatus.APPLIED ? 'Applied' : 'Dismissed'}
@@ -105,9 +105,9 @@ export function ThreadCard({
   return (
     <div
       className={cn(
-        'rounded border bg-white px-2.5 py-2 cursor-pointer transition-colors',
+        'rounded border bg-card px-2.5 py-2 cursor-pointer transition-colors',
         'hover:bg-muted/40',
-        isActive ? 'border-blue-400 bg-blue-50/50 ring-1 ring-blue-200' : 'border-border',
+        isActive ? 'border-info/50 bg-info/5 ring-1 ring-info/30' : 'border-border',
         suggestion.status !== SuggestionStatus.OPEN && 'opacity-70',
       )}
       onClick={onClick}
@@ -125,7 +125,7 @@ export function ThreadCard({
         <span
           className={cn(
             'text-[10px] px-1 py-0.5 rounded',
-            isAnchored ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600',
+            isAnchored ? 'bg-info/15 text-info' : 'bg-muted text-muted-foreground',
           )}
         >
           {lineLabel}
@@ -158,7 +158,7 @@ export function ThreadCard({
       ) : (
         <>
           {suggestion.comment?.trim() && (
-            <p className="mt-1.5 text-sm text-gray-700 whitespace-pre-wrap break-words">{suggestion.comment}</p>
+            <p className="mt-1.5 text-sm text-foreground whitespace-pre-wrap break-words">{suggestion.comment}</p>
           )}
 
           {suggestion.type === SuggestionType.CHANGE && suggestion.proposedText && isAnchored && (
@@ -166,12 +166,12 @@ export function ThreadCard({
               className="mt-2 text-[11px] leading-5 rounded bg-muted/40 px-2 py-1.5 space-y-0.5"
               style={{ fontFamily: MONO_FONT }}
             >
-              <div className="text-red-700/80 line-through whitespace-pre-wrap break-words">
+              <div className="text-destructive/80 line-through whitespace-pre-wrap break-words">
                 {(suggestion.status === SuggestionStatus.APPLIED && suggestion.originalText) ||
                   getTextFromRange(suggestion, translationContent) ||
                   '(text not available)'}
               </div>
-              <div className="text-green-800 whitespace-pre-wrap break-words">{suggestion.proposedText}</div>
+              <div className="text-success whitespace-pre-wrap break-words">{suggestion.proposedText}</div>
             </div>
           )}
         </>
@@ -179,7 +179,7 @@ export function ThreadCard({
 
       {/* Replies */}
       {replies.length > 0 && (
-        <div className="mt-2 space-y-1.5 pl-3 border-l-2 border-gray-200">
+        <div className="mt-2 space-y-1.5 pl-3 border-l-2 border-border">
           {replies.map((reply) => (
             <div key={reply.id} className="text-xs">
               <div className="flex items-center gap-1.5">
@@ -187,7 +187,7 @@ export function ThreadCard({
                 <span className="font-medium">{reply.user.name}</span>
                 <span className="text-muted-foreground">{formatTimeAgo(reply.createdAt)}</span>
               </div>
-              <p className="text-gray-700 whitespace-pre-wrap break-words mt-0.5">{reply.content}</p>
+              <p className="text-foreground whitespace-pre-wrap break-words mt-0.5">{reply.content}</p>
             </div>
           ))}
         </div>

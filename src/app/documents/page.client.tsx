@@ -280,7 +280,7 @@ export default function DocumentsClient({
         </div>
       </PageHeader>
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         {documents.length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -305,10 +305,10 @@ export default function DocumentsClient({
             </EmptyContent>
           </Empty>
         ) : (
-          <div className="rounded-md border bg-white">
+          <div className="rounded-md border bg-card">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50/80">
+                <TableRow className="bg-muted/50">
                   <SortableHead
                     label="Title"
                     sortKey="title"
@@ -360,7 +360,7 @@ export default function DocumentsClient({
                         <Link
                           href={titleHref(doc)}
                           prefetch={false}
-                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          className="font-medium text-primary underline-offset-4 hover:underline"
                         >
                           {doc.title}
                         </Link>
@@ -375,12 +375,12 @@ export default function DocumentsClient({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-600 text-sm">{doc.originalFilename || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{doc.originalFilename || '—'}</TableCell>
                     <TableCell>
                       {doc.type ? (
                         <DocumentTypeBadge type={doc.type} />
                       ) : (
-                        <span className="text-gray-400 text-sm">—</span>
+                        <span className="text-muted-foreground text-sm">—</span>
                       )}
                     </TableCell>
                     {languages.map((lang) => {
@@ -421,7 +421,7 @@ export default function DocumentsClient({
                             })}
                             prefetch={false}
                           >
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost">
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </Link>
@@ -430,8 +430,7 @@ export default function DocumentsClient({
                               render={
                                 <Button
                                   variant="ghost"
-                                  size="sm"
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                                 />
                               }
                             >
@@ -485,8 +484,8 @@ export default function DocumentsClient({
 
         {/* Legend */}
         {documents.length > 0 && (
-          <Card className="mt-4 p-4 bg-gray-50">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">Legend</h4>
+          <Card className="mt-4 p-4 bg-muted/50">
+            <h4 className="text-sm font-semibold text-foreground mb-3">Legend</h4>
             <div className="flex flex-wrap gap-6 text-sm">
               {[...DOCUMENT_STATUS_SEQUENCE, null].map((status) => {
                 const config = status ? getDocumentStatusConfig(status) : NO_STATUS;
@@ -495,7 +494,7 @@ export default function DocumentsClient({
                 return (
                   <div key={config.status} className="flex items-center gap-2">
                     <Icon className={`h-4 w-4 ${config.color.textClass}`} />
-                    <span className="text-gray-600">{config.name}</span>
+                    <span className="text-muted-foreground">{config.name}</span>
                   </div>
                 );
               })}
