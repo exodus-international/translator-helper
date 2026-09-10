@@ -1,4 +1,5 @@
-import type { Table } from "@tanstack/react-table";
+import type { RowData } from "@tanstack/react-table";
+import type { DataTableInstance } from "@/hooks/use-data-table";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,18 +19,19 @@ import {
 import { getPaginationRange } from "@/lib/list-params";
 import { cn } from "@/lib/utils";
 
-interface DataTablePaginationProps<TData> extends React.ComponentProps<"div"> {
-  table: Table<TData>;
+interface DataTablePaginationProps<TData extends RowData>
+  extends React.ComponentProps<"div"> {
+  table: DataTableInstance<TData>;
   pageSizeOptions?: number[];
 }
 
-export function DataTablePagination<TData>({
+export function DataTablePagination<TData extends RowData>({
   table,
   pageSizeOptions = [10, 25, 50, 100],
   className,
   ...props
 }: DataTablePaginationProps<TData>) {
-  const { pageIndex, pageSize } = table.getState().pagination;
+  const { pageIndex, pageSize } = table.state.pagination;
   const total = table.getFilteredRowModel().rows.length;
   // Same "Showing 1–25 of 142" line as the server-paginated lists.
   const range = getPaginationRange(pageIndex + 1, pageSize, total);
@@ -49,13 +51,13 @@ export function DataTablePagination<TData>({
         <div className="flex items-center space-x-2">
           <p className="whitespace-nowrap font-medium text-sm">Rows per page</p>
           <Select
-            value={`${table.getState().pagination.pageSize}`}
+            value={`${table.state.pagination.pageSize}`}
             onValueChange={(value) => {
               table.setPageSize(Number(value));
             }}
           >
             <SelectTrigger className="h-8 w-18 data-size:h-8">
-              <SelectValue placeholder={table.getState().pagination.pageSize} />
+              <SelectValue placeholder={table.state.pagination.pageSize} />
             </SelectTrigger>
             <SelectContent side="top">
               <SelectGroup>
@@ -69,7 +71,7 @@ export function DataTablePagination<TData>({
           </Select>
         </div>
         <div className="flex items-center justify-center font-medium text-sm">
-          Page {table.getState().pagination.pageIndex + 1} of{" "}
+          Page {table.state.pagination.pageIndex + 1} of{" "}
           {table.getPageCount()}
         </div>
         <div className="flex items-center space-x-2">
