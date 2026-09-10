@@ -2,11 +2,9 @@
 
 import { cn } from '@/lib/utils';
 import { applyTextEditAtRange, isRangeWithinBounds } from '@/lib/text-range';
-import { DiffEditor } from '@monaco-editor/react';
-import './monaco-selfhost';
-import { useEffect, useRef, useState } from 'react';
-import { SuggestionWithUser } from './monaco-suggestion-decorations';
-import { defineTranslationThemes, useMonacoTheme } from './monaco-theme';
+import { DiffEditor } from './editor/diff-editor';
+import { useEffect, useState } from 'react';
+import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 
 interface SuggestionDiffViewerProps {
   originalContent: string;
@@ -22,10 +20,6 @@ export function SuggestionDiffViewer({
   selectedUserId,
   className,
 }: SuggestionDiffViewerProps) {
-  const diffEditorRef = useRef<any>(null);
-  const monacoRef = useRef<any>(null);
-  const theme = useMonacoTheme(monacoRef);
-
   // Filter suggestions by user if selectedUserId is provided
   const filteredSuggestions = selectedUserId
     ? suggestions.filter((s) => s.user.id === selectedUserId && (s.status === 'APPLIED' || s.status === 'OPEN'))
@@ -65,35 +59,11 @@ export function SuggestionDiffViewer({
     setModifiedContent(content);
   }, [originalContent, filteredSuggestions]);
 
-  const handleEditorDidMount = (editor: any, monaco: any) => {
-    diffEditorRef.current = editor;
-    monacoRef.current = monaco;
-
-    defineTranslationThemes(monaco, { diff: true });
-    monaco.editor.setTheme(theme);
-  };
-
   return (
-    <div className={cn('border rounded-md overflow-hidden h-full', className)}>
-      <DiffEditor
-        height="100%"
-        language="markdown"
-        original={originalContent}
-        modified={modifiedContent}
-        onMount={handleEditorDidMount}
-        options={{
-          readOnly: true,
-          minimap: { enabled: false },
-          fontSize: 14,
-          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-          lineHeight: 22,
-          scrollBeyondLastLine: false,
-          wordWrap: 'on',
-          wrappingStrategy: 'advanced',
-          automaticLayout: true,
-        }}
-        theme={theme}
-      />
-    </div>
+    <DiffEditor
+      original={originalContent}
+      modified={modifiedContent}
+      className={cn('h-full', className)}
+    />
   );
 }

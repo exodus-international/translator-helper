@@ -10,13 +10,13 @@ import type { AudioTranscriptView } from '@/domain/audio/audio.types';
  * component with its server actions stubbed. Assertions are on what a person
  * sees and clicks, never on how the component stores it.
  *
- * The SSML box is Monaco in the app, which needs a real browser to mount, so
+ * The SSML box is CodeMirror in the app, which needs a real browser to mount, so
  * these render the panel with a plain textarea in its place. What that leaves
- * untested is Monaco itself; everything the panel does with what you type is
+ * untested is CodeMirror itself; everything the panel does with what you type is
  * exercised for real.
  */
 
-/** Stands in for Monaco. Everything the panel asks of an editor, and nothing more. */
+/** Stands in for the code editor. Everything the panel asks of one, and nothing more. */
 const textareaEditor = ({ value, onChange, readOnly }: AudioTextEditorProps) => (
   <textarea
     aria-label="Audio text"

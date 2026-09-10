@@ -1,6 +1,6 @@
 /**
  * Pure utilities for line/column-based text edits within a document.
- * Coordinates are 1-based (Monaco convention) — converted to 0-based internally.
+ * Coordinates are 1-based, as stored on a suggestion — converted to 0-based internally.
  *
  * Used by both:
  *  - The diff preview UI (applies suggestions to show what they'd produce)
@@ -16,7 +16,7 @@ interface TextRange {
   endColumn: number;
 }
 
-// Convert 1-based Monaco coordinates to 0-based array indices
+// Convert 1-based coordinates to 0-based array indices
 function toZeroBased(range: TextRange) {
   return {
     startLine: range.startLine - 1,
