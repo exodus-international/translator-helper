@@ -1,7 +1,7 @@
 'use client';
 
 import { UserAvatar } from '@/components/user-avatar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -104,6 +104,12 @@ function AssignTranslatorDialog() {
   const isAssigning = useDialogLoading('assignTranslator');
   const [userId, setUserId] = useState('');
   const [deadline, setDeadline] = useState('');
+
+  useEffect(() => {
+    if (dialog.type === 'assignTranslator') {
+      setDeadline(dialog.deadline ? new Date(dialog.deadline).toISOString().slice(0, 10) : '');
+    }
+  }, [dialog]);
 
   if (dialog.type !== 'assignTranslator') {
     return (
