@@ -1,4 +1,4 @@
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 
 /**
  * Builds the default title for an uploaded document, kept out of the upload

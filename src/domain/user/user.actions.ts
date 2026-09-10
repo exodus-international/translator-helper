@@ -13,7 +13,7 @@ import {
   isUserOnboarded,
 } from './user.repository';
 import { avatarRejectionReason, resolveAvatarObjectKey, sniffImageContentType } from './user.avatar';
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { updateUserProfileSchema, completeOnboardingSchema, adminUpdateUserProfileSchema } from './user.types';
 
 export async function updateUserRoleAction(userId: string, role: Role) {

@@ -1,6 +1,6 @@
 import { userBriefColumns } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
-import { ProjectRole } from '@prisma/client';
+import { ProjectRole } from '@/generated/prisma/enums';
 
 /**
  * Access control is language-based: a UserLanguage row grants its role on every

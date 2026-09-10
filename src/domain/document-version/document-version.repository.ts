@@ -1,6 +1,7 @@
 import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
-import { DocumentStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 
 /**
  * The shape the assignment lists render: who, which document, which language,

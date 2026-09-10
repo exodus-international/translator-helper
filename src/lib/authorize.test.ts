@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { Role, ProjectRole } from '@prisma/client';
+import { Role, ProjectRole } from '@/generated/prisma/enums';
 import type { SessionUser } from './session';
 import { createAuthorize, type AuthorizeDeps } from './authorize';
 
