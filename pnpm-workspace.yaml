@@ -1,13 +1,26 @@
 minimumReleaseAgeExclude:
   - dompurify@3.4.15
-  # Both were published within the release-age cooldown, so a fresh resolution
-  # rolls the lockfile back to lucide-react@1.43.0 / fallow@3.23.0 rather than
-  # failing — a silent downgrade nobody reviews. The fallow entries have no
-  # version because its platform binaries ship in lockstep with the CLI.
+  # Both were published inside the release-age cooldown. pnpm does not fail on
+  # a rejected version -- it resolves the next-oldest instead, so a plain
+  # `pnpm install` here silently rewrote the lockfile back to lucide-react@1.43.0
+  # / fallow@3.23.0 and pulled ~80 hunks of peer-suffix churn along with it.
+  #
+  # Every entry is version-pinned on purpose: these waive the cooldown only for
+  # the exact versions already resolved in pnpm-lock.yaml, so the next bump of
+  # either package gets the full cooldown again rather than inheriting a
+  # standing exemption. Both versions age out of the window on 2026-09-11;
+  # after that these can be deleted with no change to the lockfile.
   - lucide-react@1.44.0
   - fallow@3.24.1
-  - fallow-type-aware
-  - "@fallow-cli/*"
+  - fallow-type-aware@3.24.1
+  - '@fallow-cli/darwin-arm64@3.24.1'
+  - '@fallow-cli/darwin-x64@3.24.1'
+  - '@fallow-cli/linux-arm64-gnu@3.24.1'
+  - '@fallow-cli/linux-arm64-musl@3.24.1'
+  - '@fallow-cli/linux-x64-gnu@3.24.1'
+  - '@fallow-cli/linux-x64-musl@3.24.1'
+  - '@fallow-cli/win32-arm64-msvc@3.24.1'
+  - '@fallow-cli/win32-x64-msvc@3.24.1'
 
 overrides:
   "@monaco-editor/loader": ^1.7.0
