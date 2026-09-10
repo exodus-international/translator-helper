@@ -54,14 +54,6 @@ export async function setUserLanguages(userId: string, languageIds: string[]) {
   return getUserLanguages(userId);
 }
 
-export async function getUserLanguagesCount(userId: string): Promise<number> {
-  return prisma.userLanguage.count({
-    where: {
-      userId,
-    },
-  });
-}
-
 // ─── Project access ──────────────────────────────────────────
 
 /**
@@ -105,19 +97,6 @@ export async function listTranslationProjectMembers(translationProjectId: string
         },
       },
     },
-    include: {
-      user: { select: memberUserSelect },
-    },
-    orderBy: {
-      user: { name: 'asc' },
-    },
-  });
-}
-
-/** Everyone assigned to a language, with their role. */
-export async function listLanguageMembers(languageId: string) {
-  return prisma.userLanguage.findMany({
-    where: { languageId },
     include: {
       user: { select: memberUserSelect },
     },

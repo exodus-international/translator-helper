@@ -35,7 +35,7 @@ export interface Option {
   icon?: React.ComponentType<React.ComponentProps<"svg">>;
 }
 
-export type FilterVariant = "text" | "select" | "multiSelect";
+type FilterVariant = "text" | "select" | "multiSelect";
 
 export interface ExtendedColumnSort<TData> extends Omit<ColumnSort, "id"> {
   id: Extract<keyof TData, string>;

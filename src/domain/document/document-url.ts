@@ -60,7 +60,7 @@ export function buildDocumentEditPath(ref: Pick<DocumentRef, 'projectIdentifier'
  * claims them at that position. `createDocumentSchema` rejects them so a
  * document cannot be created that is unreachable by its own URL.
  */
-export const RESERVED_SLUGS = ['edit', 'new', 'translate', 'review'] as const;
+const RESERVED_SLUGS = ['edit', 'new', 'translate', 'review'] as const;
 
 export function isReservedSlug(slug: string): boolean {
   return (RESERVED_SLUGS as readonly string[]).includes(slug);

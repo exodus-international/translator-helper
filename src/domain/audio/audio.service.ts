@@ -382,8 +382,6 @@ async function failWith(
   return updated;
 }
 
-export { localeFromVoice };
-
 /** Azure allows 3-64 chars of [A-Za-z0-9-_.]; a UUID with a prefix fits. */
 function jobIdFor(audioFileId: string): string {
   return `th-${audioFileId}`;

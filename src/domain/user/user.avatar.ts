@@ -11,7 +11,7 @@
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 
 /** Formats the browser is asked to produce, in order of preference. */
-export const AVATAR_CONTENT_TYPES = ['image/webp', 'image/jpeg', 'image/png'] as const;
+const AVATAR_CONTENT_TYPES = ['image/webp', 'image/jpeg', 'image/png'] as const;
 
 export type AvatarContentType = (typeof AVATAR_CONTENT_TYPES)[number];
 
