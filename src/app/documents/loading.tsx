@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function DocumentsLoading() {
   return (
     <>
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <Skeleton className="h-8 w-48" />
@@ -18,7 +18,7 @@ export default function DocumentsLoading() {
           <Skeleton className="h-10 w-full sm:ml-auto sm:w-48" />
         </div>
       </div>
-      <div className="container mx-auto px-4 py-6">
+      <div className="px-4 py-6">
         <Skeleton className="h-[32rem] w-full" />
       </div>
     </>

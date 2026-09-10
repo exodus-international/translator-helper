@@ -157,10 +157,10 @@ function PersonCell({ person, isYou }: { person: Person | null; isYou?: boolean 
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      <UserAvatar name={person.name} image={person.image} email={person.email} size="xs" />
+      <UserAvatar name={person.name} image={person.image} email={person.email} />
       <span className="text-sm text-muted-foreground">{person.name}</span>
       {isYou && (
-        <Badge variant="primary" appearance="light" size="xs">
+        <Badge variant="default">
           You
         </Badge>
       )}
@@ -408,7 +408,7 @@ export default function DashboardClient({
     <>
       {announcements.banner && <AnnouncementBanner announcement={announcements.banner} />}
       {announcements.modal && <AnnouncementModal announcement={announcements.modal} />}
-      <div className="container mx-auto px-4 py-6 space-y-8">
+      <div className="px-4 py-6 space-y-8">
           {/* Projects section */}
           <section>
             <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
@@ -435,7 +435,7 @@ export default function DashboardClient({
                       if (!open) resetNewProject();
                     }}
                   >
-                    <DialogTrigger render={<Button size="sm" />}>
+                    <DialogTrigger render={<Button />}>
                       <Plus className="h-4 w-4 mr-1.5" />
                       New Project
                     </DialogTrigger>
@@ -486,7 +486,7 @@ export default function DashboardClient({
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">
                   Waiting for Deploy
-                  <Badge variant="secondary" size="sm" className="ml-2">
+                  <Badge variant="secondary" className="ml-2">
                     {filteredApprovedVersions.length}
                   </Badge>
                 </h2>
@@ -593,7 +593,7 @@ export default function DashboardClient({
             <h2 className="text-lg font-semibold mb-4">
               My Work
               {workItems.length > 0 && (
-                <Badge variant="secondary" size="sm" className="ml-2">
+                <Badge variant="secondary" className="ml-2">
                   {workItems.length}
                 </Badge>
               )}
@@ -614,7 +614,7 @@ export default function DashboardClient({
                   <div>
                     <h3 className="text-sm font-medium mb-2">
                       Needs you
-                      <Badge variant="secondary" size="sm" className="ml-2">
+                      <Badge variant="secondary" className="ml-2">
                         {needsYouItems.length}
                       </Badge>
                     </h3>
@@ -625,7 +625,7 @@ export default function DashboardClient({
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-2">
                       Waiting on others
-                      <Badge variant="secondary" size="sm" className="ml-2">
+                      <Badge variant="secondary" className="ml-2">
                         {waitingItems.length}
                       </Badge>
                     </h3>

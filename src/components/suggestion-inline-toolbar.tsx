@@ -68,7 +68,7 @@ export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position, co
   const toolbar = (
     <div
       ref={toolbarRef}
-      className="fixed z-[100] flex gap-1 bg-white border border-gray-300 rounded-md shadow-lg p-1"
+      className="fixed z-[100] flex gap-1 bg-popover text-popover-foreground border rounded-md shadow-lg p-1"
       style={{
         left: `${coords.left}px`,
         top: `${coords.top}px`,

@@ -68,7 +68,7 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
       <Card className="w-full max-w-lg p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Please fill in your details to get started. You can update these later from your profile page.
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="onboarding-name">
-              Full Name <span className="text-red-500">*</span>
+              Full Name <span className="text-destructive">*</span>
             </Label>
             <Input
               id="onboarding-name"
@@ -167,7 +167,7 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
               onChange={(e) => setExodus90AppId(e.target.value)}
               placeholder="Your Exodus90 app ID"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               You can find this in the My Account section of the Me page in the Exodus90 app.
             </p>
           </div>

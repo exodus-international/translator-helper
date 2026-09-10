@@ -5,6 +5,7 @@ import './globals.css';
 import { getCurrentUser } from '@/lib/session';
 import { SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { AppShell } from '@/components/app-shell';
+import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackButton } from '@/components/feedback-button';
 import { PostHogProvider } from '@/components/posthog-provider';
@@ -60,17 +61,20 @@ export default async function RootLayout({
   const sidebarOpen = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value !== 'false';
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <PostHogProvider user={user}>
-          <NuqsAdapter>
-            <AppShell user={user} defaultOpen={sidebarOpen}>
-              {children}
-            </AppShell>
-            <FeedbackButton />
-            <Toaster />
-          </NuqsAdapter>
-        </PostHogProvider>
+        <ThemeProvider>
+          <PostHogProvider user={user}>
+            <NuqsAdapter>
+              <AppShell user={user} defaultOpen={sidebarOpen}>
+                {children}
+              </AppShell>
+              {/* Signed-in users get these two links in the sidebar footer instead. */}
+              {!user && <FeedbackButton />}
+              <Toaster />
+            </NuqsAdapter>
+          </PostHogProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

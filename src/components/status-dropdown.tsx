@@ -237,7 +237,7 @@ export function StatusDropdown({
           sideOffset={4}
         >
         <DropdownMenuPrimitive.Popup
-          className="min-w-[200px] bg-white rounded-md border shadow-md p-1 z-50"
+          className="min-w-[200px] bg-popover text-popover-foreground rounded-md border shadow-md p-1 z-50"
         >
           {availableStatuses.map((status) => {
             const statusConfig = getDocumentStatusConfig(status);
@@ -259,8 +259,8 @@ export function StatusDropdown({
                 disabled={isDisabled}
                 className={cn(
                   'relative flex items-center gap-2 px-2 py-2 text-sm rounded-sm outline-none',
-                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100 focus:bg-gray-100',
-                  isCurrentStatus && 'bg-blue-50 opacity-60',
+                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-accent focus:bg-accent',
+                  isCurrentStatus && 'bg-info/10 opacity-60',
                 )}
                 closeOnClick={false}
                 onClick={() => {
@@ -273,21 +273,21 @@ export function StatusDropdown({
                   }
                 }}
               >
-                {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
+                {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-info rounded-r" />}
                 <div className="flex w-full justify-between items-center gap-2">
                   <div className="flex flex-col">
-                    <span className={cn(isDisabled ? 'text-gray-400' : 'text-gray-900 font-medium')}>
+                    <span className={cn(isDisabled ? 'text-muted-foreground' : 'text-foreground font-medium')}>
                       {getTransitionLabel(displayedStatus, status)}
                     </span>
                     {isBlockedByOpenSuggestions && (
-                      <div className="text-[12px] text-red-600 flex items-center">
+                      <div className="text-[12px] text-destructive flex items-center">
                         <AlertCircle className="h-3.5 w-3.5 mr-1" /> {openSuggestionsCount} open comment
                         {openSuggestionsCount !== 1 ? 's' : ''} remaining
                       </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <ArrowRight className={cn('h-3.5 w-3.5', isDisabled ? 'text-gray-300' : 'text-gray-400')} />
+                    <ArrowRight className={cn('h-3.5 w-3.5', isDisabled ? 'text-muted-foreground/60' : 'text-muted-foreground')} />
                     <Badge variant="secondary" className={cn('gap-1', statusConfig.color.badgeClass, 'justify-start')}>
                       <StatusIcon className={cn('h-3.5 w-3.5', statusConfig.color.textClass)} />
                       <span className={cn('font-medium', statusConfig.color.textClass)}>{statusConfig.name}</span>

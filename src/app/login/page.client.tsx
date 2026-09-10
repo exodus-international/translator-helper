@@ -50,7 +50,7 @@ export default function LoginClient() {
         <div className="text-center mb-4">
           <Logo size={48} className="mx-auto mb-2 block" />
           <h1 className="text-2xl font-bold">Translation Helper</h1>
-          <p className="text-gray-600">Manage your translations efficiently</p>
+          <p className="text-muted-foreground">Manage your translations efficiently</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">

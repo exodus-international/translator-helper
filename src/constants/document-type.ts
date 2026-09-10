@@ -39,8 +39,8 @@ export const DOCUMENT_TYPE_CONFIGS: Record<DocumentType, DocumentTypeConfig> = {
     name: 'Day',
     icon: CalendarDays,
     color: {
-      badgeClass: 'border border-indigo-200 bg-indigo-50 text-indigo-700',
-      textClass: 'text-indigo-600',
+      badgeClass: 'border border-hue-indigo/25 bg-hue-indigo/10 text-hue-indigo',
+      textClass: 'text-hue-indigo',
     },
   },
   [DocumentType.FIELD_GUIDE]: {
@@ -48,8 +48,8 @@ export const DOCUMENT_TYPE_CONFIGS: Record<DocumentType, DocumentTypeConfig> = {
     name: 'Field Guide',
     icon: Compass,
     color: {
-      badgeClass: 'border border-amber-200 bg-amber-50 text-amber-700',
-      textClass: 'text-amber-600',
+      badgeClass: 'border border-hue-amber/25 bg-hue-amber/10 text-hue-amber',
+      textClass: 'text-hue-amber',
     },
   },
   [DocumentType.DAILY_CONTENT]: {
@@ -57,8 +57,8 @@ export const DOCUMENT_TYPE_CONFIGS: Record<DocumentType, DocumentTypeConfig> = {
     name: 'Daily Content',
     icon: Newspaper,
     color: {
-      badgeClass: 'border border-sky-200 bg-sky-50 text-sky-700',
-      textClass: 'text-sky-600',
+      badgeClass: 'border border-hue-sky/25 bg-hue-sky/10 text-hue-sky',
+      textClass: 'text-hue-sky',
     },
   },
   [DocumentType.ROOT_FILE]: {
@@ -66,8 +66,8 @@ export const DOCUMENT_TYPE_CONFIGS: Record<DocumentType, DocumentTypeConfig> = {
     name: 'Root File',
     icon: FileCog,
     color: {
-      badgeClass: 'border border-slate-200 bg-slate-50 text-slate-700',
-      textClass: 'text-slate-600',
+      badgeClass: 'border border-border bg-muted text-muted-foreground',
+      textClass: 'text-muted-foreground',
     },
   },
   [DocumentType.MEETING]: {
@@ -75,8 +75,8 @@ export const DOCUMENT_TYPE_CONFIGS: Record<DocumentType, DocumentTypeConfig> = {
     name: 'Meeting',
     icon: Users,
     color: {
-      badgeClass: 'border border-rose-200 bg-rose-50 text-rose-700',
-      textClass: 'text-rose-600',
+      badgeClass: 'border border-hue-rose/25 bg-hue-rose/10 text-hue-rose',
+      textClass: 'text-hue-rose',
     },
   },
 };
