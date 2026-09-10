@@ -246,7 +246,7 @@ export default function TranslationProjectClient({
   const unassignedVersions = versions.filter((version) => !version.userId);
 
   return (
-    <div  >
+    <>
       <PageHeader
         back={{
           href: buildProjectTranslationsPath(translationProject.sourceProject.identifier),
@@ -596,6 +596,6 @@ export default function TranslationProjectClient({
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

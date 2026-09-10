@@ -148,7 +148,7 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
       : `New ${type === 'BANNER' ? 'Banner' : 'Modal'}`;
 
   return (
-    <div  >
+    <>
       <PageHeader
         title="Announcements"
         description="Notify users about new functionality or ask for their input"
@@ -359,6 +359,6 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
             ),
         )}
       </div>
-    </div>
+    </>
   );
 }

@@ -48,7 +48,7 @@ interface ProfileClientProps {
 
 export default function ProfileClient({ profile, avatarUploadEnabled }: ProfileClientProps) {
   return (
-    <div  >
+    <>
       <PageHeader title="Profile" description="Your picture, contact details and password." />
 
       <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
@@ -56,7 +56,7 @@ export default function ProfileClient({ profile, avatarUploadEnabled }: ProfileC
         <ProfileDetailsForm profile={profile} />
         <ChangePasswordSection />
       </div>
-    </div>
+    </>
   );
 }
 
