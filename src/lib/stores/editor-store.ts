@@ -1,5 +1,5 @@
 import { createStore } from 'zustand';
-import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
+import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { submitForReviewAction } from '@/domain/document-version/document-version.actions';
 import {
