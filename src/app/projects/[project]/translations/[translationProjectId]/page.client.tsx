@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { assignTranslatorToVersionAction } from '@/domain/document-version/document-version.actions';
 import { removeLanguageMemberAction, setLanguageMemberRoleAction } from '@/domain/user-language/user-language.actions';
 import { capture } from '@/lib/analytics';
-import { Prisma } from '@/generated/prisma/client';
+import type { Prisma } from '@/generated/prisma/client';
 import { ProjectRole } from '@/generated/prisma/enums';
 import { Calendar, FileText, Plus, Trash2, User, Users } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
