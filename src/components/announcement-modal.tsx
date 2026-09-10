@@ -55,21 +55,24 @@ export function AnnouncementModal({ announcement }: AnnouncementModalProps) {
         {announcement.body && <AnnouncementMarkdown>{announcement.body}</AnnouncementMarkdown>}
         {announcement.ctaLabel && announcement.ctaUrl && (
           <DialogFooter>
-            <Button asChild>
-              <Link
-                href={announcement.ctaUrl}
-                target="_blank"
-                onClick={() =>
-                  capture('announcement_cta_clicked', {
-                    announcement_id: announcement.id,
-                    announcement_title: announcement.title,
-                    display: 'modal',
-                  })
-                }
-              >
-                {announcement.ctaLabel}
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </Link>
+            <Button
+              nativeButton={false}
+              render={
+                <Link
+                  href={announcement.ctaUrl}
+                  target="_blank"
+                  onClick={() =>
+                    capture('announcement_cta_clicked', {
+                      announcement_id: announcement.id,
+                      announcement_title: announcement.title,
+                      display: 'modal',
+                    })
+                  }
+                />
+              }
+            >
+              {announcement.ctaLabel}
+              <ExternalLink className="ml-2 h-4 w-4" />
             </Button>
           </DialogFooter>
         )}

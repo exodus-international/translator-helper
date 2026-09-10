@@ -129,10 +129,10 @@ export function Navigation({ user }: NavigationProps) {
       <div className="mx-auto flex h-14 w-full max-w-screen-2xl items-center justify-between gap-2 px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-1 md:gap-4">
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu">
-                <Menu />
-              </Button>
+            <SheetTrigger
+              render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open menu" />}
+            >
+              <Menu />
             </SheetTrigger>
             <SheetContent side="left" className="flex w-80 max-w-[85vw] flex-col gap-0 p-0">
               <SheetHeader className="border-b p-4 text-left">
@@ -229,11 +229,9 @@ export function Navigation({ user }: NavigationProps) {
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {user.role === 'ADMIN' && (
-            <Button asChild size="sm" className="hidden sm:inline-flex">
-              <Link href="/documents/new">
-                <FilePlus />
-                New
-              </Link>
+            <Button size="sm" className="hidden sm:inline-flex" nativeButton={false} render={<Link href="/documents/new" />}>
+              <FilePlus />
+              New
             </Button>
           )}
           <Link href="/profile" className="flex items-center gap-2 hover:opacity-80">

@@ -197,11 +197,9 @@ export default function DocumentsClient({
         title="Documents Overview"
         description="View translation status across all languages"
         actions={
-          <Button asChild>
-            <Link href="/documents/new">
-              <Plus />
-              New Document
-            </Link>
+          <Button nativeButton={false} render={<Link href="/documents/new" />}>
+            <Plus />
+            New Document
           </Button>
         }
       >
@@ -220,7 +218,15 @@ export default function DocumentsClient({
               <FieldLabel htmlFor="documents-project-filter">Project</FieldLabel>
               <Select
                 value={selectedSourceProject}
-                onValueChange={(value) => navigate({ sourceProject: value === 'all' ? null : value, page: null })}
+                onValueChange={(value) =>
+                  navigate({ sourceProject: !value || value === 'all' ? null : value, page: null })
+                }
+                items={{
+                  all: 'All projects',
+                  ...Object.fromEntries(
+                    sourceProjects.map((project) => [project.id, `${project.name} (${project._count.documents})`]),
+                  ),
+                }}
               >
                 <SelectTrigger id="documents-project-filter" className="w-full sm:w-48">
                   <SelectValue placeholder="All projects" />
@@ -241,7 +247,13 @@ export default function DocumentsClient({
               <FieldLabel htmlFor="documents-type-filter">Type</FieldLabel>
               <Select
                 value={selectedType}
-                onValueChange={(value) => navigate({ type: value === 'all' ? null : value, page: null })}
+                onValueChange={(value) => navigate({ type: !value || value === 'all' ? null : value, page: null })}
+                items={{
+                  all: 'All types',
+                  ...Object.fromEntries(
+                    DOCUMENT_TYPE_SEQUENCE.map((type) => [type, DOCUMENT_TYPE_CONFIGS[type].name]),
+                  ),
+                }}
               >
                 <SelectTrigger id="documents-type-filter" className="w-full sm:w-40">
                   <SelectValue placeholder="All types" />
@@ -288,9 +300,7 @@ export default function DocumentsClient({
                   Clear search and filters
                 </Button>
               ) : (
-                <Button asChild>
-                  <Link href="/documents/new">New Document</Link>
-                </Button>
+                <Button nativeButton={false} render={<Link href="/documents/new" />}>New Document</Button>
               )}
             </EmptyContent>
           </Empty>
@@ -416,14 +426,16 @@ export default function DocumentsClient({
                             </Button>
                           </Link>
                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            <AlertDialogTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                />
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>

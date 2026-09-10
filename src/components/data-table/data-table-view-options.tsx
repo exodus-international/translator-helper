@@ -38,17 +38,19 @@ export function DataTableViewOptions<TData extends RowData>({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label="Toggle columns"
-          variant="outline"
-          size="sm"
-          className="ml-auto hidden h-8 font-normal lg:flex"
-          disabled={disabled}
-        >
-          <Settings2 className="mr-2 h-4 w-4 text-muted-foreground" />
-          View
-        </Button>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            aria-label="Toggle columns"
+            variant="outline"
+            size="sm"
+            className="ml-auto hidden h-8 font-normal lg:flex"
+            disabled={disabled}
+          />
+        }
+      >
+        <Settings2 className="mr-2 h-4 w-4 text-muted-foreground" />
+        View
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-48">
         <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
@@ -59,7 +61,6 @@ export function DataTableViewOptions<TData extends RowData>({
             className="capitalize"
             checked={column.getIsVisible()}
             onCheckedChange={(value) => column.toggleVisibility(!!value)}
-            onSelect={(event) => event.preventDefault()}
           >
             {column.columnDef.meta?.label ?? column.id}
           </DropdownMenuCheckboxItem>

@@ -291,8 +291,8 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                   <p className="text-gray-600 mb-4">or</p>
                   <label>
                     <input type="file" accept=".md,.yml,.yaml" onChange={handleFileSelect} className="hidden" />
-                    <Button type="button" variant="outline" asChild>
-                      <span>Browse Files</span>
+                    <Button type="button" variant="outline" render={<span />} nativeButton={false}>
+                      Browse Files
                     </Button>
                   </label>
                   <p className="text-xs text-gray-500 mt-4">Supported files: .md, .yml, .yaml</p>
@@ -328,7 +328,12 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                       {!showNewProjectInput ? (
                         <>
                           <div className="flex gap-2">
-                            <Select value={sourceProjectId} onValueChange={setSourceProjectId} required>
+                            <Select
+                              value={sourceProjectId || null}
+                              onValueChange={(v) => setSourceProjectId(v ?? '')}
+                              required
+                              items={Object.fromEntries(sourceProjects.map((project) => [project.id, project.name]))}
+                            >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select source project" />
                               </SelectTrigger>

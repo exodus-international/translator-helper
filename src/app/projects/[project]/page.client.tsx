@@ -161,7 +161,11 @@ export default function ProjectDetailClient({
         title={sourceProject.name}
         description={sourceProject.description ?? undefined}
         actions={
-          <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+          <Select
+            value={selectedLanguage}
+            onValueChange={(v) => handleLanguageChange(v ?? '')}
+            items={Object.fromEntries(languages.map((lang) => [lang.id, lang.name]))}
+          >
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select language" />
             </SelectTrigger>

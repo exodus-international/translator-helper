@@ -61,7 +61,7 @@ const ROLE_LABELS: Record<ProjectRole, string> = {
 
 function RoleSelect({ value, onChange }: { value: ProjectRole; onChange: (role: ProjectRole) => void }) {
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as ProjectRole)}>
+    <Select value={value} onValueChange={(v) => onChange((v ?? value) as ProjectRole)} items={ROLE_LABELS}>
       <SelectTrigger>
         <SelectValue placeholder="Select role" />
       </SelectTrigger>
@@ -205,11 +205,9 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
         </div>
         {canManage && (
           <Dialog modal={false} open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Add Member
-              </Button>
+            <DialogTrigger render={<Button size="sm" />}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Member
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -218,7 +216,11 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
               <div className="space-y-4 mt-4">
                 <div>
                   <Label>User</Label>
-                  <Select value={newMemberUserId} onValueChange={setNewMemberUserId}>
+                  <Select
+                    value={newMemberUserId || null}
+                    onValueChange={(v) => setNewMemberUserId(v ?? '')}
+                    items={Object.fromEntries(availableUsers.map((u) => [u.id, `${u.name} (${u.email})`]))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select user" />
                     </SelectTrigger>
@@ -300,10 +302,8 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
                           <Pencil className="h-4 w-4 text-gray-500" />
                         </Button>
                         <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon-sm">
-                              <Trash2 className="h-4 w-4 text-gray-500" />
-                            </Button>
+                          <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
+                            <Trash2 className="h-4 w-4 text-gray-500" />
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>

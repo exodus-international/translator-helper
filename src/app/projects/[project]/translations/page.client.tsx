@@ -155,11 +155,9 @@ export default function TranslationsClient({
               if (!open) resetForm();
             }}
           >
-            <DialogTrigger asChild>
-              <Button disabled={availableLanguages.length === 0}>
-                <Plus />
-                Create Translation Project
-              </Button>
+            <DialogTrigger render={<Button disabled={availableLanguages.length === 0} />}>
+              <Plus />
+              Create Translation Project
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -178,7 +176,12 @@ export default function TranslationsClient({
                 </div>
                 <div>
                   <Label htmlFor="language">Target Language *</Label>
-                  <Select value={selectedLanguageId} onValueChange={setSelectedLanguageId} required>
+                  <Select
+                    value={selectedLanguageId || null}
+                    onValueChange={(v) => setSelectedLanguageId(v ?? '')}
+                    required
+                    items={Object.fromEntries(availableLanguages.map((lang) => [lang.id, `${lang.name} (${lang.code})`]))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a language" />
                     </SelectTrigger>

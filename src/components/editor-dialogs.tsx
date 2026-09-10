@@ -74,7 +74,13 @@ function SubmitReviewDialog() {
             <Label>
               Select a reviewer <span className="text-muted-foreground font-normal">(optional)</span>
             </Label>
-            <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
+            <Select
+              value={selectedReviewerId || null}
+              onValueChange={(v) => setSelectedReviewerId(v ?? '')}
+              items={Object.fromEntries(
+                dialog.reviewers.map((member) => [member.user.id, <MemberOption key={member.user.id} user={member.user} withEmail />]),
+              )}
+            >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Choose reviewer" />
               </SelectTrigger>
@@ -141,7 +147,11 @@ function AssignTranslatorDialog() {
         <div className="space-y-4 mt-2">
           <div>
             <Label>Translator</Label>
-            <Select value={userId} onValueChange={setUserId}>
+            <Select
+              value={userId || null}
+              onValueChange={(v) => setUserId(v ?? '')}
+              items={Object.fromEntries(dialog.members.map((m) => [m.user.id, <MemberOption key={m.user.id} user={m.user} />]))}
+            >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select translator..." />
               </SelectTrigger>
@@ -208,7 +218,13 @@ function AssignReviewerDialog() {
         <div className="space-y-4 mt-2">
           <div>
             <Label>Reviewer</Label>
-            <Select value={selectedId} onValueChange={setSelectedId}>
+            <Select
+              value={selectedId || null}
+              onValueChange={(v) => setSelectedId(v ?? '')}
+              items={Object.fromEntries(
+                dialog.candidates.map((m) => [m.user.id, <MemberOption key={m.user.id} user={m.user} withEmail />]),
+              )}
+            >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select reviewer..." />
               </SelectTrigger>
