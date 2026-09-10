@@ -52,7 +52,7 @@ const THROTTLE_MS = 50;
 
 // v9 requires explicit feature registration; this app's tables all share the
 // same feature set, so it is built once at module level.
-export const dataTableFeatures = tableFeatures({
+const dataTableFeatures = tableFeatures({
   columnFacetingFeature,
   columnFilteringFeature,
   columnOrderingFeature,

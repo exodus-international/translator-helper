@@ -16,7 +16,7 @@ const DAY_FILENAME = /^(\d{1,3})\s*\.(?:md|ya?ml)$/i;
  * alone". An empty field cannot carry that meaning: it is what every project
  * starts out with, and it already says "no acronym, but still number the days".
  */
-export const NAMING_DISABLED = '-';
+const NAMING_DISABLED = '-';
 
 /**
  * The day number is padded to two digits because both document lists sort

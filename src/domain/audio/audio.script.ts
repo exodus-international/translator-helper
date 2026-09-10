@@ -113,7 +113,7 @@ const BLOCK_TAGS = new Set([
 const BLOCK_TAG_PATTERN = new RegExp(`</?(?:${[...BLOCK_TAGS].join('|')})\\b[^>]*>`, 'gi');
 
 /** Removes every element marked data-read="false", content and all. */
-export function stripUnreadElements(text: string): string {
+function stripUnreadElements(text: string): string {
   let match: RegExpMatchArray | null;
   while ((match = text.match(UNREAD_OPEN_TAG)) !== null) {
     const start = match.index ?? 0;
