@@ -5,7 +5,7 @@ import { createContext, useContext } from 'react';
 
 import { getDocumentStatusConfig, type DocumentStatusKey } from '@/constants/document-status';
 import { cn } from '@/lib/utils';
-import type { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 
 // Types
 type StepperOrientation = 'horizontal' | 'vertical';

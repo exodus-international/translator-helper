@@ -16,7 +16,7 @@ import { AUDIO_SKIP_MESSAGES, type AudioFileView } from '@/domain/audio/audio.ty
 import { capture } from '@/lib/analytics';
 import { useEditorStore } from '@/lib/stores/editor-provider';
 import { cn } from '@/lib/utils';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
 
 interface AudioStatusProps {

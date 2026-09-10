@@ -31,7 +31,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { useEditorStore } from '@/lib/stores/editor-provider';
 import {
   AlertCircle,

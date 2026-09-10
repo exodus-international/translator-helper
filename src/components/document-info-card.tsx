@@ -4,7 +4,7 @@ import { UserAvatar } from '@/components/user-avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getDocumentStatusConfig } from '@/constants/document-status';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { Eye, Pencil, User, UserMinus, UserPlus } from 'lucide-react';
 
 interface DocumentInfoCardProps {

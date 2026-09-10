@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AudioProvider } from '@prisma/client';
+import { AudioProvider } from '@/generated/prisma/enums';
 
 export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
 

@@ -14,7 +14,7 @@ import { updateUserProfileAction } from '@/domain/user/user.actions';
 import { capture } from '@/lib/analytics';
 import { authClient } from '@/lib/auth-client';
 import { formatUnambiguousDate } from '@/lib/format';
-import { TShirtSize } from '@prisma/client';
+import { TShirtSize } from '@/generated/prisma/enums';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 

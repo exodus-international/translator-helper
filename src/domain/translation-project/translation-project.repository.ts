@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client';
 import { countVersionsByLanguage } from '../document-version/document-version.repository';
 
 export const TRANSLATION_PROJECT_SORTS = ['name', 'createdAt'] as const;

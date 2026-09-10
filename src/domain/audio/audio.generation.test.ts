@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AudioProvider, AudioStatus, DocumentType, type AudioFile } from '@prisma/client';
+import type { AudioFile } from '@/generated/prisma/client';
+import { AudioProvider, AudioStatus, DocumentType } from '@/generated/prisma/enums';
 import { createStartGeneration, type GenerationDeps, type VersionForGeneration } from './audio.service';
 import type { SpeechProvider } from './providers/speech-provider';
 

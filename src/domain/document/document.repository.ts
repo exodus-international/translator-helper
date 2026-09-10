@@ -1,6 +1,7 @@
 import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
-import { DocumentType, Prisma, SuggestionStatus } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
+import { DocumentType, SuggestionStatus } from '@/generated/prisma/enums';
 
 const userWithLanguages = {
   select: {

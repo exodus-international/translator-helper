@@ -1,7 +1,7 @@
 'use client';
 
 import { UserAvatar } from '@/components/user-avatar';
-import { SuggestionStatus, SuggestionType } from '@prisma/client';
+import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 import { Check, MessageSquare, Pencil, PencilLine, RotateCcw, X } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';

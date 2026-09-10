@@ -4,7 +4,7 @@ import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { type SessionUser } from '@/lib/session';
-import { DocumentStatus, Role } from '@prisma/client';
+import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
 
