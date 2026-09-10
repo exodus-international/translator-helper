@@ -72,12 +72,10 @@ function SelectContent({
           {...props}
         >
           <SelectScrollUpButton />
-          <SelectPrimitive.List
-            className={cn(
-              'p-1',
-              'h-[var(--anchor-height)] w-full min-w-[var(--anchor-width)] scroll-my-1',
-            )}
-          >
+          {/* No height here: --anchor-height is the *trigger's* height, so setting
+              it pinned every popup to one row. The Popup above already caps at
+              --available-height and scrolls. */}
+          <SelectPrimitive.List className={cn('w-full min-w-[var(--anchor-width)] scroll-my-1 p-1')}>
             {children}
           </SelectPrimitive.List>
           <SelectScrollDownButton />
