@@ -3,8 +3,8 @@
 import { ReactNode, Ref, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import matter from 'gray-matter';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { parseFrontmatter } from '@/lib/frontmatter';
 import { useState, useMemo } from 'react';
 import { ActivityLog } from '@/components/activity-log';
 import { DocumentInfoCard } from '@/components/document-info-card';
@@ -31,7 +31,7 @@ import { buildProjectPath } from '@/domain/source-project/source-project-url';
 
 function getContentWithoutFrontmatter(text: string) {
   try {
-    const { content } = matter(text);
+    const { content } = parseFrontmatter(text);
     return content;
   } catch {
     return text;

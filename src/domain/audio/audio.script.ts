@@ -1,4 +1,4 @@
-import matter from 'gray-matter';
+import { parseFrontmatter } from '@/lib/frontmatter';
 
 /**
  * Pure conversion of stored Markdown into a speech script: the prose a
@@ -90,7 +90,7 @@ function stripInvisibleFormatting(text: string): string {
 
 function stripFrontmatter(markdown: string): string {
   try {
-    return matter(markdown).content;
+    return parseFrontmatter(markdown).content;
   } catch {
     return markdown;
   }
