@@ -47,7 +47,7 @@
     "fflate": "^0.8.3",
     "gray-matter": "^4.0.3",
     "js-yaml": "^4.3.2",
-    "lucide-react": "^0.553.0",
+    "lucide-react": "^1.41.0",
     "marked": "^15.0.12",
     "monaco-editor": "0.56.0",
     "next": "16.3.4",
