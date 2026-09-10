@@ -1,3 +1,4 @@
+import { isAudioEligible } from '@/domain/audio/audio.service';
 import { getDocumentVersionByDocumentAndLanguage } from '@/domain/document-version/document-version.repository';
 import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.repository';
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
@@ -40,6 +41,11 @@ export async function DocumentEditorPage({
     ? await getTranslationProjectBySourceAndLanguage(document.sourceProject.id, language.id)
     : null;
 
+  // The Audio text tab exists only where audio does, which is the same check
+  // generation makes: a language with a voice, a document type the project has
+  // audio turned on for, and storage and the provider configured.
+  const audioTextVersionId = targetVersion && (await isAudioEligible(targetVersion.id)) ? targetVersion.id : null;
+
   if (targetVersion && !isDraftPhase(targetVersion.status)) {
     return (
       <ReviewClient
@@ -49,6 +55,7 @@ export async function DocumentEditorPage({
         targetLanguage={targetLanguage}
         translationProjectId={translationProject?.id ?? null}
         user={user}
+        audioTextVersionId={audioTextVersionId}
         initialSuggestions={initialSuggestions}
       />
     );
