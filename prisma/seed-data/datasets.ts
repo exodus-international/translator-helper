@@ -199,6 +199,7 @@ export const DOCUMENTS: {
   { key: 'ex-disc', slug: 'ex90-disciplines', title: 'Disciplines', type: DocumentType.ROOT_FILE, labels: ['root', 'yaml'], originalFilename: 'disciplines.yml', project: 'exodus' },
   { key: 'ex-m1', slug: 'ex90-meeting-1-6', title: 'Fraternity Meeting (Days 1-6)', type: DocumentType.MEETING, labels: ['meeting'], originalFilename: '1-6.md', project: 'exodus' },
   { key: 'ex-m2', slug: 'ex90-meeting-7-13', title: 'Fraternity Meeting (Days 7-13)', type: DocumentType.MEETING, labels: ['meeting'], originalFilename: '7-13.md', project: 'exodus' },
+  { key: 'ex-md', slug: 'ex90-markdown-reference', title: 'Markdown Reference', type: DocumentType.DAILY_CONTENT, labels: ['reference', 'markdown'], originalFilename: 'markdown-reference.md', project: 'exodus' },
   // Lent
   { key: 'le-aw', slug: 'lent-ash-wednesday', title: 'Ash Wednesday Reflection', type: DocumentType.DAY, labels: ['week-1', 'special'], deadline: daysFromNow(10), project: 'lent' },
   { key: 'le-d5', slug: 'lent-day-5', title: 'Friday of the First Week', type: DocumentType.DAY, labels: ['week-1'], deadline: daysFromNow(15), originalFilename: '5.md', project: 'lent' },
@@ -235,6 +236,9 @@ export const TARGET_VERSIONS: VersionDef[] = [
   { docKey: 'ex-d45', langCode: 'cs', status: DocumentStatus.PENDING_TRANSLATION, userKey: 'admin1', versionNum: 1 },
   { docKey: 'ex-fg', langCode: 'cs', status: DocumentStatus.DEPLOYED, userKey: 'translator1', reviewerKey: 'admin1', versionNum: 5 },
   { docKey: 'ex-dc', langCode: 'cs', status: DocumentStatus.APPROVED, userKey: 'translator1', reviewerKey: 'admin1', versionNum: 4 },
+  // Left in progress on purpose: the markdown reference is where the content
+  // lint and its "Fix all" are demonstrated, and both need an editable pane.
+  { docKey: 'ex-md', langCode: 'cs', status: DocumentStatus.IN_PROGRESS, userKey: 'translator1', versionNum: 2 },
 
   // Exodus90 — Slovak
   { docKey: 'ex-d1', langCode: 'sk', status: DocumentStatus.APPROVED, userKey: 'translator1', reviewerKey: 'reviewer1', versionNum: 4 },
