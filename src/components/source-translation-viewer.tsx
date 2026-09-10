@@ -16,6 +16,7 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } f
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { SuggestionStatus } from '@/generated/prisma/enums';
 import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
@@ -131,7 +132,7 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
         // stealing ⌘B (which would toggle both sidebars at once) and from
         // overwriting the shell's persisted state cookie.
         keyboardShortcut={false}
-        cookieName="editor_sidebar_state"
+        cookieName={EDITOR_SIDEBAR_COOKIE_NAME}
         className={cn(props.className, props.layout === 'zen' && 'h-full')}
       >
         <SourceTranslationViewerInner ref={ref} {...props} />

@@ -173,8 +173,11 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
   /** Stick to the viewport on desktop so the sidebar stays in view on long
-      pages. Off by default: inset-y-0 alone tracks the page height, which
-      pushes the footer below the fold on scrolling pages. */
+      pages. Sticky is a positioned box, so it also becomes the containing
+      block for the absolute panel below: inset-y-0 then spans exactly the
+      stuck h-svh box instead of the full page height (which is what pushes
+      the footer below the fold on scrolling pages without this). Off by
+      default to preserve stock sidebar-07 behavior. */
   pinned?: boolean
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()

@@ -56,8 +56,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
-  // Same cookie ui/sidebar.tsx writes on toggle: reading it server-side means
-  // the sidebar's first paint already has the width the user last chose.
+  // First paint already has the width the user last chose.
   const sidebarOpen = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value !== 'false';
 
   return (

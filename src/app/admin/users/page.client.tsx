@@ -781,7 +781,7 @@ export default function UsersClient({
   // ─── Render ─────────────────────────────────────────────
 
   return (
-    <div  >
+    <>
       <PageHeader title="User Management" description="Manage users, roles, and invitations" />
 
       <div className="container mx-auto px-4 py-4">
@@ -1368,6 +1368,6 @@ export default function UsersClient({
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

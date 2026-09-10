@@ -256,7 +256,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   };
 
   return (
-    <div  >
+    <>
       <PageHeader title="New Document" description="Upload a markdown or YAML file, or create a new document" />
 
       <div className="container mx-auto px-4 py-4">
@@ -456,6 +456,6 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
           </Tabs>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

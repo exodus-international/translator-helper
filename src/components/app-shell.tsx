@@ -39,8 +39,10 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { capture } from '@/lib/analytics';
 import { signOut } from '@/lib/auth-client';
+import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import {
   ChevronsUpDown,
@@ -52,6 +54,7 @@ import {
   LogOut,
   Megaphone,
   ScrollText,
+  Sparkles,
   User,
   Users,
   type LucideIcon,
@@ -98,9 +101,9 @@ function HeaderBreadcrumb() {
       label: segmentLabel(segment),
     }))
     .filter((crumb) => crumb.label);
-  const last = crumbs[crumbs.length - 1];
+  const lastCrumb = crumbs[crumbs.length - 1];
 
-  if (!last) {
+  if (!lastCrumb) {
     return null;
   }
 
@@ -116,7 +119,7 @@ function HeaderBreadcrumb() {
           </React.Fragment>
         ))}
         <BreadcrumbItem>
-          <BreadcrumbPage>{last.label}</BreadcrumbPage>
+          <BreadcrumbPage>{lastCrumb.label}</BreadcrumbPage>
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
@@ -140,9 +143,9 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/settings/language-instructions', label: 'Language Instructions', icon: ScrollText },
 ];
 
-// The old navbar's "New" shortcut, kept reachable from the sidebar itself so
-// admins keep a one-click path to a fresh document on desktop and mobile.
-const NEW_DOCUMENT_ITEM: NavItem = { href: '/documents/new', label: 'New document', icon: FilePlus };
+// Rendered after the Dashboard and Admin groups for every role, matching the
+// old navbar's trailing "What's New" link.
+const TRAILING_NAV_ITEM: NavItem = { href: '/releases', label: "What's New", icon: Sparkles };
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -270,9 +273,8 @@ function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: Sessio
       </SidebarHeader>
       <SidebarContent>
         <SidebarNavGroup items={NAV_ITEMS} />
-        {user.role === 'ADMIN' && (
-          <SidebarNavGroup items={[NEW_DOCUMENT_ITEM, ...ADMIN_NAV_ITEMS]} label="Admin" />
-        )}
+        {isAdminClient(user) && <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />}
+        <SidebarNavGroup items={[TRAILING_NAV_ITEM]} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
@@ -307,6 +309,14 @@ export function AppShell({ user, defaultOpen = true, children }: AppShellProps) 
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
             <HeaderBreadcrumb />
           </div>
+          {isAdminClient(user) && (
+            <div className="ml-auto flex items-center px-4">
+              <Button size="sm" className="hidden sm:inline-flex" nativeButton={false} render={<Link href="/documents/new" />}>
+                <FilePlus />
+                New
+              </Button>
+            </div>
+          )}
         </header>
         {children}
       </SidebarInset>

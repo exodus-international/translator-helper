@@ -142,7 +142,7 @@ export default function TranslationsClient({
   const hasNoLanguages = languages.length === 0;
 
   return (
-    <div  >
+    <>
       <PageHeader
         back={{ href: '/admin/projects', label: 'Back to Projects' }}
         title={sourceProject.name}
@@ -310,6 +310,6 @@ export default function TranslationsClient({
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

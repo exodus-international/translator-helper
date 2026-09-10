@@ -90,7 +90,7 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
   };
 
   return (
-    <div  >
+    <>
       <PageHeader
         back={{ href: '/documents', label: 'Documents' }}
         title="Edit Document"
@@ -171,6 +171,6 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
           </form>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

@@ -192,7 +192,7 @@ export default function DocumentsClient({
     navigate({ sort: nextSort, order: nextOrder });
 
   return (
-    <div  >
+    <>
       <PageHeader
         title="Documents Overview"
         description="View translation status across all languages"
@@ -503,6 +503,6 @@ export default function DocumentsClient({
           </Card>
         )}
       </div>
-    </div>
+    </>
   );
 }
