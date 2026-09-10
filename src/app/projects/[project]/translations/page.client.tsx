@@ -144,7 +144,6 @@ export default function TranslationsClient({
   return (
     <>
       <PageHeader
-        back={{ href: '/admin/projects', label: 'Back to Projects' }}
         title={sourceProject.name}
         description="Translation Projects"
         actions={
@@ -196,7 +195,7 @@ export default function TranslationsClient({
                     </SelectContent>
                   </Select>
                   {availableLanguages.length === 0 && (
-                    <p className="text-sm text-gray-500 mt-1">All languages already have translation projects</p>
+                    <p className="text-sm text-muted-foreground mt-1">All languages already have translation projects</p>
                   )}
                 </div>
                 <div className="flex justify-end gap-2">
@@ -215,7 +214,7 @@ export default function TranslationsClient({
         {hasNoLanguages && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>No target languages available.</span>
-            <Link href="/admin/languages" className="flex items-center gap-1 text-blue-600 hover:underline">
+            <Link href="/admin/languages" className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline">
               Add languages
               <ExternalLink className="size-3" />
             </Link>
@@ -226,7 +225,7 @@ export default function TranslationsClient({
         )}
       </PageHeader>
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <div className="flex flex-wrap items-center gap-4 mb-4">
           <ListSearchInput
             value={searchQuery}
@@ -247,22 +246,22 @@ export default function TranslationsClient({
             <Card key={tp.id} className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1">
-                  <Languages className="h-5 w-5 text-green-500" />
+                  <Languages className="h-5 w-5 text-success" />
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
                       <h3 className="font-semibold text-lg">{tp.name}</h3>
                       <Link
                         href={buildTranslationProjectPath(sourceProject.identifier, tp.id)}
-                        className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                        className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
                       >
                         <Users className="h-4 w-4" />
                         Manage
                       </Link>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                       {tp.language.name} ({tp.language.code})
                     </p>
-                    <div className="flex gap-4 mt-2 text-sm text-gray-600">
+                    <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
                       <span>{tp.language.users.length} member(s)</span>
                       <span>{tp.documentCount} document(s)</span>
                     </div>

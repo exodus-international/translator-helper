@@ -3,6 +3,8 @@
 import * as React from 'react';
 
 import { Logo } from '@/components/logo';
+import { ModeToggle } from '@/components/mode-toggle';
+import { SUPPORT_URL, bugReportUrl } from '@/components/feedback-button';
 import { UserAvatar } from '@/components/user-avatar';
 import {
   Breadcrumb,
@@ -39,18 +41,18 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
 import { capture } from '@/lib/analytics';
 import { signOut } from '@/lib/auth-client';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import {
+  Bug,
   ChevronsUpDown,
-  FilePlus,
   FileText,
   FolderKanban,
   Languages,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Megaphone,
   ScrollText,
@@ -83,13 +85,22 @@ const SEGMENT_LABELS: Record<string, string> = {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Segments that exist only to namespace their children: none of these have a
+// page of their own, so linking them 404s. They still belong in the trail as
+// labels — shadcn's Breadcrumb renders a non-navigable crumb as plain text.
+const NAMESPACE_ONLY = new Set(['/admin', '/settings', '/onboarding', '/projects']);
+
+function isNavigable(href: string) {
+  // /documents is a flat list across projects, so neither the project slug nor
+  // the document slug under it resolves to a page.
+  return !NAMESPACE_ONLY.has(href) && !href.startsWith('/documents/');
+}
+
 function segmentLabel(segment: string): string | null {
   if (UUID_PATTERN.test(segment)) return null;
   if (SEGMENT_LABELS[segment]) return SEGMENT_LABELS[segment];
   const words = decodeURIComponent(segment).split(/[-_]+/).filter(Boolean);
-  return words.length
-    ? words.map((w) => w[0].toUpperCase() + w.slice(1)).join(' ')
-    : null;
+  return words.length ? words.map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') : null;
 }
 
 function HeaderBreadcrumb() {
@@ -113,7 +124,11 @@ function HeaderBreadcrumb() {
         {crumbs.slice(0, -1).map((crumb) => (
           <React.Fragment key={crumb.href}>
             <BreadcrumbItem className="hidden md:block">
-              <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
+              {isNavigable(crumb.href) ? (
+                <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
+              ) : (
+                crumb.label
+              )}
             </BreadcrumbItem>
             <BreadcrumbSeparator className="hidden md:block" />
           </React.Fragment>
@@ -132,20 +147,25 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
-
-const ADMIN_NAV_ITEMS: NavItem[] = [
+// Grouped by route prefix, and sorted by href inside each group. The group
+// labels are the same ones the breadcrumb uses for those segments, so the trail
+// in the topbar names the section the sidebar highlights.
+const ROOT_NAV_ITEMS: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/documents', label: 'Documents', icon: FileText },
+];
+
+// Announcements is deliberately absent: it authors what What's New shows, so it
+// lives next to it in the footer rather than a section away.
+const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/admin/languages', label: 'Languages', icon: Languages },
   { href: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
-  { href: '/settings/language-instructions', label: 'Language Instructions', icon: ScrollText },
 ];
 
-// Rendered after the Dashboard and Admin groups for every role, matching the
-// old navbar's trailing "What's New" link.
-const TRAILING_NAV_ITEM: NavItem = { href: '/releases', label: "What's New", icon: Sparkles };
+const SETTINGS_NAV_ITEMS: NavItem[] = [
+  { href: '/settings/language-instructions', label: 'Language Instructions', icon: ScrollText },
+];
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -177,6 +197,66 @@ function SidebarNavGroup({ items, label }: { items: NavItem[]; label?: string })
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
+  );
+}
+
+/**
+ * What's New plus the two service-desk links, pinned to the footer so they stay
+ * above the user row however long the nav above them grows. Admins also get
+ * Announcements here: it writes the posts What's New reads, so the pair reads as
+ * one thing. Signed-out pages get the same two service links from
+ * <FeedbackButton />, which has no sidebar to sit in.
+ */
+function NavSecondary({ isAdmin }: { isAdmin: boolean }) {
+  const pathname = usePathname();
+  const announcementsActive = isActive(pathname, '/admin/announcements');
+  const releasesActive = isActive(pathname, '/releases');
+
+  return (
+    <SidebarMenu>
+      {isAdmin && (
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            isActive={announcementsActive}
+            tooltip="Announcements"
+            render={<Link href="/admin/announcements" aria-current={announcementsActive ? 'page' : undefined} />}
+          >
+            <Megaphone />
+            <span>Announcements</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      )}
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          isActive={releasesActive}
+          tooltip="What's New"
+          render={<Link href="/releases" aria-current={releasesActive ? 'page' : undefined} />}
+        >
+          <Sparkles />
+          <span>What&apos;s New</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          tooltip="Support"
+          onClick={() => capture('support_link_clicked')}
+          render={<a href={SUPPORT_URL} target="_blank" rel="noreferrer" />}
+        >
+          <LifeBuoy />
+          <span>Support</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          tooltip="Report a bug"
+          onClick={() => capture('bug_report_clicked', { path: pathname })}
+          render={<a href={bugReportUrl(pathname)} target="_blank" rel="noreferrer" />}
+        >
+          <Bug />
+          <span>Report a bug</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }
 
@@ -254,29 +334,35 @@ function UserIdentity({ user }: { user: SessionUser }) {
 
 function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: SessionUser }) {
   const { user, ...sidebarProps } = props;
+  const isAdmin = isAdminClient(user);
 
   return (
     <Sidebar collapsible="icon" pinned {...sidebarProps}>
-      <SidebarHeader>
+      {/* Same height and rule as the topbar, so the brand row and the breadcrumb
+          sit on one line and their borders meet across the shell. */}
+      <SidebarHeader className="h-(--header-height) justify-center border-b">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip="Translation Helper" render={<Link href="/dashboard" />}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <Logo size={20} />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Translation Helper</span>
-              </div>
+            <SidebarMenuButton tooltip="Translation Helper" render={<Link href="/dashboard" />}>
+              <Logo size={16} />
+              <span className="truncate font-semibold">Translation Helper</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarNavGroup items={NAV_ITEMS} />
-        {isAdminClient(user) && <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />}
-        <SidebarNavGroup items={[TRAILING_NAV_ITEM]} />
+        {/* Documents is admin-only like the two namespaces below it, so it joins
+            the root group only for admins rather than forming a group of one. */}
+        <SidebarNavGroup items={isAdmin ? ROOT_NAV_ITEMS : ROOT_NAV_ITEMS.slice(0, 1)} />
+        {isAdmin && (
+          <>
+            <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />
+            <SidebarNavGroup items={SETTINGS_NAV_ITEMS} label="Settings" />
+          </>
+        )}
       </SidebarContent>
       <SidebarFooter>
+        <NavSecondary isAdmin={isAdmin} />
         <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
@@ -299,24 +385,21 @@ export function AppShell({ user, defaultOpen = true, children }: AppShellProps) 
   return (
     <SidebarProvider
       defaultOpen={defaultOpen}
-      style={{ '--sidebar-width': '16rem' } as React.CSSProperties}
+      style={
+        { '--sidebar-width': '16rem', '--header-height': 'calc(var(--spacing) * 12 + 1px)' } as React.CSSProperties
+      }
     >
       <AppSidebar user={user} />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+        <header className="bg-background sticky top-0 z-10 flex h-(--header-height) shrink-0 items-center gap-2 border-b">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
             <HeaderBreadcrumb />
           </div>
-          {isAdminClient(user) && (
-            <div className="ml-auto flex items-center px-4">
-              <Button size="sm" className="hidden sm:inline-flex" nativeButton={false} render={<Link href="/documents/new" />}>
-                <FilePlus />
-                New
-              </Button>
-            </div>
-          )}
+          <div className="ml-auto flex items-center px-4">
+            <ModeToggle />
+          </div>
         </header>
         {children}
       </SidebarInset>

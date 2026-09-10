@@ -157,7 +157,6 @@ export default function ProjectDetailClient({
   return (
     <>
       <PageHeader
-        back={{ href: '/dashboard', label: 'Dashboard' }}
         title={sourceProject.name}
         description={sourceProject.description ?? undefined}
         actions={
@@ -180,7 +179,7 @@ export default function ProjectDetailClient({
         }
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <Tabs defaultValue="dashboard">
           <TabsList
             className={cn(
