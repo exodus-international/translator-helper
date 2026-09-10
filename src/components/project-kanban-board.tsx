@@ -40,7 +40,7 @@ import { buildDocumentPath } from '@/domain/document/document-url';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { toast } from 'sonner';
-import { Language } from '@/generated/prisma/client';
+import type { Language } from '@/generated/prisma/client';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { FileCheck, FileText, UserPlus } from 'lucide-react';
 import Link from 'next/link';

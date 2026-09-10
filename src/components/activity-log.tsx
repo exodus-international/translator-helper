@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   FilePlus,
+  FileText,
   Languages,
   MessageSquarePlus,
   MessageSquareWarning,
@@ -70,6 +71,9 @@ const ACTION_MAP: Record<string, ActionConfig> = {
   audio_regeneration_requested: { label: 'Requested audio regeneration', icon: RotateCcw, colorClass: 'text-blue-500' },
   audio_generated: { label: 'Audio generated', icon: Volume2, colorClass: 'text-green-500' },
   audio_generation_failed: { label: 'Audio generation failed', icon: AlertTriangle, colorClass: 'text-red-500' },
+  audio_transcript_edited: { label: 'Edited the audio text', icon: PenLine, colorClass: 'text-blue-500' },
+  audio_transcript_kept: { label: 'Kept the edited audio text', icon: FileText, colorClass: 'text-blue-500' },
+  audio_transcript_reset: { label: 'Reset the audio text', icon: RotateCcw, colorClass: 'text-gray-500' },
   applied_suggestion: { label: 'Applied suggestion', icon: CheckCheck, colorClass: 'text-green-500' },
   reopened_suggestion: { label: 'Reopened suggestion', icon: RotateCcw, colorClass: 'text-orange-500' },
   dismissed_suggestion: { label: 'Dismissed suggestion', icon: XCircle, colorClass: 'text-gray-500' },
@@ -131,6 +135,8 @@ function getDetailText(action: string, details: Record<string, any> | null): str
     case 'audio_generation_started':
     case 'audio_regeneration_requested':
       return details.voice || null;
+    case 'audio_transcript_edited':
+      return details.characters ? `${details.characters} characters` : null;
     case 'github_deploy_failed':
     case 'audio_generation_failed':
       return details.error ? (details.error.length > 60 ? details.error.slice(0, 60) + '...' : details.error) : null;

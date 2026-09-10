@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * Data migration script to transform folders to projects
  *
