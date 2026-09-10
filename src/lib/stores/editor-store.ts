@@ -41,13 +41,13 @@ export type LoadingKey =
   | 'deleteTranslation'
   | 'deleteSource';
 
-interface MemberInfo {
+export interface MemberInfo {
   id: string;
   userId?: string;
   user: { id: string; name: string | null; email: string; image?: string | null };
 }
 
-type DialogState =
+export type DialogState =
   | { type: 'closed' }
   | { type: 'submitReview'; reviewers: MemberInfo[] }
   | { type: 'assignTranslator'; members: MemberInfo[]; deadline: Date | string | null }
@@ -474,11 +474,15 @@ export function createEditorStore(config: EditorStoreConfig) {
 
         // Optimistic update: find the assigned user from dialog members
         const { dialog } = get();
-        if (dialog.type === 'assignTranslator') {
+        if (dialog.type === 'assignTranslator' && targetVersion) {
           const assignedUser = dialog.members.find((m) => m.user.id === userId)?.user ?? null;
-          if (assignedUser && targetVersion) {
-            set({ targetVersion: { ...targetVersion, user: assignedUser } });
-          }
+          set({
+            targetVersion: {
+              ...targetVersion,
+              ...(assignedUser ? { user: assignedUser } : {}),
+              deadline: deadline ? new Date(deadline) : null,
+            },
+          });
         }
 
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignTranslator') });
