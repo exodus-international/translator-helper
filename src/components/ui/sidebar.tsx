@@ -148,7 +148,16 @@ function SidebarProvider({
             } as React.CSSProperties
           }
           className={cn(
-            "group/sidebar-wrapper relative flex w-full has-data-[variant=inset]:bg-sidebar",
+            // overflow-x-clip is what makes the offcanvas collapse actually
+            // hide. Our sidebar-container is `absolute`, not upstream's
+            // `fixed`, so it stays docked to its editor rather than the
+            // viewport -- but an absolute box counts towards scrollable
+            // overflow where a fixed one does not. Collapsing parks it at
+            // right:-340px, which grew the page by 340px and let you scroll
+            // straight back to the "hidden" panel. `clip` rather than
+            // `hidden`: it clips without making this a scroll container, and
+            // leaves the vertical axis alone.
+            "group/sidebar-wrapper relative flex w-full overflow-x-clip has-data-[variant=inset]:bg-sidebar",
             className
           )}
           {...props}
