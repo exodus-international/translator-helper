@@ -1,4 +1,4 @@
-import { flexRender, type Table as TanstackTable } from "@tanstack/react-table";
+import { flexRender, type RowData } from "@tanstack/react-table";
 import type * as React from "react";
 
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
@@ -10,15 +10,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { DataTableInstance } from "@/hooks/use-data-table";
 import { getColumnPinningStyle } from "@/lib/data-table";
 import { cn } from "@/lib/utils";
 
-interface DataTableProps<TData> extends React.ComponentProps<"div"> {
-  table: TanstackTable<TData>;
+interface DataTableProps<TData extends RowData>
+  extends React.ComponentProps<"div"> {
+  table: DataTableInstance<TData>;
   actionBar?: React.ReactNode;
 }
 
-export function DataTable<TData>({
+export function DataTable<TData extends RowData>({
   table,
   actionBar,
   children,

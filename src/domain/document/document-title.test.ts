@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { buildDefaultTitle, dayNumberFromFilename, parseDayNumber } from './document-title';
 
 describe('parseDayNumber', () => {

@@ -5,13 +5,15 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl", "linux-musl-openssl-3.0.x"]
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "esm"
+  generatedFileExtension = "ts"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -154,6 +156,7 @@ model Account {
   id                    String    @id
   accountId             String
   providerId            String
+  issuer                String
   userId                String
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?
@@ -168,6 +171,7 @@ model Account {
 
   // better-auth looks accounts up by user on every credential sign-in.
   @@index([userId])
+  @@unique([issuer, accountId])
   @@map("account")
 }
 
@@ -284,6 +288,14 @@ model DocumentVersion {
   assignedById  String?
   assignedBy    User?          @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
   assignedAt    DateTime?
+  // Hand-edited SSML for the speech provider, sent verbatim in place of the
+  // script derived from `content`. Null means "derive it", which is what every
+  // version does until someone edits the Audio text tab.
+  audioSsml     String?        @db.Text
+  // Fingerprint of the SSML that would have been derived when `audioSsml` was
+  // saved. Comparing it against a fresh derivation is how an edited transcript
+  // learns that the words moved on without it.
+  audioSsmlBase String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   comments      Comment[]

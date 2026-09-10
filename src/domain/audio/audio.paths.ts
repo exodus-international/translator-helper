@@ -1,4 +1,4 @@
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { resolveFilePath } from '../github/github.paths';
 import type { FilePathParams } from '../github/github.types';
 import { AUDIO_FILE_EXTENSION } from './audio.types';

@@ -1,5 +1,6 @@
 'use client';
 
+import { GithubIcon } from '@/components/github-icon';
 import { UserAvatar } from '@/components/user-avatar';
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -12,7 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   FilePlus,
-  Github,
+  FileText,
   Languages,
   MessageSquarePlus,
   MessageSquareWarning,
@@ -26,7 +27,7 @@ import {
   Volume2,
   XCircle,
 } from 'lucide-react';
-import { type LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
 
 interface ActivityLogEntry {
   id: string;
@@ -47,7 +48,9 @@ interface ActivityLogProps {
 
 interface ActionConfig {
   label: string;
-  icon: LucideIcon;
+  // lucide-react v1 dropped brand icons, so github_deployed vendors its own
+  // SVG component; both it and LucideIcon render with just a className.
+  icon: ComponentType<{ className?: string }>;
   colorClass: string;
 }
 
@@ -62,12 +65,15 @@ const ACTION_MAP: Record<string, ActionConfig> = {
   requested_changes: { label: 'Requested changes', icon: MessageSquareWarning, colorClass: 'text-orange-500' },
   deployed: { label: 'Deployed', icon: Rocket, colorClass: 'text-violet-500' },
   status_updated: { label: 'Changed status', icon: ArrowRightLeft, colorClass: 'text-gray-500' },
-  github_deployed: { label: 'Deployed to GitHub', icon: Github, colorClass: 'text-violet-500' },
+  github_deployed: { label: 'Deployed to GitHub', icon: GithubIcon, colorClass: 'text-violet-500' },
   github_deploy_failed: { label: 'GitHub deploy failed', icon: AlertTriangle, colorClass: 'text-red-500' },
   audio_generation_started: { label: 'Started audio generation', icon: Volume2, colorClass: 'text-blue-500' },
   audio_regeneration_requested: { label: 'Requested audio regeneration', icon: RotateCcw, colorClass: 'text-blue-500' },
   audio_generated: { label: 'Audio generated', icon: Volume2, colorClass: 'text-green-500' },
   audio_generation_failed: { label: 'Audio generation failed', icon: AlertTriangle, colorClass: 'text-red-500' },
+  audio_transcript_edited: { label: 'Edited the audio text', icon: PenLine, colorClass: 'text-blue-500' },
+  audio_transcript_kept: { label: 'Kept the edited audio text', icon: FileText, colorClass: 'text-blue-500' },
+  audio_transcript_reset: { label: 'Reset the audio text', icon: RotateCcw, colorClass: 'text-gray-500' },
   applied_suggestion: { label: 'Applied suggestion', icon: CheckCheck, colorClass: 'text-green-500' },
   reopened_suggestion: { label: 'Reopened suggestion', icon: RotateCcw, colorClass: 'text-orange-500' },
   dismissed_suggestion: { label: 'Dismissed suggestion', icon: XCircle, colorClass: 'text-gray-500' },
@@ -129,6 +135,8 @@ function getDetailText(action: string, details: Record<string, any> | null): str
     case 'audio_generation_started':
     case 'audio_regeneration_requested':
       return details.voice || null;
+    case 'audio_transcript_edited':
+      return details.characters ? `${details.characters} characters` : null;
     case 'github_deploy_failed':
     case 'audio_generation_failed':
       return details.error ? (details.error.length > 60 ? details.error.slice(0, 60) + '...' : details.error) : null;

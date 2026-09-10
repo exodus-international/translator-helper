@@ -26,7 +26,7 @@ import {
 } from '@/domain/user-language/user-language.actions';
 import { listUsersAction } from '@/domain/user/user.actions';
 import { SessionUser } from '@/lib/session';
-import { ProjectRole } from '@prisma/client';
+import { ProjectRole } from '@/generated/prisma/enums';
 import { Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';

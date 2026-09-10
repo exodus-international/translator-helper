@@ -2,6 +2,7 @@ minimumReleaseAgeExclude:
   - dompurify@3.4.15
 
 overrides:
+  "@monaco-editor/loader": ^1.7.0
   js-yaml@<3.15.0: 3.15.0
   mdast-util-to-hast@<13.2.1: 13.2.1
   "@babel/core@<=7.29.0": 7.29.7

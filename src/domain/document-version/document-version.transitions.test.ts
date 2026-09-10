@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { validateTransition } from './document-version.transitions';
 
 describe('validateTransition', () => {

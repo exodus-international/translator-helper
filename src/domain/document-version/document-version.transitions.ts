@@ -1,4 +1,4 @@
-import { DocumentStatus } from '@prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 
 export const VALID_TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
   [DocumentStatus.PENDING_TRANSLATION]: [DocumentStatus.IN_PROGRESS],
