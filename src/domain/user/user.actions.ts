@@ -48,11 +48,6 @@ export async function isUserOnboardedAction() {
   return await isUserOnboarded(user.id);
 }
 
-export async function adminGetUserProfileAction(userId: string) {
-  await authorize('admin');
-  return await getUserProfile(userId);
-}
-
 export async function adminUpdateUserProfileAction(userId: string, input: unknown) {
   await authorize('admin');
   const validated = adminUpdateUserProfileSchema.parse(input);
