@@ -66,21 +66,21 @@ const serverActions: AudioTextPanelActions = {
   regenerate: regenerateAudioAction,
 };
 
-/** How the SSML is edited. The default is Monaco; a test swaps in a textarea, because Monaco needs a real browser to mount. */
+/** How the SSML is edited. The default is the code editor; a test swaps in a textarea, because CodeMirror needs a real browser to mount. */
 export interface AudioTextEditorProps {
   value: string;
   onChange?: (value: string) => void;
   readOnly?: boolean;
 }
 
-const monacoEditor = ({ value, onChange, readOnly }: AudioTextEditorProps) => (
+const defaultEditor = ({ value, onChange, readOnly }: AudioTextEditorProps) => (
   <RawEditorPane value={value} onChange={onChange} readOnly={readOnly} language="xml" fullHeight />
 );
 
 export function AudioTextPanel({
   documentVersionId,
   actions = serverActions,
-  editor = monacoEditor,
+  editor = defaultEditor,
   onStateChange,
   onDirtyChange,
 }: {
