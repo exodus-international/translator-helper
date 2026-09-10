@@ -257,6 +257,88 @@
 .prose details[open] summary {
   @apply mb-2;
 }
+
+
+/*
+ * Reader view — the formatted preview, dressed as the app that consumes this
+ * content renders it, so a translator judges their work in the shape a reader
+ * will meet it: one serif column at a readable measure, not a full-bleed pane.
+ *
+ * Layered after `.prose` on purpose. The two carry equal specificity, so these
+ * rules win by source order; keep them below.
+ */
+.reader-viewport {
+  background-color: #ffffff;
+}
+
+.reader {
+  /* Reader apps let people scale the text; this is that knob's default. */
+  --reader-font-size: 16px;
+  --reader-line-height: 1.625;
+
+  /* ~81 characters: the reading app's 65ch measure at its 1.25 scale. */
+  max-width: calc(65ch * 1.25);
+  margin-inline: auto;
+  padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
+  font-family: var(--font-reader), ui-serif, Georgia, serif;
+  font-size: var(--reader-font-size);
+  line-height: var(--reader-line-height);
+  color: #111827;
+}
+
+.reader p,
+.reader li {
+  line-height: var(--reader-line-height);
+}
+
+.reader h1 {
+  @apply mt-0 mb-4 font-semibold;
+  font-size: 1.875em;
+}
+
+.reader h2 {
+  @apply font-semibold;
+  font-size: 1.5em;
+}
+
+.reader h3 {
+  @apply font-semibold;
+  font-size: 1.25em;
+}
+
+.reader a {
+  @apply underline;
+  color: #111827;
+  text-decoration-color: #9ca3af;
+}
+
+.reader blockquote {
+  @apply border-l-4 pl-4 italic;
+  border-color: #e5e7eb;
+  color: #374151;
+}
+
+.reader code,
+.reader pre {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+.dark .reader-viewport {
+  background-color: #1a1a1a;
+}
+
+.dark .reader {
+  color: #f9fafb;
+}
+
+.dark .reader a {
+  color: #f9fafb;
+}
+
+.dark .reader blockquote {
+  border-color: #374151;
+  color: #d1d5db;
+}
 /*
  * Editor chrome tokens.
  *

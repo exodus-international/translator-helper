@@ -21,7 +21,7 @@ import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { SuggestionStatus } from '@/generated/prisma/enums';
 import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { MarkdownPreview } from '@/components/markdown-preview';
+import { ReaderPreview } from '@/components/reader-preview';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import type { LintDiagnostic } from '@/lib/lint';
 import { LintStatusBar } from '@/components/editor/lint-status-bar';
@@ -726,10 +726,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   }}
                 />
               ) : !isYaml && sourceViewMode === 'formatted' ? (
-                <MarkdownPreview
-                  content={sourceFormattedContent}
-                  className="prose max-w-none h-full overflow-y-auto p-3"
-                />
+                <ReaderPreview content={sourceFormattedContent} />
               ) : (
                 <RawEditorPane
                   value={sourceContent}
@@ -942,10 +939,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     )}
                   </div>
                 ) : (
-                  <MarkdownPreview
-                    content={translationPreview || translationPreviewEmptyText}
-                    className="prose max-w-none h-full overflow-y-auto p-3"
-                  />
+                  <ReaderPreview content={translationPreview || translationPreviewEmptyText} />
                 )
               ) : isReviewEditing ? (
                 <div className="h-full flex flex-col space-y-2">
@@ -981,10 +975,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   }}
                 />
               ) : !isYaml && reviewViewMode === 'formatted' ? (
-                <MarkdownPreview
-                  content={translationPreview}
-                  className="prose max-w-none h-full overflow-y-auto p-3"
-                />
+                <ReaderPreview content={translationPreview} />
               ) : (
                 <div ref={translationContainerRef} className="relative h-full">
                   {selectedUserId ? (
