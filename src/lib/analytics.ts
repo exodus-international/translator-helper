@@ -88,6 +88,10 @@ export type AnalyticsEvent =
   | 'audio_playback_started'
   | 'audio_url_copied'
   | 'audio_generation_failed'
+  | 'audio_transcript_edited'
+  | 'audio_transcript_reset'
+  | 'audio_transcript_kept'
+  | 'audio_transcript_conflicted'
   // ── Suggestions / review threads ─────────────────────────────────────
   | 'suggestion_created'
   | 'suggestion_applied'

@@ -29,6 +29,11 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
+  // NOTE: better-auth's `account.identityStrategy` ("provider-id") is not part
+  // of the published 1.7.x options, so it cannot be set here yet. The issuer
+  // backfill in migration 20260905170000 matches 1.7.3's default derivation
+  // ('local:oauth:' + providerId, 'local:credential'), preserving the
+  // provider-scoped identity of pre-1.7 data. Revisit when upgrading past 1.7.x.
   emailAndPassword: {
     enabled: true,
   },
