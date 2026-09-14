@@ -169,7 +169,7 @@ export function AudioStatus({
   }
 
   const staleBadge = stale ? (
-    <Badge className="bg-amber-100 text-amber-800" title="The text changed after this audio was generated">
+    <Badge variant="warning" title="The text changed after this audio was generated">
       Stale
     </Badge>
   ) : null;
@@ -181,8 +181,8 @@ export function AudioStatus({
           className={cn(
             'mb-2 rounded-md border px-2 py-1.5 text-xs',
             transcriptState === 'edited_outdated'
-              ? 'border-amber-200 bg-amber-50 text-amber-900'
-              : 'border-gray-200 bg-gray-50 text-gray-600',
+              ? 'border-warning/30 bg-warning/10 text-warning'
+              : 'border-border bg-muted text-muted-foreground',
           )}
         >
           <p className="flex items-start gap-1.5">
@@ -197,7 +197,7 @@ export function AudioStatus({
             <button
               type="button"
               onClick={() => requestTranslationView('audio')}
-              className="mt-1 ml-5 underline underline-offset-2 hover:no-underline"
+              className="mt-1 ml-5 text-primary underline-offset-4 hover:underline"
             >
               Open the audio text
             </button>
@@ -206,27 +206,27 @@ export function AudioStatus({
       )}
 
       {!audio && (
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-muted-foreground">
           <p>No audio has been generated for this version.</p>
           <RegenerateButton label="Generate audio" busy={regenerating} onClick={() => handleRegenerate('generate')} />
         </div>
       )}
 
       {audio && isInFlight(audio) && (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Generating audio with {audio.voice}...
         </div>
       )}
 
       {audio && error && (
-        <div className="flex items-start gap-2 text-red-600">
+        <div className="flex items-start gap-2 text-destructive">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <div className="min-w-0">
             <p className="font-medium">{errorTitle(error.kind)}</p>
             <p className="text-sm break-all">{error.message}</p>
             {error.kind === 'configuration' && (
-              <p className="text-xs text-gray-500 mt-1">Retrying will not help until the configuration is fixed.</p>
+              <p className="text-xs text-muted-foreground mt-1">Retrying will not help until the configuration is fixed.</p>
             )}
             <RegenerateButton label="Retry" busy={regenerating} onClick={() => handleRegenerate('retry')} />
           </div>
@@ -234,7 +234,7 @@ export function AudioStatus({
       )}
 
       {audio && audio.status === 'READY' && fileMissing && (
-        <div className="flex items-start gap-2 text-amber-700">
+        <div className="flex items-start gap-2 text-warning">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <div className="min-w-0">
             <p className="font-medium">Audio file is no longer in storage</p>
@@ -261,29 +261,28 @@ export function AudioStatus({
               capture('audio_playback_started', { documentVersionId, provider: audio.provider, voice: audio.voice });
             }}
           />
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             {audio.voice}
             {audio.durationMs ? ` · ${formatDuration(audio.durationMs)}` : ''}
             {audio.sizeBytes ? ` · ${(audio.sizeBytes / 1024 / 1024).toFixed(1)} MB` : ''}
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             Generated {formatDate(audio.updatedAt)} from version {audio.sourceVersion}
             {stale ? ` (text is now at version ${currentVersion})` : ''}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
-              size="sm"
               nativeButton={false} render={<a href={audio.url} download target="_blank" rel="noopener noreferrer" />}
             >
               <Download className="h-3 w-3 mr-1" />
               Download
             </Button>
-            <Button variant="outline" size="sm" onClick={handleCopyUrl}>
+            <Button variant="outline" onClick={handleCopyUrl}>
               <Copy className="h-3 w-3 mr-1" />
               Copy URL
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleRegenerate('regenerate')} disabled={regenerating}>
+            <Button variant="outline" onClick={() => handleRegenerate('regenerate')} disabled={regenerating}>
               <RefreshCw className={`h-3 w-3 mr-1 ${regenerating ? 'animate-spin' : ''}`} />
               {regenerating ? 'Starting...' : 'Regenerate'}
             </Button>
@@ -349,15 +348,15 @@ function AudioSummaryRow({
   else if (isInFlight(audio)) label = 'Generating...';
   else if (audio.status === 'FAILED') {
     label = 'Failed';
-    tone = 'text-red-600';
+    tone = 'text-destructive';
   } else if (fileMissing) {
     label = 'File removed';
-    tone = 'text-amber-700';
+    tone = 'text-warning';
   } else {
     label = audio.durationMs ? formatDuration(audio.durationMs) : 'Ready';
     if (stale) {
       label += ' · stale';
-      tone = 'text-amber-700';
+      tone = 'text-warning';
     }
   }
 
@@ -380,7 +379,7 @@ function AudioSummaryRow({
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
             />
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={toggle} title={playing ? 'Pause' : 'Play'}>
+            <Button variant="ghost" className="h-6 w-6 p-0" onClick={toggle} title={playing ? 'Pause' : 'Play'}>
               {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
             </Button>
           </>
@@ -392,7 +391,7 @@ function AudioSummaryRow({
 
 function RegenerateButton({ label, busy, onClick }: { label: string; busy: boolean; onClick: () => void }) {
   return (
-    <Button variant="outline" size="sm" className="mt-2" onClick={onClick} disabled={busy}>
+    <Button variant="outline" className="mt-2" onClick={onClick} disabled={busy}>
       <RefreshCw className={`h-3 w-3 mr-1 ${busy ? 'animate-spin' : ''}`} />
       {busy ? 'Starting...' : label}
     </Button>

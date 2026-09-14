@@ -16,6 +16,7 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } f
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { SuggestionStatus } from '@/generated/prisma/enums';
 import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
@@ -127,6 +128,11 @@ export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle,
     return (
       <SidebarProvider
         defaultOpen={hasSidebar || !!props.sidebarHeader}
+        // Nested inside the app shell's own provider: keep this one from
+        // stealing ⌘B (which would toggle both sidebars at once) and from
+        // overwriting the shell's persisted state cookie.
+        keyboardShortcut={false}
+        cookieName={EDITOR_SIDEBAR_COOKIE_NAME}
         className={cn(props.className, props.layout === 'zen' && 'h-full')}
       >
         <SourceTranslationViewerInner ref={ref} {...props} />
@@ -661,13 +667,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {sourceBadge}
                 {canEditSource && !isSourceEditing && (
                   <>
-                    <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
+                    <Button variant="outline" onClick={enterSourceEditMode}>
                       <Edit />
                       Edit
                     </Button>
                     {/* <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline">
                         <Trash2 />
                         Delete
                       </Button>
@@ -689,11 +695,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 )}
                 {isSourceEditing && (
                   <>
-                    <Button variant="outline" size="sm" onClick={handleSourceSave} disabled={sourceSaving}>
+                    <Button variant="outline" onClick={handleSourceSave} disabled={sourceSaving}>
                       <Save />
                       {sourceSaving ? 'Saving...' : 'Save'}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleSourceCancel} disabled={sourceSaving}>
+                    <Button variant="outline" onClick={handleSourceCancel} disabled={sourceSaving}>
                       <X />
                       Cancel
                     </Button>
@@ -815,7 +821,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           Review
                           {openSuggestionsCount > 0 && (
                             <Badge
-                              variant="primary"
+                              variant="default"
                               className="absolute -top-3 -right-3 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
                             >
                               {openSuggestionsCount}
@@ -848,7 +854,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         Review
                         {openSuggestionsCount > 0 && (
                           <Badge
-                            variant="primary"
+                            variant="default"
                             className="absolute -top-1 -left-1 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
                           >
                             {openSuggestionsCount}
@@ -864,7 +870,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {hasSidebar && panelHidden && (
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={toggleSidebar}
                     className="h-7 text-xs"
                     aria-label="Show panel"
@@ -872,7 +877,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     <PanelRightOpen />
                     <span className="hidden sm:inline">Show panel</span>
                     {openSuggestionsCount > 0 && (
-                      <Badge variant="primary" className="h-4 min-w-4 px-1 text-[10px]">
+                      <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
                         {openSuggestionsCount}
                       </Badge>
                     )}
@@ -1068,7 +1073,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 </span>
                 <Button
                   variant="ghost"
-                  size="sm"
                   onClick={toggleSidebar}
                   className="h-7 w-7 p-0"
                   aria-label="Close panel"
@@ -1078,12 +1082,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               </div>
               {sidebarHeader}
               {sidebarSummary && (
-                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-white">
+                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-background">
                   {sidebarSummary}
                   {sidebarDetails && (
                     <Button
                       variant="ghost"
-                      size="sm"
                       className="h-7 w-full justify-start px-1 text-xs text-muted-foreground"
                       onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
                     >

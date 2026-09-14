@@ -178,9 +178,9 @@ const SAVE_STATUS_META: Record<
   { icon: LucideIcon; textClass: string; label: string; spin?: boolean }
 > = {
   saving: { icon: Loader2, textClass: 'text-muted-foreground', label: 'Saving...', spin: true },
-  saved: { icon: Cloud, textClass: 'text-green-600', label: 'Saved' },
-  unsaved: { icon: CloudOff, textClass: 'text-amber-600', label: 'Unsaved changes' },
-  error: { icon: CloudOff, textClass: 'text-red-600', label: 'Save failed' },
+  saved: { icon: Cloud, textClass: 'text-success', label: 'Saved' },
+  unsaved: { icon: CloudOff, textClass: 'text-warning', label: 'Unsaved changes' },
+  error: { icon: CloudOff, textClass: 'text-destructive', label: 'Save failed' },
 };
 
 function SaveStatusIndicator({
@@ -518,22 +518,22 @@ function AssignmentInfoBlock({ version }: { version: any }) {
       <div className="flex items-center gap-2 text-sm">
         {version.user ? (
           <>
-            <User className="h-4 w-4 text-blue-600" />
-            <span className="text-gray-700">
+            <User className="h-4 w-4 text-info" />
+            <span className="text-foreground">
               Assigned to: <span className="font-medium">{version.user.name}</span>
             </span>
           </>
         ) : (
           <>
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <span className="text-blue-700 font-medium">Unassigned (visible to all project members)</span>
+            <AlertCircle className="h-4 w-4 text-info" />
+            <span className="text-info font-medium">Unassigned (visible to all project members)</span>
           </>
         )}
         {version.deadline && (
           <>
-            <span className="text-gray-400">•</span>
-            <Calendar className="h-4 w-4 text-blue-600" />
-            <span className="text-gray-700">
+            <span className="text-muted-foreground">•</span>
+            <Calendar className="h-4 w-4 text-info" />
+            <span className="text-foreground">
               Deadline: <span className="font-medium">{new Date(version.deadline).toLocaleDateString()}</span>
             </span>
           </>

@@ -54,25 +54,25 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
         title="Language Instructions"
         description="Define custom guidance for the AI translator per language."
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <div className="grid gap-4">
           {languages.map((language) => (
             <Card key={language.id} className="p-5">
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <h2 className="text-sm font-semibold">{language.name}</h2>
-                  <p className="text-sm text-gray-500 flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
                     <Badge variant="secondary">{language.code}</Badge>
                     <span>Applied when translating from English to {language.name}</span>
                   </p>
                 </div>
-                <Button size="sm" onClick={() => handleSave(language.id)} disabled={savingLanguageId === language.id}>
+                <Button onClick={() => handleSave(language.id)} disabled={savingLanguageId === language.id}>
                   {savingLanguageId === language.id ? 'Saving...' : 'Save'}
                 </Button>
               </div>
@@ -90,10 +90,10 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
                 aria-invalid={(instructionsByLanguage[language.id]?.length ?? 0) > TRANSLATION_INSTRUCTIONS_MAX_LENGTH}
               />
               <div className="flex items-center justify-between mt-2">
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   {lastSavedMessage[language.id] || 'These instructions are appended to the system prompt.'}
                 </div>
-                <div className={`text-xs ${(instructionsByLanguage[language.id]?.length ?? 0) > TRANSLATION_INSTRUCTIONS_MAX_LENGTH * 0.9 ? (instructionsByLanguage[language.id]?.length ?? 0) > TRANSLATION_INSTRUCTIONS_MAX_LENGTH ? 'text-red-500 font-medium' : 'text-amber-500' : 'text-gray-400'}`}>
+                <div className={`text-xs ${(instructionsByLanguage[language.id]?.length ?? 0) > TRANSLATION_INSTRUCTIONS_MAX_LENGTH * 0.9 ? (instructionsByLanguage[language.id]?.length ?? 0) > TRANSLATION_INSTRUCTIONS_MAX_LENGTH ? 'text-destructive font-medium' : 'text-warning' : 'text-muted-foreground'}`}>
                   {instructionsByLanguage[language.id]?.length ?? 0} / {TRANSLATION_INSTRUCTIONS_MAX_LENGTH.toLocaleString()}
                 </div>
               </div>
@@ -101,6 +101,6 @@ export default function LanguageInstructionsClient({ languages }: LanguageInstru
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }
