@@ -54,6 +54,42 @@ function useSidebar() {
   return context
 }
 
+/**
+ * Open state read from the cookie on the server, keyed by cookie name.
+ *
+ * `SidebarProvider` writes the cookie but cannot read it back: it is a client
+ * component, so it has no access to cookies while the server renders it, and
+ * reading `document.cookie` at hydration would disagree with the HTML the
+ * server already sent. So a server component reads it and hands it down here.
+ *
+ * Keyed by cookie name, and merged with any outer value, so that a nested
+ * provider restores its own panel rather than whichever state the closest
+ * provider above it happens to carry.
+ */
+const SidebarStoredStateContext = React.createContext<Record<string, boolean | undefined>>({})
+
+function SidebarStoredStateProvider({
+  cookieName,
+  value,
+  children,
+}: {
+  cookieName: string
+  value: boolean | undefined
+  children: React.ReactNode
+}) {
+  const outer = React.useContext(SidebarStoredStateContext)
+  const stored = React.useMemo(
+    () => ({ ...outer, [cookieName]: value }),
+    [outer, cookieName, value]
+  )
+
+  return (
+    <SidebarStoredStateContext.Provider value={stored}>
+      {children}
+    </SidebarStoredStateContext.Provider>
+  )
+}
+
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -78,7 +114,10 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen)
+  // `defaultOpen` is only the fallback: a cookie from a previous visit wins,
+  // so a panel left collapsed stays collapsed across reloads and documents.
+  const storedOpen = React.useContext(SidebarStoredStateContext)[cookieName]
+  const [_open, _setOpen] = React.useState(storedOpen ?? defaultOpen)
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -148,7 +187,16 @@ function SidebarProvider({
             } as React.CSSProperties
           }
           className={cn(
-            "group/sidebar-wrapper relative flex w-full has-data-[variant=inset]:bg-sidebar",
+            // overflow-x-clip is what makes the offcanvas collapse actually
+            // hide. Our sidebar-container is `absolute`, not upstream's
+            // `fixed`, so it stays docked to its editor rather than the
+            // viewport -- but an absolute box counts towards scrollable
+            // overflow where a fixed one does not. Collapsing parks it at
+            // right:-340px, which grew the page by 340px and let you scroll
+            // straight back to the "hidden" panel. `clip` rather than
+            // `hidden`: it clips without making this a scroll container, and
+            // leaves the vertical axis alone.
+            "group/sidebar-wrapper relative flex w-full overflow-x-clip has-data-[variant=inset]:bg-sidebar",
             className
           )}
           {...props}
@@ -753,6 +801,7 @@ export {
   SidebarProvider,
   SidebarRail,
   SidebarSeparator,
+  SidebarStoredStateProvider,
   SidebarTrigger,
   useSidebar,
 }
