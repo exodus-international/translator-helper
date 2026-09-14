@@ -15,7 +15,7 @@ import { isUuid } from '@/lib/uuid';
 const notUuidShaped = (value: string) => !isUuid(value);
 const notUuidMessage = 'Cannot look like an id';
 
-export const sourceProjectIdentifier = z
+const sourceProjectIdentifier = z
   .string()
   .min(2)
   .max(64)
@@ -30,7 +30,7 @@ export const sourceProjectIdentifier = z
  * altogether. An empty field cannot mean that: it is the state every project
  * starts in, and it already means "no acronym, but still number the days".
  */
-export const sourceProjectAcronym = z
+const sourceProjectAcronym = z
   .string()
   .max(16)
   .regex(/^(?:-|[^\s-]+)$/, 'No spaces or dashes, or a single dash to turn day naming off');
