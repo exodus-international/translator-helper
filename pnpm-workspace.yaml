@@ -1,3 +1,6 @@
+packages:
+  - '.'
+
 minimumReleaseAgeExclude:
   - dompurify@3.4.15
 
