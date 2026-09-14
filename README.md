@@ -260,18 +260,26 @@ Deployment is handled by **Coolify**, which auto-deploys every commit:
 
 So promoting `develop → production` _is_ the release. The build step runs `prisma migrate deploy`, so database migrations apply automatically on deploy.
 
-Coolify builds with Nixpacks, which picks its pnpm from the `packageManager`
-field in `package.json` — but it only knows majors up to 10, so our `pnpm@12`
-pin makes it install pnpm 9. That pnpm 9 then reads
-`manage-package-manager-versions=true` from `.npmrc` and bootstraps itself to
-the pinned version before installing. All three parts are load-bearing: drop
-the pin, the `.npmrc` setting, or the `packageManagerDependencies` entry the
-pin adds to `pnpm-lock.yaml`, and the build falls back to pnpm 9, which ignores
+Coolify builds with Nixpacks, and the `packageManager` field in `package.json`
+decides how it installs. With that field set, Nixpacks ignores its own nix pnpm
+and runs `npm install -g corepack@0.24.1 && corepack enable` instead — a
+corepack from early 2024, too old to launch pnpm 11 or newer (it looks for
+`bin/pnpm.cjs`, which pnpm no longer ships). `nixpacks.toml` replaces that
+install phase with a current corepack, which is what lets the build reach the
+pinned pnpm 12.
+
+Three things have to stay in step, or the build breaks:
+
+- the `packageManager` pin in `package.json`,
+- the corepack version in `nixpacks.toml` — it must be new enough for the
+  pinned pnpm,
+- the `packageManagerDependencies` entry the pin adds to `pnpm-lock.yaml`.
+
+Changing the pinned pnpm version therefore means running `pnpm install` and
+committing the lockfile, and checking that the pinned corepack can launch it.
+Without the pin, Nixpacks falls back to pnpm 9, which ignores
 `pnpm-workspace.yaml`, so the `overrides` there stop matching the lockfile and
 `pnpm i --frozen-lockfile` fails.
-
-Changing the pinned pnpm version means running `pnpm install` and committing the
-lockfile, which records the pinned version.
 
 `develop` and `production` are protected, so a release is **two PRs**. Follow **[docs/RELEASE.md](docs/RELEASE.md)** — the short version:
 
