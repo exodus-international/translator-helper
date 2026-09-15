@@ -289,6 +289,41 @@ describe('parity rules', () => {
     assert.ok(result.includes('  title: "Abstain from Meat"'), `expected the block body, got:\n${result}`);
     assert.ok(result.includes('  body: "Fridays are a day of penance."'));
   });
+
+  it('leaves a localised scripture citation alone', () => {
+    // The Croatian Bible abbreviates the book and separates chapter from verse
+    // with a comma. Treating verse_tag as a slug reported this on 1,903 of the
+    // 4,144 pairs, and the fix was safe, so "fix all" put the English back.
+    const day = '---\ntitle: Day One\nverse_tag: Matthew 28:1-10\n---\n\n# H\n';
+    const text = '---\ntitle: Prvi dan\nverse_tag: Mt 28,1-10\n---\n\n# N\n';
+    assert.deepEqual(ids(text, day), []);
+    assert.equal(fixed(text, day), text);
+  });
+
+  it('leaves a citation alone when the two Bibles versify differently', () => {
+    // Not a typo: the Czech Daniel really does run to 3,98.
+    const day = '---\ntitle: T\nverse_tag: Daniel 4:1-12\n---\n\n# H\n';
+    const text = '---\ntitle: P\nverse_tag: Daniel 3,98-4,9\n---\n\n# N\n';
+    assert.deepEqual(ids(text, day), []);
+  });
+
+  it('reports a citation left blank and offers the source one', () => {
+    const day = '---\ntitle: T\nverse_tag: Matthew 28:1-10\n---\n\n# H\n';
+    const text = '---\ntitle: P\nverse_tag:\n---\n\n# N\n';
+    const [diagnostic] = lintDocument({ text, source: day }).filter((d) => d.ruleId === 'frontmatter-value-empty');
+    assert.ok(diagnostic, 'expected a frontmatter-value-empty diagnostic');
+    assert.equal(diagnostic.fix?.safe, false);
+    assert.ok(applyEdits(text, diagnostic.fix!.edits).includes('verse_tag: Matthew 28:1-10'));
+    // The citation has to be rewritten into the target Bible, so "fix all"
+    // must not paste the English one in and call the file done.
+    assert.equal(fixed(text, day), text);
+  });
+
+  it('does not read a nested block as a blank value', () => {
+    const withReminder = '---\ntitle: Day One\nreminder:\n  title: "Abstain"\n  body: "Friday."\n---\n\n# H\n';
+    const text = '---\ntitle: Prvi dan\nreminder:\n  title: "Suzdrži se"\n  body: "Petak."\n---\n\n# N\n';
+    assert.deepEqual(ids(text, withReminder), []);
+  });
 });
 
 describe('applyEdits', () => {
