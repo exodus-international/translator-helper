@@ -6,9 +6,9 @@
  * verbatim. Measured across the 4,144 source/translation pairs in
  * exodus90/content, they flag 79 rewritten `hero` slugs, 277 files with a
  * dropped frontmatter key, 316 that lost a URL, 428 whose heading structure
- * drifted, one renumbered `section_order`, and ten files where a *key* was
- * mistyped or translated — `hrdina` for `hero`, `Day` for `day`, `## title`
- * for `title`.
+ * drifted, one renumbered `section_order`, three files whose `verse_tag` was
+ * left blank, and ten files where a *key* was mistyped or translated —
+ * `hrdina` for `hero`, `Day` for `day`, `## title` for `title`.
  */
 
 import type { LintDiagnostic, LintEdit, LintRule } from '../types';
@@ -36,16 +36,19 @@ export const KNOWN_FRONTMATTER_KEYS = [
   'reminder',
 ];
 
-/** Keys whose *value* is an identifier or number, never prose to translate. */
-export const NON_TRANSLATABLE_KEYS = [
-  'hero',
-  'day',
-  'verse_tag',
-  'lectionary number',
-  'identifier',
-  'section_order',
-  'sort_order',
-];
+/**
+ * Keys whose *value* is an identifier or number, never prose to translate.
+ *
+ * `verse_tag` is deliberately not one of them. A scripture citation localises
+ * on every axis: the book name (`Matthew` → `Mt`, `Izl`, `Éxodo`), the
+ * chapter/verse separator (a comma in cs, de, hr, hu, pl, sk and sl; a colon
+ * in lt and nl; a comma and a space in es), and the verse numbers themselves,
+ * because Bible editions genuinely versify differently — the Czech `Daniel
+ * 3,98-4,9` really is the English `Daniel 4:1-12`. Treating it as a slug made
+ * this rule fire on 1,903 of 4,144 pairs, in all ten languages, and its fix
+ * was safe, so "fix all" rewrote correct citations back into English.
+ */
+export const NON_TRANSLATABLE_KEYS = ['hero', 'day', 'lectionary number', 'identifier', 'section_order', 'sort_order'];
 
 export const frontmatterKeyTranslated: LintRule = {
   id: 'frontmatter-key-translated',
@@ -161,6 +164,55 @@ export const frontmatterValueChanged: LintRule = {
         fix: {
           title: `Restore "${sourceEntry.value}"`,
           edits: [{ from: entry.valueFrom, to: entry.valueTo, insert: sourceEntry.value }],
+        },
+      });
+    }
+    return diagnostics;
+  },
+};
+
+/**
+ * A key the source fills in but the translation leaves blank.
+ *
+ * Three files in exodus90/content carry a bare `verse_tag:` — the citation was
+ * never localised and the reader gets a day with no scripture reference. The
+ * fix offers the English citation as a starting point, but is never applied by
+ * "fix all": a citation has to be rewritten into the target language's Bible,
+ * not pasted in.
+ */
+export const frontmatterValueEmpty: LintRule = {
+  id: 'frontmatter-value-empty',
+  severity: 'error',
+  description: 'A frontmatter key the source fills in must not be left blank.',
+  requiresSource: true,
+  check({ text, source }) {
+    const translation = scanFrontmatter(text);
+    const original = scanFrontmatter(source ?? '');
+    if (!translation.present || !original.present) return [];
+
+    const originalByKey = new Map(original.entries.map((e) => [e.key, e]));
+    const diagnostics: LintDiagnostic[] = [];
+
+    for (const entry of translation.entries) {
+      if (entry.value !== '') continue;
+      // `reminder:` keeps its content on the lines indented beneath it, so its
+      // own value is empty on every correctly written file.
+      if (entry.blockTo > entry.lineTo) continue;
+
+      const sourceEntry = originalByKey.get(entry.key);
+      if (!sourceEntry || sourceEntry.value === '') continue;
+
+      diagnostics.push({
+        ruleId: 'frontmatter-value-empty',
+        severity: 'error',
+        // The value is zero-width, so the key carries the marker.
+        from: entry.keyFrom,
+        to: entry.keyTo,
+        message: `"${entry.key}" is blank; the source has "${sourceEntry.value}".`,
+        fix: {
+          title: `Fill in from the source ("${sourceEntry.value}")`,
+          edits: [{ from: entry.lineFrom, to: entry.lineTo, insert: `${entry.key}: ${sourceEntry.value}` }],
+          safe: false,
         },
       });
     }
@@ -309,6 +361,7 @@ export const parityRules: LintRule[] = [
   frontmatterKeyTranslated,
   frontmatterMissingKey,
   frontmatterValueChanged,
+  frontmatterValueEmpty,
   linkUrlChanged,
   headingStructure,
 ];
