@@ -269,16 +269,14 @@ function EditorViewer({
       status={targetVersion?.status}
       sidebarHeader={
         <DocumentInfoCard
-          stats={[
-            { label: 'Words', value: wordCount.toLocaleString(), hint: 'translated' },
-            {
-              label: 'Open comments',
-              value: openSuggestionsCount,
-              hint: openSuggestionsCount === 1 ? 'thread' : 'threads',
-            },
-            { label: 'Version', value: `v${targetVersion?.version ?? 1}` },
-            { label: 'Updated', value: shortAgo(targetVersion?.updatedAt) ?? '—' },
-          ]}
+          meta={[
+            `v${targetVersion?.version ?? 1}`,
+            `${wordCount.toLocaleString()} ${wordCount === 1 ? 'word' : 'words'}`,
+            `${openSuggestionsCount} open ${openSuggestionsCount === 1 ? 'comment' : 'comments'}`,
+            targetVersion ? `updated ${shortAgo(targetVersion.updatedAt)}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
           statusControl={
             targetVersion ? (
               // The status is a field of the document, so it lives in the panel

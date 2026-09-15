@@ -9,12 +9,6 @@ import { CircleDot, Eye, Languages, Pencil, User, UserMinus, UserPlus } from 'lu
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-interface DocumentStat {
-  label: string;
-  value: ReactNode;
-  hint?: string;
-}
-
 interface DocumentInfoCardProps {
   status?: DocumentStatus | null;
   /**
@@ -22,8 +16,12 @@ interface DocumentInfoCardProps {
    * reserves the row; who owns the transition stays with the editor.
    */
   statusControl?: ReactNode;
-  /** A couple of numbers worth glancing at, in the detail page's tile grid. */
-  stats?: DocumentStat[];
+  /**
+   * The numbers worth a glance — version, words, comments, when it last moved —
+   * as one line. They are reference, not the point of the panel: as a grid of
+   * tiles they took the eye before the status did.
+   */
+  meta?: string;
   translator?: { id: string; name: string | null; email: string; image?: string | null } | null;
   reviewer?: { id: string; name: string | null; email: string; image?: string | null } | null;
   language?: string;
@@ -34,14 +32,15 @@ interface DocumentInfoCardProps {
 }
 
 /**
- * The facts about this version as one card: stat tiles on top, then a label /
- * value row per field, hairline-divided. The panel around it supplies the
- * surface and the width, so the card only owns the structure.
+ * The facts about this version as one card: a label / value row per field,
+ * hairline-divided, with the dry numbers in a line underneath. The panel
+ * around it supplies the surface and the width, so the card only owns the
+ * structure.
  */
 export function DocumentInfoCard({
   status,
   statusControl,
-  stats,
+  meta,
   translator,
   reviewer,
   language,
@@ -54,18 +53,6 @@ export function DocumentInfoCard({
 
   return (
     <div className="flex flex-col gap-3">
-      {stats && stats.length > 0 && (
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border">
-          {stats.map((stat) => (
-            <div key={stat.label} className="flex min-w-0 flex-col gap-1 bg-card p-3">
-              <span className="truncate text-[11px] text-muted-foreground">{stat.label}</span>
-              <span className="truncate text-base font-semibold tabular-nums">{stat.value}</span>
-              {stat.hint && <span className="truncate text-[11px] text-muted-foreground">{stat.hint}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-
       <Card className="shrink-0 gap-0 overflow-hidden rounded-lg bg-card py-0 shadow-none">
         <CardContent className="divide-y p-0">
           {/* Status */}
@@ -162,6 +149,8 @@ export function DocumentInfoCard({
           </Row>
         </CardContent>
       </Card>
+
+      {meta && <p className="px-1 text-[11px] text-muted-foreground">{meta}</p>}
     </div>
   );
 }
