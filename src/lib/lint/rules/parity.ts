@@ -3,17 +3,25 @@
  *
  * These catch the failure mode that actually shows up in the content
  * repository: a translator edits structure that is supposed to be carried over
- * verbatim. Measured across 1,753 real source/translation pairs in
- * exodus90/content, these rules flag 64 rewritten `hero` slugs, 27 dropped
- * frontmatter keys, 283 files that lost a URL, 185 files whose heading
- * structure drifted, and one file where the *key* `hero` was translated to
- * `hrdina`.
+ * verbatim. Measured across the 4,144 source/translation pairs in
+ * exodus90/content, they flag 79 rewritten `hero` slugs, 277 files with a
+ * dropped frontmatter key, 316 that lost a URL, 428 whose heading structure
+ * drifted, one renumbered `section_order`, and ten files where a *key* was
+ * mistyped or translated — `hrdina` for `hero`, `Day` for `day`, `## title`
+ * for `title`.
  */
 
 import type { LintDiagnostic, LintEdit, LintRule } from '../types';
 import { scanFrontmatter } from '../frontmatter-entries';
 
-/** Keys the content team uses. Anything else is almost always a translated key. */
+/**
+ * Keys the content team uses. Anything else is almost always a translated key.
+ *
+ * `identifier` and `section_order` are required on every field guide section,
+ * `sort_order` on most exercise root files, and `reminder` heads the nested
+ * block on a day file. All four were missing here, so the rule below reported
+ * 593 of them as keys a translator had invented.
+ */
 export const KNOWN_FRONTMATTER_KEYS = [
   'title',
   'subtitle',
@@ -22,11 +30,22 @@ export const KNOWN_FRONTMATTER_KEYS = [
   'day',
   'verse_tag',
   'lectionary number',
+  'identifier',
+  'section_order',
   'sort_order',
+  'reminder',
 ];
 
 /** Keys whose *value* is an identifier or number, never prose to translate. */
-export const NON_TRANSLATABLE_KEYS = ['hero', 'day', 'verse_tag', 'lectionary number'];
+export const NON_TRANSLATABLE_KEYS = [
+  'hero',
+  'day',
+  'verse_tag',
+  'lectionary number',
+  'identifier',
+  'section_order',
+  'sort_order',
+];
 
 export const frontmatterKeyTranslated: LintRule = {
   id: 'frontmatter-key-translated',
@@ -90,9 +109,14 @@ export const frontmatterMissingKey: LintRule = {
 
       // Insert after the same-named neighbour when we can, else at the end.
       const last = translation.entries[translation.entries.length - 1];
-      const at = last ? last.lineTo : translation.endOffset;
+      const at = last ? last.blockTo : translation.endOffset;
+      // A key written as a nested mapping (`reminder:`) carries its whole block
+      // over, prose included: inserting a bare `reminder:` would leave the
+      // translator a null value and lose the text they are meant to translate.
+      const nested = entry.blockTo > entry.lineTo;
       // Slugs and numbers carry over verbatim; prose is left for the translator.
       const value = NON_TRANSLATABLE_KEYS.includes(entry.key) ? ` ${entry.value}` : '';
+      const insert = nested ? `\n${(source ?? '').slice(entry.lineFrom, entry.blockTo)}` : `\n${entry.key}:${value}`;
 
       diagnostics.push({
         ruleId: 'frontmatter-missing-key',
@@ -102,7 +126,7 @@ export const frontmatterMissingKey: LintRule = {
         to: translation.entries[0]?.lineTo ?? 0,
         fix: {
           title: `Add "${entry.key}"`,
-          edits: [{ from: at, to: at, insert: `\n${entry.key}:${value}` }],
+          edits: [{ from: at, to: at, insert }],
         },
       });
     }
