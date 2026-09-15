@@ -45,32 +45,22 @@ function getContentWithoutFrontmatter(text: string) {
 // caller-supplied actions on the right
 // ──────────────────────────────────────────────────────────────
 
-export function DocumentEditorHeader({
-  document,
-  actions,
-}: {
-  document: any;
-  actions: ReactNode;
-  /** Retired with the panel move; the pane badges carry the language now. */
-  sourceLanguageName?: string;
-  targetLanguageName?: string;
-}) {
+export function DocumentEditorHeader({ document, actions }: { document: any; actions: ReactNode }) {
   return (
     <div className="border-b bg-background">
       <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        {/* The document's name is not repeated here: the shell's breadcrumb
+            carries it, language and all. What is left is the way back to the
+            project, which the breadcrumb only links one crumb at a time. */}
         <div className="flex min-w-0 items-center gap-2">
           {document.sourceProject && (
-            <>
-              <Link
-                href={buildProjectPath(document.sourceProject.identifier)}
-                className="shrink-0 truncate text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {document.sourceProject.name}
-              </Link>
-              <span className="shrink-0 text-muted-foreground/60">/</span>
-            </>
+            <Link
+              href={buildProjectPath(document.sourceProject.identifier)}
+              className="shrink-0 truncate text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {document.sourceProject.name}
+            </Link>
           )}
-          <h1 className="truncate text-sm font-semibold">{document.title}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
       </div>
@@ -182,6 +172,7 @@ function EditorViewer({
   const setAudioTranscriptState = useEditorStore((s) => s.setAudioTranscriptState);
   const openAssignTranslatorDialog = useEditorStore((s) => s.openAssignTranslatorDialog);
   const openAssignReviewerDialog = useEditorStore((s) => s.openAssignReviewerDialog);
+  const openDeadlineDialog = useEditorStore((s) => s.openDeadlineDialog);
   const unassignTranslator = useEditorStore((s) => s.unassignTranslator);
   const unassignReviewer = useEditorStore((s) => s.unassignReviewer);
 
@@ -297,6 +288,7 @@ function EditorViewer({
           translator={targetVersion?.user ?? null}
           reviewer={targetVersion?.reviewer}
           language={targetVersion?.language?.name}
+          deadline={targetVersion?.deadline}
           onAssignTranslator={
             isAdminClient(user) && translationProjectId && targetVersion ? openAssignTranslatorDialog : undefined
           }
@@ -305,6 +297,7 @@ function EditorViewer({
             isAdminClient(user) && translationProjectId && targetVersion ? openAssignReviewerDialog : undefined
           }
           onUnassignReviewer={isAdminClient(user) && targetVersion?.reviewer ? unassignReviewer : undefined}
+          onEditDeadline={isAdminClient(user) && translationProjectId && targetVersion ? openDeadlineDialog : undefined}
         />
       }
     />
@@ -408,7 +401,7 @@ interface DocumentEditorProps {
   initialSuggestions?: any[];
   translationProjectId: string | null;
   /** The language this page translates into; used to create the first version. */
-  targetLanguageId?: string;
+  targetLanguageId: string;
 
   // User
   user: SessionUser;
@@ -510,7 +503,7 @@ export function DocumentEditor({
       documentTitle={document.title}
       sourceLanguageName={sourceVersion.language.name}
       originalFilename={document.originalFilename ?? null}
-      targetLanguageId={targetLanguageId ?? ''}
+      targetLanguageId={targetLanguageId}
       targetVersion={targetVersion}
       sourceContent={sourceVersion.content}
       initialSuggestions={initialSuggestions}

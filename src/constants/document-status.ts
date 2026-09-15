@@ -44,7 +44,7 @@ export const DOCUMENT_STATUS_SEQUENCE: DocumentStatus[] = [
 export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfig> = {
   [DocumentStatus.PENDING_TRANSLATION]: {
     status: DocumentStatus.PENDING_TRANSLATION,
-    name: 'TODO',
+    name: 'Not Started',
     icon: AlertCircle,
     color: {
       hex: '#BABABA',
@@ -56,7 +56,7 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
   },
   [DocumentStatus.IN_PROGRESS]: {
     status: DocumentStatus.IN_PROGRESS,
-    name: 'Translations in Progress',
+    name: 'In Progress',
     icon: PenLine,
     color: {
       hex: '#0063ed',
@@ -68,7 +68,7 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
   },
   [DocumentStatus.PENDING_REVIEW]: {
     status: DocumentStatus.PENDING_REVIEW,
-    name: 'Texts in Review',
+    name: 'In Review',
     icon: Clock3,
     color: {
       hex: '#FACC15',
@@ -80,7 +80,7 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
   },
   [DocumentStatus.APPROVED]: {
     status: DocumentStatus.APPROVED,
-    name: 'Approved Texts',
+    name: 'Approved',
     icon: CheckCircle2,
     color: {
       hex: '#10B981',
@@ -92,7 +92,7 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
   },
   [DocumentStatus.DEPLOYED]: {
     status: DocumentStatus.DEPLOYED,
-    name: 'Deployed Texts',
+    name: 'Deployed',
     icon: Rocket,
     color: {
       hex: '#8B5CF6',

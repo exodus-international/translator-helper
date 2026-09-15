@@ -1,98 +1,77 @@
 'use client';
 
-import { UserAvatar } from '@/components/user-avatar';
+import { UserSelect, type SelectableUser } from '@/components/user-select';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEditorStore } from '@/lib/stores/editor-provider';
-import type { LoadingKey } from '@/lib/stores/editor-store';
+import type { LoadingKey, MemberInfo } from '@/lib/stores/editor-store';
 
 function useDialogLoading(key: LoadingKey) {
   return useEditorStore((s) => s.loading.has(key));
 }
 
-/** A person in an assignment dropdown: face, name, and the address that disambiguates two of them. */
-function MemberOption({
-  user,
-  withEmail,
-}: {
-  user: { id: string; name: string | null; email: string; image?: string | null };
-  withEmail?: boolean;
-}) {
-  return (
-    <span className="flex items-center gap-2">
-      <UserAvatar name={user.name} image={user.image} email={user.email} size="sm" className="pointer-events-none" />
-      <span>{user.name || user.email}</span>
-      {withEmail && user.name && <span className="text-muted-foreground">({user.email})</span>}
-    </span>
-  );
+/** `yyyy-mm-dd` in the viewer's own timezone, which `<input type="date">` speaks. */
+function toDateInputValue(value: unknown): string {
+  if (!value) return '';
+  const date = new Date(value as string);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 }
+
+/**
+ * Each dialog is two pieces: a switch that decides whether the form is on
+ * screen at all, and a form that mounts with the version's current assignment
+ * already in its state. The form is therefore also what prefills itself --
+ * opening the dialog mounts it, so what is already true is what it opens on,
+ * with no effect writing state after the fact.
+ */
 
 function SubmitReviewDialog() {
   const dialog = useEditorStore((s) => s.dialog);
+  if (dialog.type !== 'submitReview') return null;
+  return <SubmitReviewForm reviewers={dialog.reviewers} />;
+}
+
+function SubmitReviewForm({ reviewers }: { reviewers: MemberInfo[] }) {
   const closeDialog = useEditorStore((s) => s.closeDialog);
   const submitForReview = useEditorStore((s) => s.submitForReview);
+  const targetVersion = useEditorStore((s) => s.targetVersion);
   const isSubmitting = useDialogLoading('submitForReview');
-  const [selectedReviewerId, setSelectedReviewerId] = useState('');
-
-  if (dialog.type !== 'submitReview') {
-    return (
-      <Dialog open={false} onOpenChange={() => {}}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Submit for Review</DialogTitle>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  const [reviewerId, setReviewerId] = useState(targetVersion?.reviewer?.id ?? '');
 
   const handleSubmit = async () => {
-    await submitForReview(selectedReviewerId || undefined);
-    setSelectedReviewerId('');
+    await submitForReview(reviewerId || undefined);
   };
 
   return (
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) {
-          closeDialog();
-          setSelectedReviewerId('');
-        }
+        if (!open) closeDialog();
       }}
     >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Submit for Review</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 mt-2">
+        <div className="mt-2 flex flex-col gap-4">
           <div>
             <Label>
-              Select a reviewer <span className="text-muted-foreground font-normal">(optional)</span>
+              Select a reviewer <span className="font-normal text-muted-foreground">(optional)</span>
             </Label>
-            <Select
-              value={selectedReviewerId || null}
-              onValueChange={(v) => setSelectedReviewerId(v ?? '')}
-              items={Object.fromEntries(
-                dialog.reviewers.map((member) => [member.user.id, <MemberOption key={member.user.id} user={member.user} withEmail />]),
-              )}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Choose reviewer" />
-              </SelectTrigger>
-              <SelectContent>
-                {dialog.reviewers.map((member) => (
-                  <SelectItem key={member.user.id} value={member.user.id}>
-                    <MemberOption user={member.user} withEmail />
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">A reviewer can be assigned later if not known yet.</p>
+            <UserSelect
+              value={reviewerId}
+              onValueChange={setReviewerId}
+              users={reviewers.map((member) => member.user)}
+              current={targetVersion?.reviewer ?? null}
+              placeholder="Choose reviewer"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">A reviewer can be assigned later if not known yet.</p>
           </div>
           <Button onClick={handleSubmit} disabled={isSubmitting} className="w-full">
             {isSubmitting ? 'Submitting...' : 'Submit for Review'}
@@ -105,64 +84,43 @@ function SubmitReviewDialog() {
 
 function AssignTranslatorDialog() {
   const dialog = useEditorStore((s) => s.dialog);
+  if (dialog.type !== 'assignTranslator') return null;
+  return <AssignTranslatorForm members={dialog.members} />;
+}
+
+function AssignTranslatorForm({ members }: { members: MemberInfo[] }) {
   const closeDialog = useEditorStore((s) => s.closeDialog);
   const assignTranslator = useEditorStore((s) => s.assignTranslator);
+  const targetVersion = useEditorStore((s) => s.targetVersion);
   const isAssigning = useDialogLoading('assignTranslator');
-  const [userId, setUserId] = useState('');
-  const [deadline, setDeadline] = useState('');
-
-  if (dialog.type !== 'assignTranslator') {
-    return (
-      <Dialog open={false} onOpenChange={() => {}}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Translator</DialogTitle>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  const [userId, setUserId] = useState(targetVersion?.user?.id ?? '');
+  const [deadline, setDeadline] = useState(toDateInputValue(targetVersion?.deadline));
 
   const handleAssign = async () => {
     await assignTranslator(userId, deadline || undefined);
-    setUserId('');
-    setDeadline('');
   };
 
   return (
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) {
-          closeDialog();
-          setUserId('');
-          setDeadline('');
-        }
+        if (!open) closeDialog();
       }}
     >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Assign Translator</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 mt-2">
+        <div className="mt-2 flex flex-col gap-4">
           <div>
             <Label>Translator</Label>
-            <Select
-              value={userId || null}
-              onValueChange={(v) => setUserId(v ?? '')}
-              items={Object.fromEntries(dialog.members.map((m) => [m.user.id, <MemberOption key={m.user.id} user={m.user} />]))}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select translator..." />
-              </SelectTrigger>
-              <SelectContent>
-                {dialog.members.map((m) => (
-                  <SelectItem key={m.user.id} value={m.user.id}>
-                    <MemberOption user={m.user} />
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <UserSelect
+              value={userId}
+              onValueChange={setUserId}
+              users={members.map((member) => member.user)}
+              current={targetVersion?.user ?? null}
+              placeholder="Select translator..."
+            />
           </div>
           <div>
             <Label>Deadline (optional)</Label>
@@ -179,67 +137,98 @@ function AssignTranslatorDialog() {
 
 function AssignReviewerDialog() {
   const dialog = useEditorStore((s) => s.dialog);
+  if (dialog.type !== 'assignReviewer') return null;
+  return <AssignReviewerForm candidates={dialog.candidates} />;
+}
+
+function AssignReviewerForm({ candidates }: { candidates: MemberInfo[] }) {
   const closeDialog = useEditorStore((s) => s.closeDialog);
   const assignReviewer = useEditorStore((s) => s.assignReviewer);
+  const targetVersion = useEditorStore((s) => s.targetVersion);
   const isAssigning = useDialogLoading('assignReviewer');
-  const [selectedId, setSelectedId] = useState('');
-
-  if (dialog.type !== 'assignReviewer') {
-    return (
-      <Dialog open={false} onOpenChange={() => {}}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Reviewer</DialogTitle>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  const [userId, setUserId] = useState(targetVersion?.reviewer?.id ?? '');
 
   const handleAssign = async () => {
-    await assignReviewer(selectedId);
-    setSelectedId('');
+    await assignReviewer(userId);
   };
 
   return (
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) {
-          closeDialog();
-          setSelectedId('');
-        }
+        if (!open) closeDialog();
       }}
     >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Assign Reviewer</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 mt-2">
+        <div className="mt-2 flex flex-col gap-4">
           <div>
             <Label>Reviewer</Label>
-            <Select
-              value={selectedId || null}
-              onValueChange={(v) => setSelectedId(v ?? '')}
-              items={Object.fromEntries(
-                dialog.candidates.map((m) => [m.user.id, <MemberOption key={m.user.id} user={m.user} withEmail />]),
-              )}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select reviewer..." />
-              </SelectTrigger>
-              <SelectContent>
-                {dialog.candidates.map((m) => (
-                  <SelectItem key={m.user.id} value={m.user.id}>
-                    <MemberOption user={m.user} withEmail />
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <UserSelect
+              value={userId}
+              onValueChange={setUserId}
+              users={candidates.map((member) => member.user)}
+              current={targetVersion?.reviewer ?? null}
+              placeholder="Select reviewer..."
+            />
           </div>
-          <Button onClick={handleAssign} disabled={!selectedId || isAssigning} className="w-full">
+          <Button onClick={handleAssign} disabled={!userId || isAssigning} className="w-full">
             {isAssigning ? 'Assigning...' : 'Assign Reviewer'}
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeadlineDialog() {
+  const dialog = useEditorStore((s) => s.dialog);
+  if (dialog.type !== 'deadline') return null;
+  return <DeadlineForm />;
+}
+
+function DeadlineForm() {
+  const closeDialog = useEditorStore((s) => s.closeDialog);
+  const setDeadline = useEditorStore((s) => s.setDeadline);
+  const targetVersion = useEditorStore((s) => s.targetVersion);
+  const isSaving = useDialogLoading('setDeadline');
+  const [value, setValue] = useState(toDateInputValue(targetVersion?.deadline));
+
+  const close = () => closeDialog();
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Deadline</DialogTitle>
+        </DialogHeader>
+        <div className="mt-2 flex flex-col gap-4">
+          <div>
+            <Label htmlFor="version-deadline">When this version is due</Label>
+            <Input
+              id="version-deadline"
+              type="date"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Leave it empty to clear the deadline.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setDeadline(value ? new Date(value) : null)} disabled={isSaving} className="flex-1">
+              {isSaving ? 'Saving...' : 'Save deadline'}
+            </Button>
+            <Button variant="outline" onClick={close} disabled={isSaving}>
+              Cancel
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -252,6 +241,9 @@ export function EditorDialogs() {
       <SubmitReviewDialog />
       <AssignTranslatorDialog />
       <AssignReviewerDialog />
+      <DeadlineDialog />
     </>
   );
 }
+
+export type { SelectableUser };

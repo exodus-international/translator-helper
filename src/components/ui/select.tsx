@@ -50,13 +50,15 @@ function SelectContent({
   alignOffset,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Popup> &
-  Pick<
-    SelectPrimitive.Positioner.Props,
-    'alignItemWithTrigger' | 'side' | 'sideOffset' | 'align' | 'alignOffset'
-  >) {
+  Pick<SelectPrimitive.Positioner.Props, 'alignItemWithTrigger' | 'side' | 'sideOffset' | 'align' | 'alignOffset'>) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner
+        // isolate z-50: the positioner is what competes with a dialog's own
+        // z-50, not the popup inside it. Without this the popup opens in a
+        // z-auto box and paints behind the modal that holds its trigger --
+        // every picker in the editor dialogs, on every row.
+        className="isolate z-50"
         alignItemWithTrigger={alignItemWithTrigger}
         side={side}
         sideOffset={sideOffset}
@@ -135,10 +137,7 @@ function SelectScrollUpButton({ className, ...props }: React.ComponentProps<type
   );
 }
 
-function SelectScrollDownButton({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.ScrollDownArrow>) {
+function SelectScrollDownButton({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.ScrollDownArrow>) {
   return (
     <SelectPrimitive.ScrollDownArrow
       data-slot="select-scroll-down-button"

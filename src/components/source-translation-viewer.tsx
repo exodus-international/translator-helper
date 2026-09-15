@@ -13,10 +13,12 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
   Sidebar,
   SidebarContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -33,12 +35,12 @@ import { DocumentStatus, SuggestionStatus } from '@/generated/prisma/enums';
 import {
   BookOpen,
   ChevronDown,
-  ChevronRight,
   Edit,
   Eye,
   FileEdit,
   Loader2,
   MessageSquare,
+  PanelRightClose,
   PanelRightOpen,
   Plus,
   Save,
@@ -1197,58 +1199,92 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               </SidebarMenu>
             </SidebarContent>
 
+            {/* The panel's own header, the height of the panes': one control,
+                so folding is a button as well as the seam between columns. */}
+            <SidebarHeader className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
+              <div className="flex h-11 shrink-0 items-center justify-end border-b px-2">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleSidebar}
+                  aria-label="Fold document panel"
+                  title="Fold document panel"
+                >
+                  <PanelRightClose />
+                </Button>
+              </div>
+            </SidebarHeader>
+
             {/* Unfolded: the facts, the actions and the status rows scroll
                 together, so a tall panel never clips the button someone came to
                 press. */}
             <SidebarContent className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
-              <div className="flex flex-col gap-3 p-3">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
                 {sidebarHeader}
                 {sidebarActions}
                 {sidebarSummary && (
                   <div className="flex flex-col divide-y overflow-hidden rounded-lg border bg-card [&>*]:px-3 [&>*]:py-2.5">
                     {sidebarSummary}
-                    {sidebarDetails && (
-                      <Button
-                        variant="ghost"
-                        className="h-7 w-full justify-start rounded-none px-0 text-xs text-muted-foreground"
-                        onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
+                  </div>
+                )}
+                {/* The details are their own card: as a row inside the card
+                    above they read as one more button, and open they read as a
+                    second, unstyled list bolted onto the panel.
+
+                    The header is the trigger, which is why the label is a span
+                    rather than CardTitle: a control that is a whole row cannot
+                    hold a div, and the alternative -- a title nobody can click
+                    plus a chevron to hit -- splits one target into two. The
+                    chevron turns off the trigger's own state, so the motion is
+                    CSS and the row says expanded to a screen reader either way. */}
+                {sidebarDetails && (
+                  <Card className="gap-0 overflow-hidden rounded-lg py-0 shadow-none">
+                    <Collapsible
+                      open={sidebarView === 'details'}
+                      onOpenChange={(open) => setSidebarView(open ? 'details' : 'threads')}
+                    >
+                      <CollapsibleTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            // ring-inset: the card clips what it contains, and a
+                            // focus ring on the header's edge would be half cut.
+                            className="group h-auto w-full justify-between rounded-none bg-muted/60 px-3 py-2 transition-colors focus-visible:ring-inset"
+                          />
+                        }
                       >
-                        {sidebarView === 'details' ? (
-                          <>
-                            <ChevronDown />
-                            Hide details
-                          </>
-                        ) : (
-                          <>
-                            <ChevronRight />
-                            Open details
-                          </>
-                        )}
-                      </Button>
-                    )}
+                        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                          Details
+                        </span>
+                        <ChevronDown className="size-3.5 text-muted-foreground transition-transform duration-200 group-aria-expanded:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="border-t [&>section:last-child]:border-b-0">
+                        {sidebarDetails}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </Card>
+                )}
+
+                {hasSidebar && (
+                  <div className="flex min-h-[16rem] flex-1 flex-col">
+                    <ThreadSidebar
+                      suggestions={suggestions}
+                      currentUserId={currentUserId || ''}
+                      translationContent={translationContent}
+                      canCreateSuggestions={canCreateSuggestions}
+                      onReply={onReply}
+                      onApply={onApplySuggestion}
+                      onDismiss={(id) => onDismissSuggestion?.(id)}
+                      onReopen={(id) => onReopenSuggestion?.(id)}
+                      onEdit={onEditSuggestion}
+                      onSuggestionClick={handleSuggestionClickInternal}
+                      onCreateGeneralThread={onCreateGeneralThread}
+                      activeThreadId={activeThreadId}
+                      disableReopen={disableReopen}
+                    />
                   </div>
                 )}
               </div>
-              {sidebarView === 'details' && sidebarDetails && <div className="shrink-0">{sidebarDetails}</div>}
-              {hasSidebar && (
-                <div className="flex-1 min-h-[16rem] flex flex-col">
-                  <ThreadSidebar
-                    suggestions={suggestions}
-                    currentUserId={currentUserId || ''}
-                    translationContent={translationContent}
-                    canCreateSuggestions={canCreateSuggestions}
-                    onReply={onReply}
-                    onApply={onApplySuggestion}
-                    onDismiss={(id) => onDismissSuggestion?.(id)}
-                    onReopen={(id) => onReopenSuggestion?.(id)}
-                    onEdit={onEditSuggestion}
-                    onSuggestionClick={handleSuggestionClickInternal}
-                    onCreateGeneralThread={onCreateGeneralThread}
-                    activeThreadId={activeThreadId}
-                    disableReopen={disableReopen}
-                  />
-                </div>
-              )}
             </SidebarContent>
 
             {/* Folding happens at the panel's own edge, the way the app nav's
