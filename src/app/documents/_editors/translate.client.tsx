@@ -5,7 +5,6 @@ import { AudioStatus } from '@/components/audio-status';
 import { DocumentEditor, DocumentEditorHeader } from '@/components/document-editor';
 import { MarkdownGuide } from '@/components/markdown-guide';
 import { GitHubStatus } from '@/components/github-status';
-import { SidebarSection } from '@/components/sidebar-section';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -28,20 +27,7 @@ import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { useEditorStore } from '@/lib/stores/editor-provider';
-import {
-  AlertCircle,
-  Calendar,
-  CloudCheck,
-  CloudOff,
-  Loader2,
-  Maximize2,
-  Minimize2,
-  Save,
-  Send,
-  Sparkles,
-  Trash2,
-  User,
-} from 'lucide-react';
+import { CloudCheck, CloudOff, Loader2, Maximize2, Minimize2, Save, Send, Sparkles, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -138,9 +124,6 @@ export default function TranslateClient({
       sidebarDetails={
         initialTargetVersion ? (
           <>
-            <SidebarSection title="Assignment">
-              <AssignmentInfoBlock version={initialTargetVersion} />
-            </SidebarSection>
             <AudioStatus
               documentVersionId={initialTargetVersion.id}
               currentVersion={initialTargetVersion.version}
@@ -376,41 +359,6 @@ function TranslateWorkflowActions({ user }: { user: SessionUser }) {
           </AlertDialogContent>
         </AlertDialog>
       )}
-    </div>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────────────
-// Translate-only details extra: assignment block in collapsible
-// ──────────────────────────────────────────────────────────────────────
-
-function AssignmentInfoBlock({ version }: { version: any }) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 text-sm">
-        {version.user ? (
-          <>
-            <User className="h-4 w-4 text-info" />
-            <span className="text-foreground">
-              Assigned to: <span className="font-medium">{version.user.name}</span>
-            </span>
-          </>
-        ) : (
-          <>
-            <AlertCircle className="h-4 w-4 text-info" />
-            <span className="text-info font-medium">Unassigned (visible to all project members)</span>
-          </>
-        )}
-        {version.deadline && (
-          <>
-            <span className="text-muted-foreground">•</span>
-            <Calendar className="h-4 w-4 text-info" />
-            <span className="text-foreground">
-              Deadline: <span className="font-medium">{new Date(version.deadline).toLocaleDateString()}</span>
-            </span>
-          </>
-        )}
-      </div>
     </div>
   );
 }

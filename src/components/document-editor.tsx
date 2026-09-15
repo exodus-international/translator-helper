@@ -172,6 +172,7 @@ function EditorViewer({
   const setAudioTranscriptState = useEditorStore((s) => s.setAudioTranscriptState);
   const openAssignTranslatorDialog = useEditorStore((s) => s.openAssignTranslatorDialog);
   const openAssignReviewerDialog = useEditorStore((s) => s.openAssignReviewerDialog);
+  const openDeadlineDialog = useEditorStore((s) => s.openDeadlineDialog);
   const unassignTranslator = useEditorStore((s) => s.unassignTranslator);
   const unassignReviewer = useEditorStore((s) => s.unassignReviewer);
 
@@ -287,6 +288,7 @@ function EditorViewer({
           translator={targetVersion?.user ?? null}
           reviewer={targetVersion?.reviewer}
           language={targetVersion?.language?.name}
+          deadline={targetVersion?.deadline}
           onAssignTranslator={
             isAdminClient(user) && translationProjectId && targetVersion ? openAssignTranslatorDialog : undefined
           }
@@ -295,6 +297,7 @@ function EditorViewer({
             isAdminClient(user) && translationProjectId && targetVersion ? openAssignReviewerDialog : undefined
           }
           onUnassignReviewer={isAdminClient(user) && targetVersion?.reviewer ? unassignReviewer : undefined}
+          onEditDeadline={isAdminClient(user) && translationProjectId && targetVersion ? openDeadlineDialog : undefined}
         />
       }
     />

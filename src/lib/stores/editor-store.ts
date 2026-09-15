@@ -39,12 +39,13 @@ export type LoadingKey =
   | 'submitForReview'
   | 'assignTranslator'
   | 'assignReviewer'
+  | 'setDeadline'
   | 'startTranslation'
   | 'aiTranslate'
   | 'deleteTranslation'
   | 'deleteSource';
 
-interface MemberInfo {
+export interface MemberInfo {
   id: string;
   userId?: string;
   user: { id: string; name: string | null; email: string; image?: string | null };
@@ -54,7 +55,8 @@ type DialogState =
   | { type: 'closed' }
   | { type: 'submitReview'; reviewers: MemberInfo[] }
   | { type: 'assignTranslator'; members: MemberInfo[] }
-  | { type: 'assignReviewer'; candidates: MemberInfo[] };
+  | { type: 'assignReviewer'; candidates: MemberInfo[] }
+  | { type: 'deadline' };
 
 export interface EditorStoreConfig {
   documentId: string;
@@ -170,6 +172,9 @@ interface EditorActions {
   openAssignReviewerDialog: () => Promise<void>;
   assignReviewer: (userId: string) => Promise<void>;
   unassignReviewer: () => Promise<void>;
+  /** Opens the small modal that sets or clears this version's deadline. */
+  openDeadlineDialog: () => void;
+  setDeadline: (deadline: Date | null) => Promise<void>;
   closeDialog: () => void;
 
   // Loading helpers
@@ -638,6 +643,40 @@ export function createEditorStore(config: EditorStoreConfig) {
         toast.success('Reviewer unassigned');
       } catch (error: any) {
         toast.error(error.message || 'Failed to unassign reviewer');
+      }
+    },
+
+    // ─── Deadline ──────────────────────────────────────
+    openDeadlineDialog: () => {
+      set({ dialog: { type: 'deadline' } });
+      capture('dialog_opened', { dialog: 'deadline' });
+    },
+
+    setDeadline: async (deadline) => {
+      const { documentId, translationProjectId, targetVersion } = get();
+      if (!translationProjectId || !targetVersion) return;
+
+      set(addLoading(get(), 'setDeadline'));
+      try {
+        // The deadline travels with the assignment, the way the translations
+        // page sets it: same action, same permission, same activity entry --
+        // only the translator stays whoever it already was.
+        const updated = await assignTranslatorToVersionAction({
+          documentId,
+          translationProjectId,
+          userId: targetVersion.user?.id ?? null,
+          deadline,
+        });
+        set({
+          targetVersion: { ...targetVersion, deadline: updated?.deadline ?? deadline },
+          dialog: { type: 'closed' },
+          ...removeLoading(get(), 'setDeadline'),
+        });
+        capture('dialog_opened', { dialog: 'deadline_set' });
+        toast.success(deadline ? 'Deadline set' : 'Deadline cleared');
+      } catch (error: any) {
+        set(removeLoading(get(), 'setDeadline'));
+        toast.error(error.message || 'Failed to set the deadline');
       }
     },
 
