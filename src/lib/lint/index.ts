@@ -9,11 +9,12 @@
 import type { LintContext, LintDiagnostic, LintEdit, LintRule } from './types';
 import { houseStyleRules } from './rules/house-style';
 import { parityRules } from './rules/parity';
+import { untranslatedRules } from './rules/untranslated';
 
 export * from './types';
 export { KNOWN_FRONTMATTER_KEYS, NON_TRANSLATABLE_KEYS } from './rules/parity';
 
-export const allRules: LintRule[] = [...parityRules, ...houseStyleRules];
+export const allRules: LintRule[] = [...parityRules, ...untranslatedRules, ...houseStyleRules];
 
 export interface LintOptions {
   rules?: LintRule[];
