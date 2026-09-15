@@ -49,19 +49,18 @@ export function DocumentEditorHeader({ document, actions }: { document: any; act
   return (
     <div className="border-b bg-background">
       <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        {/* The document's name is not repeated here: the shell's breadcrumb
+            carries it, language and all. What is left is the way back to the
+            project, which the breadcrumb only links one crumb at a time. */}
         <div className="flex min-w-0 items-center gap-2">
           {document.sourceProject && (
-            <>
-              <Link
-                href={buildProjectPath(document.sourceProject.identifier)}
-                className="shrink-0 truncate text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {document.sourceProject.name}
-              </Link>
-              <span className="shrink-0 text-muted-foreground/60">/</span>
-            </>
+            <Link
+              href={buildProjectPath(document.sourceProject.identifier)}
+              className="shrink-0 truncate text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {document.sourceProject.name}
+            </Link>
           )}
-          <h1 className="truncate text-sm font-semibold">{document.title}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
       </div>
