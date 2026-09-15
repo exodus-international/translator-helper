@@ -3,9 +3,9 @@
 import { ActivityLog } from '@/components/activity-log';
 import { AudioStatus } from '@/components/audio-status';
 import { GitHubStatus } from '@/components/github-status';
-import { StatusDropdown } from '@/components/status-dropdown';
 import { Button } from '@/components/ui/button';
 import { DocumentEditor, DocumentEditorHeader } from '@/components/document-editor';
+import { MarkdownGuide } from '@/components/markdown-guide';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { toggleDocumentLabelAction } from '@/domain/document/document.actions';
 import { editSuggestionAction } from '@/domain/suggestion/suggestion.actions';
@@ -14,10 +14,10 @@ import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analyt
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useEditorStore } from '@/lib/stores/editor-provider';
-import { DocumentStatus, SuggestionStatus } from '@/generated/prisma/enums';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 interface ReviewClientProps {
@@ -32,8 +32,7 @@ interface ReviewClientProps {
   initialSuggestions?: any[];
 }
 
-const isApprovedOrLater = (tv: any) =>
-  tv?.status === DocumentStatus.APPROVED || tv?.status === DocumentStatus.DEPLOYED;
+const isApprovedOrLater = (tv: any) => tv?.status === DocumentStatus.APPROVED || tv?.status === DocumentStatus.DEPLOYED;
 
 function getDownloadFilename(document: any): string {
   return document.originalFilename || `${document.slug}.md`;
@@ -59,10 +58,11 @@ export default function ReviewClient({
       targetVersion={initialTargetVersion}
       initialSuggestions={initialSuggestions}
       translationProjectId={translationProjectId}
+      targetLanguageId={initialTargetVersion.languageId ?? ''}
       user={user}
       audioTextVersionId={audioTextVersionId}
       variant="review"
-      header={<ReviewToolbar document={document} sourceVersion={sourceVersion} user={user} />}
+      header={<ReviewToolbar document={document} />}
       canEditSource={(tv) => isAdminClient(user) && !isApprovedOrLater(tv)}
       canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
       disableReopen={(tv) => isApprovedOrLater(tv)}
@@ -80,6 +80,7 @@ export default function ReviewClient({
         }
       }}
       hideDetails
+      sidebarActions={<ReviewWorkflowActions document={document} />}
       sidebarSummary={
         <>
           <AudioStatus
@@ -122,23 +123,24 @@ export default function ReviewClient({
 // Toolbar — runs inside <EditorProvider>, drives store-aware buttons
 // ──────────────────────────────────────────────────────────────────────
 
-function ReviewToolbar({ document, sourceVersion, user }: { document: any; sourceVersion: any; user: SessionUser }) {
+function ReviewToolbar({ document }: { document: any }) {
+  return <DocumentEditorHeader document={document} actions={null} />;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Review workflow — rendered by the editor inside the Document info panel,
+// under the status field it moves.
+// ──────────────────────────────────────────────────────────────────────
+
+function ReviewWorkflowActions({ document }: { document: any }) {
   const router = useRouter();
   const targetVersion = useEditorStore((s) => s.targetVersion);
   const content = useEditorStore((s) => s.content);
-  const suggestions = useEditorStore((s) => s.suggestions);
-  const handleStatusChange = useEditorStore((s) => s.handleStatusChange);
-  const openReviewDialog = useEditorStore((s) => s.openReviewDialog);
   const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
 
   const [labelLoading, setLabelLoading] = useState(false);
   const [waitingForFinalLabel, setWaitingForFinalLabel] = useState(
     document.labels?.includes('Waiting for final label') || false,
-  );
-
-  const openSuggestionsCount = useMemo(
-    () => suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length,
-    [suggestions],
   );
 
   const handleDownload = () => {
@@ -173,53 +175,34 @@ function ReviewToolbar({ document, sourceVersion, user }: { document: any; sourc
     }
   };
 
-  // Header actions, ordered by workflow: status → contextual actions → passive.
-  const actions = (
-    <>
-      {targetVersion && (
-        <StatusDropdown
-          currentStatus={targetVersion.status}
-          versionId={targetVersion.id}
-          user={user}
-          documentId={document.id}
-          disabled={isAnyLoading}
-          onStatusChange={handleStatusChange}
-          onReviewRequested={openReviewDialog}
-          openSuggestionsCount={openSuggestionsCount}
-        />
-      )}
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
       {targetVersion?.status === DocumentStatus.PENDING_REVIEW && (
         <Button
           variant={waitingForFinalLabel ? 'outline' : 'default'}
           size="sm"
           onClick={handleToggleWaitingForFinalLabel}
           disabled={labelLoading}
-          className={
-            waitingForFinalLabel
-              ? 'bg-success text-background border-success hover:bg-success/90'
-              : ''
-          }
+          className={waitingForFinalLabel ? 'bg-success text-background border-success hover:bg-success/90' : ''}
         >
           {waitingForFinalLabel ? <FileCheck /> : <FilePlus />}
           {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
         </Button>
       )}
       {(targetVersion?.status === DocumentStatus.APPROVED || targetVersion?.status === DocumentStatus.DEPLOYED) && (
-        <Button variant="default" size="sm" onClick={handleDownload} disabled={isAnyLoading}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-start"
+          onClick={handleDownload}
+          disabled={isAnyLoading}
+        >
           <Download />
           Download
         </Button>
       )}
-    </>
-  );
-
-  return (
-    <DocumentEditorHeader
-      document={document}
-      sourceLanguageName={sourceVersion.language.name}
-      targetLanguageName={targetVersion?.language?.name ?? ''}
-      actions={actions}
-    />
+      <MarkdownGuide variant="button" />
+    </div>
   );
 }
 
