@@ -17,6 +17,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import {
   Sidebar,
   SidebarContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -39,6 +40,7 @@ import {
   FileEdit,
   Loader2,
   MessageSquare,
+  PanelRightClose,
   PanelRightOpen,
   Plus,
   Save,
@@ -1196,6 +1198,22 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarContent>
+
+            {/* The panel's own header, the height of the panes': one control,
+                so folding is a button as well as the seam between columns. */}
+            <SidebarHeader className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
+              <div className="flex h-11 shrink-0 items-center justify-end border-b px-2">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleSidebar}
+                  aria-label="Fold document panel"
+                  title="Fold document panel"
+                >
+                  <PanelRightClose />
+                </Button>
+              </div>
+            </SidebarHeader>
 
             {/* Unfolded: the facts, the actions and the status rows scroll
                 together, so a tall panel never clips the button someone came to
