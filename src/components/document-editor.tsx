@@ -45,16 +45,7 @@ function getContentWithoutFrontmatter(text: string) {
 // caller-supplied actions on the right
 // ──────────────────────────────────────────────────────────────
 
-export function DocumentEditorHeader({
-  document,
-  actions,
-}: {
-  document: any;
-  actions: ReactNode;
-  /** Retired with the panel move; the pane badges carry the language now. */
-  sourceLanguageName?: string;
-  targetLanguageName?: string;
-}) {
+export function DocumentEditorHeader({ document, actions }: { document: any; actions: ReactNode }) {
   return (
     <div className="border-b bg-background">
       <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -408,7 +399,7 @@ interface DocumentEditorProps {
   initialSuggestions?: any[];
   translationProjectId: string | null;
   /** The language this page translates into; used to create the first version. */
-  targetLanguageId?: string;
+  targetLanguageId: string;
 
   // User
   user: SessionUser;
@@ -510,7 +501,7 @@ export function DocumentEditor({
       documentTitle={document.title}
       sourceLanguageName={sourceVersion.language.name}
       originalFilename={document.originalFilename ?? null}
-      targetLanguageId={targetLanguageId ?? ''}
+      targetLanguageId={targetLanguageId}
       targetVersion={targetVersion}
       sourceContent={sourceVersion.content}
       initialSuggestions={initialSuggestions}
