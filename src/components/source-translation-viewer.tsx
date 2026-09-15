@@ -13,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import {
   Sidebar,
@@ -1218,7 +1219,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 together, so a tall panel never clips the button someone came to
                 press. */}
             <SidebarContent className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
-              <div className="flex flex-col gap-3 p-3">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
                 {sidebarHeader}
                 {sidebarActions}
                 {sidebarSummary && (
@@ -1226,55 +1227,64 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     {sidebarSummary}
                   </div>
                 )}
-                {/* The details are their own card, header and all: as a row
-                    inside the card above they read as one more button, and
-                    open they read as a second, unstyled list bolted onto the
-                    panel. The header row is the control, so the card opens and
-                    closes as one thing. */}
+                {/* The details are their own card: as a row inside the card
+                    above they read as one more button, and open they read as a
+                    second, unstyled list bolted onto the panel.
+
+                    The header is the trigger, which is why the label is a span
+                    rather than CardTitle: a control that is a whole row cannot
+                    hold a div, and the alternative -- a title nobody can click
+                    plus a chevron to hit -- splits one target into two. The
+                    chevron turns off the trigger's own state, so the motion is
+                    CSS and the row says expanded to a screen reader either way. */}
                 {sidebarDetails && (
-                  <Card className="shrink-0 gap-0 overflow-hidden rounded-lg bg-card py-0 shadow-none">
-                    <button
-                      type="button"
-                      onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
-                      aria-expanded={sidebarView === 'details'}
-                      title={sidebarView === 'details' ? 'Hide details' : 'Show details'}
-                      className="flex w-full cursor-pointer items-center justify-between gap-2 border-b bg-muted/60 px-3 py-2 text-left transition-colors hover:bg-muted"
+                  <Card className="gap-0 overflow-hidden rounded-lg py-0 shadow-none">
+                    <Collapsible
+                      open={sidebarView === 'details'}
+                      onOpenChange={(open) => setSidebarView(open ? 'details' : 'threads')}
                     >
-                      <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                        Details
-                      </span>
-                      <ChevronDown
-                        className={cn(
-                          'size-3.5 text-muted-foreground transition-transform duration-200',
-                          sidebarView === 'details' && 'rotate-180',
-                        )}
-                      />
-                    </button>
-                    {sidebarView === 'details' && (
-                      <div className="[&>section:last-child]:border-b-0">{sidebarDetails}</div>
-                    )}
+                      <CollapsibleTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            // ring-inset: the card clips what it contains, and a
+                            // focus ring on the header's edge would be half cut.
+                            className="group h-auto w-full justify-between rounded-none bg-muted/60 px-3 py-2 transition-colors focus-visible:ring-inset"
+                          />
+                        }
+                      >
+                        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                          Details
+                        </span>
+                        <ChevronDown className="size-3.5 text-muted-foreground transition-transform duration-200 group-aria-expanded:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="border-t [&>section:last-child]:border-b-0">
+                        {sidebarDetails}
+                      </CollapsibleContent>
+                    </Collapsible>
                   </Card>
                 )}
+
+                {hasSidebar && (
+                  <div className="flex min-h-[16rem] flex-1 flex-col">
+                    <ThreadSidebar
+                      suggestions={suggestions}
+                      currentUserId={currentUserId || ''}
+                      translationContent={translationContent}
+                      canCreateSuggestions={canCreateSuggestions}
+                      onReply={onReply}
+                      onApply={onApplySuggestion}
+                      onDismiss={(id) => onDismissSuggestion?.(id)}
+                      onReopen={(id) => onReopenSuggestion?.(id)}
+                      onEdit={onEditSuggestion}
+                      onSuggestionClick={handleSuggestionClickInternal}
+                      onCreateGeneralThread={onCreateGeneralThread}
+                      activeThreadId={activeThreadId}
+                      disableReopen={disableReopen}
+                    />
+                  </div>
+                )}
               </div>
-              {hasSidebar && (
-                <div className="flex-1 min-h-[16rem] flex flex-col">
-                  <ThreadSidebar
-                    suggestions={suggestions}
-                    currentUserId={currentUserId || ''}
-                    translationContent={translationContent}
-                    canCreateSuggestions={canCreateSuggestions}
-                    onReply={onReply}
-                    onApply={onApplySuggestion}
-                    onDismiss={(id) => onDismissSuggestion?.(id)}
-                    onReopen={(id) => onReopenSuggestion?.(id)}
-                    onEdit={onEditSuggestion}
-                    onSuggestionClick={handleSuggestionClickInternal}
-                    onCreateGeneralThread={onCreateGeneralThread}
-                    activeThreadId={activeThreadId}
-                    disableReopen={disableReopen}
-                  />
-                </div>
-              )}
             </SidebarContent>
 
             {/* Folding happens at the panel's own edge, the way the app nav's
