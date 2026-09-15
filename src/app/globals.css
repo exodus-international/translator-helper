@@ -39,6 +39,8 @@
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
+  --color-workspace: var(--workspace);
+  --color-editor: var(--editor);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
@@ -92,6 +94,14 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* The editor is a workspace, not a page: a ground the panes sit on, and the
+     surface the panes themselves are painted on. In light mode that is the
+     familiar white sheet on a grey desk. Dark mode needs the pair separated
+     further apart than --background/--card are, because the code panes ARE the
+     page here — an editor the same near-black as the ground reads as a hole,
+     not a surface to type on. */
+  --workspace: oklch(0.97 0 0);
+  --editor: oklch(1 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -137,6 +147,9 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  /* Ground drops to near-black so the grey panes read as lit surfaces. */
+  --workspace: oklch(0.145 0 0);
+  --editor: oklch(0.245 0 0);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -258,7 +271,6 @@
   @apply mb-2;
 }
 
-
 /*
  * Reader view — the formatted preview, dressed as the app that consumes this
  * content renders it, so a translator judges their work in the shape a reader
@@ -339,6 +351,56 @@
   border-color: #374151;
   color: #d1d5db;
 }
+
+/*
+ * The Markdown guide's rendered column: the same marked output the Live pane
+ * shows, at the scale of a two-line example rather than a document. Deliberately
+ * not `.prose` — those sizes are for a reading column and would fight the
+ * dialog. Tailwind's preflight strips list markers and heading weight, so this
+ * puts back just enough for an example to look like the published render.
+ */
+.md-example {
+  @apply text-sm leading-6 text-foreground;
+}
+
+.md-example > * + * {
+  @apply mt-2;
+}
+
+.md-example h1,
+.md-example h2,
+.md-example h3 {
+  @apply text-base font-semibold;
+}
+
+.md-example ul {
+  @apply list-disc pl-5;
+}
+
+.md-example ol {
+  @apply list-decimal pl-5;
+}
+
+.md-example li + li {
+  @apply mt-0.5;
+}
+
+.md-example blockquote {
+  @apply border-l-2 border-border pl-3 italic text-muted-foreground;
+}
+
+.md-example code {
+  @apply rounded bg-muted px-1 py-0.5 font-mono text-xs;
+}
+
+.md-example a {
+  @apply text-primary underline underline-offset-2;
+}
+
+.md-example hr {
+  @apply border-border;
+}
+
 /*
  * Editor chrome tokens.
  *

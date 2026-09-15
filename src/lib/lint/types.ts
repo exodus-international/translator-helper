@@ -37,6 +37,13 @@ export interface LintDiagnostic {
   from: number;
   to: number;
   fix?: LintFix;
+  /**
+   * Set on findings that belong to the document rather than to a stretch of
+   * text — a heading or link count that no longer matches the source, say.
+   * There is no range to underline, so consumers report these outside the text
+   * rather than pinning them to whichever line happens to be first.
+   */
+  scope?: 'document';
 }
 
 export interface LintContext {

@@ -79,6 +79,93 @@ describe('house style rules', () => {
   });
 });
 
+describe('brokenFormatting', () => {
+  const diagnostics = (text: string) => lintDocument({ text }).filter((d) => d.ruleId === 'broken-formatting');
+
+  it('reports emphasis wrapped across a blank line once, at the opener', () => {
+    const text =
+      '*A ti, kad se moliš, uđi u svoju sobu, zatvori vrata i pomoli se Ocu svomu, koji je u tajnosti.” — Matej 6,6\n\n' +
+      'A ti, kad se moliš, uđi u svoju sobu, zatvori vrata i pomoli se Ocu svomu, koji je u tajnosti.” — Matej 6,6*\n';
+
+    const found = diagnostics(text);
+    assert.equal(found.length, 1);
+    assert.match(found[0].message, /closed in a later paragraph \(line 3\)/);
+    assert.equal(found[0].from, 0);
+  });
+
+  it('reports an opener that never closes', () => {
+    const found = diagnostics('Bold here: **a discipline you commit to.\n');
+    assert.equal(found.length, 1);
+    assert.match(found[0].message, /never closed/);
+  });
+
+  it('reports a closer that was never opened, with an escape hint', () => {
+    const found = diagnostics('A discipline you commit to.**\n');
+    assert.equal(found.length, 1);
+    assert.match(found[0].message, /without an opening marker/);
+    assert.match(found[0].message, /\\\*\\\*/);
+  });
+
+  it('accepts balanced markers in one paragraph, across lines', () => {
+    assert.deepEqual(ids('**a discipline you commit to**\nand *the disposition* it brings.\n'), []);
+    assert.deepEqual(ids('***both at once***\n'), []);
+    assert.deepEqual(ids('Read the `hero` key.\n'), []);
+  });
+
+  it('does not mistake literal punctuation for markers', () => {
+    assert.deepEqual(ids('* Prayer — twenty minutes\n* Fraternity — a brother\n'), []);
+    assert.deepEqual(ids('Five * three is fifteen.\n'), []);
+    assert.deepEqual(ids('hero: markdown_reference-exodus_2026\n'), []);
+    // Fill-in blanks on the check-in sheets.
+    assert.deepEqual(ids('Celý čas modlitby: ___ / 7\n\nKvalita modlitby (1-5): ___\n'), []);
+    // Escaped, so deliberately literal.
+    assert.deepEqual(ids('Five \\* three is fifteen.\n'), []);
+  });
+
+  it('leaves markers inside markup and code alone', () => {
+    assert.deepEqual(ids('<span style="color:#CC0000;">All stand.</span>\n'), []);
+    assert.deepEqual(ids('[link](https://example.com/a*b_c)\n'), []);
+    assert.deepEqual(ids('```\nconst a = 5 * 3;\n```\n'), []);
+  });
+
+  it('closes an unclosed opener at the end of its paragraph', () => {
+    const text = 'Bold here: **a discipline you commit to.\n';
+    const [found] = diagnostics(text);
+    assert.equal(found.fix?.title, 'Close the emphasis here');
+    assert.equal(applyEdits(text, found.fix!.edits), 'Bold here: **a discipline you commit to.**\n');
+  });
+
+  it('keeps the emphasis where it was opened, and drops the far marker', () => {
+    const text = '*Be still, and know that I am God.\n\nBe still, and know that I am God.*\n';
+    const [found] = diagnostics(text);
+    assert.equal(
+      applyEdits(text, found.fix!.edits),
+      '*Be still, and know that I am God.*\n\nBe still, and know that I am God.\n',
+    );
+  });
+
+  it('removes a stray closer', () => {
+    const text = 'A discipline you commit to.**\n';
+    const [found] = diagnostics(text);
+    assert.equal(found.fix?.title, 'Remove the stray marker');
+    assert.equal(applyEdits(text, found.fix!.edits), 'A discipline you commit to.\n');
+  });
+
+  it('offers every repair one at a time, never in bulk', () => {
+    // Each fix decides where the emphasis lands, which is the translator's
+    // call — so "fix all" must leave the document alone.
+    for (const text of [
+      '*Be still, and know that I am God.\n\nBe still, and know that I am God.*\n',
+      'Bold here: **a discipline you commit to.\n',
+      'A discipline you commit to.**\n',
+    ]) {
+      const [found] = diagnostics(text);
+      assert.equal(found.fix?.safe, false);
+      assert.equal(fixed(text), text);
+    }
+  });
+});
+
 describe('parity rules', () => {
   const source =
     '---\ntitle: Day One\nsubtitle: Sub\ncaption: Cap\nhero: shirt-e90_2026\n---\n\n# Heading\n\nRead [the guide](https://exodus90.com/guide).\n';
