@@ -44,6 +44,7 @@ import { Separator } from '@/components/ui/separator';
 import { capture } from '@/lib/analytics';
 import { signOut } from '@/lib/auth-client';
 import { isAdminClient } from '@/lib/permissions-client';
+import { useTrailStore, type TrailCrumb } from '@/lib/page-trail';
 import { SessionUser } from '@/lib/session';
 import {
   Bug,
@@ -105,30 +106,35 @@ function segmentLabel(segment: string): string | null {
 
 function HeaderBreadcrumb() {
   const pathname = usePathname();
+  const trail = useTrailStore((s) => s.trail);
   const segments = pathname.split('/').filter(Boolean);
-  const crumbs = segments
-    .map((segment, index) => ({
-      href: '/' + segments.slice(0, index + 1).join('/'),
-      label: segmentLabel(segment),
-    }))
-    .filter((crumb) => crumb.label);
+  // A page that knows its own names wins: a document editor shows the
+  // document's title and its language's name, where the pathname can only
+  // offer the slug and the language code.
+  const crumbs: TrailCrumb[] =
+    trail ??
+    segments
+      .map((segment, index) => ({
+        href: '/' + segments.slice(0, index + 1).join('/'),
+        label: segmentLabel(segment) ?? '',
+      }))
+      .filter((crumb) => crumb.label);
   const lastCrumb = crumbs[crumbs.length - 1];
 
   if (!lastCrumb) {
     return null;
   }
 
+  const renderCrumb = (crumb: TrailCrumb) =>
+    crumb.href ? <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink> : crumb.label;
+
   return (
     <Breadcrumb>
       <BreadcrumbList>
         {crumbs.slice(0, -1).map((crumb) => (
-          <React.Fragment key={crumb.href}>
+          <React.Fragment key={crumb.label}>
             <BreadcrumbItem className="hidden md:block">
-              {isNavigable(crumb.href) ? (
-                <BreadcrumbLink render={<Link href={crumb.href} />}>{crumb.label}</BreadcrumbLink>
-              ) : (
-                crumb.label
-              )}
+              {trail ? renderCrumb(crumb) : isNavigable(crumb.href!) ? renderCrumb(crumb) : crumb.label}
             </BreadcrumbItem>
             <BreadcrumbSeparator className="hidden md:block" />
           </React.Fragment>

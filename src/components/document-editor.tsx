@@ -1,7 +1,6 @@
 'use client';
 
 import { ReactNode, Ref, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { parseFrontmatter } from '@/lib/frontmatter';
@@ -27,6 +26,7 @@ import { SuggestionStatus } from '@/generated/prisma/enums';
 import { getStatusStep, isDraftPhase, isStepCompleted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
+import { useTrailStore } from '@/lib/page-trail';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import { useAutoSave } from '@/lib/stores/hooks';
 import { buildProjectPath } from '@/domain/source-project/source-project-url';
@@ -38,34 +38,6 @@ function getContentWithoutFrontmatter(text: string) {
   } catch {
     return text;
   }
-}
-
-// ──────────────────────────────────────────────────────────────
-// Header helper — shared breadcrumb + title + lang pair on the left,
-// caller-supplied actions on the right
-// ──────────────────────────────────────────────────────────────
-
-export function DocumentEditorHeader({ document, actions }: { document: any; actions: ReactNode }) {
-  return (
-    <div className="border-b bg-background">
-      <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        {/* The document's name is not repeated here: the shell's breadcrumb
-            carries it, language and all. What is left is the way back to the
-            project, which the breadcrumb only links one crumb at a time. */}
-        <div className="flex min-w-0 items-center gap-2">
-          {document.sourceProject && (
-            <Link
-              href={buildProjectPath(document.sourceProject.identifier)}
-              className="shrink-0 truncate text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {document.sourceProject.name}
-            </Link>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
-      </div>
-    </div>
-  );
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -92,6 +64,12 @@ interface ViewerConfig {
   /** Version id when this document is eligible for audio; enables the Audio text tab. */
   audioTextVersionId?: string | null;
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
+  /** The language this editor is open on, for the shell's trail. */
+  targetLanguageName?: string | null;
+  /** The editor's own controls, drawn in the document panel's header row. */
+  panelActions?: ReactNode;
+  /** Toggles zen mode; the panel's folded rail keeps a button for it. */
+  onToggleZen?: () => void;
   /** Workflow buttons, shown above the summary rows in the panel. */
   sidebarActions?: ReactNode;
   sidebarSummary?: ReactNode;
@@ -135,6 +113,8 @@ function EditorViewer({
   sidebarDetails,
   sidebarDetailsDefaultOpen,
   contentLanguage,
+  panelActions,
+  onToggleZen,
 }: ViewerConfig) {
   const router = useRouter();
   const targetVersion = useEditorStore((s) => s.targetVersion);
@@ -258,6 +238,8 @@ function EditorViewer({
       sidebarDetails={sidebarDetails}
       sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
       status={targetVersion?.status}
+      panelActions={panelActions}
+      onToggleZen={onToggleZen}
       sidebarHeader={
         <DocumentInfoCard
           meta={[
@@ -406,8 +388,9 @@ interface DocumentEditorProps {
   // User
   user: SessionUser;
 
-  // Header — page-supplied (built with <DocumentEditorHeader /> or fully custom)
-  header: ReactNode;
+  // Header — page-supplied, and now only for chrome a view adds to itself:
+  // zen mode's own bar. The default layout has none.
+  header?: ReactNode;
 
   // Outer container
   fullscreen?: boolean;
@@ -421,6 +404,12 @@ interface DocumentEditorProps {
   translationPreviewEmptyText?: string;
   /** Version id when this document is eligible for audio; enables the Audio text tab. */
   audioTextVersionId?: string | null;
+  /** The language this editor is open on, for the shell's trail. */
+  targetLanguageName?: string | null;
+  /** The editor's own controls, drawn in the document panel's header row. */
+  panelActions?: ReactNode;
+  /** Toggles zen mode; the panel's folded rail keeps a button for it. */
+  onToggleZen?: () => void;
 
   // Capabilities (value or function of live targetVersion from store)
   canEditSource: CapFn;
@@ -475,6 +464,9 @@ export function DocumentEditor({
   sidebarSummary,
   sidebarDetails,
   sidebarDetailsDefaultOpen,
+  targetLanguageName,
+  panelActions,
+  onToggleZen,
   extraDetails,
   activityLogs,
   hideDetails,
@@ -496,6 +488,23 @@ export function DocumentEditor({
   // the tab, the sidebar card's link to it, and the panel itself answering the
   // same question.
   const audioTextTarget = contentLanguage === 'yaml' ? null : (audioTextVersionId ?? null);
+
+  // The shell's breadcrumb shows what this page is, by name: the pathname only
+  // knows the slug and the language code, so the editor publishes the rest
+  // while it is mounted.
+  const setTrail = useTrailStore((s) => s.setTrail);
+  const languageName = targetLanguageName ?? sourceVersion.language.name;
+  useEffect(() => {
+    setTrail([
+      { label: 'Documents', href: '/documents' },
+      ...(document.sourceProject
+        ? [{ label: document.sourceProject.name, href: buildProjectPath(document.sourceProject.identifier) }]
+        : []),
+      { label: document.title },
+      ...(languageName ? [{ label: languageName }] : []),
+    ]);
+    return () => setTrail(null);
+  }, [setTrail, document.title, document.sourceProject, languageName]);
 
   return (
     <EditorProvider
@@ -538,6 +547,8 @@ export function DocumentEditor({
               sidebarDetails={sidebarDetails}
               sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
               contentLanguage={contentLanguage}
+              panelActions={panelActions}
+              onToggleZen={onToggleZen}
             />
           </div>
 
