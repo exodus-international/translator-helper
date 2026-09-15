@@ -2,7 +2,7 @@
 
 import { ActivityLog } from '@/components/activity-log';
 import { AudioStatus } from '@/components/audio-status';
-import { DocumentEditor, DocumentEditorHeader } from '@/components/document-editor';
+import { DocumentEditor } from '@/components/document-editor';
 import { MarkdownGuide } from '@/components/markdown-guide';
 import { GitHubStatus } from '@/components/github-status';
 import { Button } from '@/components/ui/button';
@@ -90,20 +90,19 @@ export default function TranslateClient({
       layout={zenMode ? 'zen' : 'default'}
       fullscreen={zenMode}
       viewerRef={viewerRef}
-      header={
-        <TranslateToolbar
-          document={document}
-          targetLanguageId={targetLanguageId}
-          zenMode={zenMode}
-          setZenMode={setZenMode}
-        />
-      }
+      header={<TranslateZenBar document={document} zenMode={zenMode} setZenMode={setZenMode} />}
+      panelActions={<TranslatePanelActions zenMode={zenMode} setZenMode={setZenMode} />}
+      onToggleZen={() => {
+        capture('zen_mode_toggled', { enabled: !zenMode });
+        setZenMode(!zenMode);
+      }}
+      targetLanguageName={targetLanguage?.name ?? null}
       canEditSource={isAdminClient(user)}
       translationPlaceholder="Enter your translation here..."
       translationPreviewEmptyText="*No content yet...*"
       hideDetails
       autoSaveDelayMs={3000}
-      sidebarActions={<TranslateWorkflowActions user={user} />}
+      sidebarActions={<TranslateWorkflowActions user={user} targetLanguageId={targetLanguageId} />}
       sidebarSummary={
         initialTargetVersion ? (
           <>
@@ -213,23 +212,54 @@ function SaveControl({
   );
 }
 
-function TranslateToolbar({
+/**
+ * Zen mode hides the shell, so while it is on this bar is the only chrome the
+ * page has: it names the document and offers the way back out. In the default
+ * layout the panel holds these controls and the topbar holds the trail, so
+ * there is no bar at all.
+ */
+function TranslateZenBar({
   document,
-  targetLanguageId,
   zenMode,
   setZenMode,
 }: {
   document: any;
-  targetLanguageId: string;
   zenMode: boolean;
   setZenMode: (zen: boolean) => void;
 }) {
+  if (!zenMode) return null;
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-b bg-background px-3 py-2">
+      <div className="min-w-0 truncate text-sm">
+        {document.title} <span className="text-muted-foreground">· Zen mode</span>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <TranslateSaveState />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setZenMode(false)}
+          aria-label="Exit zen mode"
+          title="Exit zen mode (Esc)"
+        >
+          <Minimize2 />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The save state on its own, where it can be read: the panel's header row while
+ * the panel is there, and zen mode's bar, which is all zen keeps.
+ */
+function TranslateSaveState() {
   const targetVersion = useEditorStore((s) => s.targetVersion);
   const saveContent = useEditorStore((s) => s.saveContent);
   const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
   const saveStatus = useEditorStore((s) => s.saveStatus());
   const lastSavedAt = useEditorStore((s) => s.lastSavedAt);
-
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
@@ -243,49 +273,61 @@ function TranslateToolbar({
     }
   };
 
-  const busy = loading || isAnyLoading;
+  if (!targetVersion || targetVersion.status === DocumentStatus.PENDING_TRANSLATION) return null;
 
-  // ─── Header actions ───────────────────────────────────────────
-  // Both headers render this same node: the only thing that differs between
-  // zen and the default view is the toggle that leaves it, which is why the two
-  // rows no longer drift apart. Status, submit and delete live in the Document
-  // info panel — they act on the document, not on the view.
-  const headerActions = targetVersion ? (
-    targetVersion.status !== DocumentStatus.PENDING_TRANSLATION ? (
-      <>
-        <SaveControl status={saveStatus} lastSavedAt={lastSavedAt} onSave={handleSave} disabled={busy} />
-        <Button
-          variant="outline"
-          size="icon-sm"
-          onClick={() => {
-            capture('zen_mode_toggled', { enabled: !zenMode });
-            setZenMode(!zenMode);
-          }}
-          aria-label={zenMode ? 'Exit zen mode' : 'Zen mode'}
-          title={zenMode ? 'Exit zen mode (Esc)' : 'Zen mode (F11)'}
-        >
-          {zenMode ? <Minimize2 /> : <Maximize2 />}
-        </Button>
-      </>
-    ) : null
-  ) : targetLanguageId ? null : (
-    <span className="text-sm text-muted-foreground">
-      Please select a target language from the documents page to start translating.
-    </span>
+  return (
+    <SaveControl status={saveStatus} lastSavedAt={lastSavedAt} onSave={handleSave} disabled={loading || isAnyLoading} />
   );
+}
 
-  if (zenMode) {
-    return (
-      <div className="flex items-center justify-between gap-3 border-b bg-background px-3 py-2">
-        <div className="min-w-0 truncate text-sm">
-          {document.title} <span className="text-muted-foreground">· Zen mode</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">{headerActions}</div>
-      </div>
-    );
-  }
+/**
+ * The editor's own controls for the panel's header row: the save state and the
+ * zen toggle. Autosave flips the saved state several times a minute while
+ * someone types, so it sits where it cannot be scrolled away and does not move.
+ */
+function TranslatePanelActions({ zenMode, setZenMode }: { zenMode: boolean; setZenMode: (zen: boolean) => void }) {
+  const targetVersion = useEditorStore((s) => s.targetVersion);
+  const saveContent = useEditorStore((s) => s.saveContent);
+  const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
+  const saveStatus = useEditorStore((s) => s.saveStatus());
+  const lastSavedAt = useEditorStore((s) => s.lastSavedAt);
+  const [loading, setLoading] = useState(false);
 
-  return <DocumentEditorHeader document={document} actions={headerActions} />;
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await saveContent();
+    } catch {
+      // The store has already toasted it; the control shows the failed state.
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!targetVersion || targetVersion.status === DocumentStatus.PENDING_TRANSLATION) return null;
+
+  return (
+    <>
+      <SaveControl
+        status={saveStatus}
+        lastSavedAt={lastSavedAt}
+        onSave={handleSave}
+        disabled={loading || isAnyLoading}
+      />
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => {
+          capture('zen_mode_toggled', { enabled: !zenMode });
+          setZenMode(!zenMode);
+        }}
+        aria-label={zenMode ? 'Exit zen mode' : 'Zen mode'}
+        title={zenMode ? 'Exit zen mode (Esc)' : 'Zen mode (F11)'}
+      >
+        {zenMode ? <Minimize2 /> : <Maximize2 />}
+      </Button>
+    </>
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -293,7 +335,7 @@ function TranslateToolbar({
 // beside the fields they move: submit to review, delete the version.
 // ──────────────────────────────────────────────────────────────────────
 
-function TranslateWorkflowActions({ user }: { user: SessionUser }) {
+function TranslateWorkflowActions({ user, targetLanguageId }: { user: SessionUser; targetLanguageId: string }) {
   const router = useRouter();
   const targetVersion = useEditorStore((s) => s.targetVersion);
   const setTargetVersion = useEditorStore((s) => s.setTargetVersion);
@@ -321,7 +363,13 @@ function TranslateWorkflowActions({ user }: { user: SessionUser }) {
     }
   };
 
-  if (!targetVersion) return null;
+  if (!targetVersion) {
+    return targetLanguageId ? null : (
+      <div className="rounded-lg border bg-card p-3 text-sm text-muted-foreground">
+        Please select a target language from the documents page to start translating.
+      </div>
+    );
+  }
 
   const busy = deleting || isAnyLoading;
   const canDelete = targetVersion.status === DocumentStatus.PENDING_TRANSLATION && isAdminClient(user);
