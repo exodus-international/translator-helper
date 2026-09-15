@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getDocumentStatusConfig } from '@/constants/document-status';
 import { DocumentStatus } from '@/generated/prisma/enums';
-import { CircleDot, Eye, Languages, Pencil, User, UserMinus, UserPlus } from 'lucide-react';
+import { CalendarDays, CircleDot, Eye, Languages, Pencil, User, UserMinus, UserPlus } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -25,6 +25,10 @@ interface DocumentInfoCardProps {
   translator?: { id: string; name: string | null; email: string; image?: string | null } | null;
   reviewer?: { id: string; name: string | null; email: string; image?: string | null } | null;
   language?: string;
+  /** When this version is due, as the assignment carried it. */
+  deadline?: Date | string | null;
+  /** Opens the modal that sets or clears the deadline. Absent for readers. */
+  onEditDeadline?: () => void;
   onAssignTranslator?: () => void;
   onUnassignTranslator?: () => void;
   onAssignReviewer?: () => void;
@@ -44,6 +48,8 @@ export function DocumentInfoCard({
   translator,
   reviewer,
   language,
+  deadline,
+  onEditDeadline,
   onAssignTranslator,
   onUnassignTranslator,
   onAssignReviewer,
@@ -145,6 +151,30 @@ export function DocumentInfoCard({
               </Button>
             ) : (
               <span className="text-xs text-muted-foreground italic">Not assigned</span>
+            )}
+          </Row>
+
+          {/* Deadline */}
+          <Row icon={CalendarDays} label="Deadline">
+            {onEditDeadline ? (
+              // The row is the way in: a value that can be set is a value that
+              // can be changed, and the pencil only says so on hover.
+              <button
+                onClick={onEditDeadline}
+                className="group -mr-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted"
+                title="Change deadline"
+              >
+                {deadline ? (
+                  <span className="text-xs font-medium">{new Date(deadline).toLocaleDateString()}</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">Not set</span>
+                )}
+                <Pencil className="size-2.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+            ) : deadline ? (
+              <span className="text-xs font-medium">{new Date(deadline).toLocaleDateString()}</span>
+            ) : (
+              <span className="text-xs text-muted-foreground italic">Not set</span>
             )}
           </Row>
         </CardContent>
