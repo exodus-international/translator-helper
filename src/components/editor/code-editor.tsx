@@ -63,7 +63,7 @@ export interface CodeEditorHandle {
   fixAll(): { fixed: number; remaining: number };
 }
 
-export interface CodeEditorProps {
+interface CodeEditorProps {
   value: string;
   onChange?: (value: string) => void;
   onCursorChange?: (lineNumber: number) => void;
@@ -86,6 +86,8 @@ export interface CodeEditorProps {
   disabledRules?: string[];
   /** Turn linting off entirely — for panes showing content the reader can't edit. */
   lint?: boolean;
+  /** Opens the Markdown guide from a lint finding, when the host offers one. */
+  onOpenGuide?: () => void;
 }
 
 export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function CodeEditor(
@@ -106,6 +108,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     onDiagnosticsChange,
     disabledRules,
     lint = true,
+    onOpenGuide,
   },
   forwardedRef,
 ) {
@@ -115,8 +118,22 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
 
   // Callbacks live in refs: the extensions below are created once at mount, so
   // reading the prop directly would pin the first render's closure.
-  const callbacks = useRef({ onChange, onCursorChange, onSelectionChange, onSuggestionClick, onDiagnosticsChange });
-  callbacks.current = { onChange, onCursorChange, onSelectionChange, onSuggestionClick, onDiagnosticsChange };
+  const callbacks = useRef({
+    onChange,
+    onCursorChange,
+    onSelectionChange,
+    onSuggestionClick,
+    onDiagnosticsChange,
+    onOpenGuide,
+  });
+  callbacks.current = {
+    onChange,
+    onCursorChange,
+    onSelectionChange,
+    onSuggestionClick,
+    onDiagnosticsChange,
+    onOpenGuide,
+  };
 
   const languageCompartment = useRef(new Compartment()).current;
   const readOnlyCompartment = useRef(new Compartment()).current;
@@ -177,7 +194,11 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       placeholderCompartment.of(placeholder ? placeholderExtension(placeholder) : []),
       highlightLineField,
       suggestionExtension((suggestion) => callbacks.current.onSuggestionClick?.(suggestion)),
-      lintCompartment.of(lint ? [contentLinter(lintOptions.current), lintGutter()] : []),
+      lintCompartment.of(
+        lint
+          ? [contentLinter(lintOptions.current, { onOpenGuide: () => callbacks.current.onOpenGuide?.() }), lintGutter()]
+          : [],
+      ),
       EditorView.lineWrapping,
       editorTheme,
       updateListener,
@@ -277,7 +298,11 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
 
   useEffect(() => {
     viewRef.current?.dispatch({
-      effects: lintCompartment.reconfigure(lint ? [contentLinter(lintOptions.current), lintGutter()] : []),
+      effects: lintCompartment.reconfigure(
+        lint
+          ? [contentLinter(lintOptions.current, { onOpenGuide: () => callbacks.current.onOpenGuide?.() }), lintGutter()]
+          : [],
+      ),
     });
   }, [lint, lintCompartment]);
 
@@ -315,5 +340,5 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     [],
   );
 
-  return <div ref={hostRef} className={cn('cm-host border-t overflow-hidden h-full', className)} />;
+  return <div ref={hostRef} className={cn('cm-host h-full overflow-hidden', className)} />;
 });

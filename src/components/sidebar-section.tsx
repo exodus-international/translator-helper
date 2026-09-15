@@ -5,6 +5,10 @@ import { cn } from '@/lib/utils';
  * The one frame every right-sidebar panel uses: an uppercase label row with
  * an optional action, then flat content. No rounded cards, no margins, so
  * document info, audio, deploy, activity log and feedback read as one list.
+ *
+ * It paints no surface of its own: it is always mounted inside the editor's
+ * right panel, and a second background there would band the panel in dark mode,
+ * where `--background` is darker than the sidebar it sits on.
  */
 export function SidebarSection({
   title,
@@ -20,12 +24,12 @@ export function SidebarSection({
   contentClassName?: string;
 }) {
   return (
-    <section className={cn('border-b bg-background', className)}>
-      <div className="px-3 py-2 flex items-center justify-between gap-2 border-b bg-muted/60">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</span>
+    <section className={cn('border-b', className)}>
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/60 px-3 py-2">
+        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</span>
         {action}
       </div>
-      <div className={cn('px-3 py-3 min-w-0 overflow-hidden', contentClassName)}>{children}</div>
+      <div className={cn('min-w-0 overflow-hidden px-3 py-3', contentClassName)}>{children}</div>
     </section>
   );
 }

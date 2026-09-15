@@ -167,7 +167,9 @@ export const linkUrlChanged: LintRule = {
     if (original.length === 0) return [];
 
     // Different counts means content was added or dropped; the positional
-    // pairing below would be meaningless, so report it as one finding.
+    // pairing below would be meaningless, so report it as one finding. It is a
+    // document-level finding: nothing in the text is the problem, so it has no
+    // range and consumers show it beside the editor, not above line 1.
     if (translated.length !== original.length) {
       const originalUrls = new Set(original.map((d) => d.url));
       const translatedUrls = new Set(translated.map((d) => d.url));
@@ -177,6 +179,7 @@ export const linkUrlChanged: LintRule = {
         {
           ruleId: 'link-url-changed',
           severity: 'error',
+          scope: 'document',
           message:
             `Translation has ${translated.length} link(s), the source has ${original.length}. ` +
             `Missing: ${lost.slice(0, 3).join(', ')}${lost.length > 3 ? ` (+${lost.length - 3} more)` : ''}`,
@@ -234,14 +237,19 @@ export const headingStructure: LintRule = {
     const original = headings(source ?? '');
     if (original.length === 0) return [];
 
+    // A count mismatch says nothing about any single heading, so it is a
+    // document-level finding. Anchoring it at the first heading (or at 0 when
+    // there are none) put an underline and a marker on a line that was not
+    // itself wrong; the status bar carries it instead.
     if (translated.length !== original.length) {
       return [
         {
           ruleId: 'heading-structure',
           severity: 'warning',
+          scope: 'document',
           message: `Translation has ${translated.length} heading(s), the source has ${original.length}.`,
-          from: translated[0]?.from ?? 0,
-          to: translated[0]?.to ?? 0,
+          from: 0,
+          to: 0,
         },
       ];
     }

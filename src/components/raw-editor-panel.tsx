@@ -4,14 +4,6 @@ import { CodeEditor, type CodeEditorHandle } from './editor/code-editor';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import type { LintDiagnostic } from '@/lib/lint';
 
-interface LineInfo {
-  primaryLabel: string;
-  primaryValue: number;
-  secondaryLabel?: string;
-  secondaryValue?: number;
-  direction?: 'to' | 'from';
-}
-
 interface RawEditorPaneProps {
   value: string;
   onChange?: (value: string) => void;
@@ -21,7 +13,6 @@ interface RawEditorPaneProps {
   currentLine?: number;
   highlightLine?: number;
   language?: string;
-  lineInfo?: LineInfo;
   fullHeight?: boolean;
   className?: string;
   editorContainerClassName?: string;
@@ -35,6 +26,8 @@ interface RawEditorPaneProps {
   onDiagnosticsChange?: (diagnostics: LintDiagnostic[]) => void;
   /** Turn linting off entirely — for panes showing content the reader can't edit. */
   lint?: boolean;
+  /** Opens the Markdown guide from a lint finding, when the host offers one. */
+  onOpenGuide?: () => void;
   /** Rendered under the editor, inside the pane — the lint status bar goes here. */
   footer?: ReactNode;
 }
@@ -49,7 +42,6 @@ export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(fu
     currentLine,
     highlightLine,
     language,
-    lineInfo,
     fullHeight = false,
     className,
     editorContainerClassName,
@@ -59,30 +51,20 @@ export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(fu
     sourceContent,
     onDiagnosticsChange,
     lint,
+    onOpenGuide,
     footer,
   },
   ref,
 ) {
   return (
-    <div className={cn(fullHeight ? 'flex h-full flex-col space-y-2 ' : 'flex h-full flex-col space-y-2', className)}>
-      {lineInfo && (
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-2 py-0.5">
-          <span className="font-semibold">L{lineInfo.primaryValue}</span>
-          {lineInfo.secondaryLabel !== undefined && lineInfo.secondaryValue !== undefined && (
-            <>
-              <span>{lineInfo.direction === 'from' ? '←' : '→'}</span>
-              <span>L{lineInfo.secondaryValue}</span>
-            </>
-          )}
-        </div>
-      )}
+    <div className={cn('flex h-full flex-col', className)}>
       {/*
         min-h-0 is load-bearing: a column flex item defaults to min-height:auto,
         which is the editor's full document height. Without it the container
         grows past the pane instead of shrinking, and CodeMirror's scroller —
         sized to that container — has nothing left to scroll.
       */}
-      <div className={cn(fullHeight ? 'min-h-0 flex-1' : 'flex h-full min-h-0 flex-col', editorContainerClassName)}>
+      <div className={cn(fullHeight ? 'min-h-0 flex-1' : 'flex min-h-0 flex-1 flex-col', editorContainerClassName)}>
         <CodeEditor
           ref={ref}
           value={value}
@@ -99,6 +81,7 @@ export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(fu
           sourceContent={sourceContent}
           onDiagnosticsChange={onDiagnosticsChange}
           lint={lint}
+          onOpenGuide={onOpenGuide}
         />
       </div>
       {footer}
