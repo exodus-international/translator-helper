@@ -19,6 +19,18 @@ How we track usage, and how to turn the raw events into insight in the PostHog U
 - **Config:** `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST`. These are
   build-time `NEXT_PUBLIC_*` vars — set them in Coolify for **staging and production**.
 
+### Sentry
+- **Init:** one options object in `src/lib/sentry-options.ts`, used by
+  `src/instrumentation-client.ts` (browser), `sentry.server.config.ts` (Node) and
+  `sentry.edge.config.ts` (edge).
+- **Config:** `NEXT_PUBLIC_SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_ENVIRONMENT`. Both are
+  build-time `NEXT_PUBLIC_*` vars — set them in Coolify for **staging and production**
+  only. With no DSN the SDK initialises disabled and sends nothing, which is the
+  local-dev and E2E default. Never hardcode the DSN in source; that is how dev
+  errors ended up in the production project.
+- **Filtering:** every event carries `environment`, so staging noise can be
+  excluded in the Sentry UI. Unset it and Sentry labels everything `production`.
+
 ### Adding a new event
 1. Add the name to the `AnalyticsEvent` union in `src/lib/analytics.ts`.
 2. Call `capture('event_name', { ...props })` from a **client** handler, on the

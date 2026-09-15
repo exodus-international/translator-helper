@@ -61,6 +61,11 @@ The `AUDIO_S3_*` block in `.env.example` already matches the MinIO above, so
 picture uploads work locally. Leave it out and the app still runs; the profile
 page then says uploads are unavailable.
 
+Sentry stays off unless `NEXT_PUBLIC_SENTRY_DSN` is set, so local errors never
+reach the dashboard. The variable lives in Coolify for staging and production
+only, together with `NEXT_PUBLIC_SENTRY_ENVIRONMENT` (`staging` / `production`).
+See [docs/ANALYTICS.md](docs/ANALYTICS.md#sentry).
+
 ### 4. Run Database Migrations
 
 ```bash
