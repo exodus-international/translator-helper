@@ -208,7 +208,10 @@ function getTranslationContent(docKey: string, langCode: string, status: Documen
 
   const langContent = CONTENT_BY_LANGUAGE[langCode];
   if (langContent && langContent[docKey]) {
-    if (status === DocumentStatus.IN_PROGRESS) {
+    // The markdown reference carries its own half-finished translation, written
+    // with the lint violations it exists to demonstrate. Halving it would cut
+    // them out, so it is the one document that keeps what the dataset says.
+    if (status === DocumentStatus.IN_PROGRESS && docKey !== 'ex-md') {
       // Partial content: first half
       const lines = langContent[docKey].split('\n');
       return lines.slice(0, Math.ceil(lines.length / 2)).join('\n') + '\n\n<!-- TODO: finish translation -->';
