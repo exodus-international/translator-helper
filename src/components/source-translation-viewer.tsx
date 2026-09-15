@@ -34,7 +34,6 @@ import { DocumentStatus, SuggestionStatus } from '@/generated/prisma/enums';
 import {
   BookOpen,
   ChevronDown,
-  ChevronRight,
   Edit,
   Eye,
   FileEdit,
@@ -1225,29 +1224,38 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {sidebarSummary && (
                   <div className="flex flex-col divide-y overflow-hidden rounded-lg border bg-card [&>*]:px-3 [&>*]:py-2.5">
                     {sidebarSummary}
-                    {sidebarDetails && (
-                      <Button
-                        variant="ghost"
-                        className="h-7 w-full justify-start rounded-none px-0 text-xs text-muted-foreground"
-                        onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
-                      >
-                        {sidebarView === 'details' ? (
-                          <>
-                            <ChevronDown />
-                            Hide details
-                          </>
-                        ) : (
-                          <>
-                            <ChevronRight />
-                            Open details
-                          </>
-                        )}
-                      </Button>
-                    )}
                   </div>
                 )}
+                {/* The details are their own card, header and all: as a row
+                    inside the card above they read as one more button, and
+                    open they read as a second, unstyled list bolted onto the
+                    panel. The header row is the control, so the card opens and
+                    closes as one thing. */}
+                {sidebarDetails && (
+                  <Card className="shrink-0 gap-0 overflow-hidden rounded-lg bg-card py-0 shadow-none">
+                    <button
+                      type="button"
+                      onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
+                      aria-expanded={sidebarView === 'details'}
+                      title={sidebarView === 'details' ? 'Hide details' : 'Show details'}
+                      className="flex w-full cursor-pointer items-center justify-between gap-2 border-b bg-muted/60 px-3 py-2 text-left transition-colors hover:bg-muted"
+                    >
+                      <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        Details
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          'size-3.5 text-muted-foreground transition-transform duration-200',
+                          sidebarView === 'details' && 'rotate-180',
+                        )}
+                      />
+                    </button>
+                    {sidebarView === 'details' && (
+                      <div className="[&>section:last-child]:border-b-0">{sidebarDetails}</div>
+                    )}
+                  </Card>
+                )}
               </div>
-              {sidebarView === 'details' && sidebarDetails && <div className="shrink-0">{sidebarDetails}</div>}
               {hasSidebar && (
                 <div className="flex-1 min-h-[16rem] flex flex-col">
                   <ThreadSidebar
