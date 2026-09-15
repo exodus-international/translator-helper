@@ -234,23 +234,56 @@ function TranslateZenBar({
       <div className="min-w-0 truncate text-sm">
         {document.title} <span className="text-muted-foreground">· Zen mode</span>
       </div>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={() => setZenMode(false)}
-        aria-label="Exit zen mode"
-        title="Exit zen mode (Esc)"
-      >
-        <Minimize2 />
-      </Button>
+      <div className="flex shrink-0 items-center gap-1">
+        <TranslateSaveState />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => setZenMode(false)}
+          aria-label="Exit zen mode"
+          title="Exit zen mode (Esc)"
+        >
+          <Minimize2 />
+        </Button>
+      </div>
     </div>
   );
 }
 
 /**
- * The save state and the zen toggle, drawn in the document panel's header row.
- * Autosave flips the saved state several times a minute while someone types, so
- * it sits where it cannot be scrolled away and does not move.
+ * The save state on its own, where it can be read: the panel's header row while
+ * the panel is there, and zen mode's bar, which is all zen keeps.
+ */
+function TranslateSaveState() {
+  const targetVersion = useEditorStore((s) => s.targetVersion);
+  const saveContent = useEditorStore((s) => s.saveContent);
+  const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
+  const saveStatus = useEditorStore((s) => s.saveStatus());
+  const lastSavedAt = useEditorStore((s) => s.lastSavedAt);
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await saveContent();
+    } catch {
+      // The store has already toasted it; the control shows the failed state.
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!targetVersion || targetVersion.status === DocumentStatus.PENDING_TRANSLATION) return null;
+
+  return (
+    <SaveControl status={saveStatus} lastSavedAt={lastSavedAt} onSave={handleSave} disabled={loading || isAnyLoading} />
+  );
+}
+
+/**
+ * The editor's own controls for the panel's header row: the save state and the
+ * zen toggle. Autosave flips the saved state several times a minute while
+ * someone types, so it sits where it cannot be scrolled away and does not move.
  */
 function TranslatePanelActions({ zenMode, setZenMode }: { zenMode: boolean; setZenMode: (zen: boolean) => void }) {
   const targetVersion = useEditorStore((s) => s.targetVersion);
