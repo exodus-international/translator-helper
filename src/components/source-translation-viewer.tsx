@@ -961,7 +961,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {/* On desktop the panel folds to its own rail, so it needs no
                     button here. On mobile it is a sheet with no rail to reach
                     for, and this icon is the only way in. */}
-                {hasPanel && panelHidden && (
+                {hasPanel && !isZen && panelHidden && (
                   <Button
                     variant="outline"
                     size="icon-sm"
@@ -1156,7 +1156,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </AlertDialog>
         </div>
 
-        {hasPanel && (
+        {/* Zen mode is the writing surface, so it carries neither sidebar: the
+            shell's own nav is hidden by the overlay, and this panel is simply
+            not rendered. Its header row goes with it, which is why zen mode's
+            bar shows the save state. */}
+        {hasPanel && !isZen && (
           <Sidebar
             side="right"
             variant="floating"
