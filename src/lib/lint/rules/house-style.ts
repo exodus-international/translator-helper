@@ -1,6 +1,6 @@
 /**
  * Rules that judge a document on its own, without comparing it to the source.
- * Every one of these carries a safe autofix.
+ * All but `brokenFormatting` carry a safe autofix.
  *
  * Thresholds come from the 646-file 2026 corpus: bullets are written `*`
  * (26,274 occurrences vs 0 for `-`), and prose uses curly quotes
@@ -169,6 +169,201 @@ export const smartQuotes: LintRule = {
   },
 };
 
+/**
+ * Inline formatting that never closes.
+ *
+ * Emphasis and inline code cannot cross a blank line, so a `*` opened in one
+ * paragraph and closed in the next does not set anything off: the reader gets
+ * the marker characters in the text, or one run that swallows both paragraphs.
+ * The renderer never complains, which is what makes this worth a rule — the
+ * most common break in translated content is a quotation wrapped in `*…*` with
+ * a stray blank line inside it, and nothing else in the pipeline notices.
+ *
+ * The check is per paragraph, then across paragraphs: a leftover opener that
+ * finds a leftover closer further down is reported once, at the opener, naming
+ * the line the closer sits on. A marker that could be literal punctuation —
+ * `*` between spaces, an intraword `_` — is not a marker at all.
+ */
+
+/** Longest first, so `**` is one token rather than two `*`. */
+const MARKER = /(\*+|_+|`+)/g;
+
+/** Runs longer than this are not a formatter this library writes. */
+const LONGEST = { '*': 3, _: 2 } as const;
+
+interface Marker {
+  kind: string;
+  from: number;
+  to: number;
+  /** Paragraph index, in document order. */
+  block: number;
+  canOpen: boolean;
+  canClose: boolean;
+}
+
+function markerName(kind: string): string {
+  if (kind === '***') return 'Bold italic';
+  if (kind === '**' || kind === '__') return 'Bold';
+  if (kind === '`') return 'Inline code';
+  return 'Emphasis';
+}
+
+function closeTitle(kind: string): string {
+  return kind === '`' ? 'Close the code span here' : 'Close the emphasis here';
+}
+
+/** Paragraphs: the stretches between blank lines, which is where emphasis ends. */
+function blockRanges(text: string): { from: number; to: number }[] {
+  const blocks: { from: number; to: number }[] = [];
+  let start = 0;
+  for (const match of text.matchAll(/\n[ \t]*\n/g)) {
+    const at = match.index ?? 0;
+    blocks.push({ from: start, to: at });
+    start = at + match[0].length;
+  }
+  blocks.push({ from: start, to: text.length });
+  return blocks;
+}
+
+/** Where a marker would go to close at the end of its paragraph, bar trailing space. */
+function paragraphEnd(text: string, block: { from: number; to: number }): number {
+  let at = block.to;
+  while (at > block.from && /\s/.test(text[at - 1])) at -= 1;
+  return at;
+}
+
+/** `**` → `\*\*`: every character escaped, which is what renders the run literally. */
+function escapeHint(kind: string): string {
+  return kind.replace(/./g, (char) => `\\${char}`);
+}
+
+function lineAt(text: string, offset: number): number {
+  return text.slice(0, offset).split('\n').length;
+}
+
+const isWord = (char: string | undefined) => !!char && /[0-9A-Za-z]/.test(char);
+const isSpace = (char: string | undefined) => char === undefined || /\s/.test(char);
+
+export const brokenFormatting: LintRule = {
+  id: 'broken-formatting',
+  severity: 'error',
+  description: 'Emphasis and inline code must open and close inside one paragraph.',
+  check({ text }) {
+    const regions = protectedRegions(text);
+    const blocks = blockRanges(text);
+    const leftovers: { marker: Marker; role: 'open' | 'close' }[] = [];
+
+    blocks.forEach((block, blockIndex) => {
+      const unpaired: Marker[] = [];
+
+      for (const match of text.slice(block.from, block.to).matchAll(MARKER)) {
+        const from = block.from + (match.index ?? 0);
+        const to = from + match[0].length;
+        if (isProtected(regions, from)) continue;
+
+        const kind = match[0];
+        // A run longer than the markdown this library writes: `___` is a
+        // fill-in blank on the check-in sheets, `****` is nobody's emphasis.
+        const longest = LONGEST[kind[0] as keyof typeof LONGEST] ?? kind.length;
+        if (kind.length > longest) continue;
+
+        const before = from > 0 ? text[from - 1] : undefined;
+        if (before === '\\') continue; // escaped, so deliberately literal
+        const after = text[to];
+        // Markdown will not open emphasis before whitespace, nor close it after
+        // whitespace; an underscore inside a word is always literal.
+        const intraword = kind.startsWith('_');
+        const canOpen = !isSpace(after) && (!intraword || !isWord(before));
+        const canClose = !isSpace(before) && (!intraword || !isWord(after));
+        if (!canOpen && !canClose) continue;
+
+        const marker: Marker = { kind, from, to, block: blockIndex, canOpen, canClose };
+        const innermost = unpaired[unpaired.length - 1];
+        if (innermost && innermost.kind === kind && canClose) {
+          unpaired.pop();
+        } else if (canOpen) {
+          unpaired.push(marker);
+        } else {
+          leftovers.push({ marker, role: 'close' });
+        }
+      }
+
+      for (const marker of unpaired) leftovers.push({ marker, role: 'open' });
+    });
+
+    const diagnostics: LintDiagnostic[] = [];
+    const claimed = new Set<number>();
+
+    /** Where the marker would land if it closed at the end of its paragraph. */
+    const closeEdits = (marker: Marker): LintEdit[] => {
+      const at = paragraphEnd(text, blocks[marker.block]);
+      return [{ from: at, to: at, insert: marker.kind }];
+    };
+
+    // An opener and a closer in different paragraphs is the case the rule exists
+    // for, so it is reported once, at the opener, rather than as two orphans.
+    leftovers.forEach((entry, index) => {
+      if (entry.role !== 'open' || claimed.has(index)) return;
+
+      const pairedAt = leftovers.findIndex(
+        (candidate, candidateIndex) =>
+          candidateIndex > index &&
+          !claimed.has(candidateIndex) &&
+          candidate.role === 'close' &&
+          candidate.marker.block > entry.marker.block &&
+          candidate.marker.kind === entry.marker.kind,
+      );
+      if (pairedAt === -1) return;
+
+      claimed.add(index);
+      claimed.add(pairedAt);
+      const opener = entry.marker;
+      const closer = leftovers[pairedAt].marker;
+      diagnostics.push({
+        ruleId: 'broken-formatting',
+        severity: 'error',
+        message: `${markerName(opener.kind)} opened here is closed in a later paragraph (line ${lineAt(text, closer.from)}). Formatting cannot cross a blank line.`,
+        from: opener.from,
+        to: opener.to,
+        // The repair has to decide where the emphasis ends, which is the
+        // translator's call — so it is offered here and never applied by
+        // "Fix all". It keeps the emphasis where it was opened and drops the
+        // marker that was left holding the far end.
+        fix: {
+          title: closeTitle(opener.kind),
+          edits: [...closeEdits(opener), { from: closer.from, to: closer.to, insert: '' }],
+          safe: false,
+        },
+      });
+    });
+
+    leftovers.forEach((entry, index) => {
+      if (claimed.has(index)) return;
+      const { marker, role } = entry;
+      diagnostics.push({
+        ruleId: 'broken-formatting',
+        severity: 'error',
+        message:
+          role === 'open'
+            ? `${markerName(marker.kind)} opened here is never closed in this paragraph.`
+            : `${markerName(marker.kind)} is closed here without an opening marker — if the character is literal, escape it as ${escapeHint(marker.kind)}.`,
+        from: marker.from,
+        to: marker.to,
+        fix:
+          role === 'open'
+            ? { title: closeTitle(marker.kind), edits: closeEdits(marker), safe: false }
+            : {
+                title: 'Remove the stray marker',
+                edits: [{ from: marker.from, to: marker.to, insert: '' }],
+                safe: false,
+              },
+      });
+    });
+
+    return diagnostics;
+  },
+};
+
 export const houseStyleRules: LintRule[] = [
   noCrlf,
   trailingWhitespace,
@@ -176,4 +371,5 @@ export const houseStyleRules: LintRule[] = [
   bulletMarker,
   excessBlankLines,
   smartQuotes,
+  brokenFormatting,
 ];

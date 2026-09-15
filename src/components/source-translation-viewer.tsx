@@ -13,18 +13,32 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { SuggestionStatus } from '@/generated/prisma/enums';
-import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Edit,
+  Eye,
+  FileEdit,
+  Loader2,
+  PanelRightClose,
+  PanelRightOpen,
+  Plus,
+  Save,
+  X,
+} from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ReaderPreview } from '@/components/reader-preview';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import type { LintDiagnostic } from '@/lib/lint';
 import { LintStatusBar } from '@/components/editor/lint-status-bar';
+import { MarkdownGuideDialog } from '@/components/markdown-guide';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
@@ -109,6 +123,8 @@ interface SourceTranslationViewerProps {
   onCreateGeneralThread?: (comment: string) => void;
   disableReopen?: boolean;
   sidebarHeader?: ReactNode;
+  /** Workflow buttons, shown under the info card in the panel. */
+  sidebarActions?: ReactNode;
   /** Compact one-line rows shown under the header (audio, deploy). */
   sidebarSummary?: ReactNode;
   /** Full panels shown in place of the feedback list when the user opens details. */
@@ -117,6 +133,16 @@ interface SourceTranslationViewerProps {
   sidebarDetailsDefaultOpen?: boolean;
   /** Language id for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
+  /**
+   * False until this language has a version. The translation pane then offers
+   * the call to action instead of an editor — there is nothing to type into yet,
+   * and linting an empty document only reports everything as missing.
+   */
+  translationStarted?: boolean;
+  onStartTranslation?: () => void;
+  startingTranslation?: boolean;
+  /** Opens the Markdown guide from a lint finding. */
+  onOpenGuide?: () => void;
   /** Passed through to the Audio text tab so the sidebar card's badge follows what happens in it. */
   onAudioTranscriptStateChange?: (state: AudioTranscriptState) => void;
 }
@@ -124,6 +150,27 @@ interface SourceTranslationViewerProps {
 const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
   return Math.min(Math.max(_lineNumber, 1), Math.max(toTotal, 1));
 };
+
+/**
+ * Where the cursor sits in this pane and where its counterpart sits in the
+ * other, kept in step by the cursor handlers above. It lives in the pane header
+ * because it is chrome: as a strip above the editor it bought its own line of
+ * the document it only describes.
+ */
+function CursorSync({ line, otherLine, title }: { line: number; otherLine: number; title: string }) {
+  return (
+    <span
+      className="hidden shrink-0 items-center gap-1 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline-flex"
+      title={title}
+    >
+      L{line}
+      <span className="text-muted-foreground/50" aria-hidden>
+        ↔
+      </span>
+      <span className="text-muted-foreground/60">L{otherLine}</span>
+    </span>
+  );
+}
 
 export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle, SourceTranslationViewerProps>(
   function SourceTranslationViewerOuter(props, ref) {
@@ -187,10 +234,15 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       onCreateGeneralThread,
       disableReopen = false,
       sidebarHeader,
+      sidebarActions,
       sidebarSummary,
       sidebarDetails,
       sidebarDetailsDefaultOpen = false,
       contentLanguage = 'markdown',
+      translationStarted = true,
+      onStartTranslation,
+      startingTranslation = false,
+      onOpenGuide,
       onAudioTranscriptStateChange,
     },
     ref,
@@ -390,14 +442,23 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       }
     };
 
-    const cardClassName = isZen
-      ? 'p-3 flex flex-1 flex-col min-w-0 min-h-0'
-      : 'p-0 gap-0 shadow-none flex flex-1 flex-col min-w-0 min-h-0';
-    const bodyClassName = isZen ? 'flex-1 min-h-0 overflow-hidden relative' : 'flex-1 min-h-0 overflow-hidden';
+    // One pane object, shared by both sides: a sheet on the workspace ground,
+    // with room for a header and nothing else of its own.
+    const paneClassName = 'min-h-0 min-w-0 flex-1 gap-0 overflow-hidden rounded-lg border bg-editor p-0 shadow-none';
+    const bodyClassName = 'relative min-h-0 flex-1 overflow-hidden';
     // Mobile: only the active pane is displayed; desktop keeps both side by side.
     const paneVisibility = (visible: boolean) => (visible ? 'flex' : 'hidden md:flex');
     const sourcePaneVisible = !isMobile || mobilePane === 'source';
     const translationPaneVisible = !isMobile || mobilePane === 'translation';
+    // Report only once there is text to report on. A version that has just
+    // been started is empty, and checking it against the source calls every
+    // heading, key and link missing — an error the translator has not made.
+    // (The rules themselves already stay quiet on an empty document; this keeps
+    // the bar from saying anything at all until there is work to judge.)
+    const translationHasContent = translationContent.trim().length > 0;
+    // The cursor chip only means something when both panes are showing editors:
+    // it names this pane's line and the line the other pane is parked on.
+    const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -606,12 +667,17 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
     return (
       <>
-        <div className={cn('flex min-w-0 flex-1 flex-col border-0 md:grid md:grid-cols-2', isZen && 'h-full')}>
+        <div
+          className={cn(
+            'flex min-w-0 flex-1 flex-col gap-2 bg-workspace p-2 md:grid md:grid-cols-2',
+            isZen && 'h-full',
+          )}
+        >
           {/* Mobile: one pane at a time, toggled by this switcher. Desktop: both panes side by side. */}
           <Tabs
             value={mobilePane}
             onValueChange={(value) => setMobilePane(value as 'source' | 'translation')}
-            className="shrink-0 px-2 pt-2 md:hidden"
+            className="shrink-0 md:hidden"
           >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="source">Source</TabsTrigger>
@@ -619,14 +685,22 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             </TabsList>
           </Tabs>
 
-          <Card
-            className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1', paneVisibility(sourcePaneVisible))}
-          >
-            <div className="flex h-12 items-center justify-between px-2">
+          <Card className={cn(paneClassName, paneVisibility(sourcePaneVisible))}>
+            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
               {/* The mobile switcher above already names this pane; the language
                   badge below still travels with the header. */}
-              <h2 className="hidden min-w-0 truncate text-sm font-semibold md:block">Source (English)</h2>
-              <div className="flex flex-1 items-center gap-2 md:flex-none md:justify-end">
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="hidden min-w-0 truncate text-sm font-medium md:block">Source</h2>
+                {sourceBadge}
+                {showCursorSync && (
+                  <CursorSync
+                    line={sourceLine}
+                    otherLine={syncedTranslationLine ?? translationLine}
+                    title={`Source line ${sourceLine} ↔ translation line ${syncedTranslationLine ?? translationLine}`}
+                  />
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
                 {!isSourceEditing &&
                   !isYaml &&
                   (mounted ? (
@@ -634,13 +708,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       value={sourceViewMode}
                       onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}
                     >
-                      <TabsList>
-                        <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                        <TabsTrigger value="raw">Raw</TabsTrigger>
+                      <TabsList className="h-8">
+                        <TabsTrigger value="formatted">Live</TabsTrigger>
+                        <TabsTrigger value="raw">Markdown</TabsTrigger>
                       </TabsList>
                     </Tabs>
                   ) : (
-                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                    <div className="inline-flex h-8 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
                       <button
                         type="button"
                         disabled
@@ -649,7 +723,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           sourceViewMode === 'formatted' && 'bg-background shadow-sm',
                         )}
                       >
-                        Formatted
+                        Live
                       </button>
                       <button
                         type="button"
@@ -659,14 +733,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           sourceViewMode === 'raw' && 'bg-background shadow-sm',
                         )}
                       >
-                        Raw
+                        Markdown
                       </button>
                     </div>
                   ))}
-                {sourceBadge}
                 {canEditSource && !isSourceEditing && (
                   <>
-                    <Button variant="outline" onClick={enterSourceEditMode}>
+                    <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
                       <Edit />
                       Edit
                     </Button>
@@ -694,11 +767,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 )}
                 {isSourceEditing && (
                   <>
-                    <Button variant="outline" onClick={handleSourceSave} disabled={sourceSaving}>
+                    <Button variant="outline" size="sm" onClick={handleSourceSave} disabled={sourceSaving}>
                       <Save />
                       {sourceSaving ? 'Saving...' : 'Save'}
                     </Button>
-                    <Button variant="outline" onClick={handleSourceCancel} disabled={sourceSaving}>
+                    <Button variant="outline" size="sm" onClick={handleSourceCancel} disabled={sourceSaving}>
                       <X />
                       Cancel
                     </Button>
@@ -717,13 +790,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
                   language={contentLanguage}
-                  lineInfo={{
-                    primaryLabel: 'Source Line',
-                    primaryValue: sourceLine,
-                    secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                    secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
-                    direction: 'to',
-                  }}
+                  onOpenGuide={onOpenGuide}
                 />
               ) : !isYaml && sourceViewMode === 'formatted' ? (
                 <ReaderPreview content={sourceFormattedContent} />
@@ -737,32 +804,30 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
-                  lineInfo={{
-                    primaryLabel: 'Source Line',
-                    primaryValue: sourceLine,
-                    secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                    secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
-                    direction: 'to',
-                  }}
+                  onOpenGuide={onOpenGuide}
                 />
               )}
             </div>
           </Card>
 
-          <Card
-            className={cn(
-              cardClassName,
-              'rounded-none border-t-0 border-r-0 pt-1',
-              paneVisibility(translationPaneVisible),
-            )}
-          >
-            <div className="flex h-12 items-center justify-between px-2">
-              <h2 className="hidden min-w-0 truncate text-sm font-semibold md:block">Translation</h2>
-              <div className="flex flex-1 items-center gap-2 md:flex-none md:justify-end">
+          <Card className={cn(paneClassName, paneVisibility(translationPaneVisible))}>
+            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="hidden min-w-0 truncate text-sm font-medium md:block">Translation</h2>
+                {translationBadge}
+                {showCursorSync && (
+                  <CursorSync
+                    line={translationLine}
+                    otherLine={syncedSourceLine ?? sourceLine}
+                    title={`Translation line ${translationLine} ↔ source line ${syncedSourceLine ?? sourceLine}`}
+                  />
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
                 {variant === 'translate' ? (
                   isYaml ? null : mounted ? (
                     <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
-                      <TabsList>
+                      <TabsList className="h-8">
                         <TabsTrigger value="edit">
                           <FileEdit />
                           Edit
@@ -774,7 +839,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       </TabsList>
                     </Tabs>
                   ) : (
-                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                    <div className="inline-flex h-8 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
                       <button
                         type="button"
                         disabled
@@ -812,15 +877,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         setReviewViewMode(next);
                       }}
                     >
-                      <TabsList>
-                        <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                        <TabsTrigger value="review" className="relative">
+                      <TabsList className="h-8">
+                        <TabsTrigger value="formatted">Live</TabsTrigger>
+                        <TabsTrigger value="review">
                           Review
                           {openSuggestionsCount > 0 && (
-                            <Badge
-                              variant="default"
-                              className="absolute -top-3 -right-3 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
-                            >
+                            <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
                               {openSuggestionsCount}
                             </Badge>
                           )}
@@ -829,7 +891,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       </TabsList>
                     </Tabs>
                   ) : (
-                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+                    <div className="inline-flex h-8 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
                       <button
                         type="button"
                         disabled
@@ -838,7 +900,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           reviewViewMode === 'formatted' && 'bg-background shadow-sm',
                         )}
                       >
-                        Formatted
+                        Live
                       </button>
                       <button
                         type="button"
@@ -850,10 +912,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       >
                         Review
                         {openSuggestionsCount > 0 && (
-                          <Badge
-                            variant="default"
-                            className="absolute -top-1 -left-1 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
-                          >
+                          <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
                             {openSuggestionsCount}
                           </Badge>
                         )}
@@ -861,14 +920,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     </div>
                   )
                 ) : null}
-                {translationBadge}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
                 {hasPanel && panelHidden && (
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={toggleSidebar}
-                    className="h-7 text-xs"
+                    className="text-xs"
                     aria-label="Show panel"
                   >
                     <PanelRightOpen />
@@ -885,7 +944,25 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
             <div className={bodyClassName}>
               {variant === 'translate' ? (
-                isYaml || translateTab === 'edit' ? (
+                !translationStarted ? (
+                  <Empty className="h-full border-0">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <FileEdit />
+                      </EmptyMedia>
+                      <EmptyTitle>No translation yet</EmptyTitle>
+                      <EmptyDescription>
+                        Start the translation for this document and write it here, next to the source.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                      <Button onClick={onStartTranslation} disabled={startingTranslation}>
+                        {startingTranslation ? <Loader2 className="animate-spin" /> : <Plus />}
+                        Start translation
+                      </Button>
+                    </EmptyContent>
+                  </Empty>
+                ) : isYaml || translateTab === 'edit' ? (
                   <div ref={translationContainerRef} className="relative h-full">
                     <RawEditorPane
                       ref={translationEditorRef}
@@ -896,10 +973,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       sourceContent={sourceContent}
                       onDiagnosticsChange={setTranslationDiagnostics}
                       footer={
-                        <LintStatusBar
-                          diagnostics={translationDiagnostics}
-                          onFixAll={() => translationEditorRef.current?.fixAll()}
-                        />
+                        translationHasContent ? (
+                          <LintStatusBar
+                            diagnostics={translationDiagnostics}
+                            onFixAll={() => translationEditorRef.current?.fixAll()}
+                          />
+                        ) : undefined
                       }
                       placeholder={translationPlaceholder}
                       currentLine={translationLine}
@@ -908,13 +987,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       suggestions={showSuggestionDecorations ? suggestions : undefined}
                       onSuggestionClick={showSuggestionDecorations ? handleSuggestionClickInternal : undefined}
                       onSelectionChange={showSelectionToolbar ? handleSelectionChange : undefined}
-                      lineInfo={{
-                        primaryLabel: 'Translation Line',
-                        primaryValue: translationLine,
-                        secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                        secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
-                        direction: 'from',
-                      }}
+                      onOpenGuide={onOpenGuide}
                     />
                     {toolbarPosition && canCreateSuggestions && (
                       <SuggestionInlineToolbar
@@ -952,17 +1025,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     language={contentLanguage}
                     sourceContent={sourceContent}
                     fullHeight
-                    lineInfo={
-                      sourceViewMode === 'raw'
-                        ? {
-                            primaryLabel: 'Translation Line',
-                            primaryValue: translationLine,
-                            secondaryLabel: 'Source Line',
-                            secondaryValue: sourceLine,
-                            direction: 'from',
-                          }
-                        : undefined
-                    }
+                    onOpenGuide={onOpenGuide}
                   />
                   {translationEditActions}
                 </div>
@@ -1002,13 +1065,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         suggestions={suggestions}
                         onSuggestionClick={handleSuggestionClickInternal}
                         onSelectionChange={handleSelectionChange}
-                        lineInfo={{
-                          primaryLabel: 'Translation Line',
-                          primaryValue: translationLine,
-                          secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                          secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
-                          direction: 'from',
-                        }}
+                        onOpenGuide={onOpenGuide}
                       />
                       {toolbarPosition && canCreateSuggestions && (
                         <SuggestionInlineToolbar
@@ -1067,47 +1124,47 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
         {hasPanel && (
           <Sidebar side="right" collapsible="offcanvas">
-            <SidebarHeader className="p-0 gap-0">
-              <div className="px-3 py-2 flex items-center justify-between border-b">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <SidebarHeader className="gap-0 p-0">
+              <div className="flex items-center justify-between border-b bg-muted/60 px-3 py-2">
+                <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                   Document info
                 </span>
-                <Button
-                  variant="ghost"
-                  onClick={toggleSidebar}
-                  className="h-7 w-7 p-0"
-                  aria-label="Close panel"
-                >
+                <Button variant="ghost" onClick={toggleSidebar} className="h-7 w-7 p-0" aria-label="Close panel">
                   <PanelRightClose />
                 </Button>
               </div>
-              {sidebarHeader}
-              {sidebarSummary && (
-                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-background">
-                  {sidebarSummary}
-                  {sidebarDetails && (
-                    <Button
-                      variant="ghost"
-                      className="h-7 w-full justify-start px-1 text-xs text-muted-foreground"
-                      onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
-                    >
-                      {sidebarView === 'details' ? (
-                        <>
-                          <ChevronDown />
-                          Hide details
-                        </>
-                      ) : (
-                        <>
-                          <ChevronRight />
-                          Open details
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              )}
             </SidebarHeader>
-            <SidebarContent className="p-0 gap-0">
+            {/* The facts, the actions and the status rows scroll together, so a
+                tall panel never clips the button someone came to press. */}
+            <SidebarContent className="gap-0 p-0">
+              <div className="flex flex-col gap-3 p-3">
+                {sidebarHeader}
+                {sidebarActions}
+                {sidebarSummary && (
+                  <div className="flex flex-col divide-y overflow-hidden rounded-lg border bg-card [&>*]:px-3 [&>*]:py-2.5">
+                    {sidebarSummary}
+                    {sidebarDetails && (
+                      <Button
+                        variant="ghost"
+                        className="h-7 w-full justify-start rounded-none px-0 text-xs text-muted-foreground"
+                        onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
+                      >
+                        {sidebarView === 'details' ? (
+                          <>
+                            <ChevronDown />
+                            Hide details
+                          </>
+                        ) : (
+                          <>
+                            <ChevronRight />
+                            Open details
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
               {sidebarView === 'details' && sidebarDetails && <div className="shrink-0">{sidebarDetails}</div>}
               {hasSidebar && (
                 <div className="flex-1 min-h-[16rem] flex flex-col">
@@ -1131,6 +1188,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             </SidebarContent>
           </Sidebar>
         )}
+
+        {/* Mounted once for the whole editor: the lint cards and the panel
+            button both open this one dialog. */}
+        <MarkdownGuideDialog />
       </>
     );
   },
