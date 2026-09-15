@@ -6,7 +6,7 @@ import { Check, MessageSquare, Pencil, PencilLine, RotateCcw, X } from 'lucide-r
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SuggestionWithUser } from './monaco-suggestion-decorations';
+import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import { SuggestionForm } from './suggestion-form';
 import { ThreadReplyInput } from './thread-reply-input';
 

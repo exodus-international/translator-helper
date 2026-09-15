@@ -121,7 +121,7 @@ The application manages the complete lifecycle of document translations:
 - **Authentication**: Better-auth
 - **UI Components**: Shadcn/ui + Tailwind CSS
 - **Markdown**: react-markdown with GitHub Flavored Markdown
-- **Code Editor**: Monaco Editor (@monaco-editor/react)
+- **Code Editor**: CodeMirror 6, with content lint rules and autofix (`src/lib/lint`)
 - **Icons**: Lucide React
 
 ### Architecture Pattern
@@ -168,7 +168,7 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 
 2. **RawEditorPane**: Code editor with line numbers
 
-   - Monaco editor integration
+   - CodeMirror integration, with content linting and autofix
    - Line highlighting
    - Cursor position tracking
    - Read-only mode

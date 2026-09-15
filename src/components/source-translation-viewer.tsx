@@ -1,4 +1,5 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
+import type { CodeEditorHandle } from '@/components/editor/code-editor';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +22,9 @@ import { SuggestionStatus } from '@/generated/prisma/enums';
 import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { MarkdownPreview } from '@/components/markdown-preview';
-import { SuggestionWithUser } from './monaco-suggestion-decorations';
+import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
+import type { LintDiagnostic } from '@/lib/lint';
+import { LintStatusBar } from '@/components/editor/lint-status-bar';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
@@ -101,7 +104,7 @@ interface SourceTranslationViewerProps {
   documentVersion?: number;
   isApplyingSuggestion?: boolean;
   isDismissingSuggestion?: boolean;
-  editorRef?: React.RefObject<any>; // Ref to the Monaco editor to get cursor position
+  editorRef?: React.RefObject<CodeEditorHandle | null>; // Ref to the editor, to read cursor position
   onReply?: (suggestionId: string, content: string) => void;
   onCreateGeneralThread?: (comment: string) => void;
   disableReopen?: boolean;
@@ -112,7 +115,7 @@ interface SourceTranslationViewerProps {
   sidebarDetails?: ReactNode;
   /** Start with the details panels open instead of the feedback list. */
   sidebarDetailsDefaultOpen?: boolean;
-  /** Monaco language for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
+  /** Language id for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
   /** Passed through to the Audio text tab so the sidebar card's badge follows what happens in it. */
   onAudioTranscriptStateChange?: (state: AudioTranscriptState) => void;
@@ -238,7 +241,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [discardKind, setDiscardKind] = useState<'suggestion' | 'audioText'>('suggestion');
     const pendingDiscardActionRef = useRef<(() => void) | null>(null);
     const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
-    const translationEditorRef = useRef<any>(null);
+    const translationEditorRef = useRef<CodeEditorHandle | null>(null);
+    const [translationDiagnostics, setTranslationDiagnostics] = useState<LintDiagnostic[]>([]);
     const translationContainerRef = useRef<HTMLDivElement>(null);
     const [selectedUserId] = useState<string | null>(null); // Filter by user for diff view
     const [isSourceEditing, setIsSourceEditing] = useState(false);
@@ -353,17 +357,15 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           suggestion.endLine != null &&
           suggestion.endColumn != null
         ) {
-          const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-          const editor = editorWrapper?.editor;
-          const monaco = editorWrapper?.monaco;
-          if (editor && monaco) {
-            const range = new monaco.Range(
-              suggestion.startLine,
-              suggestion.startColumn,
-              suggestion.endLine,
-              suggestion.endColumn,
-            );
-            editor.revealRangeInCenter(range);
+          const editor = (translationEditorRef.current || externalEditorRef?.current)?.editor;
+          if (editor) {
+            const range = {
+              startLine: suggestion.startLine,
+              startColumn: suggestion.startColumn,
+              endLine: suggestion.endLine,
+              endColumn: suggestion.endColumn,
+            };
+            editor.revealRange(range);
             editor.setSelection(range);
           }
 
@@ -503,20 +505,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setSelectedRange(range);
       // Get selected text from editor
       if (range) {
-        const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-        const editor = editorWrapper?.editor;
-        const monaco = editorWrapper?.monaco;
+        const editor = (translationEditorRef.current || externalEditorRef?.current)?.editor;
 
-        if (editor && monaco && typeof editor.getModel === 'function') {
+        if (editor) {
           try {
-            const model = editor.getModel();
-            if (model) {
-              const monacoRange = new monaco.Range(range.startLine, range.startColumn, range.endLine, range.endColumn);
-              const text = model.getValueInRange(monacoRange);
-              setSelectedText(text);
-            }
+            setSelectedText(editor.getTextInRange(range));
           } catch (error) {
-            console.error('Error getting selected text from Monaco:', error);
+            console.error('Error getting selected text from the editor:', error);
             // Fallback to content extraction
             extractTextFromContent(range);
           }
@@ -553,11 +548,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       const showToolbar = range && canCreateSuggestions && (isReviewMode || suggestions.length > 0);
       if (showToolbar) {
         // Try to get actual position from editor
-        const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-        const editor = editorWrapper?.editor;
-        if (editor && typeof editor.getScrolledVisiblePosition === 'function') {
+        const editor = (translationEditorRef.current || externalEditorRef?.current)?.editor;
+        if (editor) {
           try {
-            const pos = editor.getScrolledVisiblePosition({ lineNumber: range.endLine, column: range.endColumn });
+            const pos = editor.coordsAt({ line: range.endLine, column: range.endColumn });
             if (pos) {
               setToolbarPosition({ x: pos.left + 20, y: pos.top + pos.height + 4 });
             } else {
@@ -626,11 +620,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Tabs>
 
           <Card
-            className={cn(
-              cardClassName,
-              'rounded-none border-t-0 border-r-0 pt-1',
-              paneVisibility(sourcePaneVisible),
-            )}
+            className={cn(cardClassName, 'rounded-none border-t-0 border-r-0 pt-1', paneVisibility(sourcePaneVisible))}
           >
             <div className="flex h-12 items-center justify-between px-2">
               {/* The mobile switcher above already names this pane; the language
@@ -744,6 +734,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 <RawEditorPane
                   value={sourceContent}
                   readOnly
+                  lint={false}
                   language={contentLanguage}
                   currentLine={sourceLine}
                   highlightLine={syncedSourceLine}
@@ -905,6 +896,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       onChange={onTranslationChange}
                       onCursorChange={handleTranslationCursorChange}
                       language={contentLanguage}
+                      sourceContent={sourceContent}
+                      onDiagnosticsChange={setTranslationDiagnostics}
+                      footer={
+                        <LintStatusBar
+                          diagnostics={translationDiagnostics}
+                          onFixAll={() => translationEditorRef.current?.fixAll()}
+                        />
+                      }
                       placeholder={translationPlaceholder}
                       currentLine={translationLine}
                       highlightLine={syncedTranslationLine}
@@ -957,6 +956,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     currentLine={translationLine}
                     highlightLine={syncedTranslationLine}
                     language={contentLanguage}
+                    sourceContent={sourceContent}
                     fullHeight
                     lineInfo={
                       sourceViewMode === 'raw'
@@ -1004,6 +1004,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         value={translationContent}
                         readOnly
                         language={contentLanguage}
+                        sourceContent={sourceContent}
                         currentLine={translationLine}
                         highlightLine={syncedTranslationLine}
                         onCursorChange={handleTranslationCursorChange}
@@ -1119,21 +1120,21 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               {sidebarView === 'details' && sidebarDetails && <div className="shrink-0">{sidebarDetails}</div>}
               {hasSidebar && (
                 <div className="flex-1 min-h-[16rem] flex flex-col">
-                <ThreadSidebar
-                  suggestions={suggestions}
-                  currentUserId={currentUserId || ''}
-                  translationContent={translationContent}
-                  canCreateSuggestions={canCreateSuggestions}
-                  onReply={onReply}
-                  onApply={onApplySuggestion}
-                  onDismiss={(id) => onDismissSuggestion?.(id)}
-                  onReopen={(id) => onReopenSuggestion?.(id)}
-                  onEdit={onEditSuggestion}
-                  onSuggestionClick={handleSuggestionClickInternal}
-                  onCreateGeneralThread={onCreateGeneralThread}
-                  activeThreadId={activeThreadId}
-                  disableReopen={disableReopen}
-                />
+                  <ThreadSidebar
+                    suggestions={suggestions}
+                    currentUserId={currentUserId || ''}
+                    translationContent={translationContent}
+                    canCreateSuggestions={canCreateSuggestions}
+                    onReply={onReply}
+                    onApply={onApplySuggestion}
+                    onDismiss={(id) => onDismissSuggestion?.(id)}
+                    onReopen={(id) => onReopenSuggestion?.(id)}
+                    onEdit={onEditSuggestion}
+                    onSuggestionClick={handleSuggestionClickInternal}
+                    onCreateGeneralThread={onCreateGeneralThread}
+                    activeThreadId={activeThreadId}
+                    disableReopen={disableReopen}
+                  />
                 </div>
               )}
             </SidebarContent>

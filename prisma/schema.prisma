@@ -369,7 +369,7 @@ model Suggestion {
   userId            String
   user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Range v textu (Monaco formát) - optional for general (unanchored) threads
+  // Range v textu (1-based řádek/sloupec) - optional for general (unanchored) threads
   startLine   Int?
   startColumn Int?
   endLine     Int?
