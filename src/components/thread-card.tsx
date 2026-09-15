@@ -105,9 +105,10 @@ export function ThreadCard({
   return (
     <div
       className={cn(
-        'rounded border bg-card px-2.5 py-2 cursor-pointer transition-colors',
-        'hover:bg-muted/40',
-        isActive ? 'border-info/50 bg-info/5 ring-1 ring-info/30' : 'border-border',
+        // A row in the feedback card, not a card: the list owns the dividers,
+        // this owns hover and the highlight for the thread the editor is on.
+        'cursor-pointer px-3 py-2.5 transition-colors hover:bg-muted/40',
+        isActive && 'bg-info/5 ring-1 ring-info/30 ring-inset',
         suggestion.status !== SuggestionStatus.OPEN && 'opacity-70',
       )}
       onClick={onClick}
@@ -115,24 +116,26 @@ export function ThreadCard({
       {/* Header */}
       <div className="flex items-center gap-1.5 text-xs">
         {suggestion.type === SuggestionType.COMMENT ? (
-          <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0" />
+          <MessageSquare className="size-3 shrink-0 text-muted-foreground" />
         ) : (
-          <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
+          <Pencil className="size-3 shrink-0 text-muted-foreground" />
         )}
         <UserAvatar name={suggestion.user.name} image={suggestion.user.image} email={suggestion.user.email} size="xs" />
-        <span className="font-medium truncate">{suggestion.user.name}</span>
-        <span className="text-muted-foreground">·</span>
+        {/* min-w-0 is what lets the name give way first: without it the row
+            refuses to shrink, and the timestamp wraps instead. */}
+        <span className="min-w-0 truncate font-medium">{suggestion.user.name}</span>
+        <span className="shrink-0 text-muted-foreground">·</span>
         <span
           className={cn(
-            'text-[10px] px-1 py-0.5 rounded',
+            'shrink-0 rounded px-1 py-0.5 text-[10px]',
             isAnchored ? 'bg-info/15 text-info' : 'bg-muted text-muted-foreground',
           )}
         >
           {lineLabel}
         </span>
-        <span className="text-muted-foreground">·</span>
-        <span className="text-muted-foreground">{formatTimeAgo(suggestion.createdAt)}</span>
-        <span className="ml-auto">{statusBadge}</span>
+        <span className="shrink-0 text-muted-foreground">·</span>
+        <span className="shrink-0 whitespace-nowrap text-muted-foreground">{formatTimeAgo(suggestion.createdAt)}</span>
+        <span className="ml-auto shrink-0">{statusBadge}</span>
       </div>
 
       {/* Edit form or Comment text + diff */}
@@ -200,46 +203,44 @@ export function ThreadCard({
 
       {/* Actions */}
       {suggestion.status === SuggestionStatus.OPEN && (onApply || onDismiss || canEdit) && !isEditing && (
-        <div className="flex gap-1.5 mt-2">
+        <div className="mt-2 flex gap-1.5">
           {suggestion.type === SuggestionType.CHANGE && isAnchored && onApply && (
             <Button
-              size="sm"
-              variant="default"
+              size="xs"
               onClick={(e) => {
                 e.stopPropagation();
                 onApply(suggestion.id);
               }}
-              className="h-6 text-xs px-2"
             >
-              <Check className="h-3 w-3 mr-1" />
+              <Check />
               Apply
             </Button>
           )}
           {onDismiss && (
             <Button
-              size="sm"
+              size="xs"
               variant="outline"
               onClick={(e) => {
                 e.stopPropagation();
                 onDismiss(suggestion.id);
               }}
-              className="h-6 text-xs px-2"
             >
-              <X className="h-3 w-3 mr-1" />
+              <X />
               Dismiss
             </Button>
           )}
           {canEdit && (
             <Button
-              size="sm"
+              size="xs"
               variant="outline"
+              aria-label="Edit comment"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsEditing(true);
               }}
-              className="h-6 text-xs px-2 ml-auto"
+              className="ml-auto"
             >
-              <PencilLine className="h-3 w-3 mr-1" />
+              <PencilLine />
             </Button>
           )}
         </div>
@@ -247,17 +248,16 @@ export function ThreadCard({
 
       {/* Reopen action for resolved suggestions */}
       {suggestion.status !== SuggestionStatus.OPEN && onReopen && !disableReopen && (
-        <div className="flex gap-1.5 mt-2">
+        <div className="mt-2 flex gap-1.5">
           <Button
-            size="sm"
+            size="xs"
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();
               onReopen(suggestion.id);
             }}
-            className="h-6 text-xs px-2"
           >
-            <RotateCcw className="h-3 w-3 mr-1" />
+            <RotateCcw />
             Reopen
           </Button>
         </div>
