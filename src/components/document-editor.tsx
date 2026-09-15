@@ -232,6 +232,7 @@ function EditorViewer({
       sidebarSummary={sidebarSummary}
       sidebarDetails={sidebarDetails}
       sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
+      status={targetVersion?.status}
       sidebarHeader={
         <DocumentInfoCard
           status={targetVersion?.status}
