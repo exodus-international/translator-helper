@@ -107,12 +107,7 @@ export function scanFrontmatter(text: string): FrontmatterScan {
 
 /**
  * Offset of the body (everything after the frontmatter block and its newline).
- *
- * Nothing in the repo calls it yet -- the rules that read the prose below the
- * frontmatter are the ones that will, and the geometry belongs beside the scan
- * that produces it rather than re-derived at each call site.
  */
-// fallow-ignore-next-line unused-export
 export function bodyOffset(text: string): number {
   const region = frontmatterRegion(text);
   if (!region) return 0;

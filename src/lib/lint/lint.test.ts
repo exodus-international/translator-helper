@@ -139,6 +139,47 @@ describe('house style rules', () => {
     assert.equal(fixed("don't stop\n"), 'don’t stop\n');
     assert.equal(fixed("'quoted' word\n"), "'quoted' word\n");
   });
+
+  // Named, because the character is invisible: a formatter is free to
+  // normalise a literal one out of the string and the test would quietly stop
+  // testing anything.
+  const NBSP = String.fromCharCode(0xa0);
+
+  it('replaces a no-break space typed in the middle of a sentence', () => {
+    const text = `Otevriť${NBSP}sa jeho slovu.\n`;
+    assert.ok(ids(text).includes('no-nbsp'));
+    assert.equal(fixed(text), 'Otevriť sa jeho slovu.\n');
+  });
+
+  it('keeps the no-break space that holds a one-letter preposition', () => {
+    // Czech and Slovak typography forbids ending a line on `v`.
+    const text = `růstu v${NBSP}ctnosti\n`;
+    assert.equal(ids(text).includes('no-nbsp'), false);
+    assert.equal(fixed(text), text);
+  });
+
+  it('sees a no-break space inside the frontmatter, where it breaks the block', () => {
+    const text = `---\ntitle: T\nreminder:\n${NBSP} body: "B"\n---\n\nBody\n`;
+    assert.ok(ids(text).includes('no-nbsp'));
+  });
+
+  it('replaces a tab after a list marker', () => {
+    assert.equal(fixed('1.\tMelkisedek\n'), '1. Melkisedek\n');
+  });
+
+  it('offers to replace an indenting tab but leaves it to a human', () => {
+    const text = '* one\n\t* nested\n';
+    const [diagnostic] = lintDocument({ text }).filter((d) => d.ruleId === 'no-tab');
+    assert.ok(diagnostic, 'expected a no-tab diagnostic');
+    assert.equal(diagnostic.fix?.safe, false);
+    // Depth is the author's call, so "fix all" must not flatten it.
+    assert.ok(fixed(text).includes('\t'));
+  });
+
+  it('leaves a tab inside a code fence alone', () => {
+    const text = '```\nconst a\t= 1;\n```\n';
+    assert.equal(ids(text).includes('no-tab'), false);
+  });
 });
 
 describe('brokenFormatting', () => {
@@ -364,6 +405,64 @@ describe('parity rules', () => {
     const withReminder = '---\ntitle: Day One\nreminder:\n  title: "Abstain"\n  body: "Friday."\n---\n\n# H\n';
     const text = '---\ntitle: Prvi dan\nreminder:\n  title: "Suzdrži se"\n  body: "Petak."\n---\n\n# N\n';
     assert.deepEqual(ids(text, withReminder), []);
+  });
+});
+
+describe('untranslated content', () => {
+  const english =
+    '---\ntitle: T\n---\n\n# Freedom, Family, and Vocation\n\n' +
+    'A man who has never been asked to give anything up has never been asked to choose. '.repeat(4) +
+    '\n';
+
+  it('reports a body that is still the English source', () => {
+    const text = english.replace('title: T', 'title: P');
+    const [diagnostic] = lintDocument({ text, source: english }).filter((d) => d.ruleId === 'body-untranslated');
+    assert.ok(diagnostic, 'expected a body-untranslated diagnostic');
+    assert.equal(diagnostic.scope, 'document');
+    assert.equal(diagnostic.fix, undefined, 'there is nothing to repair, only writing to do');
+  });
+
+  it('says it once rather than once per heading', () => {
+    const text = english.replace('title: T', 'title: P');
+    assert.equal(ids(text, english).includes('heading-untranslated'), false);
+  });
+
+  it('reports a heading left in English under translated prose', () => {
+    const text = english.replace(
+      /A man who[\s\S]*/,
+      'Muž, od kterého nikdy nikdo nic nežádal, si nikdy nemusel vybrat.\n',
+    );
+    const [diagnostic] = lintDocument({ text, source: english }).filter((d) => d.ruleId === 'heading-untranslated');
+    assert.ok(diagnostic, 'expected a heading-untranslated diagnostic');
+    assert.equal(text.slice(diagnostic.from, diagnostic.to), 'Freedom, Family, and Vocation');
+  });
+
+  it('leaves a short heading alone, which is as likely to be a name kept', () => {
+    const source = '---\ntitle: T\n---\n\n# Amen\n\nLet us pray for the grace to begin again.\n';
+    const text = '---\ntitle: P\n---\n\n# Amen\n\nModleme se za milost za\u010D\u00EDt znovu.\n';
+    assert.deepEqual(ids(text, source), []);
+  });
+});
+
+describe('lineBreaksDropped', () => {
+  const source = '---\ntitle: T\n---\n\n<p>Line one<br>Line two<br>Line three</p>\n';
+
+  it('reports a translation that dropped every break', () => {
+    const text = '---\ntitle: P\n---\n\n<p>Prvi redak Drugi redak Tre\u0107i redak</p>\n';
+    const [diagnostic] = lintDocument({ text, source }).filter((d) => d.ruleId === 'line-breaks-dropped');
+    assert.ok(diagnostic, 'expected a line-breaks-dropped diagnostic');
+    assert.equal(diagnostic.scope, 'document');
+  });
+
+  it('accepts a different count, which a translator may have meant', () => {
+    const text = '---\ntitle: P\n---\n\n<p>Prvi redak<br>Drugi i tre\u0107i redak</p>\n';
+    assert.equal(ids(text, source).includes('line-breaks-dropped'), false);
+  });
+
+  it('says nothing when the source breaks no lines either', () => {
+    const plain = '---\ntitle: T\n---\n\n<p>One sentence.</p>\n';
+    const text = '---\ntitle: P\n---\n\n<p>Jedna re\u010Denica.</p>\n';
+    assert.equal(ids(text, plain).includes('line-breaks-dropped'), false);
   });
 });
 
