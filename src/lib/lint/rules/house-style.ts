@@ -1,14 +1,18 @@
 /**
  * Rules that judge a document on its own, without comparing it to the source.
- * All but `brokenFormatting` carry a safe autofix.
+ * All carry a safe autofix except `brokenFormatting`, and `no-tab` on a tab
+ * that is setting indentation.
  *
  * Thresholds come from the 646-file 2026 corpus: bullets are written `*`
  * (26,274 occurrences vs 0 for `-`), and prose uses curly quotes
  * (20,480 `“` vs straight quotes that appear almost only inside HTML).
+ *
+ * `no-nbsp` and `no-tab` clean up after a word processor: across the 4,144
+ * translated files they find 977 no-break spaces and 692 tabs.
  */
 
 import type { LintDiagnostic, LintEdit, LintRule } from '../types';
-import { isProtected, protectedRegions } from '../regions';
+import { codeRegions, isProtected, protectedRegions } from '../regions';
 
 const TRAILING_WHITESPACE = /[ \t]+$/gm;
 
@@ -364,6 +368,97 @@ export const brokenFormatting: LintRule = {
   },
 };
 
+/**
+ * Named, because the character is invisible in source and a formatter is free
+ * to normalise a literal one out of a string.
+ */
+const NBSP = String.fromCharCode(0xa0);
+
+/**
+ * A one-letter word followed by a no-break space is deliberate: Czech, Slovak
+ * and Polish typography forbids leaving a single-letter preposition at the end
+ * of a line. 87 of the corpus's 1,064 no-break spaces are that, and they are
+ * correct; the other 977 are plain spaces that came out of a word processor,
+ * including the ones indenting a `reminder:` block, where the character made
+ * the block's own keys look like top-level ones.
+ */
+function holdsAWordToTheNext(text: string, at: number): boolean {
+  const letter = text[at - 1];
+  if (!letter || !isLetter(letter)) return false;
+  const before = text[at - 2];
+  return before === undefined || !(isLetter(before) || /[0-9]/.test(before));
+}
+
+/**
+ * A letter in any of the ten alphabets the content is translated into, all of
+ * them cased Latin. Written this way because `\p{L}` needs an ES2018 regex and
+ * this project targets ES2017.
+ */
+function isLetter(char: string): boolean {
+  return char.toLowerCase() !== char.toUpperCase();
+}
+
+export const noNbsp: LintRule = {
+  id: 'no-nbsp',
+  severity: 'warning',
+  description: 'No-break spaces belong only where typography needs them.',
+  check({ text }) {
+    const code = codeRegions(text);
+    const diagnostics: LintDiagnostic[] = [];
+
+    for (let at = text.indexOf(NBSP); at !== -1; at = text.indexOf(NBSP, at + 1)) {
+      if (isProtected(code, at)) continue;
+      if (holdsAWordToTheNext(text, at)) continue;
+      diagnostics.push({
+        ruleId: 'no-nbsp',
+        severity: 'warning',
+        message: 'No-break space where a normal space belongs.',
+        from: at,
+        to: at + 1,
+        fix: { title: 'Replace with a normal space', edits: [{ from: at, to: at + 1, insert: ' ' }] },
+      });
+    }
+    return diagnostics;
+  },
+};
+
+export const noTab: LintRule = {
+  id: 'no-tab',
+  severity: 'warning',
+  description: 'Tabs must be spaces.',
+  check({ text }) {
+    const code = codeRegions(text);
+    const diagnostics: LintDiagnostic[] = [];
+
+    for (const match of text.matchAll(/\t/g)) {
+      const from = match.index ?? 0;
+      if (isProtected(code, from)) continue;
+
+      // Every tab in the corpus separates an ordered-list marker from its text
+      // (`1.<tab>Melchizedek`), pasted out of a word processor; one space reads
+      // and renders the same. A tab in a line's leading whitespace is different
+      // — it sets nesting depth, and how deep is the author's call — so that
+      // one is offered rather than applied.
+      const lineFrom = text.lastIndexOf('\n', from - 1) + 1;
+      const indenting = /^[^\S\r\n]*$/.test(text.slice(lineFrom, from));
+
+      diagnostics.push({
+        ruleId: 'no-tab',
+        severity: 'warning',
+        message: indenting ? 'Tab used to indent; use spaces.' : 'Tab character; use a space.',
+        from,
+        to: from + 1,
+        fix: {
+          title: 'Replace with a space',
+          edits: [{ from, to: from + 1, insert: ' ' }],
+          ...(indenting ? { safe: false } : {}),
+        },
+      });
+    }
+    return diagnostics;
+  },
+};
+
 export const houseStyleRules: LintRule[] = [
   noCrlf,
   trailingWhitespace,
@@ -372,4 +467,6 @@ export const houseStyleRules: LintRule[] = [
   excessBlankLines,
   smartQuotes,
   brokenFormatting,
+  noNbsp,
+  noTab,
 ];

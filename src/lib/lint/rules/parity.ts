@@ -12,7 +12,7 @@
  */
 
 import type { LintDiagnostic, LintEdit, LintRule } from '../types';
-import { scanFrontmatter } from '../frontmatter-entries';
+import { bodyOffset, scanFrontmatter } from '../frontmatter-entries';
 
 /**
  * Keys the content team uses. Anything else is almost always a translated key.
@@ -357,6 +357,45 @@ export const headingStructure: LintRule = {
   },
 };
 
+const LINE_BREAK = /<br\s*\/?>/gi;
+
+/** Explicit line breaks in the body, which the corpus uses for verse and prayer. */
+function lineBreaks(text: string): number {
+  return text.slice(bodyOffset(text)).match(LINE_BREAK)?.length ?? 0;
+}
+
+/**
+ * The source breaks lines explicitly and the translation breaks none at all.
+ *
+ * The corpus sets scripture, prayers and litanies as one `<p>` full of `<br>`,
+ * so a translation with none renders the whole stanza as a paragraph. 282 of
+ * the 4,144 pairs do this. Any other difference in the count is left alone:
+ * 959 pairs have one, the deltas run from one to two thousand, and a
+ * translator who joins two short lines is not making a mistake — only losing
+ * every break is unambiguous.
+ */
+export const lineBreaksDropped: LintRule = {
+  id: 'line-breaks-dropped',
+  severity: 'warning',
+  description: 'A translation must keep the explicit line breaks its source uses.',
+  requiresSource: true,
+  check({ text, source }) {
+    const original = lineBreaks(source ?? '');
+    if (original === 0 || lineBreaks(text) > 0) return [];
+    return [
+      {
+        ruleId: 'line-breaks-dropped',
+        severity: 'warning',
+        // Nothing in the text is the problem; what is missing has no position.
+        scope: 'document',
+        message: `The source breaks ${original} line(s) with <br>; this translation breaks none.`,
+        from: 0,
+        to: 0,
+      },
+    ];
+  },
+};
+
 export const parityRules: LintRule[] = [
   frontmatterKeyTranslated,
   frontmatterMissingKey,
@@ -364,4 +403,5 @@ export const parityRules: LintRule[] = [
   frontmatterValueEmpty,
   linkUrlChanged,
   headingStructure,
+  lineBreaksDropped,
 ];
