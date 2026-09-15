@@ -4,7 +4,7 @@ import { ActivityLog } from '@/components/activity-log';
 import { AudioStatus } from '@/components/audio-status';
 import { GitHubStatus } from '@/components/github-status';
 import { Button } from '@/components/ui/button';
-import { DocumentEditor, DocumentEditorHeader } from '@/components/document-editor';
+import { DocumentEditor } from '@/components/document-editor';
 import { MarkdownGuide } from '@/components/markdown-guide';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { toggleDocumentLabelAction } from '@/domain/document/document.actions';
@@ -62,7 +62,7 @@ export default function ReviewClient({
       user={user}
       audioTextVersionId={audioTextVersionId}
       variant="review"
-      header={<ReviewToolbar document={document} />}
+      targetLanguageName={targetLanguage?.name ?? null}
       canEditSource={(tv) => isAdminClient(user) && !isApprovedOrLater(tv)}
       canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
       disableReopen={(tv) => isApprovedOrLater(tv)}
@@ -117,14 +117,6 @@ export default function ReviewClient({
       sidebarDetailsDefaultOpen={initialTargetVersion.status === DocumentStatus.DEPLOYED}
     />
   );
-}
-
-// ──────────────────────────────────────────────────────────────────────
-// Toolbar — runs inside <EditorProvider>, drives store-aware buttons
-// ──────────────────────────────────────────────────────────────────────
-
-function ReviewToolbar({ document }: { document: any }) {
-  return <DocumentEditorHeader document={document} actions={null} />;
 }
 
 // ──────────────────────────────────────────────────────────────────────

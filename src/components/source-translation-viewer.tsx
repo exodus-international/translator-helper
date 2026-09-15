@@ -39,7 +39,9 @@ import {
   Eye,
   FileEdit,
   Loader2,
+  Maximize2,
   MessageSquare,
+  Minimize2,
   PanelRightClose,
   PanelRightOpen,
   Plus,
@@ -149,6 +151,18 @@ interface SourceTranslationViewerProps {
    * coloured dot, so a folded panel still says where the document stands.
    */
   status?: DocumentStatus | null;
+  /**
+   * The editor's own controls -- the save state, the zen toggle -- drawn in the
+   * panel's header row. They are chrome about the document, which is what the
+   * panel is; the row above the panes had them only because it came first.
+   */
+  panelActions?: ReactNode;
+  /**
+   * Toggles zen mode. Present only on the editor that has one; the folded rail
+   * then keeps its button, because zen is a change of view and the rail is
+   * still on screen.
+   */
+  onToggleZen?: () => void;
   /** Language id for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
   /**
@@ -257,6 +271,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       sidebarDetails,
       sidebarDetailsDefaultOpen = false,
       status,
+      panelActions,
+      onToggleZen,
       contentLanguage = 'markdown',
       translationStarted = true,
       onStartTranslation,
@@ -1196,13 +1212,22 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     <span>Guide</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {onToggleZen && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip={isZen ? 'Exit zen mode' : 'Zen mode'} onClick={onToggleZen}>
+                      {isZen ? <Minimize2 /> : <Maximize2 />}
+                      <span>{isZen ? 'Exit zen' : 'Zen mode'}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarContent>
 
             {/* The panel's own header, the height of the panes': one control,
                 so folding is a button as well as the seam between columns. */}
             <SidebarHeader className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
-              <div className="flex h-11 shrink-0 items-center justify-end border-b px-2">
+              <div className="flex h-11 shrink-0 items-center justify-end gap-1 border-b px-2">
+                {panelActions && <div className="mr-auto flex items-center gap-1">{panelActions}</div>}
                 <Button
                   variant="ghost"
                   size="icon-sm"
