@@ -14,20 +14,31 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  useSidebar,
+} from '@/components/ui/sidebar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { getDocumentStatusConfig } from '@/constants/document-status';
 import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
-import { SuggestionStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, SuggestionStatus } from '@/generated/prisma/enums';
 import {
+  BookOpen,
   ChevronDown,
   ChevronRight,
   Edit,
   Eye,
   FileEdit,
   Loader2,
-  PanelRightClose,
+  MessageSquare,
   PanelRightOpen,
   Plus,
   Save,
@@ -131,6 +142,11 @@ interface SourceTranslationViewerProps {
   sidebarDetails?: ReactNode;
   /** Start with the details panels open instead of the feedback list. */
   sidebarDetailsDefaultOpen?: boolean;
+  /**
+   * The state the version is in. The panel's collapsed rail shows it as one
+   * coloured dot, so a folded panel still says where the document stands.
+   */
+  status?: DocumentStatus | null;
   /** Language id for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
   /**
@@ -238,6 +254,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       sidebarSummary,
       sidebarDetails,
       sidebarDetailsDefaultOpen = false,
+      status,
       contentLanguage = 'markdown',
       translationStarted = true,
       onStartTranslation,
@@ -445,6 +462,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // One pane object, shared by both sides: a sheet on the workspace ground,
     // with room for a header and nothing else of its own.
     const paneClassName = 'min-h-0 min-w-0 flex-1 gap-0 overflow-hidden rounded-lg border bg-editor p-0 shadow-none';
+    const panelStatus = status ? getDocumentStatusConfig(status) : null;
     const bodyClassName = 'relative min-h-0 flex-1 overflow-hidden';
     // Mobile: only the active pane is displayed; desktop keeps both side by side.
     const paneVisibility = (visible: boolean) => (visible ? 'flex' : 'hidden md:flex');
@@ -922,21 +940,19 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 ) : null}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
+                {/* On desktop the panel folds to its own rail, so it needs no
+                    button here. On mobile it is a sheet with no rail to reach
+                    for, and this icon is the only way in. */}
                 {hasPanel && panelHidden && (
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon-sm"
                     onClick={toggleSidebar}
-                    className="text-xs"
-                    aria-label="Show panel"
+                    className="md:hidden"
+                    aria-label="Open document panel"
+                    title="Open document panel"
                   >
                     <PanelRightOpen />
-                    <span className="hidden sm:inline">Show panel</span>
-                    {openSuggestionsCount > 0 && (
-                      <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
-                        {openSuggestionsCount}
-                      </Badge>
-                    )}
                   </Button>
                 )}
               </div>
@@ -1123,20 +1139,68 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
         </div>
 
         {hasPanel && (
-          <Sidebar side="right" collapsible="offcanvas">
-            <SidebarHeader className="gap-0 p-0">
-              <div className="flex items-center justify-between border-b bg-muted/60 px-3 py-2">
-                <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  Document info
-                </span>
-                <Button variant="ghost" onClick={toggleSidebar} className="h-7 w-7 p-0" aria-label="Close panel">
-                  <PanelRightClose />
-                </Button>
-              </div>
-            </SidebarHeader>
-            {/* The facts, the actions and the status rows scroll together, so a
-                tall panel never clips the button someone came to press. */}
-            <SidebarContent className="gap-0 p-0">
+          <Sidebar
+            side="right"
+            variant="floating"
+            collapsible="icon"
+            // The panel is a sidebar painted with the editor's own tokens, so
+            // the third column reads as another sheet on the workspace rather
+            // than a second kind of surface. Collapsed it keeps a rail — the
+            // document's state at a glance, and the way back in — which is what
+            // replaces the "Show panel" button the pane header used to carry.
+            style={{ '--sidebar': 'var(--editor)', '--sidebar-border': 'var(--border)' } as React.CSSProperties}
+          >
+            {/* Folded: the rail. Same affordance as the app nav's, so folding
+                this panel and folding the shell's behave the same way. */}
+            <SidebarContent className="hidden gap-1 p-2 group-data-[collapsible=icon]:flex">
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Open document panel" onClick={toggleSidebar}>
+                    <PanelRightOpen />
+                    <span>Open</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                {panelStatus && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip={`Status: ${panelStatus.name}`} onClick={toggleSidebar}>
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: panelStatus.color.hex }}
+                      />
+                      <span>{panelStatus.name}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip={`${openSuggestionsCount} open ${openSuggestionsCount === 1 ? 'comment' : 'comments'}`}
+                    onClick={() => {
+                      setSidebarView('threads');
+                      toggleSidebar();
+                    }}
+                  >
+                    <MessageSquare />
+                    <span>Comments</span>
+                    {openSuggestionsCount > 0 && (
+                      <span className="absolute top-0 right-0 rounded-full bg-primary px-1 text-[10px] leading-4 tabular-nums text-primary-foreground">
+                        {openSuggestionsCount}
+                      </span>
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Markdown guide" onClick={onOpenGuide}>
+                    <BookOpen />
+                    <span>Guide</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarContent>
+
+            {/* Unfolded: the facts, the actions and the status rows scroll
+                together, so a tall panel never clips the button someone came to
+                press. */}
+            <SidebarContent className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
               <div className="flex flex-col gap-3 p-3">
                 {sidebarHeader}
                 {sidebarActions}
@@ -1186,6 +1250,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 </div>
               )}
             </SidebarContent>
+
+            {/* Folding happens at the panel's own edge, the way the app nav's
+                does. The rail is only reachable on desktop, where the collapsed
+                panel is still on screen. */}
+            <SidebarRail />
           </Sidebar>
         )}
 
