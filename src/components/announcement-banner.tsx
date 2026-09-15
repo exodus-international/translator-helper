@@ -45,13 +45,13 @@ export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
   };
 
   return (
-    <div className="bg-zinc-900">
-      <div className="container mx-auto px-4 py-2.5">
+    <div className="bg-primary text-primary-foreground">
+      <div className="px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10">
-            <Megaphone className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-foreground/10">
+            <Megaphone className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
-          <p className="min-w-0 flex-1 truncate text-sm font-medium text-white">{announcement.title}</p>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium">{announcement.title}</p>
           {announcement.ctaLabel && announcement.ctaUrl && (
             <Link
               href={announcement.ctaUrl}
@@ -63,7 +63,7 @@ export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
                   display: 'banner',
                 })
               }
-              className="shrink-0 text-sm font-semibold text-white hover:underline"
+              className="shrink-0 text-sm font-semibold underline-offset-4 hover:underline"
             >
               {announcement.ctaLabel}
             </Link>
@@ -72,7 +72,7 @@ export function AnnouncementBanner({ announcement }: AnnouncementBannerProps) {
             type="button"
             onClick={handleDismiss}
             aria-label="Dismiss announcement"
-            className="shrink-0 rounded-md p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            className="shrink-0 rounded-md p-1 text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground"
           >
             <X className="h-4 w-4" />
           </button>

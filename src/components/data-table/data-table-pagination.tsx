@@ -1,3 +1,4 @@
+import * as React from "react";
 import type { RowData } from "@tanstack/react-table";
 import type { DataTableInstance } from "@/hooks/use-data-table";
 import {
@@ -19,6 +20,9 @@ import {
 import { getPaginationRange } from "@/lib/list-params";
 import { cn } from "@/lib/utils";
 
+/** Module-level so the default keeps one identity across renders. */
+const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 interface DataTablePaginationProps<TData extends RowData>
   extends React.ComponentProps<"div"> {
   table: DataTableInstance<TData>;
@@ -27,12 +31,19 @@ interface DataTablePaginationProps<TData extends RowData>
 
 export function DataTablePagination<TData extends RowData>({
   table,
-  pageSizeOptions = [10, 25, 50, 100],
+  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   className,
   ...props
 }: DataTablePaginationProps<TData>) {
   const { pageIndex, pageSize } = table.state.pagination;
   const total = table.getFilteredRowModel().rows.length;
+  // Base UI reads `items` on every render to map value -> label. Rebuilding the
+  // object inline handed it a new identity each time, which re-entered the
+  // update it had just scheduled and blew the update-depth limit.
+  const pageSizeItems = React.useMemo(
+    () => Object.fromEntries(pageSizeOptions.map((size) => [String(size), size])),
+    [pageSizeOptions],
+  );
   // Same "Showing 1–25 of 142" line as the server-paginated lists.
   const range = getPaginationRange(pageIndex + 1, pageSize, total);
 
@@ -48,14 +59,14 @@ export function DataTablePagination<TData extends RowData>({
         {range.text}
       </div>
       <div className="flex flex-col-reverse items-center gap-4 sm:flex-row sm:gap-6 lg:gap-8">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           <p className="whitespace-nowrap font-medium text-sm">Rows per page</p>
           <Select
             value={`${table.state.pagination.pageSize}`}
             onValueChange={(value) => {
               if (value != null) table.setPageSize(Number(value));
             }}
-            items={Object.fromEntries(pageSizeOptions.map((s) => [String(s), s]))}
+            items={pageSizeItems}
           >
             <SelectTrigger className="h-8 w-18 data-size:h-8">
               <SelectValue placeholder={table.state.pagination.pageSize} />
@@ -75,7 +86,7 @@ export function DataTablePagination<TData extends RowData>({
           Page {table.state.pagination.pageIndex + 1} of{" "}
           {table.getPageCount()}
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           <Button
             aria-label="Go to first page"
             variant="outline"

@@ -14,10 +14,17 @@ import { cn } from "@/lib/utils";
 interface DataTableToolbarProps<TData extends RowData>
   extends React.ComponentProps<"div"> {
   table: DataTableInstance<TData>;
+  /**
+   * Page-specific controls (a segmented filter, a search box) rendered at the
+   * head of the filter group. They belong on the same line as the column
+   * filters — a separate row above just doubles the chrome above the table.
+   */
+  leading?: React.ReactNode;
 }
 
 export function DataTableToolbar<TData extends RowData>({
   table,
+  leading,
   children,
   className,
   ...props
@@ -44,6 +51,7 @@ export function DataTableToolbar<TData extends RowData>({
       {...props}
     >
       <div className="flex flex-1 flex-wrap items-center gap-2">
+        {leading}
         {columns.map((column) => (
           <DataTableToolbarFilter key={column.id} column={column} />
         ))}

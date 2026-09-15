@@ -227,7 +227,7 @@ export default function ProjectsClient({
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-gray-500 mt-1">Approved documents of these types get generated audio</p>
+              <p className="text-xs text-muted-foreground mt-1">Approved documents of these types get generated audio</p>
             </div>
           )}
         </>
@@ -273,7 +273,7 @@ export default function ProjectsClient({
           <Card key={project.id} className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 flex-1">
-                <FolderOpen className="h-5 w-5 text-blue-500" />
+                <FolderOpen className="h-5 w-5 text-info" />
                 <div className="flex-1">
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold text-lg">{project.name}</h3>
@@ -285,17 +285,17 @@ export default function ProjectsClient({
                     )}
                     <Link
                       href={buildProjectTranslationsPath(project.identifier)}
-                      className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                      className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
                     >
                       <Languages className="h-4 w-4" />
                       Manage Translations
                     </Link>
                   </div>
-                  {project.description && <p className="text-sm text-gray-600 mt-1">{project.description}</p>}
+                  {project.description && <p className="text-sm text-muted-foreground mt-1">{project.description}</p>}
                   {(project as any).identifier && (
-                    <p className="text-xs text-gray-500 mt-1">ID: {(project as any).identifier}</p>
+                    <p className="text-xs text-muted-foreground mt-1">ID: {(project as any).identifier}</p>
                   )}
-                  <div className="flex gap-4 mt-2 text-sm text-gray-600">
+                  <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
                     <span>{project._count.documents} document(s)</span>
                     <span>{project._count.translationProjects} translation project(s)</span>
                   </div>
@@ -304,13 +304,12 @@ export default function ProjectsClient({
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
                   onClick={() => handleToggleStatus(project)}
                   title={project.status === 'ACTIVE' ? 'Mark as Complete' : 'Mark as Active'}
                 >
                   <CheckCircle2 className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleEdit(project)}>
+                <Button variant="outline" onClick={() => handleEdit(project)}>
                   <Edit className="h-4 w-4" />
                 </Button>
                 <DeleteConfirmDialog

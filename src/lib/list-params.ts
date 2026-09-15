@@ -16,11 +16,11 @@
 //
 // Kept free of React/Prisma so it can be unit tested in isolation.
 
-export const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 25;
 export const DEFAULT_ORDER = 'desc' as const;
-export const MIN_PAGE_SIZE = 1;
-export const MAX_PAGE_SIZE = 100;
+const MIN_PAGE_SIZE = 1;
+const MAX_PAGE_SIZE = 100;
 
 export type SortOrder = 'asc' | 'desc';
 

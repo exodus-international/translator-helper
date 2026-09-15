@@ -196,7 +196,7 @@ function ReviewToolbar({ document, sourceVersion, user }: { document: any; sourc
           disabled={labelLoading}
           className={
             waitingForFinalLabel
-              ? 'bg-green-700 text-white border-green-200 hover:bg-green-700/80 hover:text-white'
+              ? 'bg-success text-background border-success hover:bg-success/90'
               : ''
           }
         >

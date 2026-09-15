@@ -104,7 +104,7 @@ export function ThreadSidebar({
   );
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* Header */}
       <div className="px-3 py-2 border-b bg-muted/60 shrink-0">
         <div className="flex items-center justify-between">
@@ -129,7 +129,7 @@ export function ThreadSidebar({
 
       {/* General thread input */}
       {showGeneralInput && (
-        <div className="px-3 py-2 border-b bg-blue-50/50 shrink-0">
+        <div className="px-3 py-2 border-b bg-info/50 shrink-0">
           <textarea
             value={generalComment}
             onChange={(e) => setGeneralComment(e.target.value)}

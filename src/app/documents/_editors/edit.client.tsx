@@ -90,14 +90,13 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
-        back={{ href: '/documents', label: 'Documents' }}
         title="Edit Document"
         description={`Editing: ${document.title}`}
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <Card className="p-4">
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
@@ -171,6 +170,6 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
           </form>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

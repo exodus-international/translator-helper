@@ -8,6 +8,7 @@ import { useRender } from "@base-ui/react/use-render"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { SIDEBAR_COOKIE_NAME } from "@/lib/sidebar-cookie"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -26,7 +27,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "340px"
 const SIDEBAR_WIDTH_MOBILE = "min(340px, 85vw)"
@@ -54,10 +54,48 @@ function useSidebar() {
   return context
 }
 
+/**
+ * Open state read from the cookie on the server, keyed by cookie name.
+ *
+ * `SidebarProvider` writes the cookie but cannot read it back: it is a client
+ * component, so it has no access to cookies while the server renders it, and
+ * reading `document.cookie` at hydration would disagree with the HTML the
+ * server already sent. So a server component reads it and hands it down here.
+ *
+ * Keyed by cookie name, and merged with any outer value, so that a nested
+ * provider restores its own panel rather than whichever state the closest
+ * provider above it happens to carry.
+ */
+const SidebarStoredStateContext = React.createContext<Record<string, boolean | undefined>>({})
+
+function SidebarStoredStateProvider({
+  cookieName,
+  value,
+  children,
+}: {
+  cookieName: string
+  value: boolean | undefined
+  children: React.ReactNode
+}) {
+  const outer = React.useContext(SidebarStoredStateContext)
+  const stored = React.useMemo(
+    () => ({ ...outer, [cookieName]: value }),
+    [outer, cookieName, value]
+  )
+
+  return (
+    <SidebarStoredStateContext.Provider value={stored}>
+      {children}
+    </SidebarStoredStateContext.Provider>
+  )
+}
+
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
   onOpenChange: setOpenProp,
+  keyboardShortcut = true,
+  cookieName = SIDEBAR_COOKIE_NAME,
   className,
   style,
   children,
@@ -66,13 +104,20 @@ function SidebarProvider({
   defaultOpen?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Listen for ⌘/Ctrl+B to toggle. Turn off for nested providers so one press doesn't toggle both. */
+  keyboardShortcut?: boolean
+  /** Nested providers must not share the persisted-state cookie with the app shell. */
+  cookieName?: string
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen)
+  // `defaultOpen` is only the fallback: a cookie from a previous visit wins,
+  // so a panel left collapsed stays collapsed across reloads and documents.
+  const storedOpen = React.useContext(SidebarStoredStateContext)[cookieName]
+  const [_open, _setOpen] = React.useState(storedOpen ?? defaultOpen)
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -84,9 +129,9 @@ function SidebarProvider({
       }
 
       // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      document.cookie = `${cookieName}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
     },
-    [setOpenProp, open]
+    [setOpenProp, open, cookieName]
   )
 
   // Helper to toggle the sidebar.
@@ -96,6 +141,8 @@ function SidebarProvider({
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
+    if (!keyboardShortcut) return
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
@@ -108,7 +155,7 @@ function SidebarProvider({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [toggleSidebar])
+  }, [toggleSidebar, keyboardShortcut])
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
@@ -140,7 +187,16 @@ function SidebarProvider({
             } as React.CSSProperties
           }
           className={cn(
-            "group/sidebar-wrapper relative flex w-full has-data-[variant=inset]:bg-sidebar",
+            // overflow-x-clip is what makes the offcanvas collapse actually
+            // hide. Our sidebar-container is `absolute`, not upstream's
+            // `fixed`, so it stays docked to its editor rather than the
+            // viewport -- but an absolute box counts towards scrollable
+            // overflow where a fixed one does not. Collapsing parks it at
+            // right:-340px, which grew the page by 340px and let you scroll
+            // straight back to the "hidden" panel. `clip` rather than
+            // `hidden`: it clips without making this a scroll container, and
+            // leaves the vertical axis alone.
+            "group/sidebar-wrapper relative flex w-full overflow-x-clip has-data-[variant=inset]:bg-sidebar",
             className
           )}
           {...props}
@@ -156,6 +212,7 @@ function Sidebar({
   side = "left",
   variant = "sidebar",
   collapsible = "offcanvas",
+  pinned = false,
   className,
   children,
   ...props
@@ -163,6 +220,13 @@ function Sidebar({
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
+  /** Stick to the viewport on desktop so the sidebar stays in view on long
+      pages. Sticky is a positioned box, so it also becomes the containing
+      block for the absolute panel below: inset-y-0 then spans exactly the
+      stuck h-svh box instead of the full page height (which is what pushes
+      the footer below the fold on scrolling pages without this). Off by
+      default to preserve stock sidebar-07 behavior. */
+  pinned?: boolean
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
@@ -208,7 +272,10 @@ function Sidebar({
 
   return (
     <div
-      className="group peer hidden text-sidebar-foreground md:block"
+      className={cn(
+        "group peer hidden text-sidebar-foreground md:block",
+        pinned && "sticky top-0 h-svh self-start"
+      )}
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
@@ -310,7 +377,11 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        "relative flex w-full flex-1 flex-col bg-background",
+        // min-w-0: as a flex item the inset defaults to min-width:auto, so wide
+        // page content (tables, card grids) pushes it past the viewport and the
+        // whole shell — header included — scrolls sideways. Let it shrink and
+        // leave overflow to the scroll containers inside it.
+        "relative flex w-full min-w-0 flex-1 flex-col bg-background",
         "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className
       )}
@@ -730,6 +801,7 @@ export {
   SidebarProvider,
   SidebarRail,
   SidebarSeparator,
+  SidebarStoredStateProvider,
   SidebarTrigger,
   useSidebar,
 }

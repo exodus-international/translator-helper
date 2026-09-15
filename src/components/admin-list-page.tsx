@@ -43,7 +43,7 @@ export function AdminListPage({
   children,
 }: AdminListPageProps) {
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
         title={title}
         description={description}
@@ -73,10 +73,10 @@ export function AdminListPage({
         }
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <div className="grid gap-4">{children}</div>
       </div>
-    </div>
+    </>
   );
 }
 

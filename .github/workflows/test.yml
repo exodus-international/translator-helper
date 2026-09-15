@@ -16,9 +16,9 @@ jobs:
           # clones do not contain.
           fetch-depth: 0
 
+      # No version input: it reads the pinned pnpm from the "packageManager"
+      # field, and errors out if both are set.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:

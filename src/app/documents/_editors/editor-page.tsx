@@ -4,6 +4,9 @@ import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
 import { isDraftPhase } from '@/lib/document-status';
 import { SessionUser } from '@/lib/session';
+import { EDITOR_SIDEBAR_COOKIE_NAME, parseSidebarState } from '@/lib/sidebar-cookie';
+import { SidebarStoredStateProvider } from '@/components/ui/sidebar';
+import { cookies } from 'next/headers';
 import ReviewClient from './review.client';
 import TranslateClient from './translate.client';
 
@@ -46,31 +49,41 @@ export async function DocumentEditorPage({
   // audio turned on for, and storage and the provider configured.
   const audioTextVersionId = targetVersion && (await isAudioEligible(targetVersion.id)) ? targetVersion.id : null;
 
+  // Read here rather than in the panel itself: the panel is a client
+  // component, so it cannot reach cookies while the server renders it. Both
+  // editors are wrapped, so a panel left collapsed stays collapsed across
+  // reloads and across documents.
+  const storedSidebarState = parseSidebarState((await cookies()).get(EDITOR_SIDEBAR_COOKIE_NAME)?.value);
+
   if (targetVersion && !isDraftPhase(targetVersion.status)) {
     return (
-      <ReviewClient
-        document={document}
-        sourceVersion={sourceVersion}
-        targetVersion={targetVersion}
-        targetLanguage={targetLanguage}
-        translationProjectId={translationProject?.id ?? null}
-        user={user}
-        audioTextVersionId={audioTextVersionId}
-        initialSuggestions={initialSuggestions}
-      />
+      <SidebarStoredStateProvider cookieName={EDITOR_SIDEBAR_COOKIE_NAME} value={storedSidebarState}>
+        <ReviewClient
+          document={document}
+          sourceVersion={sourceVersion}
+          targetVersion={targetVersion}
+          targetLanguage={targetLanguage}
+          translationProjectId={translationProject?.id ?? null}
+          user={user}
+          audioTextVersionId={audioTextVersionId}
+          initialSuggestions={initialSuggestions}
+        />
+      </SidebarStoredStateProvider>
     );
   }
 
   return (
-    <TranslateClient
-      document={document}
-      sourceVersion={sourceVersion}
-      targetVersion={targetVersion}
-      targetLanguageId={language.id}
-      targetLanguage={targetLanguage}
-      translationProject={translationProject}
-      user={user}
-      initialSuggestions={initialSuggestions}
-    />
+    <SidebarStoredStateProvider cookieName={EDITOR_SIDEBAR_COOKIE_NAME} value={storedSidebarState}>
+      <TranslateClient
+        document={document}
+        sourceVersion={sourceVersion}
+        targetVersion={targetVersion}
+        targetLanguageId={language.id}
+        targetLanguage={targetLanguage}
+        translationProject={translationProject}
+        user={user}
+        initialSuggestions={initialSuggestions}
+      />
+    </SidebarStoredStateProvider>
   );
 }
