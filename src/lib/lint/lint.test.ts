@@ -24,6 +24,41 @@ describe('scanFrontmatter', () => {
   it('reports absent frontmatter', () => {
     assert.equal(scanFrontmatter('# Just a heading\n').present, false);
   });
+
+  it('treats an indented block as part of the key above it', () => {
+    // The `reminder:` block on a day file. Reading its `title:`/`body:` as
+    // top-level keys made `body` an unknown key on every day file that has one.
+    const text =
+      '---\ntitle: Divine Discipline\nday: 5\nreminder:\n  title: "Abstain from Meat"\n  body: "Fridays are a day of penance."\n---\n\nBody\n';
+    const scan = scanFrontmatter(text);
+    assert.deepEqual(
+      scan.entries.map((e) => e.key),
+      ['title', 'day', 'reminder'],
+    );
+  });
+
+  it('still reads a block indented with a non-breaking space', () => {
+    // Real files out of Word indent with U+00A0. Treating that as column zero
+    // made `body` look like a top-level key on every one of them.
+    // Named, because the character is invisible: a formatter is otherwise
+    // free to normalise it out of the string, and the test would quietly stop
+    // testing anything.
+    const NBSP = String.fromCharCode(0xa0);
+    const text = `---\ntitle: T\nreminder:\n${NBSP} title: "A"\n${NBSP} body: "B"\n---\n\nBody\n`;
+    assert.deepEqual(
+      scanFrontmatter(text).entries.map((e) => e.key),
+      ['title', 'reminder'],
+    );
+  });
+
+  it('measures a nested block so a fix can carry the whole thing', () => {
+    const text = '---\ntitle: T\nreminder:\n  title: "A"\n  body: "B"\n---\n\nBody\n';
+    const reminder = scanFrontmatter(text).entries.find((e) => e.key === 'reminder')!;
+    assert.equal(text.slice(reminder.lineFrom, reminder.blockTo), 'reminder:\n  title: "A"\n  body: "B"');
+    // A plain key's extent is just its own line.
+    const title = scanFrontmatter(text).entries[0];
+    assert.equal(title.blockTo, title.lineTo);
+  });
 });
 
 describe('protectedRegions', () => {
@@ -221,6 +256,38 @@ describe('parity rules', () => {
   it('skips source-dependent rules when no source is supplied', () => {
     const text = source.replace('hero:', 'hrdina:');
     assert.equal(ids(text).includes('frontmatter-key-translated'), false);
+  });
+
+  it('leaves a faithfully translated reminder block alone', () => {
+    const withReminder =
+      '---\ntitle: Day One\nhero: shirt-e90_2026\nreminder:\n  title: "Abstain from Meat"\n  body: "Fridays are a day of penance."\n---\n\n# Heading\n';
+    const text =
+      '---\ntitle: Prvi dan\nhero: shirt-e90_2026\nreminder:\n  title: "Suzdrži se od mesa"\n  body: "Petci su dan pokore."\n---\n\n# Naslov\n';
+    assert.deepEqual(ids(text, withReminder), []);
+  });
+
+  it('accepts the field guide and exercise keys as the content team writes them', () => {
+    const guide = '---\ntitle: Weekly Meeting Guide\nidentifier: weekly_meeting_guide\nsection_order: 1\n---\n\n# H\n';
+    const text =
+      '---\ntitle: Vodič za tjedni sastanak\nidentifier: weekly_meeting_guide\nsection_order: 1\n---\n\n# N\n';
+    assert.deepEqual(ids(text, guide), []);
+  });
+
+  it('still catches a renumbered section_order', () => {
+    const guide = '---\ntitle: T\nidentifier: weekly_meeting_guide\nsection_order: 4\n---\n\n# H\n';
+    const text = guide.replace('section_order: 4', 'section_order: 6');
+    assert.ok(ids(text, guide).includes('frontmatter-value-changed'));
+    assert.ok(fixed(text, guide).includes('section_order: 4'));
+  });
+
+  it('re-adds a dropped reminder block with its text, not a bare key', () => {
+    const withReminder =
+      '---\ntitle: Day One\nhero: a_2026\nreminder:\n  title: "Abstain from Meat"\n  body: "Fridays are a day of penance."\n---\n\n# H\n';
+    const text = '---\ntitle: Prvi dan\nhero: a_2026\n---\n\n# N\n';
+    assert.ok(ids(text, withReminder).includes('frontmatter-missing-key'));
+    const result = fixed(text, withReminder);
+    assert.ok(result.includes('  title: "Abstain from Meat"'), `expected the block body, got:\n${result}`);
+    assert.ok(result.includes('  body: "Fridays are a day of penance."'));
   });
 });
 

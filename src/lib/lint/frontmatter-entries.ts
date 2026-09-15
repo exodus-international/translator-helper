@@ -4,6 +4,11 @@
  * `parseFrontmatter` in @/lib/frontmatter gives values but not positions, and
  * diagnostics need to point at the exact key or value they are complaining
  * about. This keeps the raw line geometry alongside the parsed text.
+ *
+ * Only top-level keys are entries. Indented lines belong to the key above them
+ * — the `reminder:` block on a day file carries its own `title:` and `body:` —
+ * and reading those as keys in their own right made `body` look like a key
+ * nobody recognised and `title` look like a duplicate of the real one.
  */
 
 import { frontmatterRegion } from './regions';
@@ -20,6 +25,12 @@ export interface FrontmatterEntry {
   /** Offsets of the whole line, excluding its newline. */
   lineFrom: number;
   lineTo: number;
+  /**
+   * End offset of the key's indented block, for a key written as a nested
+   * mapping. Equal to `lineTo` when nothing is indented beneath the key, so
+   * `text.slice(lineFrom, blockTo)` is always the whole entry.
+   */
+  blockTo: number;
 }
 
 export interface FrontmatterScan {
@@ -30,6 +41,16 @@ export interface FrontmatterScan {
 }
 
 const KEY_LINE = /^([^:\n]+):(.*)$/;
+
+/**
+ * An indented line continues the key above it rather than starting one.
+ *
+ * Any whitespace counts, not just space and tab: files pasted out of Word
+ * indent the `reminder:` block with a non-breaking space, and treating that as
+ * column zero turned the block's `body:` into a key nobody recognised. The
+ * NBSP is still wrong — `no-nbsp` reports it, and in those words.
+ */
+const NESTED_LINE = /^[^\S\r\n]/;
 
 export function scanFrontmatter(text: string): FrontmatterScan {
   const region = frontmatterRegion(text);
@@ -45,7 +66,15 @@ export function scanFrontmatter(text: string): FrontmatterScan {
     const lineFrom = offset;
     offset += rawLine.length + 1; // + newline
 
-    if (line === '---' || line.trim() === '') continue;
+    if (line === '---') continue;
+
+    // An indented line extends the entry above it. A blank line is skipped
+    // without closing the block, so a stray gap inside one does not split it.
+    if (line.trim() === '' || NESTED_LINE.test(line)) {
+      const open = entries[entries.length - 1];
+      if (open && line.trim() !== '') open.blockTo = lineFrom + line.length;
+      continue;
+    }
 
     const match = KEY_LINE.exec(line);
     if (!match) continue;
@@ -58,6 +87,7 @@ export function scanFrontmatter(text: string): FrontmatterScan {
     const value = rawValue.trim();
     const valueStartInLine = rawKey.length + 1 + (value ? rawValue.indexOf(value) : rawValue.length);
     const valueFrom = lineFrom + valueStartInLine;
+    const lineTo = lineFrom + line.length;
 
     entries.push({
       key,
@@ -67,7 +97,8 @@ export function scanFrontmatter(text: string): FrontmatterScan {
       valueFrom,
       valueTo: valueFrom + value.length,
       lineFrom,
-      lineTo: lineFrom + line.length,
+      lineTo,
+      blockTo: lineTo,
     });
   }
 
