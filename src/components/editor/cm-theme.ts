@@ -44,11 +44,14 @@ export const editorHighlightStyle = HighlightStyle.define([
   { tag: tags.strong, color: 'var(--foreground)', fontWeight: '700' },
   { tag: tags.emphasis, fontStyle: 'italic' },
   { tag: tags.strikethrough, textDecoration: 'line-through' },
-  { tag: [tags.link, tags.url], color: 'var(--info)' },
+  { tag: tags.link, color: 'var(--info)', textDecoration: 'underline' },
+  { tag: tags.url, color: 'var(--info)' },
   { tag: tags.monospace, color: 'var(--muted-foreground)' },
   { tag: tags.quote, color: 'var(--muted-foreground)', fontStyle: 'italic' },
   { tag: [tags.contentSeparator, tags.list], color: 'var(--muted-foreground)' },
-  { tag: tags.processingInstruction, color: 'var(--muted-foreground)' },
+  // The markers themselves -- `#`, `**`, `>`, the `-` of a list item. Quiet,
+  // but not hidden: a translator is writing them, and needs to see where.
+  { tag: tags.processingInstruction, color: 'var(--muted-foreground)', opacity: '0.55' },
   // HTML: the content library embeds it, so tags, attributes and the strings
   // they carry all need to be told apart.
   { tag: tags.tagName, color: 'var(--foreground)', fontWeight: '600' },

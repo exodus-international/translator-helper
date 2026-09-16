@@ -38,6 +38,7 @@ import {
   ChevronDown,
   Edit,
   Eye,
+  FileCode,
   FileEdit,
   Loader2,
   Maximize2,
@@ -57,6 +58,7 @@ import { LintStatusBar } from '@/components/editor/lint-status-bar';
 import { MarkdownGuideDialog } from '@/components/markdown-guide';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
+import { FormattingToolbar, type FormattingAction } from './editor/formatting-toolbar';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
 import { ThreadSidebar } from './thread-sidebar';
 import { AudioTextPanel } from '@/components/audio-text-panel';
@@ -420,6 +422,62 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setTranslationLine(translationTargetLine);
     };
 
+    /** Bold, italic, a line break, or the markers stripped -- on the selection. */
+    const handleFormat = (action: FormattingAction) => {
+      const view = (translationEditorRef.current || externalEditorRef?.current)?.view;
+      if (!view) return;
+
+      const { from, to } = view.state.selection.main;
+      const selected = view.state.sliceDoc(from, to);
+
+      if (action === 'lineBreak') {
+        view.dispatch({ changes: { from: to, insert: '<br>' }, selection: { anchor: to + 4 } });
+        view.focus();
+        return;
+      }
+
+      if (action === 'clear') {
+        // The markers the library uses, gone; the words stay.
+        const cleaned = selected.replace(/\*\*|\*|__|_|~~|`/g, '');
+        view.dispatch({
+          changes: { from, to, insert: cleaned },
+          selection: { anchor: from, head: from + cleaned.length },
+        });
+        view.focus();
+        return;
+      }
+
+      const marker = action === 'bold' ? '**' : '*';
+      const wrappedInside =
+        from >= marker.length &&
+        to + marker.length <= view.state.doc.length &&
+        view.state.sliceDoc(from - marker.length, from) === marker &&
+        view.state.sliceDoc(to, to + marker.length) === marker;
+      const wrappedInSelection =
+        selected.length >= marker.length * 2 && selected.startsWith(marker) && selected.endsWith(marker);
+
+      if (wrappedInside || wrappedInSelection) {
+        const changes = wrappedInSelection
+          ? { from, to, insert: selected.slice(marker.length, -marker.length) }
+          : [
+              { from: from - marker.length, to: from, insert: '' },
+              { from: to, to: to + marker.length, insert: '' },
+            ];
+        view.dispatch({
+          changes,
+          selection: { anchor: from, head: to - (wrappedInSelection ? marker.length * 2 : 0) },
+        });
+        view.focus();
+        return;
+      }
+
+      view.dispatch({
+        changes: { from, to, insert: `${marker}${selected}${marker}` },
+        selection: { anchor: from + marker.length, head: from + marker.length + selected.length },
+      });
+      view.focus();
+    };
+
     const handleTranslationCursorChange = (lineNumber: number) => {
       setTranslationLine(lineNumber);
       // Clear stale decoration on the translation pane (user is now active here)
@@ -651,7 +709,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
         }
       }
 
-      const showToolbar = range && canCreateSuggestions && (isReviewMode || suggestions.length > 0);
+      const showToolbar =
+        !!range && ((canCreateSuggestions && (isReviewMode || suggestions.length > 0)) || formattingEnabled);
       if (showToolbar) {
         // Try to get actual position from editor
         const editor = (translationEditorRef.current || externalEditorRef?.current)?.editor;
@@ -709,6 +768,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
     const showSelectionToolbar = canCreateSuggestions && (isReviewMode || showSuggestionDecorations);
+    // Formatting is offered wherever the translation pane is the thing being
+    // typed into. Where the suggestion toolbar owns the selection (review, or a
+    // document with feedback), that toolbar keeps the spot.
+    const formattingEnabled = variant === 'translate' && translateTab === 'edit' && !showSelectionToolbar;
 
     return (
       <>
@@ -754,8 +817,14 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}
                     >
                       <TabsList className="h-8">
-                        <TabsTrigger value="formatted">Live</TabsTrigger>
-                        <TabsTrigger value="raw">Markdown</TabsTrigger>
+                        <TabsTrigger value="raw">
+                          <FileCode />
+                          Markdown
+                        </TabsTrigger>
+                        <TabsTrigger value="formatted">
+                          <Eye />
+                          Preview
+                        </TabsTrigger>
                       </TabsList>
                     </Tabs>
                   ) : (
@@ -765,20 +834,22 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         disabled
                         className={cn(
                           'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          sourceViewMode === 'formatted' && 'bg-background shadow-sm',
+                          sourceViewMode === 'raw' && 'bg-background shadow-sm',
                         )}
                       >
-                        Live
+                        <FileCode />
+                        Markdown
                       </button>
                       <button
                         type="button"
                         disabled
                         className={cn(
                           'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          sourceViewMode === 'raw' && 'bg-background shadow-sm',
+                          sourceViewMode === 'formatted' && 'bg-background shadow-sm',
                         )}
                       >
-                        Markdown
+                        <Eye />
+                        Preview
                       </button>
                     </div>
                   ))}
@@ -1029,9 +1100,16 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       fullHeight
                       suggestions={showSuggestionDecorations ? suggestions : undefined}
                       onSuggestionClick={showSuggestionDecorations ? handleSuggestionClickInternal : undefined}
-                      onSelectionChange={showSelectionToolbar ? handleSelectionChange : undefined}
+                      onSelectionChange={showSelectionToolbar || formattingEnabled ? handleSelectionChange : undefined}
                       onOpenGuide={onOpenGuide}
                     />
+                    {toolbarPosition && formattingEnabled && (
+                      <FormattingToolbar
+                        position={toolbarPosition}
+                        containerRef={translationContainerRef}
+                        onFormat={handleFormat}
+                      />
+                    )}
                     {toolbarPosition && canCreateSuggestions && (
                       <SuggestionInlineToolbar
                         position={toolbarPosition}
