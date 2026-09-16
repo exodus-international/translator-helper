@@ -82,11 +82,24 @@ export const noCrlf: LintRule = {
 
 const DASH_BULLET = /^([ \t]*)-([ \t]+)/gm;
 
+/** Whether the source writes its own list items with dashes and no stars. */
+function sourceWritesDashBullets(source: string): boolean {
+  const dashes = /^[ \t]*-[ \t]+/m.test(source);
+  const stars = /^[ \t]*\*[ \t]+/m.test(source);
+  return dashes && !stars;
+}
+
 export const bulletMarker: LintRule = {
   id: 'bullet-marker',
   severity: 'warning',
-  description: 'List items use `*`, matching the rest of the content library.',
-  check({ text }) {
+  description: 'List items use `*`, matching the source and the content library.',
+  check({ text, source }) {
+    // The corpus gave this rule its `*`. The source in hand outranks the
+    // corpus: when the English is written with `-`, a translation that mirrors
+    // it is not a finding -- QA asked exactly that, with a document whose
+    // source used dashes and whose translation was told to change them.
+    if (source && sourceWritesDashBullets(source)) return [];
+
     const regions = protectedRegions(text);
     const diagnostics: LintDiagnostic[] = [];
     for (const match of text.matchAll(DASH_BULLET)) {
@@ -134,8 +147,13 @@ const OPENS_QUOTE = /[\s([{—–“‘>]/;
 export const smartQuotes: LintRule = {
   id: 'smart-quotes',
   severity: 'info',
-  description: 'Prose uses typographic quotes and apostrophes.',
-  check({ text }) {
+  description: 'Prose uses typographic quotes and apostrophes, where the source does.',
+  check({ text, source }) {
+    // Same bar as the bullets: the source sets the typography. A source
+    // written with straight quotes is not a reason to ask for curly ones in
+    // its translation -- that is the library's style, not this document's.
+    if (source && !/[\u201C\u201D\u2018\u2019]/.test(source)) return [];
+
     const regions = protectedRegions(text);
     const diagnostics: LintDiagnostic[] = [];
 
