@@ -14,7 +14,16 @@ import type { LintDiagnostic, LintEdit, LintRule } from '../types';
 import { scanFrontmatter } from '../frontmatter-entries';
 
 /** Keys the content team uses. Anything else is almost always a translated key. */
-export const KNOWN_FRONTMATTER_KEYS = ['title', 'subtitle', 'caption', 'hero', 'day', 'verse_tag', 'lectionary number'];
+export const KNOWN_FRONTMATTER_KEYS = [
+  'title',
+  'subtitle',
+  'caption',
+  'hero',
+  'day',
+  'verse_tag',
+  'lectionary number',
+  'sort_order',
+];
 
 /** Keys whose *value* is an identifier or number, never prose to translate. */
 export const NON_TRANSLATABLE_KEYS = ['hero', 'day', 'verse_tag', 'lectionary number'];

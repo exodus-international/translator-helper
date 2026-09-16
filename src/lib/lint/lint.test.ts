@@ -64,6 +64,17 @@ describe('house style rules', () => {
     assert.equal(ids('He said "hello".\n', 'He said \u201Chi\u201D.\n').includes('smart-quotes'), true);
   });
 
+  it('accepts sort_order as a frontmatter key', () => {
+    const text = '---\ntitle: A\nsort_order: 3\n---\n\nBody\n';
+    assert.equal(ids(text, text).includes('frontmatter-key-translated'), false);
+  });
+
+  it('still flags a translated key', () => {
+    const text = '---\ntitle: A\nnazev: B\n---\n\nBody\n';
+    const source = '---\ntitle: A\nhero: B\n---\n\nBody\n';
+    assert.equal(ids(text, source).includes('frontmatter-key-translated'), true);
+  });
+
   it('does not treat the frontmatter fence as a bullet', () => {
     const text = '---\ntitle: A\n---\n\nBody\n';
     assert.equal(ids(text).includes('bullet-marker'), false);
