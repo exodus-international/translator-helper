@@ -53,7 +53,7 @@ import {
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ReaderPreview } from '@/components/reader-preview';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
-import type { LintDiagnostic } from '@/lib/lint';
+import { lintDocument, type LintDiagnostic } from '@/lib/lint';
 import { LintStatusBar } from '@/components/editor/lint-status-bar';
 import { MarkdownGuideDialog } from '@/components/markdown-guide';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
@@ -341,6 +341,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
     const translationEditorRef = useRef<CodeEditorHandle | null>(null);
     const [translationDiagnostics, setTranslationDiagnostics] = useState<LintDiagnostic[]>([]);
+    const [sourceDiagnostics, setSourceDiagnostics] = useState<LintDiagnostic[]>([]);
+    const sourceEditorRef = useRef<CodeEditorHandle | null>(null);
     const translationContainerRef = useRef<HTMLDivElement>(null);
     const [selectedUserId] = useState<string | null>(null); // Filter by user for diff view
     const [isSourceEditing, setIsSourceEditing] = useState(false);
@@ -609,6 +611,18 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // (The rules themselves already stay quiet on an empty document; this keeps
     // the bar from saying anything at all until there is work to judge.)
     const translationHasContent = translationContent.trim().length > 0;
+    // The source pane is linted like the translation, against itself: the
+    // parity rules come out even and the style rules adopt whatever the source
+    // already does. In Preview there is no editor to report them, so they are
+    // computed from the text.
+    const sourcePreviewDiagnostics = useMemo(
+      () =>
+        !isSourceEditing && sourceViewMode === 'formatted'
+          ? lintDocument({ text: sourceContent, source: sourceContent })
+          : [],
+      [isSourceEditing, sourceViewMode, sourceContent],
+    );
+    const sourcePaneDiagnostics = sourcePreviewDiagnostics.length ? sourcePreviewDiagnostics : sourceDiagnostics;
     // The cursor chip only means something when both panes are showing editors:
     // it names this pane's line and the line the other pane is parked on.
     const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
@@ -949,6 +963,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             <div className={bodyClassName}>
               {isSourceEditing ? (
                 <RawEditorPane
+                  ref={sourceEditorRef}
                   value={sourceEditValue}
                   onChange={handleSourceEditChange}
                   currentLine={sourceLine}
@@ -956,21 +971,42 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
                   language={contentLanguage}
+                  sourceContent={sourceContent}
+                  onDiagnosticsChange={setSourceDiagnostics}
                   onOpenGuide={onOpenGuide}
+                  footer={
+                    <LintStatusBar
+                      diagnostics={sourcePaneDiagnostics}
+                      onFixAll={() => sourceEditorRef.current?.fixAll()}
+                    />
+                  }
                 />
               ) : !isYaml && sourceViewMode === 'formatted' ? (
-                <ReaderPreview content={sourceFormattedContent} />
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <ReaderPreview content={sourceFormattedContent} />
+                  </div>
+                  <LintStatusBar diagnostics={sourcePaneDiagnostics} />
+                </div>
               ) : (
                 <RawEditorPane
+                  ref={sourceEditorRef}
                   value={sourceContent}
                   readOnly
-                  lint={false}
                   language={contentLanguage}
                   currentLine={sourceLine}
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
+                  sourceContent={sourceContent}
+                  onDiagnosticsChange={setSourceDiagnostics}
                   onOpenGuide={onOpenGuide}
+                  footer={
+                    <LintStatusBar
+                      diagnostics={sourcePaneDiagnostics}
+                      onFixAll={() => sourceEditorRef.current?.fixAll()}
+                    />
+                  }
                 />
               )}
             </div>
