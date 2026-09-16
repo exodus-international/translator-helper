@@ -58,7 +58,8 @@ import { LintStatusBar } from '@/components/editor/lint-status-bar';
 import { MarkdownGuideDialog } from '@/components/markdown-guide';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
-import { FormattingToolbar, type FormattingAction } from './editor/formatting-toolbar';
+import { FormattingToolbar } from './editor/formatting-toolbar';
+import { useFormattingToolbar } from './editor/use-formatting-toolbar';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
 import { ThreadSidebar } from './thread-sidebar';
 import { AudioTextPanel } from '@/components/audio-text-panel';
@@ -343,6 +344,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [translationDiagnostics, setTranslationDiagnostics] = useState<LintDiagnostic[]>([]);
     const [sourceDiagnostics, setSourceDiagnostics] = useState<LintDiagnostic[]>([]);
     const sourceEditorRef = useRef<CodeEditorHandle | null>(null);
+    const sourceContainerRef = useRef<HTMLDivElement>(null);
     const translationContainerRef = useRef<HTMLDivElement>(null);
     const [selectedUserId] = useState<string | null>(null); // Filter by user for diff view
     const [isSourceEditing, setIsSourceEditing] = useState(false);
@@ -422,112 +424,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setSyncedTranslationLine(translationTargetLine);
       // Update the translation pane's displayed line to match the synced target
       setTranslationLine(translationTargetLine);
-    };
-
-    /** How many `char` the string starts with. */
-    const leadingRun = (text: string, char: string) => {
-      let run = 0;
-      while (run < text.length && text[run] === char) run += 1;
-      return run;
-    };
-
-    /** How many `char` the string ends with. */
-    const trailingRun = (text: string, char: string) => {
-      let run = 0;
-      while (run < text.length && text[text.length - 1 - run] === char) run += 1;
-      return run;
-    };
-
-    /**
-     * Whether a run of that many marker characters carries this marker.
-     *
-     * Emphasis and strong emphasis are written with the same character -- `*`
-     * is a prefix of `**` -- so asking only whether the text beside the
-     * selection begins with the marker reads the inner asterisks of `**bold**`
-     * as italic, and "unwraps" it by taking one from each side: the bold is
-     * destroyed and no italic is added. The length of the whole run is what
-     * tells them apart. One is italic, two are bold, three are both.
-     */
-    const runCarries = (run: number, marker: string) => {
-      if (marker.length === 1) return run === 1 || run >= 3;
-      return run >= marker.length;
-    };
-
-    /** Bold, italic, a line break, or the markers stripped -- on the selection. */
-    const handleFormat = (action: FormattingAction) => {
-      const view = (translationEditorRef.current || externalEditorRef?.current)?.view;
-      if (!view) return;
-
-      const { from, to } = view.state.selection.main;
-      const selected = view.state.sliceDoc(from, to);
-
-      if (action === 'lineBreak') {
-        view.dispatch({ changes: { from: to, insert: '<br>' }, selection: { anchor: to + 4 } });
-        view.focus();
-        return;
-      }
-
-      if (action === 'clear') {
-        // The markers the library uses, gone; the words stay. An underscore
-        // inside a word is not one of them: `sort_order` and `snake_case` are
-        // keys this library is full of, and CommonMark does not read an
-        // intraword `_` as emphasis either, so a selected key keeps its name.
-        const cleaned = selected.replace(/\*\*|\*|__|_|~~|`/g, (marker, offset: number) => {
-          if (marker[0] !== '_') return '';
-          const isWord = (character: string | undefined) => !!character && /\w/.test(character);
-          return isWord(selected[offset - 1]) && isWord(selected[offset + marker.length]) ? marker : '';
-        });
-        view.dispatch({
-          changes: { from, to, insert: cleaned },
-          selection: { anchor: from, head: from + cleaned.length },
-        });
-        view.focus();
-        return;
-      }
-
-      const marker = action === 'bold' ? '**' : '*';
-      const character = marker[0];
-      // Two past the marker is as far as this has to look to tell a run of one
-      // from two from three.
-      const look = marker.length + 2;
-      const outsideRun = Math.min(
-        trailingRun(view.state.sliceDoc(Math.max(0, from - look), from), character),
-        leadingRun(view.state.sliceDoc(to, Math.min(view.state.doc.length, to + look)), character),
-      );
-      const insideRun = Math.min(leadingRun(selected, character), trailingRun(selected, character));
-
-      const wrappedInside = runCarries(outsideRun, marker);
-      const wrappedInSelection = selected.length >= marker.length * 2 && runCarries(insideRun, marker);
-
-      if (wrappedInSelection) {
-        const bare = selected.slice(marker.length, -marker.length);
-        view.dispatch({
-          changes: { from, to, insert: bare },
-          selection: { anchor: from, head: from + bare.length },
-        });
-        view.focus();
-        return;
-      }
-
-      if (wrappedInside) {
-        view.dispatch({
-          changes: [
-            { from: from - marker.length, to: from, insert: '' },
-            { from: to, to: to + marker.length, insert: '' },
-          ],
-          // The text before the selection just got shorter, and a dispatched
-          // selection is read in the document the changes leave behind.
-          selection: { anchor: from - marker.length, head: to - marker.length },
-        });
-        view.focus();
-        return;
-      }
-
-      view.dispatch({
-        changes: { from, to, insert: `${marker}${selected}${marker}` },
-        selection: { anchor: from + marker.length, head: from + marker.length + selected.length },
-      });
-      view.focus();
     };
 
     const handleTranslationCursorChange = (lineNumber: number) => {
@@ -844,6 +740,18 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // typed into. Where the suggestion toolbar owns the selection (review, or a
     // document with feedback), that toolbar keeps the spot.
     const formattingEnabled = variant === 'translate' && translateTab === 'edit' && !showSelectionToolbar;
+    // The same toolbar for both panes: one hook each, pointed at the editor of
+    // the pane and the box it floats over.
+    const sourceFormatting = useFormattingToolbar({
+      editorRef: sourceEditorRef,
+      containerRef: sourceContainerRef,
+      enabled: isSourceEditing,
+    });
+    const translationFormatting = useFormattingToolbar({
+      editorRef: translationEditorRef,
+      containerRef: translationContainerRef,
+      enabled: formattingEnabled,
+    });
 
     return (
       <>
@@ -968,12 +876,20 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {sourceHeaderExtra}
               </div>
             </div>
-            <div className={bodyClassName}>
+            <div ref={sourceContainerRef} className={bodyClassName}>
+              {sourceFormatting.position && (
+                <FormattingToolbar
+                  position={sourceFormatting.position}
+                  containerRef={sourceContainerRef}
+                  onFormat={sourceFormatting.onFormat}
+                />
+              )}
               {isSourceEditing ? (
                 <RawEditorPane
                   ref={sourceEditorRef}
                   value={sourceEditValue}
                   onChange={handleSourceEditChange}
+                  onSelectionChange={sourceFormatting.onSelectionChange}
                   currentLine={sourceLine}
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
@@ -1194,14 +1110,17 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       fullHeight
                       suggestions={showSuggestionDecorations ? suggestions : undefined}
                       onSuggestionClick={showSuggestionDecorations ? handleSuggestionClickInternal : undefined}
-                      onSelectionChange={showSelectionToolbar || formattingEnabled ? handleSelectionChange : undefined}
+                      onSelectionChange={(range) => {
+                        if (showSelectionToolbar || formattingEnabled) handleSelectionChange(range);
+                        translationFormatting.onSelectionChange(range);
+                      }}
                       onOpenGuide={onOpenGuide}
                     />
-                    {toolbarPosition && formattingEnabled && (
+                    {translationFormatting.position && (
                       <FormattingToolbar
-                        position={toolbarPosition}
+                        position={translationFormatting.position}
                         containerRef={translationContainerRef}
-                        onFormat={handleFormat}
+                        onFormat={translationFormatting.onFormat}
                       />
                     )}
                     {/*
