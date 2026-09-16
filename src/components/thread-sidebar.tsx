@@ -157,8 +157,11 @@ export function ThreadSidebar({
       )}
 
       {/* Thread list: the rows inside the card are flat and divided, the way
-          the sections above it are, so a thread never nests a card in a card. */}
-      <div ref={scrollContainerRef} className="min-h-0 flex-1 divide-y overflow-y-auto">
+          the sections above it are, so a thread never nests a card in a card.
+          It scrolls with the panel rather than inside it -- one scrollbar for
+          the whole panel, which is what the QA asked after opening the
+          activity log and finding the feedback trapped in a shorter box. */}
+      <div ref={scrollContainerRef} className="flex-1 divide-y">
         {suggestions.length === 0 ? (
           <Empty className="gap-3 p-6">
             <EmptyHeader>
