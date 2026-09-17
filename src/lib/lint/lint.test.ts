@@ -170,6 +170,20 @@ describe('parity rules', () => {
   const source =
     '---\ntitle: Day One\nsubtitle: Sub\ncaption: Cap\nhero: shirt-e90_2026\n---\n\n# Heading\n\nRead [the guide](https://exodus90.com/guide).\n';
 
+  it('stays quiet on a translation nobody has typed in yet', () => {
+    // Starting a translation creates the version with empty content, and the
+    // editor mounts on it straight away. Judged against the source, every
+    // parity rule would report the whole document as missing before the
+    // translator has written a word.
+    assert.deepEqual(ids('', source), []);
+    // Whitespace only is the same story for the parity rules; the house-style
+    // rules still have their own say about the whitespace itself.
+    assert.deepEqual(
+      ids('   \n\n', source).filter((id) => id.startsWith('frontmatter-') || id === 'link-url-changed' || id === 'heading-structure'),
+      [],
+    );
+  });
+
   it('accepts a faithful translation', () => {
     const text =
       '---\ntitle: Prvi dan\nsubtitle: Podnaslov\ncaption: Natpis\nhero: shirt-e90_2026\n---\n\n# Naslov\n\nPročitaj [vodič](https://exodus90.com/guide).\n';

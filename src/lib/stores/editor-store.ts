@@ -249,6 +249,11 @@ export function createEditorStore(config: EditorStoreConfig) {
         toast.warning('Please select a target language first');
         return;
       }
+      // Two controls offer this, and a disabled attribute only takes effect on
+      // the next render: without this the second click of a double-click, or
+      // the panel's button racing the header's, sends a second assign for the
+      // same document and language.
+      if (get().isLoading('startTranslation')) return;
 
       set(addLoading(get(), 'startTranslation'));
       try {

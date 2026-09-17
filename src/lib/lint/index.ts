@@ -28,6 +28,12 @@ export function lintDocument(context: LintContext, options: LintOptions = {}): L
   for (const rule of rules) {
     if (disabled.includes(rule.id)) continue;
     if (rule.requiresSource && !context.source) continue;
+    // The mirror of the line above. A parity rule compares this document
+    // against its source, so with nothing typed on this side there is nothing
+    // to compare: every such rule would report the whole source as missing the
+    // moment a version is created with empty content, before the translator has
+    // written a word. A translation earns its parity findings once it has text.
+    if (rule.requiresSource && context.text.trim().length === 0) continue;
     try {
       diagnostics.push(...rule.check(context));
     } catch {

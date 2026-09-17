@@ -20,7 +20,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import {
-  assignDocumentVersionAction,
   createDocumentVersionAction,
   deleteDocumentVersionAction,
 } from '@/domain/document-version/document-version.actions';
@@ -229,6 +228,8 @@ function TranslateToolbar({
   const handleStatusChange = useEditorStore((s) => s.handleStatusChange);
   const openReviewDialog = useEditorStore((s) => s.openReviewDialog);
   const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
+  const startTranslation = useEditorStore((s) => s.startTranslation);
+  const startingTranslation = useEditorStore((s) => s.isLoading('startTranslation'));
   const saveStatus = useEditorStore((s) => s.saveStatus());
 
   const [translating, setTranslating] = useState(false);
@@ -254,28 +255,6 @@ function TranslateToolbar({
       if (!targetVersion) {
         toast.error(error.message || 'Failed to save translation');
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleStartTranslation = async () => {
-    if (!targetLanguageId) {
-      toast.warning('Please select a target language first');
-      return;
-    }
-    setLoading(true);
-    try {
-      const version = await assignDocumentVersionAction({
-        documentId: document.id,
-        languageId: targetLanguageId,
-        content: '',
-      });
-      setTargetVersion(version);
-      setContent(version.content || '');
-      capture('translation_started');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to start translation');
     } finally {
       setLoading(false);
     }
@@ -431,7 +410,7 @@ function TranslateToolbar({
                 )}
               </>
             ) : targetLanguageId ? (
-              <Button onClick={handleStartTranslation} disabled={loading} size="sm">
+              <Button onClick={startTranslation} disabled={busy || startingTranslation} size="sm">
                 Start Translation
               </Button>
             ) : (
@@ -489,7 +468,7 @@ function TranslateToolbar({
       )}
     </>
   ) : targetLanguageId ? (
-    <Button onClick={handleStartTranslation} disabled={loading} size="sm">
+    <Button onClick={startTranslation} disabled={busy || startingTranslation} size="sm">
       Start Translation
     </Button>
   ) : (
