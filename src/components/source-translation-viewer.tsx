@@ -615,7 +615,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // parity rules come out even and the style rules adopt whatever the source
     // already does. In Preview there is no editor to report them, so they are
     // computed from the text.
-    const inSourcePreview = !isSourceEditing && sourceViewMode === 'formatted';
+    // `!isYaml` for the same reason the editor gates itself on the language:
+    // these are Markdown rules, and the Preview branch below is not the only
+    // reader of this flag.
+    const inSourcePreview = !isYaml && !isSourceEditing && sourceViewMode === 'formatted';
     const sourcePreviewDiagnostics = useMemo(
       () => (inSourcePreview ? lintDocument({ text: sourceContent, source: sourceContent }) : []),
       [inSourcePreview, sourceContent],
