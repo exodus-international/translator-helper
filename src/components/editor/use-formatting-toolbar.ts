@@ -30,18 +30,33 @@ export function useFormattingToolbar({
   containerRef: React.RefObject<HTMLElement | null>;
   enabled: boolean;
 }) {
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [rawPosition, setPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // A toolbar is only ever offered for a pane that can be typed into. Both
+  // render sites used to test the position alone, so a toolbar opened in Edit
+  // stayed on screen after a switch to Preview -- and `onFormat` dispatches
+  // straight through the view, which `EditorState.readOnly` does not stop.
+  // Reporting it from here means neither caller can forget.
+  const position = enabled ? rawPosition : null;
 
   // A pane keeps its selection when the other pane takes the cursor, so the
   // toolbar has to go when its pane does -- otherwise both panes' toolbars sit
   // on screen, one of them acting on a selection nobody can see any more.
+  //
+  // Bound while the toolbar is up rather than once at mount: a pane's box is
+  // conditionally rendered -- Edit and Preview are different elements, and a
+  // language with no version yet renders neither -- so a ref read at mount
+  // gives an element that is about to leave the document, or nothing at all.
+  // A ref object's identity never changes, so the effect would not run again
+  // to notice.
   useEffect(() => {
+    if (!position) return;
     const container = containerRef.current;
     if (!container) return;
     const clear = () => setPosition(null);
     container.addEventListener('focusout', clear);
     return () => container.removeEventListener('focusout', clear);
-  }, [containerRef]);
+  }, [position, containerRef]);
 
   const onSelectionChange = useCallback(
     (range: SelectionRange | null) => {
@@ -63,6 +78,7 @@ export function useFormattingToolbar({
 
   const onFormat = useCallback(
     (action: FormattingAction) => {
+      if (!enabled) return;
       const view = editorRef.current?.view;
       if (!view) return;
       const outcome = applyFormattingAction(
@@ -74,7 +90,7 @@ export function useFormattingToolbar({
       view.dispatch({ changes: outcome.changes, selection: outcome.selection });
       view.focus();
     },
-    [editorRef],
+    [enabled, editorRef],
   );
 
   return { position, onSelectionChange, onFormat, containerRef };

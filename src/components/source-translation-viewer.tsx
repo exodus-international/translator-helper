@@ -580,6 +580,19 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       suggestionFormDirtyRef.current = false;
     }, []);
 
+    // Everything below is read off a selection, and the editor that reported it
+    // is unmounted when the view changes. A freshly mounted one says nothing
+    // until someone moves the cursor, so this state used to outlive the pane it
+    // came from: the suggestion toolbar reappeared at its old coordinates with
+    // nothing highlighted, and Comment or Suggest edit filed against a range
+    // out of a tab the reviewer had already left. The form goes too -- it
+    // remounts empty while its dirty flag stayed set, so cancelling a form
+    // nobody had touched asked whether to discard the work in it.
+    useEffect(() => {
+      setToolbarPosition(null);
+      doCloseSuggestionForm();
+    }, [reviewViewMode, translateTab, isReviewEditing, doCloseSuggestionForm]);
+
     const requestCloseSuggestionForm = useCallback(
       (onConfirmed?: () => void) => {
         if (!suggestionFormDirtyRef.current) {
