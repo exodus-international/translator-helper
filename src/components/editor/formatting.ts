@@ -133,6 +133,7 @@ function perLine(
   const changes: FormattingEdit[] = [];
   let offset = start;
   let index = 0;
+  let delta = 0;
 
   for (const line of text.slice(start, end).split('\n')) {
     const lineEnd = offset + line.length;
@@ -140,13 +141,21 @@ function perLine(
       const next = edit(line, index);
       if (next !== null && next !== line) {
         changes.push({ from: offset, to: lineEnd, insert: next });
+        delta += next.length - line.length;
       }
       index += 1;
     }
     offset = lineEnd + 1;
   }
 
-  return { changes, selection: { anchor: start, head: end } };
+  // `start` and `end` are offsets in the document as it is now, and a
+  // dispatched selection is read in the one these changes leave behind: every
+  // line that grew or shrank moves the end of the block. Without the delta,
+  // taking a marker off the last lines of a document put `head` past the last
+  // character, CodeMirror rejected the whole transaction, and the button did
+  // nothing at all -- and anywhere else the selection quietly spilled into the
+  // line below, so the next click reformatted text nobody had selected.
+  return { changes, selection: { anchor: start, head: end + delta } };
 }
 
 /** The selected lines that have something on them. */

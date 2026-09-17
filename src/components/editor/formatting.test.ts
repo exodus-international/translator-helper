@@ -95,6 +95,34 @@ describe('formatting actions', () => {
     assert.equal(run('_really_ snake_case_here', 0, 24, 'clear').text, 'really snake_case_here');
   });
 
+  it('leaves the selection on the block after a line action, not past the document', () => {
+    // These offsets are dispatched as a selection, so they are read in the
+    // document the changes leave behind. When they were not, taking a marker
+    // off the last lines put `head` past the end, CodeMirror rejected the whole
+    // transaction and the button did nothing; mid-document the selection
+    // spilled into the line below and the next click reformatted text nobody
+    // had selected.
+    const off = run('* one\n* two', 0, 11, 'bulletList');
+    assert.equal(off.text, 'one\ntwo');
+    assert.equal(off.selection.head, off.text.length);
+    assert.equal(off.text.slice(off.selection.anchor, off.selection.head), 'one\ntwo');
+
+    const on = run('one\ntwo', 0, 7, 'bulletList');
+    assert.equal(on.text.slice(on.selection.anchor, on.selection.head), '* one\n* two');
+
+    const midDocument = run('* one\n* two\ntail line\n', 0, 11, 'bulletList');
+    assert.equal(midDocument.text.slice(midDocument.selection.anchor, midDocument.selection.head), 'one\ntwo');
+
+    for (const [text, action] of [
+      ['## Title', 'heading2'],
+      ['> quoted', 'quote'],
+      ['1. one\n2. two', 'numberedList'],
+    ] as const) {
+      const result = run(text, 0, text.length, action);
+      assert.equal(result.selection.head, result.text.length, `${action} ran past the document`);
+    }
+  });
+
   it('wraps only the selected line when the selection starts mid-line', () => {
     const result = run('intro\nsecond line here\n', 8, 24, 'bulletList');
     assert.equal(result.text, 'intro\n* second line here\n');
