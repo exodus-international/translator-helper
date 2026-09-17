@@ -19,8 +19,8 @@ import {
 } from '@codemirror/view';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
-import { contentLinter, runFixAll, setLintContext } from '@/lib/lint/codemirror';
-import type { LintDiagnostic } from '@/lib/lint';
+import { contentLinter, refreshLint, runFixAll, setLintContext } from '@/lib/lint/codemirror';
+import type { LintDiagnostic, LintOptions } from '@/lib/lint';
 import { lintDocument } from '@/lib/lint';
 import { createEditorApi, offsetToPosition, type EditorApi } from './editor-api';
 import { setSuggestions, suggestionExtension } from './cm-suggestions';
@@ -122,8 +122,16 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   const readOnlyCompartment = useRef(new Compartment()).current;
   const placeholderCompartment = useRef(new Compartment()).current;
   const lintCompartment = useRef(new Compartment()).current;
-  const lintOptions = useRef({ disabled: disabledRules });
-  lintOptions.current = { disabled: disabledRules };
+  // One object for the editor's whole life, mutated in place. `contentLinter`
+  // captures it when the compartment is configured but reads `disabled` at
+  // lint time, so replacing the object here would leave the linter holding the
+  // rule set from the last reconfigure while the status bar moved on.
+  const lintOptions = useRef<LintOptions>({ disabled: disabledRules });
+  lintOptions.current.disabled = disabledRules;
+
+  // Identity, not the array: callers build this list inline, so depending on
+  // the array itself would re-run every effect below on every render.
+  const disabledKey = (disabledRules ?? []).join('\u0000');
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -234,7 +242,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   useEffect(() => {
     const view = viewRef.current;
     if (view) reportDiagnostics.current(view.state.doc.toString());
-  }, [ready, value, sourceContent, lint, disabledRules]);
+  }, [ready, value, sourceContent, lint, disabledKey]);
 
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setSuggestions.of(suggestions) });
@@ -272,6 +280,15 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       effects: lintCompartment.reconfigure(lint ? [contentLinter(lintOptions.current), lintGutter()] : []),
     });
   }, [lint, lintCompartment]);
+
+  // Turning a rule off changes no text, so CodeMirror has no reason to lint
+  // again on its own: without this the squiggles and gutter markers keep the
+  // rule set they were drawn with while the status bar already reflects the new
+  // one -- the bar and the editor disagreeing, indefinitely.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view && lint) refreshLint(view);
+  }, [disabledKey, lint, ready]);
 
   useEffect(() => {
     const view = viewRef.current;

@@ -92,6 +92,17 @@ export function runFixAll(view: EditorView, options: LintOptions = {}): FixAllOu
   return { fixed: result.fixed, remaining: result.remaining.length };
 }
 
+/**
+ * Asks a mounted editor to lint again.
+ *
+ * `contentLinter` reads its options at lint time, so a changed rule set is
+ * picked up without rebuilding the extension -- but nothing would ask for a
+ * new pass, since toggling a rule changes no text.
+ */
+export function refreshLint(view: EditorView): void {
+  forceLinting(view);
+}
+
 /** Pushes a new source document (or filename) into a mounted editor. */
 export function updateLintContext(view: EditorView, value: LintContextValue): void {
   view.dispatch({ effects: setLintContext.of(value) });
