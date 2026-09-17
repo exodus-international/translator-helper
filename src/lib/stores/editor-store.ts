@@ -41,16 +41,16 @@ export type LoadingKey =
   | 'deleteTranslation'
   | 'deleteSource';
 
-interface MemberInfo {
+export interface MemberInfo {
   id: string;
   userId?: string;
   user: { id: string; name: string | null; email: string; image?: string | null };
 }
 
-type DialogState =
+export type DialogState =
   | { type: 'closed' }
   | { type: 'submitReview'; reviewers: MemberInfo[] }
-  | { type: 'assignTranslator'; members: MemberInfo[] }
+  | { type: 'assignTranslator'; members: MemberInfo[]; deadline: Date | string | null }
   | { type: 'assignReviewer'; candidates: MemberInfo[] };
 
 export interface EditorStoreConfig {
@@ -448,11 +448,11 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     openAssignTranslatorDialog: async () => {
-      const { translationProjectId } = get();
+      const { translationProjectId, targetVersion } = get();
       if (!translationProjectId) return;
       try {
         const members = await listTranslationProjectMembersAction(translationProjectId);
-        set({ dialog: { type: 'assignTranslator', members } });
+        set({ dialog: { type: 'assignTranslator', members, deadline: targetVersion?.deadline ?? null } });
         capture('dialog_opened', { dialog: 'assign_translator' });
       } catch (error) {
         toast.error('Failed to load team members');
@@ -474,11 +474,15 @@ export function createEditorStore(config: EditorStoreConfig) {
 
         // Optimistic update: find the assigned user from dialog members
         const { dialog } = get();
-        if (dialog.type === 'assignTranslator') {
+        if (dialog.type === 'assignTranslator' && targetVersion) {
           const assignedUser = dialog.members.find((m) => m.user.id === userId)?.user ?? null;
-          if (assignedUser && targetVersion) {
-            set({ targetVersion: { ...targetVersion, user: assignedUser } });
-          }
+          set({
+            targetVersion: {
+              ...targetVersion,
+              ...(assignedUser ? { user: assignedUser } : {}),
+              deadline: deadline ? new Date(deadline) : null,
+            },
+          });
         }
 
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignTranslator') });
