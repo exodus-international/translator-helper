@@ -239,6 +239,8 @@ export function createEditorStore(config: EditorStoreConfig) {
   // and both want this. Fetch it for whoever asks first and hand the same
   // promise to the second.
   let transcriptStateRequest: Promise<void> | null = null;
+  /** The write currently in flight, so the next one can queue behind it. */
+  let pendingSave: Promise<void> | null = null;
 
   return createStore<EditorStore>()((set, get) => ({
     // ─── Initial state ─────────────────────────────────
@@ -300,12 +302,24 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     translateWithAi: async () => {
-      const { targetLanguageId, content } = get();
+      const { targetLanguageId } = get();
       if (!targetLanguageId) {
         toast.warning('Select a target language before requesting an AI translation.');
         return;
       }
+      // As in `startTranslation`: a disabled attribute only takes effect on the
+      // next render, so without this the second click of a double-click spends
+      // another model call on a draft that is thrown away.
+      if (get().isLoading('aiTranslate')) return;
 
+      // This replaces the whole document, so anything typed and not yet saved
+      // would be thrown away -- and `savedContent` would then be the text the
+      // draft replaced, leaving autosave to persist the draft over it with no
+      // dirty flag left pointing at the edits. Writing them first also means
+      // the model is asked to revise what the reader actually has.
+      if (!(await flushPendingEdits(get))) return;
+
+      const before = get().content;
       set(addLoading(get(), 'aiTranslate'));
       try {
         const result = await translateDocumentAction({
@@ -313,11 +327,22 @@ export function createEditorStore(config: EditorStoreConfig) {
           sourceLanguageName: config.sourceLanguageName,
           targetLanguageId,
           sourceContent: config.sourceContent,
-          currentTranslation: content || undefined,
+          currentTranslation: before || undefined,
           originalFilename: config.originalFilename ?? undefined,
         });
+        // A whole document takes the model tens of seconds and the pane stays
+        // editable the entire time. Whoever kept translating while they waited
+        // has the only copy of that work: a version is overwritten in place,
+        // so it is nowhere on the server, and the editor's undo history is the
+        // only way back -- which the next remount takes with it. A draft can
+        // be asked for again; those lines cannot.
+        if (get().content !== before) {
+          set(removeLoading(get(), 'aiTranslate'));
+          toast.warning('Your edits were kept -- the AI draft would have replaced them. Ask for it again to use it.');
+          return;
+        }
         set({ content: result.translatedContent, ...removeLoading(get(), 'aiTranslate') });
-        capture('ai_translate_triggered', { overwrite: content.trim().length > 0 });
+        capture('ai_translate_triggered', { overwrite: before.trim().length > 0 });
         toast.success('AI translation generated successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'aiTranslate'));
@@ -333,34 +358,53 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     // ─── Save ──────────────────────────────────────────
-    saveContent: async (trigger = 'manual') => {
-      const { targetVersion, content, savedContent } = get();
-      if (!targetVersion) return;
-      // A save with nothing to write costs a request and a toast for no reason;
-      // the save control stays clickable when clean, so this is the guard that
-      // makes that honest.
-      if (content === savedContent) return;
+    saveContent: (trigger = 'manual') => {
+      const write = async () => {
+        const { targetVersion, content, savedContent } = get();
+        if (!targetVersion) return;
+        // A save with nothing to write costs a request and a toast for no
+        // reason; the save control stays clickable when clean, so this is the
+        // guard that makes that honest. It is also what makes queueing cheap
+        // below: a write that waited for one which already persisted the same
+        // text stops here.
+        if (content === savedContent) return;
 
-      set(addLoading(get(), 'save'));
-      try {
-        const updated = await updateDocumentVersionAction(targetVersion.id, { content });
-        set({
-          targetVersion: updated,
-          savedContent: content,
-          lastSavedAt: new Date(),
-          ...removeLoading(get(), 'save'),
-        });
-        // Only track explicit user saves; the 3s-debounced auto-save would
-        // otherwise flood analytics with background events.
-        if (trigger === 'manual') {
-          capture('translation_saved', { documentVersionId: targetVersion.id });
+        set(addLoading(get(), 'save'));
+        try {
+          const updated = await updateDocumentVersionAction(targetVersion.id, { content });
+          set({
+            targetVersion: updated,
+            savedContent: content,
+            lastSavedAt: new Date(),
+            ...removeLoading(get(), 'save'),
+          });
+          // Only track explicit user saves; the 3s-debounced auto-save would
+          // otherwise flood analytics with background events.
+          if (trigger === 'manual') {
+            capture('translation_saved', { documentVersionId: targetVersion.id });
+          }
+          toast.success('Translation saved successfully!');
+        } catch (error: any) {
+          set(removeLoading(get(), 'save'));
+          toast.error(error.message || 'Failed to save translation');
+          throw error;
         }
-        toast.success('Translation saved successfully!');
-      } catch (error: any) {
-        set(removeLoading(get(), 'save'));
-        toast.error(error.message || 'Failed to save translation');
-        throw error;
-      }
+      };
+
+      // One write at a time. A version is updated in place -- the repository
+      // reads the row to bump `version`, then writes the content back over it,
+      // and keeps no history -- so two writes in flight at once lose the
+      // counter and leave the later reply setting `targetVersion` to whichever
+      // finished last. Clicking Save with the 3s autosave already armed did
+      // exactly that: the hook's guard only covers a timer firing while an
+      // earlier *autosave* runs, and nothing cancelled the timer when a manual
+      // save started, so the request in flight had not yet moved
+      // `savedContent` when the timer read it.
+      const queued = (pendingSave ?? Promise.resolve()).catch(() => {}).then(write);
+      // A failed write must not reject whatever queued behind it; its own
+      // caller still gets the rejection, which `flushPendingEdits` reads.
+      pendingSave = queued.catch(() => {});
+      return queued;
     },
 
     saveSource: async (sourceVersionId) => {
