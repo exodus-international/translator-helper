@@ -64,8 +64,33 @@ export function contentLinter(options: LintOptions = {}, hooks: { onOpenGuide?: 
                   ? [
                       {
                         name: fix.title,
-                        apply(target: EditorView) {
-                          target.dispatch({ changes: fix.edits });
+                        apply(target: EditorView, from: number, to: number) {
+                          // Look the finding up again rather than replaying
+                          // `fix.edits`. Those offsets belong to the document
+                          // this pass read, and an action outlives that
+                          // document: CodeMirror maps the diagnostic through
+                          // every change and keeps the panel open across them,
+                          // which is why it hands the action the finding's
+                          // *current* range. The edits were left behind
+                          // unmapped, so a quick fix clicked after a few
+                          // keystrokes cut the document where the finding used
+                          // to be -- rewriting or deleting text the rule had
+                          // nothing to say about.
+                          const fresh = lintDocument(contextFor(target.state), options).find(
+                            (candidate) =>
+                              candidate.fix !== undefined &&
+                              candidate.ruleId === diagnostic.ruleId &&
+                              candidate.from === from &&
+                              Math.max(candidate.to, candidate.from) === to,
+                          );
+                          // Gone or moved further than the mapping accounts
+                          // for: there is no edit that can be trusted, so ask
+                          // for a pass and let the tooltip redraw from it.
+                          if (!fresh?.fix) {
+                            forceLinting(target);
+                            return;
+                          }
+                          target.dispatch({ changes: fresh.fix.edits });
                         },
                       },
                     ]
