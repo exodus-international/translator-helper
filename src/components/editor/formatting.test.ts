@@ -68,6 +68,33 @@ describe('formatting actions', () => {
     assert.equal(run('the **bold** and `code` words', 0, 30, 'clear').text, 'the bold and code words');
   });
 
+  it('tells italic from bold instead of eating one of its markers', () => {
+    // `*` is a prefix of `**`, so a test that looked only at the character
+    // beside the selection read the inner asterisks of `**grace**` as italic
+    // and took one from each side: the bold gone, no italic added.
+    assert.equal(run('say **grace**', 6, 11, 'italic').text, 'say ***grace***');
+    assert.equal(run('say **grace**', 4, 13, 'italic').text, 'say ***grace***');
+  });
+
+  it('adds bold over italic and takes each back off a run of three', () => {
+    assert.equal(run('say *grace*', 5, 10, 'bold').text, 'say ***grace***');
+    assert.equal(run('say ***grace***', 7, 12, 'italic').text, 'say **grace**');
+    assert.equal(run('say ***grace***', 7, 12, 'bold').text, 'say *grace*');
+  });
+
+  it('puts the selection back on the words after unwrapping from outside', () => {
+    const result = run('say **grace**', 6, 11, 'bold');
+    assert.equal(result.text, 'say grace');
+    assert.equal(result.text.slice(result.selection.anchor, result.selection.head), 'grace');
+  });
+
+  it('leaves an underscore inside a word alone when clearing', () => {
+    // `sort_order` is a frontmatter key, not emphasis, and CommonMark does not
+    // read an intraword `_` as emphasis either.
+    assert.equal(run('the **sort_order** key', 0, 22, 'clear').text, 'the sort_order key');
+    assert.equal(run('_really_ snake_case_here', 0, 24, 'clear').text, 'really snake_case_here');
+  });
+
   it('wraps only the selected line when the selection starts mid-line', () => {
     const result = run('intro\nsecond line here\n', 8, 24, 'bulletList');
     assert.equal(result.text, 'intro\n* second line here\n');

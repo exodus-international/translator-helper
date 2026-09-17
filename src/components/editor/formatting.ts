@@ -66,6 +66,50 @@ const LINE_PREFIXES: Partial<Record<FormattingAction, RegExp>> = {
 const ANY_BLOCK_PREFIX = /^\s*(?:#{1,6}\s+|>\s?|[*+-]\s+|\d+\.\s+)/;
 const INLINE_MARKERS = /\*\*|__|~~|`|\*|_/g;
 
+/** How many `character` the string starts with. */
+function leadingRun(text: string, character: string): number {
+  let run = 0;
+  while (run < text.length && text[run] === character) run += 1;
+  return run;
+}
+
+/** How many `character` the string ends with. */
+function trailingRun(text: string, character: string): number {
+  let run = 0;
+  while (run < text.length && text[text.length - 1 - run] === character) run += 1;
+  return run;
+}
+
+/**
+ * Whether a run of that many marker characters carries this marker.
+ *
+ * Emphasis and strong emphasis are written with the same character -- `*` is a
+ * prefix of `**` -- so asking only whether the text beside the selection
+ * begins with the marker reads the inner asterisks of `**bold**` as italic,
+ * and "unwraps" it by taking one from each side: the bold is destroyed and no
+ * italic arrives. The length of the whole run is what tells them apart. One is
+ * italic, two are bold, three are both.
+ */
+function runCarries(run: number, marker: string): boolean {
+  if (marker.length === 1) return run === 1 || run >= 3;
+  return run >= marker.length;
+}
+
+/**
+ * The inline markers stripped out of a selection.
+ *
+ * An underscore inside a word is not a marker: `sort_order` and `snake_case`
+ * are keys this library is full of, and CommonMark does not read an intraword
+ * `_` as emphasis either, so a selected key keeps its name.
+ */
+function stripInlineMarkers(selected: string): string {
+  return selected.replace(INLINE_MARKERS, (marker, offset: number) => {
+    if (marker[0] !== '_') return '';
+    const isWord = (character: string | undefined) => !!character && /\w/.test(character);
+    return isWord(selected[offset - 1]) && isWord(selected[offset + marker.length]) ? marker : '';
+  });
+}
+
 function lineRange(text: string, from: number, to: number): { start: number; end: number } {
   const start = text.lastIndexOf('\n', from - 1) + 1;
   const nextBreak = text.indexOf('\n', to);
@@ -127,7 +171,7 @@ export function applyFormattingAction(
   }
 
   if (action === 'clear') {
-    const cleaned = selected.replace(INLINE_MARKERS, '');
+    const cleaned = stripInlineMarkers(selected);
     return { changes: [{ from, to, insert: cleaned }], selection: { anchor: from, head: from + cleaned.length } };
   }
 
@@ -169,12 +213,18 @@ export function applyFormattingAction(
   }
 
   const marker = wrap.marker;
-  const outside =
-    from >= marker.length &&
-    to + marker.length <= text.length &&
-    text.slice(from - marker.length, from) === marker &&
-    text.slice(to, to + marker.length) === marker;
-  const inside = selected.length >= marker.length * 2 && selected.startsWith(marker) && selected.endsWith(marker);
+  const character = marker[0];
+  // Two past the marker is as far as this has to look to tell a run of one
+  // from two from three.
+  const look = marker.length + 2;
+  const outsideRun = Math.min(
+    trailingRun(text.slice(Math.max(0, from - look), from), character),
+    leadingRun(text.slice(to, Math.min(text.length, to + look)), character),
+  );
+  const insideRun = Math.min(leadingRun(selected, character), trailingRun(selected, character));
+
+  const outside = runCarries(outsideRun, marker);
+  const inside = selected.length >= marker.length * 2 && runCarries(insideRun, marker);
 
   if (outside) {
     return {
