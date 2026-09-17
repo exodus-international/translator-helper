@@ -33,6 +33,7 @@ import { getDocumentStatusConfig } from '@/constants/document-status';
 import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { DocumentStatus, SuggestionStatus } from '@/generated/prisma/enums';
 import {
+  AlertCircle,
   BookOpen,
   ChevronDown,
   Edit,
@@ -173,6 +174,13 @@ interface SourceTranslationViewerProps {
   translationStarted?: boolean;
   onStartTranslation?: () => void;
   startingTranslation?: boolean;
+  /**
+   * True when this document has no target language yet, so there is nothing to
+   * translate into. The panel says so in full; the folded rail has to say it
+   * too, since the panel's folded state persists across documents and would
+   * otherwise leave the next one silently empty.
+   */
+  targetLanguageMissing?: boolean;
   /** Opens the Markdown guide from a lint finding. */
   onOpenGuide?: () => void;
   /** Passed through to the Audio text tab so the sidebar card's badge follows what happens in it. */
@@ -275,6 +283,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       onToggleZen,
       contentLanguage = 'markdown',
       translationStarted = true,
+      targetLanguageMissing = false,
       onStartTranslation,
       startingTranslation = false,
       onOpenGuide,
@@ -1182,6 +1191,17 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     <span>Open</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {targetLanguageMissing && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      tooltip="Select a target language from the documents page to start translating"
+                      onClick={toggleSidebar}
+                    >
+                      <AlertCircle className="text-muted-foreground" />
+                      <span>No language</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {panelStatus && (
                   <SidebarMenuItem>
                     <SidebarMenuButton tooltip={`Status: ${panelStatus.name}`} onClick={toggleSidebar}>

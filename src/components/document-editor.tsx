@@ -76,6 +76,8 @@ interface ViewerConfig {
   sidebarDetails?: ReactNode;
   sidebarDetailsDefaultOpen?: boolean;
   contentLanguage?: 'markdown' | 'yaml';
+  /** No target language yet: the folded panel has to say so too. */
+  targetLanguageMissing?: boolean;
 }
 
 /** "Just now" / "5m ago" / "2d ago" — as much resolution as a tile can carry. */
@@ -115,6 +117,7 @@ function EditorViewer({
   contentLanguage,
   panelActions,
   onToggleZen,
+  targetLanguageMissing,
 }: ViewerConfig) {
   const router = useRouter();
   const targetVersion = useEditorStore((s) => s.targetVersion);
@@ -205,6 +208,7 @@ function EditorViewer({
       sourceBadge={<Badge variant="outline">{sourceVersion.language.name}</Badge>}
       translationBadge={<Badge variant="outline">{targetVersion?.language?.name || 'New Translation'}</Badge>}
       translationStarted={!!targetVersion}
+      targetLanguageMissing={targetLanguageMissing}
       onStartTranslation={startTranslation}
       startingTranslation={isStartingTranslation}
       onOpenGuide={() => setMarkdownGuideOpen(true)}
@@ -492,19 +496,20 @@ export function DocumentEditor({
   // The shell's breadcrumb shows what this page is, by name: the pathname only
   // knows the slug and the language code, so the editor publishes the rest
   // while it is mounted.
-  const setTrail = useTrailStore((s) => s.setTrail);
+  const publishTrail = useTrailStore((s) => s.publish);
   const languageName = targetLanguageName ?? sourceVersion.language.name;
-  useEffect(() => {
-    setTrail([
-      { label: 'Documents', href: '/documents' },
-      ...(document.sourceProject
-        ? [{ label: document.sourceProject.name, href: buildProjectPath(document.sourceProject.identifier) }]
-        : []),
-      { label: document.title },
-      ...(languageName ? [{ label: languageName }] : []),
-    ]);
-    return () => setTrail(null);
-  }, [setTrail, document.title, document.sourceProject, languageName]);
+  useEffect(
+    () =>
+      publishTrail([
+        { label: 'Documents', href: '/documents' },
+        ...(document.sourceProject
+          ? [{ label: document.sourceProject.name, href: buildProjectPath(document.sourceProject.identifier) }]
+          : []),
+        { label: document.title },
+        ...(languageName ? [{ label: languageName }] : []),
+      ]),
+    [publishTrail, document.title, document.sourceProject, languageName],
+  );
 
   return (
     <EditorProvider
@@ -549,6 +554,7 @@ export function DocumentEditor({
               contentLanguage={contentLanguage}
               panelActions={panelActions}
               onToggleZen={onToggleZen}
+              targetLanguageMissing={!targetLanguageId}
             />
           </div>
 

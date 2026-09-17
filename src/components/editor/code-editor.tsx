@@ -35,6 +35,23 @@ function languageSupport(language: string): Extension {
   return markdown();
 }
 
+/**
+ * Read-only panes stay focusable.
+ *
+ * CodeMirror only sets `contenteditable` on an editable view, and adds no
+ * tabindex of its own, so the source pane's content DOM cannot take focus from
+ * a click -- `.cm-focused` never lands and the theme, which paints the active
+ * line only on a focused editor, leaves the clicked line unmarked. A tabindex
+ * is the hook CodeMirror itself looks for on a non-editable view.
+ */
+function readOnlyExtensions(readOnly: boolean): Extension[] {
+  return [
+    EditorState.readOnly.of(readOnly),
+    EditorView.editable.of(!readOnly),
+    readOnly ? EditorView.contentAttributes.of({ tabindex: '0' }) : [],
+  ];
+}
+
 /** Whole-line background on the line synced from the other pane. */
 const highlightLineField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -190,7 +207,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap]),
       languageCompartment.of(languageExtension),
-      readOnlyCompartment.of([EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]),
+      readOnlyCompartment.of(readOnlyExtensions(readOnly)),
       placeholderCompartment.of(placeholder ? placeholderExtension(placeholder) : []),
       highlightLineField,
       suggestionExtension((suggestion) => callbacks.current.onSuggestionClick?.(suggestion)),
@@ -280,7 +297,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
 
   useEffect(() => {
     viewRef.current?.dispatch({
-      effects: readOnlyCompartment.reconfigure([EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]),
+      effects: readOnlyCompartment.reconfigure(readOnlyExtensions(readOnly)),
     });
   }, [readOnly, readOnlyCompartment]);
 

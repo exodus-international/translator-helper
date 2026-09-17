@@ -8,8 +8,16 @@ export interface TrailCrumb {
 
 interface TrailState {
   trail: TrailCrumb[] | null;
-  setTrail: (trail: TrailCrumb[] | null) => void;
+  /** Which publisher the current trail belongs to. */
+  owner: number | null;
+  /**
+   * Publishes a trail and returns the release for it. The release clears the
+   * slot only while this publisher still owns it.
+   */
+  publish: (trail: TrailCrumb[]) => () => void;
 }
+
+let nextOwner = 0;
 
 /**
  * The trail a document editor publishes for the shell's topbar.
@@ -20,7 +28,23 @@ interface TrailState {
  * editor publishes them here and the topbar prefers them, falling back to the
  * pathname's own crumbs for every other page in the app.
  */
-export const useTrailStore = create<TrailState>((set) => ({
+export const useTrailStore = create<TrailState>((set, get) => ({
   trail: null,
-  setTrail: (trail) => set({ trail }),
+  owner: null,
+
+  publish: (trail) => {
+    const owner = ++nextOwner;
+    set({ trail, owner });
+
+    // One slot, and mount ordering is not ours to choose: navigating quickly
+    // from one document to another runs the new editor's effect before the old
+    // one's cleanup, so an unconditional clear would wipe the trail the page
+    // now on screen had just published and collapse its breadcrumb to the
+    // pathname's own crumbs. Only the publisher still holding the slot may
+    // clear it.
+    return () => {
+      if (get().owner !== owner) return;
+      set({ trail: null, owner: null });
+    };
+  },
 }));
