@@ -13,6 +13,7 @@
 
 import type { LintDiagnostic, LintEdit, LintRule } from '../types';
 import { bodyOffset, scanFrontmatter } from '../frontmatter-entries';
+import { isProtected, protectedRegions } from '../regions';
 
 /**
  * Keys the content team uses. Anything else is almost always a translated key.
@@ -68,7 +69,13 @@ const frontmatterKeyTranslated: LintRule = {
       if (KNOWN_FRONTMATTER_KEYS.includes(entry.key)) continue;
 
       // When exactly one source key is unaccounted for, this unknown key is
-      // almost certainly it, translated — so the rename is a safe autofix.
+      // probably it, translated -- probably enough to name in the message and
+      // offer as a fix, not enough for "fix all" to take on its own. The other
+      // reading is a key the translator added while a real one went missing,
+      // and there the rename relabels their line: `frontmatter-value-changed`
+      // then finds a slug that does not match the source and replaces it,
+      // because that fix *is* safe, and between the two passes the line they
+      // wrote is gone.
       const candidate = missingFromTranslation.length === 1 ? missingFromTranslation[0] : null;
 
       diagnostics.push({
@@ -83,6 +90,7 @@ const frontmatterKeyTranslated: LintRule = {
           ? {
               title: `Rename to "${candidate}"`,
               edits: [{ from: entry.keyFrom, to: entry.keyTo, insert: candidate }],
+              safe: false,
             }
           : undefined,
       });
@@ -303,10 +311,23 @@ interface Heading {
   to: number;
 }
 
+/**
+ * The document's headings -- the ones a reader sees.
+ *
+ * Filtered through the protected regions, because `^#` is not a heading
+ * everywhere it appears. The library's files show markdown to the translator
+ * inside fenced blocks, so a file with one real heading and a three-line
+ * sample counted four; and a `#` comment in the frontmatter counted as a fifth.
+ * The rule compares counts, so a translation that carried the fence over
+ * matched by luck, while dropping or adding a sample reported a heading
+ * structure that had not drifted at all.
+ */
 function headings(text: string): Heading[] {
+  const regions = protectedRegions(text);
   const found: Heading[] = [];
   for (const match of text.matchAll(/^(#{1,6})[ \t]/gm)) {
     const from = match.index ?? 0;
+    if (isProtected(regions, from)) continue;
     found.push({ level: match[1].length, from, to: from + match[1].length });
   }
   return found;

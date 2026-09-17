@@ -14,6 +14,21 @@
 import type { LintDiagnostic, LintEdit, LintRule } from '../types';
 import { codeRegions, isProtected, protectedRegions } from '../regions';
 
+/**
+ * A word character in any script this library is translated into.
+ *
+ * `[0-9A-Za-z]` and `\w` were the tests, and both are only ever asked about the
+ * character beside a marker or a quote. Under ASCII the underscore in
+ * `день_1.md` had a letter on neither side, so `broken-formatting` read it
+ * as emphasis that never closes and reported an error -- in Ukrainian,
+ * Croatian, Czech and every other language whose letters are not ASCII, on a
+ * filename the translator had copied correctly. The apostrophe in Ukrainian's
+ * `п'ять` was the same test failing the other way: no letters around it, so no
+ * contraction, so it was left straight. Marks count, because a combining
+ * accent is part of the letter it sits on.
+ */
+const isWord = (char: string | undefined) => !!char && /[\p{L}\p{N}\p{M}]/u.test(char);
+
 const TRAILING_WHITESPACE = /[ \t]+$/gm;
 
 const trailingWhitespace: LintRule = {
@@ -146,7 +161,21 @@ const excessBlankLines: LintRule = {
   },
 };
 
-const OPENS_QUOTE = /[\s([{—–“‘>]/;
+/**
+ * What a `"` can close: a letter, a digit, or the punctuation that ends a
+ * clause or a bracketed aside.
+ *
+ * This is the short, stable half of the question. The other half is not: a
+ * quote opens after whitespace and `(`, but also after `„` in German, Czech,
+ * Slovak, Polish, Croatian and Slovenian, `«` and `‹` in the romance
+ * languages, `「` and `（` in the CJK files, `¿` in Spanish, and a bare `-`
+ * where a dash was typed as a hyphen. That list was what the rule tested, and
+ * every language whose own quotes were missing from it got a closing `”`
+ * where an opening `“` belonged -- on the first quote inside every
+ * quotation. Ask whether the quote closes something instead, and the default
+ * falls the right way for punctuation nobody has enumerated yet.
+ */
+const CLOSES_QUOTE = /[\p{L}\p{N}.,;:!?%…)\]}”’»›」』）】]/u;
 
 const smartQuotes: LintRule = {
   id: 'smart-quotes',
@@ -171,8 +200,8 @@ const smartQuotes: LintRule = {
 
       let replacement: string;
       if (char === '"') {
-        replacement = before === '' || OPENS_QUOTE.test(before) ? '“' : '”';
-      } else if (/\w/.test(before) && /\w/.test(after)) {
+        replacement = CLOSES_QUOTE.test(before) ? '”' : '“';
+      } else if (isWord(before) && isWord(after)) {
         replacement = '’'; // contraction: don't -> don’t
       } else {
         continue; // standalone single quote is ambiguous; leave it alone
@@ -263,7 +292,7 @@ function lineAt(text: string, offset: number): number {
   return text.slice(0, offset).split('\n').length;
 }
 
-const isWord = (char: string | undefined) => !!char && /[0-9A-Za-z]/.test(char);
+/** Deliberately JavaScript's `\s`, which is CommonMark's Unicode whitespace. */
 const isSpace = (char: string | undefined) => char === undefined || /\s/.test(char);
 
 const brokenFormatting: LintRule = {

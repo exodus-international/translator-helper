@@ -51,6 +51,31 @@ describe('scanFrontmatter', () => {
     );
   });
 
+  it('does not read a comment line as a key', () => {
+    // A note a translator left above the key it is about. `# Molitva` parsed as
+    // a key no rule recognised, so it was reported as a translated key -- and
+    // the rename offered would have turned the note into `hero:`.
+    const text = '---\nday: 1\n# Molitva: opomba\nhero: shirt-e90_2026\n---\n\nBody\n';
+    assert.deepEqual(
+      scanFrontmatter(text).entries.map((e) => e.key),
+      ['day', 'hero'],
+    );
+  });
+
+  it('stops a value at the comment YAML allows after it', () => {
+    const text = '---\nday: 3 # tretji dan\nhero: shirt#2\ntitle: "a # b"\ncaption: # nothing yet\n---\n\nBody\n';
+    const entries = scanFrontmatter(text);
+    const value = (key: string) => entries.entries.find((e) => e.key === key)!;
+    assert.equal(value('day').value, '3');
+    assert.equal(text.slice(value('day').valueFrom, value('day').valueTo), '3');
+    // Only a `#` after whitespace, and only outside quotes, opens a comment.
+    assert.equal(value('hero').value, 'shirt#2');
+    assert.equal(value('title').value, '"a # b"');
+    // A key whose value is nothing but a comment reads as blank, which is what
+    // `frontmatter-value-empty` is there to report.
+    assert.equal(value('caption').value, '');
+  });
+
   it('measures a nested block so a fix can carry the whole thing', () => {
     const text = '---\ntitle: T\nreminder:\n  title: "A"\n  body: "B"\n---\n\nBody\n';
     const reminder = scanFrontmatter(text).entries.find((e) => e.key === 'reminder')!;
@@ -138,6 +163,28 @@ describe('house style rules', () => {
   it('curls apostrophes only inside words', () => {
     assert.equal(fixed("don't stop\n"), 'don’t stop\n');
     assert.equal(fixed("'quoted' word\n"), "'quoted' word\n");
+    // The word test was ASCII, so a contraction went uncurled wherever the
+    // letters around the apostrophe were not: Ukrainian writes `п'ять`.
+    assert.equal(fixed("п'ять хлібів\n"), 'п’ять хлібів\n');
+    // (`l'homme` was already ASCII on both sides, so it always worked.)
+    assert.equal(fixed("l'homme\n"), 'l’homme\n');
+  });
+
+  it('opens a quote after punctuation from any language', () => {
+    // The rule tested a list of characters a quote may open after, and every
+    // language whose own quotation marks were missing from it got a closing
+    // ” where an opening “ belonged -- on the first quote of every
+    // quotation. It now asks whether the quote closes something instead.
+    const opens = ['「', '„', '«', '‹', '（', '¿', '-', '—'];
+    for (const before of opens) {
+      assert.equal(fixed(`${before}"a"\n`), `${before}“a”\n`, `after ${JSON.stringify(before)}`);
+    }
+    // And what a quote does close still closes: a letter, a digit, the
+    // punctuation that ends a clause, a bracket.
+    for (const before of ['a', '1', '.', ',', '!', ')', '…']) {
+      assert.equal(fixed(`${before}"\n`), `${before}”\n`, `after ${JSON.stringify(before)}`);
+    }
+    assert.equal(fixed('Rekel je: "Pridi."\n'), 'Rekel je: “Pridi.”\n');
   });
 
   // Named, because the character is invisible: a formatter is free to
@@ -194,6 +241,17 @@ describe('brokenFormatting', () => {
     assert.equal(found.length, 1);
     assert.match(found[0].message, /closed in a later paragraph \(line 3\)/);
     assert.equal(found[0].from, 0);
+  });
+
+  it('leaves an underscore inside a word alone in any script', () => {
+    // The intraword test was `[0-9A-Za-z]`, so the underscore in a Cyrillic
+    // word had a letter on neither side: it opened emphasis that never closed,
+    // and the rule reported an error -- on a filename copied correctly.
+    assert.deepEqual(diagnostics('Дивіться файл день_1.md для подробиць.\n'), []);
+    assert.deepEqual(diagnostics('see day_1.md for more\n'), []);
+    assert.deepEqual(diagnostics('Použij súbor deň_1.md\n'), []);
+    // A marker that really does open emphasis still reports.
+    assert.equal(diagnostics('Почніть _тут і зараз\n').length, 1);
   });
 
   it('reports an opener that never closes', () => {
@@ -293,11 +351,19 @@ describe('parity rules', () => {
     assert.deepEqual(ids(text, source), []);
   });
 
-  it('catches a translated frontmatter key and renames it back', () => {
+  it('offers to rename a translated frontmatter key but never applies it in bulk', () => {
     const text = source.replace('hero:', 'hrdina:');
-    assert.ok(ids(text, source).includes('frontmatter-key-translated'));
-    assert.ok(fixed(text, source).includes('hero: shirt-e90_2026'));
-    assert.ok(!fixed(text, source).includes('hrdina'));
+    const [diagnostic] = lintDocument({ text, source }).filter((d) => d.ruleId === 'frontmatter-key-translated');
+    assert.ok(diagnostic, 'expected a frontmatter-key-translated diagnostic');
+    assert.match(diagnostic.message, /hero/);
+    assert.equal(diagnostic.fix?.safe, false);
+    assert.ok(applyEdits(text, diagnostic.fix!.edits).includes('hero: shirt-e90_2026'));
+    // The other reading of one unknown key beside one missing key is a key the
+    // translator added while a real one went missing. Renaming relabels their
+    // line, and `frontmatter-value-changed` -- whose fix *is* safe -- then
+    // replaces the value under the new name, so between the two passes what
+    // they wrote is gone. Reported and offered, never taken unasked.
+    assert.ok(fixed(text, source).includes('hrdina'), 'fix all must leave the key alone');
   });
 
   it('catches a rewritten hero slug and restores it', () => {
@@ -333,6 +399,35 @@ describe('parity rules', () => {
     const text = source.replace('# Heading', '## Heading');
     assert.ok(ids(text, source).includes('heading-structure'));
     assert.ok(fixed(text, source).includes('\n# Heading'));
+  });
+
+  it('counts only the headings a reader sees', () => {
+    // The library shows markdown to the translator inside fenced blocks, and
+    // `^#` is not a heading there -- nor in a frontmatter comment. Counting
+    // them meant a translation that dropped a sample reported a heading
+    // structure that had not drifted.
+    const fenced = source.replace('# Heading\n', '# Heading\n\n```md\n# Sample\n## Another\n```\n');
+    const translation = '---\ntitle: Prvi dan\nsubtitle: Podnaslov\ncaption: Natpis\nhero: shirt-e90_2026\n---\n\n# Naslov\n\nPro\u010ditaj [vodi\u010d](https://exodus90.com/guide).\n';
+    assert.ok(!ids(translation, fenced).includes('heading-structure'));
+    // And a `#` comment in the frontmatter is not a heading either.
+    const commented = translation.replace('hero:', '# opomba: ne prevajaj\nhero:');
+    assert.ok(!ids(commented, fenced).includes('heading-structure'));
+  });
+
+  it('leaves a translator\'s note on a slug alone', () => {
+    // `day: 3 # tretji dan` is day 3. Comparing the raw text called the day
+    // changed, and the fix offered -- a safe one, applied by "fix all" --
+    // replaced the whole span and deleted the note.
+    const numbered = source.replace('hero: shirt-e90_2026', 'day: 3');
+    const annotated = numbered.replace('day: 3', 'day: 3 # tretji dan');
+    assert.ok(!ids(annotated, numbered).includes('frontmatter-value-changed'));
+    assert.ok(fixed(annotated, numbered).includes('# tretji dan'));
+
+    // A real mismatch is still caught, and still keeps the note.
+    const wrong = numbered.replace('day: 3', 'day: 4 # tretji dan');
+    assert.ok(ids(wrong, numbered).includes('frontmatter-value-changed'));
+    const after = fixed(wrong, numbered);
+    assert.ok(after.includes('day: 3 # tretji dan'), after);
   });
 
   it('skips source-dependent rules when no source is supplied', () => {
