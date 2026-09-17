@@ -145,38 +145,24 @@ const getStatusForColumn = (columnId: string): DocumentStatus | null => {
   }
 };
 
-const columns: KanbanColumn[] = [
-  {
-    id: 'pending',
-    name: 'To Do',
-    color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.PENDING_TRANSLATION].color.hex,
-    status: DocumentStatus.PENDING_TRANSLATION,
-  },
-  {
-    id: 'in-progress',
-    name: 'In Progress',
-    color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.IN_PROGRESS].color.hex,
-    status: DocumentStatus.IN_PROGRESS,
-  },
-  {
-    id: 'review',
-    name: 'Texts in review',
-    color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.PENDING_REVIEW].color.hex,
-    status: DocumentStatus.PENDING_REVIEW,
-  },
-  {
-    id: 'approved',
-    name: 'Texts approved',
-    color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.APPROVED].color.hex,
-    status: DocumentStatus.APPROVED,
-  },
-  {
-    id: 'deployed',
-    name: 'Texts deployed',
-    color: DOCUMENT_STATUS_CONFIGS[DocumentStatus.DEPLOYED].color.hex,
-    status: DocumentStatus.DEPLOYED,
-  },
+// The board's own ids, in board order; everything a reader sees about a status
+// -- its name and its colour -- comes from the one config it is named after, so
+// a column cannot say "Texts in review" while the chip beside it says
+// "In Review".
+const COLUMN_IDS: { id: string; status: DocumentStatus }[] = [
+  { id: 'pending', status: DocumentStatus.PENDING_TRANSLATION },
+  { id: 'in-progress', status: DocumentStatus.IN_PROGRESS },
+  { id: 'review', status: DocumentStatus.PENDING_REVIEW },
+  { id: 'approved', status: DocumentStatus.APPROVED },
+  { id: 'deployed', status: DocumentStatus.DEPLOYED },
 ];
+
+const columns: KanbanColumn[] = COLUMN_IDS.map(({ id, status }) => ({
+  id,
+  name: DOCUMENT_STATUS_CONFIGS[status].name,
+  color: DOCUMENT_STATUS_CONFIGS[status].color.hex,
+  status,
+}));
 
 const activeColumnIds = new Set(columns.map((column) => column.id));
 

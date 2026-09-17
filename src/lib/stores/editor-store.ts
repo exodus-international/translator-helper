@@ -213,6 +213,24 @@ function removeLoading(state: EditorState, key: LoadingKey): Partial<EditorState
   return { loading: next };
 }
 
+/**
+ * Writes anything typed but not yet saved, before an action that replaces the
+ * document with the server's copy. Returns false when the write failed, in
+ * which case the caller must not go on and overwrite the edits it has just
+ * failed to preserve.
+ */
+async function flushPendingEdits(get: () => EditorStore): Promise<boolean> {
+  const { content, savedContent } = get();
+  if (content === savedContent) return true;
+  try {
+    await get().saveContent('auto');
+    return true;
+  } catch {
+    // `saveContent` has already told the reader why.
+    return false;
+  }
+}
+
 // ─── Store factory ───────────────────────────────────────────
 
 export function createEditorStore(config: EditorStoreConfig) {
@@ -386,6 +404,16 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     applySuggestion: async (suggestionId) => {
+      // This and `reopenSuggestion` replace the whole document with the
+      // server's copy, so anything typed and not yet saved would be thrown
+      // away -- and, because `savedContent` is replaced too, the UI would read
+      // "saved" over text it had just discarded, with no dirty flag left for
+      // autosave to recover from. Writing the edits first loses nothing and is
+      // what the reader meant anyway: the server applies the suggestion to the
+      // stored version, so unsaved edits would otherwise be overwritten by a
+      // suggestion applied to text that never included them.
+      if (!(await flushPendingEdits(get))) return;
+
       set(addLoading(get(), 'applySuggestion'));
       try {
         const updatedVersion = await applySuggestionAction({ suggestionId });
@@ -419,6 +447,8 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     reopenSuggestion: async (suggestionId) => {
+      if (!(await flushPendingEdits(get))) return;
+
       set(addLoading(get(), 'reopenSuggestion'));
       try {
         const result = await reopenSuggestionAction({ suggestionId });
