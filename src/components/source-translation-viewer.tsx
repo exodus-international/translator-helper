@@ -615,14 +615,19 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // parity rules come out even and the style rules adopt whatever the source
     // already does. In Preview there is no editor to report them, so they are
     // computed from the text.
+    const inSourcePreview = !isSourceEditing && sourceViewMode === 'formatted';
     const sourcePreviewDiagnostics = useMemo(
-      () =>
-        !isSourceEditing && sourceViewMode === 'formatted'
-          ? lintDocument({ text: sourceContent, source: sourceContent })
-          : [],
-      [isSourceEditing, sourceViewMode, sourceContent],
+      () => (inSourcePreview ? lintDocument({ text: sourceContent, source: sourceContent }) : []),
+      [inSourcePreview, sourceContent],
     );
-    const sourcePaneDiagnostics = sourcePreviewDiagnostics.length ? sourcePreviewDiagnostics : sourceDiagnostics;
+    // Whichever view is up owns the bar. Falling back to the editor's last
+    // report whenever Preview came back empty could not tell "Preview found
+    // nothing" from "Preview has not run" -- and since this is computed
+    // synchronously those were never two states. What it did instead was carry
+    // a finding from the editor into Preview, where the text it was about is
+    // no longer on screen and there is no Fix all to clear it with. Nothing
+    // clears `sourceDiagnostics` on the way out, so it sat there.
+    const sourcePaneDiagnostics = inSourcePreview ? sourcePreviewDiagnostics : sourceDiagnostics;
     // The cursor chip only means something when both panes are showing editors:
     // it names this pane's line and the line the other pane is parked on.
     const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
