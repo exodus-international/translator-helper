@@ -422,6 +422,35 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setTranslationLine(translationTargetLine);
     };
 
+    /** How many `char` the string starts with. */
+    const leadingRun = (text: string, char: string) => {
+      let run = 0;
+      while (run < text.length && text[run] === char) run += 1;
+      return run;
+    };
+
+    /** How many `char` the string ends with. */
+    const trailingRun = (text: string, char: string) => {
+      let run = 0;
+      while (run < text.length && text[text.length - 1 - run] === char) run += 1;
+      return run;
+    };
+
+    /**
+     * Whether a run of that many marker characters carries this marker.
+     *
+     * Emphasis and strong emphasis are written with the same character -- `*`
+     * is a prefix of `**` -- so asking only whether the text beside the
+     * selection begins with the marker reads the inner asterisks of `**bold**`
+     * as italic, and "unwraps" it by taking one from each side: the bold is
+     * destroyed and no italic is added. The length of the whole run is what
+     * tells them apart. One is italic, two are bold, three are both.
+     */
+    const runCarries = (run: number, marker: string) => {
+      if (marker.length === 1) return run === 1 || run >= 3;
+      return run >= marker.length;
+    };
+
     /** Bold, italic, a line break, or the markers stripped -- on the selection. */
     const handleFormat = (action: FormattingAction) => {
       const view = (translationEditorRef.current || externalEditorRef?.current)?.view;
@@ -437,8 +466,15 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       }
 
       if (action === 'clear') {
-        // The markers the library uses, gone; the words stay.
-        const cleaned = selected.replace(/\*\*|\*|__|_|~~|`/g, '');
+        // The markers the library uses, gone; the words stay. An underscore
+        // inside a word is not one of them: `sort_order` and `snake_case` are
+        // keys this library is full of, and CommonMark does not read an
+        // intraword `_` as emphasis either, so a selected key keeps its name.
+        const cleaned = selected.replace(/\*\*|\*|__|_|~~|`/g, (marker, offset: number) => {
+          if (marker[0] !== '_') return '';
+          const isWord = (character: string | undefined) => !!character && /\w/.test(character);
+          return isWord(selected[offset - 1]) && isWord(selected[offset + marker.length]) ? marker : '';
+        });
         view.dispatch({
           changes: { from, to, insert: cleaned },
           selection: { anchor: from, head: from + cleaned.length },
@@ -448,24 +484,38 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       }
 
       const marker = action === 'bold' ? '**' : '*';
-      const wrappedInside =
-        from >= marker.length &&
-        to + marker.length <= view.state.doc.length &&
-        view.state.sliceDoc(from - marker.length, from) === marker &&
-        view.state.sliceDoc(to, to + marker.length) === marker;
-      const wrappedInSelection =
-        selected.length >= marker.length * 2 && selected.startsWith(marker) && selected.endsWith(marker);
+      const character = marker[0];
+      // Two past the marker is as far as this has to look to tell a run of one
+      // from two from three.
+      const look = marker.length + 2;
+      const outsideRun = Math.min(
+        trailingRun(view.state.sliceDoc(Math.max(0, from - look), from), character),
+        leadingRun(view.state.sliceDoc(to, Math.min(view.state.doc.length, to + look)), character),
+      );
+      const insideRun = Math.min(leadingRun(selected, character), trailingRun(selected, character));
 
-      if (wrappedInside || wrappedInSelection) {
-        const changes = wrappedInSelection
-          ? { from, to, insert: selected.slice(marker.length, -marker.length) }
-          : [
-              { from: from - marker.length, to: from, insert: '' },
-              { from: to, to: to + marker.length, insert: '' },
-            ];
+      const wrappedInside = runCarries(outsideRun, marker);
+      const wrappedInSelection = selected.length >= marker.length * 2 && runCarries(insideRun, marker);
+
+      if (wrappedInSelection) {
+        const bare = selected.slice(marker.length, -marker.length);
         view.dispatch({
-          changes,
-          selection: { anchor: from, head: to - (wrappedInSelection ? marker.length * 2 : 0) },
+          changes: { from, to, insert: bare },
+          selection: { anchor: from, head: from + bare.length },
+        });
+        view.focus();
+        return;
+      }
+
+      if (wrappedInside) {
+        view.dispatch({
+          changes: [
+            { from: from - marker.length, to: from, insert: '' },
+            { from: to, to: to + marker.length, insert: '' },
+          ],
+          // The text before the selection just got shorter, and a dispatched
+          // selection is read in the document the changes leave behind.
+          selection: { anchor: from - marker.length, head: to - marker.length },
         });
         view.focus();
         return;
@@ -1110,7 +1160,15 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         onFormat={handleFormat}
                       />
                     )}
-                    {toolbarPosition && canCreateSuggestions && (
+                    {/*
+                      `showSelectionToolbar`, not `canCreateSuggestions`: the
+                      two toolbars share a position, and `formattingEnabled` is
+                      already its negation, so this is what keeps them apart.
+                      Until this pane offered formatting, a selection was only
+                      ever reported when the suggestion toolbar was the one
+                      that wanted it, and the wider gate never showed.
+                    */}
+                    {toolbarPosition && showSelectionToolbar && (
                       <SuggestionInlineToolbar
                         position={toolbarPosition}
                         containerRef={translationContainerRef}
