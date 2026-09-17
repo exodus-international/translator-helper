@@ -1,4 +1,6 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@/generated/prisma/client';
+import { Role } from '@/generated/prisma/enums';
 
 // Coerce any unrecognized role value to USER before it reaches the DB
 function ensureValidRole(args: { data?: { role?: unknown } }) {
@@ -7,7 +9,9 @@ function ensureValidRole(args: { data?: { role?: unknown } }) {
   }
 }
 
-const prismaClient = new PrismaClient().$extends({
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+
+const prismaClient = new PrismaClient({ adapter }).$extends({
   query: {
     user: {
       async create({ args, query }) {

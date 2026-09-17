@@ -5,6 +5,7 @@ import Editor from '@monaco-editor/react';
 import './monaco-selfhost';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { SuggestionWithUser, useMonacoSuggestions } from './monaco-suggestion-decorations';
+import { defineTranslationThemes, useMonacoTheme } from './monaco-theme';
 
 interface TextareaWithLineNumbersProps {
   value: string;
@@ -42,6 +43,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
 ) {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
+  const theme = useMonacoTheme(monacoRef);
   const [editorMounted, setEditorMounted] = useState(false);
   const onSelectionChangeRef = useRef(onSelectionChange);
   // Same for the cursor callback: Monaco registers the listener once at mount,
@@ -105,25 +107,8 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Define custom theme matching your app's design
-    monaco.editor.defineTheme('translation-theme', {
-      base: 'vs',
-      inherit: true,
-      rules: [{ token: '', foreground: '0a0a0a' }],
-      colors: {
-        'editor.background': '#ffffff',
-        'editor.foreground': '#0a0a0a',
-        'editor.lineHighlightBackground': '#dbeafe', // Light blue-100
-        'editor.lineHighlightBorder': '#00000000', // Transparent (no border)
-        'editorLineNumber.foreground': '#9ca3af', // Gray-400
-        'editorLineNumber.activeForeground': '#3b82f6', // Blue-500
-        'editor.selectionBackground': '#bfdbfe', // Blue-200
-        'editor.inactiveSelectionBackground': '#bfdbfe', // Blue-200 (same as active)
-        'editorCursor.foreground': '#3b82f6', // Blue-500
-      },
-    });
-
-    monaco.editor.setTheme('translation-theme');
+    defineTranslationThemes(monaco);
+    monaco.editor.setTheme(theme);
 
     // Listen for cursor position changes
     editor.onDidChangeCursorPosition((e: any) => {
@@ -217,7 +202,7 @@ export const TextareaWithLineNumbers = forwardRef<any, TextareaWithLineNumbersPr
           selectionHighlight: false,
           selectOnLineNumbers: true,
         }}
-        theme="translation-theme"
+        theme={theme}
       />
     </div>
   );

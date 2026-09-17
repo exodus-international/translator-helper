@@ -33,11 +33,13 @@ export function DocumentTypeFilter({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="min-w-[140px] justify-between font-normal sm:min-w-[160px]">
-          <span className={selected.length === 0 ? 'text-muted-foreground' : undefined}>{triggerLabel(selected)}</span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
-        </Button>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="outline" className="min-w-[140px] justify-between font-normal sm:min-w-[160px]" />
+        }
+      >
+        <span className={selected.length === 0 ? 'text-muted-foreground' : undefined}>{triggerLabel(selected)}</span>
+        <ChevronDown className="h-4 w-4 opacity-50" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[200px]">
         {DOCUMENT_TYPE_SEQUENCE.map((type) => {
@@ -48,7 +50,6 @@ export function DocumentTypeFilter({
               key={type}
               checked={selected.includes(type)}
               onCheckedChange={() => toggle(type)}
-              onSelect={(e) => e.preventDefault()}
             >
               <Icon className={`h-4 w-4 ${config.color.textClass}`} />
               {config.name}
@@ -58,14 +59,13 @@ export function DocumentTypeFilter({
         <DropdownMenuCheckboxItem
           checked={selected.includes(NO_TYPE)}
           onCheckedChange={() => toggle(NO_TYPE)}
-          onSelect={(e) => e.preventDefault()}
         >
           No type
         </DropdownMenuCheckboxItem>
         {selected.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => onChange([])}>Clear filter</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onChange([])}>Clear filter</DropdownMenuItem>
           </>
         )}
       </DropdownMenuContent>

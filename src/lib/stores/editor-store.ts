@@ -22,7 +22,7 @@ import {
 import { deleteDocumentAction } from '@/domain/document/document.actions';
 import { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions';
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
-import { DocumentStatus, SuggestionType } from '@prisma/client';
+import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
 import { capture } from '@/lib/analytics';
 

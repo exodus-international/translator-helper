@@ -30,7 +30,8 @@ import { buildListSearchParams, DEFAULT_PAGE_SIZE } from '@/lib/list-params';
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus, DocumentType, Language } from '@prisma/client';
+import type { Language } from '@/generated/prisma/client';
+import { DocumentStatus, DocumentType } from '@/generated/prisma/enums';
 import { ArrowDown, ArrowUp, ArrowUpDown, FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -191,16 +192,14 @@ export default function DocumentsClient({
     navigate({ sort: nextSort, order: nextOrder });
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
         title="Documents Overview"
         description="View translation status across all languages"
         actions={
-          <Button asChild>
-            <Link href="/documents/new">
-              <Plus />
-              New Document
-            </Link>
+          <Button nativeButton={false} render={<Link href="/documents/new" />}>
+            <Plus />
+            New Document
           </Button>
         }
       >
@@ -219,7 +218,15 @@ export default function DocumentsClient({
               <FieldLabel htmlFor="documents-project-filter">Project</FieldLabel>
               <Select
                 value={selectedSourceProject}
-                onValueChange={(value) => navigate({ sourceProject: value === 'all' ? null : value, page: null })}
+                onValueChange={(value) =>
+                  navigate({ sourceProject: !value || value === 'all' ? null : value, page: null })
+                }
+                items={{
+                  all: 'All projects',
+                  ...Object.fromEntries(
+                    sourceProjects.map((project) => [project.id, `${project.name} (${project._count.documents})`]),
+                  ),
+                }}
               >
                 <SelectTrigger id="documents-project-filter" className="w-full sm:w-48">
                   <SelectValue placeholder="All projects" />
@@ -240,7 +247,13 @@ export default function DocumentsClient({
               <FieldLabel htmlFor="documents-type-filter">Type</FieldLabel>
               <Select
                 value={selectedType}
-                onValueChange={(value) => navigate({ type: value === 'all' ? null : value, page: null })}
+                onValueChange={(value) => navigate({ type: !value || value === 'all' ? null : value, page: null })}
+                items={{
+                  all: 'All types',
+                  ...Object.fromEntries(
+                    DOCUMENT_TYPE_SEQUENCE.map((type) => [type, DOCUMENT_TYPE_CONFIGS[type].name]),
+                  ),
+                }}
               >
                 <SelectTrigger id="documents-type-filter" className="w-full sm:w-40">
                   <SelectValue placeholder="All types" />
@@ -267,7 +280,7 @@ export default function DocumentsClient({
         </div>
       </PageHeader>
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         {documents.length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -287,17 +300,15 @@ export default function DocumentsClient({
                   Clear search and filters
                 </Button>
               ) : (
-                <Button asChild>
-                  <Link href="/documents/new">New Document</Link>
-                </Button>
+                <Button nativeButton={false} render={<Link href="/documents/new" />}>New Document</Button>
               )}
             </EmptyContent>
           </Empty>
         ) : (
-          <div className="rounded-md border bg-white">
+          <div className="rounded-md border bg-card">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50/80">
+                <TableRow className="bg-muted/50">
                   <SortableHead
                     label="Title"
                     sortKey="title"
@@ -349,7 +360,7 @@ export default function DocumentsClient({
                         <Link
                           href={titleHref(doc)}
                           prefetch={false}
-                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          className="font-medium text-primary underline-offset-4 hover:underline"
                         >
                           {doc.title}
                         </Link>
@@ -364,12 +375,12 @@ export default function DocumentsClient({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-600 text-sm">{doc.originalFilename || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{doc.originalFilename || '—'}</TableCell>
                     <TableCell>
                       {doc.type ? (
                         <DocumentTypeBadge type={doc.type} />
                       ) : (
-                        <span className="text-gray-400 text-sm">—</span>
+                        <span className="text-muted-foreground text-sm">—</span>
                       )}
                     </TableCell>
                     {languages.map((lang) => {
@@ -410,19 +421,20 @@ export default function DocumentsClient({
                             })}
                             prefetch={false}
                           >
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost">
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </Link>
                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            <AlertDialogTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                                />
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
@@ -472,8 +484,8 @@ export default function DocumentsClient({
 
         {/* Legend */}
         {documents.length > 0 && (
-          <Card className="mt-4 p-4 bg-gray-50">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">Legend</h4>
+          <Card className="mt-4 p-4 bg-muted/50">
+            <h4 className="text-sm font-semibold text-foreground mb-3">Legend</h4>
             <div className="flex flex-wrap gap-6 text-sm">
               {[...DOCUMENT_STATUS_SEQUENCE, null].map((status) => {
                 const config = status ? getDocumentStatusConfig(status) : NO_STATUS;
@@ -482,7 +494,7 @@ export default function DocumentsClient({
                 return (
                   <div key={config.status} className="flex items-center gap-2">
                     <Icon className={`h-4 w-4 ${config.color.textClass}`} />
-                    <span className="text-gray-600">{config.name}</span>
+                    <span className="text-muted-foreground">{config.name}</span>
                   </div>
                 );
               })}
@@ -490,6 +502,6 @@ export default function DocumentsClient({
           </Card>
         )}
       </div>
-    </div>
+    </>
   );
 }

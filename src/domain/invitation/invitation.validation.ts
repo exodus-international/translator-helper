@@ -1,4 +1,4 @@
-import type { InvitationStatus } from '@prisma/client';
+import { InvitationStatus } from '@/generated/prisma/enums';
 
 export interface InvitationForValidation {
   status: InvitationStatus;

@@ -25,6 +25,16 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-hue-blue: var(--hue-blue);
+  --color-hue-amber: var(--hue-amber);
+  --color-hue-emerald: var(--hue-emerald);
+  --color-hue-violet: var(--hue-violet);
+  --color-hue-indigo: var(--hue-indigo);
+  --color-hue-sky: var(--hue-sky);
+  --color-hue-rose: var(--hue-rose);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -60,6 +70,25 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  /* Status accents. shadcn ships only --destructive, but the app also needs a
+     "done", a "needs attention" and a "neutral notice" tone. These are tuned to
+     read as text on --background, so chips use them at low alpha for the fill
+     (bg-success/10) and full strength for the label (text-success). */
+  --success: oklch(0.55 0.14 150);
+  --warning: oklch(0.56 0.14 70);
+  --info: oklch(0.55 0.18 255);
+  /* The document status and document type palettes need a set of hues that stay
+     apart from each other, which no amount of --success/--warning covers. Each
+     is tuned to be legible *as text* on its theme's ground; chips build the fill
+     and border from the same token at low alpha (bg-hue-blue/10,
+     border-hue-blue/25) so one value drives the whole chip. */
+  --hue-blue: oklch(0.52 0.2 258);
+  --hue-amber: oklch(0.56 0.14 70);
+  --hue-emerald: oklch(0.55 0.14 160);
+  --hue-violet: oklch(0.52 0.2 295);
+  --hue-indigo: oklch(0.5 0.2 275);
+  --hue-sky: oklch(0.53 0.13 235);
+  --hue-rose: oklch(0.55 0.19 15);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -94,6 +123,17 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  /* Lightened so they keep contrast against the dark ground. */
+  --success: oklch(0.76 0.15 155);
+  --warning: oklch(0.82 0.14 85);
+  --info: oklch(0.72 0.15 255);
+  --hue-blue: oklch(0.72 0.15 258);
+  --hue-amber: oklch(0.82 0.14 85);
+  --hue-emerald: oklch(0.76 0.14 162);
+  --hue-violet: oklch(0.74 0.16 295);
+  --hue-indigo: oklch(0.72 0.16 275);
+  --hue-sky: oklch(0.75 0.12 235);
+  --hue-rose: oklch(0.72 0.16 15);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);

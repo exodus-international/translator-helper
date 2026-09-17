@@ -1,0 +1,12 @@
+# Nixpacks hardcodes `npm install -g corepack@0.24.1 && corepack enable` as the
+# install phase for any project carrying a "packageManager" field, and that
+# corepack is too old to launch pnpm 11 or newer: it looks for bin/pnpm.cjs,
+# which pnpm no longer ships, so the build dies with MODULE_NOT_FOUND before
+# installing anything. Replacing the phase with a current corepack is the only
+# way to reach pnpm 12 from the repo. Cache directories and PATH entries are
+# inherited from the phase Nixpacks generates; only the commands are replaced.
+[phases.install]
+cmds = [
+  "npm install -g corepack@0.36.0 && corepack enable",
+  "pnpm i --frozen-lockfile",
+]

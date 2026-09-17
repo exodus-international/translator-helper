@@ -1,7 +1,7 @@
 import { buildDocumentPath } from '@/domain/document/document-url';
 import prisma from '@/lib/db';
 import { getGitHubConfig } from '@/lib/github-config';
-import { GitHubPRStatus } from '@prisma/client';
+import { GitHubPRStatus } from '@/generated/prisma/enums';
 import crypto from 'crypto';
 import { App } from 'octokit';
 import { resolveFilePath } from './github.paths';

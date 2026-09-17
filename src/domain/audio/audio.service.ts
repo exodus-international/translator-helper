@@ -1,7 +1,8 @@
 import prisma from '@/lib/db';
 import { isAudioStorageConfigured } from '@/lib/audio-storage-config';
 import { putObject } from '@/lib/object-storage';
-import { AudioStatus, type AudioFile, type AudioProvider, type DocumentType } from '@prisma/client';
+import type { AudioFile } from '@/generated/prisma/client';
+import { AudioProvider, AudioStatus, DocumentType } from '@/generated/prisma/enums';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { resolveAudioObjectKey } from './audio.paths';
 import {
@@ -322,7 +323,7 @@ async function complete(
   audioFile: AudioFile,
   result: SynthesisResult,
   ctx: {
-    document: { type: import('@prisma/client').DocumentType | null; originalFilename: string | null; slug: string; sourceProject: { identifier: string | null } | null };
+    document: { type: import('@/generated/prisma/client').DocumentType | null; originalFilename: string | null; slug: string; sourceProject: { identifier: string | null } | null };
     languageCode: string;
   },
 ): Promise<AudioFile> {
@@ -380,8 +381,6 @@ async function failWith(
   }
   return updated;
 }
-
-export { localeFromVoice };
 
 /** Azure allows 3-64 chars of [A-Za-z0-9-_.]; a UUID with a prefix fits. */
 function jobIdFor(audioFileId: string): string {

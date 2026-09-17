@@ -1,6 +1,6 @@
 import { getDocumentTypeConfig } from '@/constants/document-type';
 import { cn } from '@/lib/utils';
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 
 /**
  * Visual identifier for a document's content type. Renders nothing for

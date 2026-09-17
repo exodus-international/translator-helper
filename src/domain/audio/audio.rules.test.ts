@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AudioProvider, DocumentType } from '@prisma/client';
+import { AudioProvider, DocumentType } from '@/generated/prisma/enums';
 import {
   audioSkipReason,
   fingerprint,

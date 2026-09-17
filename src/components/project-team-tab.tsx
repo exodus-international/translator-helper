@@ -26,7 +26,7 @@ import {
 } from '@/domain/user-language/user-language.actions';
 import { listUsersAction } from '@/domain/user/user.actions';
 import { SessionUser } from '@/lib/session';
-import { ProjectRole } from '@prisma/client';
+import { ProjectRole } from '@/generated/prisma/enums';
 import { Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -61,7 +61,7 @@ const ROLE_LABELS: Record<ProjectRole, string> = {
 
 function RoleSelect({ value, onChange }: { value: ProjectRole; onChange: (role: ProjectRole) => void }) {
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as ProjectRole)}>
+    <Select value={value} onValueChange={(v) => onChange((v ?? value) as ProjectRole)} items={ROLE_LABELS}>
       <SelectTrigger>
         <SelectValue placeholder="Select role" />
       </SelectTrigger>
@@ -176,8 +176,8 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
   if (!translationProjectId) {
     return (
       <div className="text-center py-12">
-        <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-        <p className="text-gray-500">No translation project exists for {selectedLanguageName}</p>
+        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+        <p className="text-muted-foreground">No translation project exists for {selectedLanguageName}</p>
       </div>
     );
   }
@@ -185,7 +185,7 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
   if (loading) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Loading team members...</p>
+        <p className="text-muted-foreground">Loading team members...</p>
       </div>
     );
   }
@@ -199,17 +199,15 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
           <h2 className="text-lg font-semibold">
             {selectedLanguageName} Team ({members.length})
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Members work on every {selectedLanguageName} project, not just this one.
           </p>
         </div>
         {canManage && (
           <Dialog modal={false} open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Add Member
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Member
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -218,7 +216,11 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
               <div className="space-y-4 mt-4">
                 <div>
                   <Label>User</Label>
-                  <Select value={newMemberUserId} onValueChange={setNewMemberUserId}>
+                  <Select
+                    value={newMemberUserId || null}
+                    onValueChange={(v) => setNewMemberUserId(v ?? '')}
+                    items={Object.fromEntries(availableUsers.map((u) => [u.id, `${u.name} (${u.email})`]))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select user" />
                     </SelectTrigger>
@@ -234,7 +236,7 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
                 <div>
                   <Label>Role</Label>
                   <RoleSelect value={newMemberRole} onChange={setNewMemberRole} />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Grants this role on all {selectedLanguageName} translation projects.
                   </p>
                 </div>
@@ -254,8 +256,8 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
 
       {members.length === 0 ? (
         <div className="text-center py-12">
-          <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500">No team members yet</p>
+          <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-muted-foreground">No team members yet</p>
         </div>
       ) : (
         <Card>
@@ -276,16 +278,15 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
                         name={member.user.name}
                         image={member.user.image}
                         email={member.user.email}
-                        size="sm"
                       />
                       <div>
                         <p className="font-medium text-sm">{member.user.name}</p>
-                        <p className="text-xs text-gray-500">{member.user.email}</p>
+                        <p className="text-xs text-muted-foreground">{member.user.email}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" size="sm">
+                    <Badge variant="secondary">
                       {ROLE_LABELS[member.role]}
                     </Badge>
                   </TableCell>
@@ -297,13 +298,11 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
                           size="icon-sm"
                           onClick={() => openEditDialog(member.user.id, member.user.name, member.role)}
                         >
-                          <Pencil className="h-4 w-4 text-gray-500" />
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
                         </Button>
                         <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon-sm">
-                              <Trash2 className="h-4 w-4 text-gray-500" />
-                            </Button>
+                          <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
@@ -346,7 +345,7 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
           <div className="mt-4">
             <Label>Role</Label>
             <RoleSelect value={editRole} onChange={setEditRole} />
-            <p className="text-xs text-gray-500 mt-1">Applies to all {selectedLanguageName} translation projects.</p>
+            <p className="text-xs text-muted-foreground mt-1">Applies to all {selectedLanguageName} translation projects.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingMember(null)}>

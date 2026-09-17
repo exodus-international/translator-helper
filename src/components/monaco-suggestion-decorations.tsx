@@ -1,6 +1,6 @@
 'use client';
 
-import { SuggestionStatus, SuggestionType } from '@prisma/client';
+import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 import { useEffect, useRef } from 'react';
 
 interface SuggestionReplyWithUser {

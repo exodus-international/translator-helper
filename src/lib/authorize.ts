@@ -1,4 +1,4 @@
-import { ProjectRole, Role } from '@prisma/client';
+import { ProjectRole, Role } from '@/generated/prisma/enums';
 import { requireUser, type SessionUser } from './session';
 import { getUserRolesInProject } from '@/domain/user-language/user-language.repository';
 // ─── Types ───────────────────────────────────────────────────

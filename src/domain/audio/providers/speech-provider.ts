@@ -1,4 +1,4 @@
-import { AudioProvider } from '@prisma/client';
+import { AudioProvider } from '@/generated/prisma/enums';
 
 /**
  * The one interface the rest of the app talks to. Vendor specifics

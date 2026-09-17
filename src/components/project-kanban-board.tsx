@@ -40,7 +40,8 @@ import { buildDocumentPath } from '@/domain/document/document-url';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { toast } from 'sonner';
-import { DocumentStatus, Language } from '@prisma/client';
+import type { Language } from '@/generated/prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { FileCheck, FileText, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useState } from 'react';
@@ -61,7 +62,6 @@ function MemberAvatarStack({ users }: { users: MemberLike[] }) {
           name={u.name}
           image={u.image}
           email={u.email}
-          size="sm"
           className="border-2 border-background"
         />
       ))}
@@ -485,7 +485,15 @@ export default function ProjectKanbanBoard({
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:gap-4">
           <span className="hidden sm:inline">Filters:</span>
           <DocumentTypeFilter selected={selectedTypes} onChange={handleTypeFilterChange} />
-          <Select value={selectedUser} onValueChange={setSelectedUser}>
+          <Select
+            value={selectedUser}
+            onValueChange={(v) => setSelectedUser(v ?? 'all')}
+            items={{
+              all: 'All users',
+              me: 'Me',
+              ...Object.fromEntries(availableUsers.map((u) => [u.id, u.name ?? u.email])),
+            }}
+          >
             <SelectTrigger className="min-w-0 flex-1 sm:min-w-[200px]">
               <div className="flex items-center gap-2">
                 <SelectValue placeholder="All users" className="[&_div]:hidden! [&_span:last-child]:inline!" />
@@ -499,7 +507,6 @@ export default function ProjectKanbanBoard({
                     name={user.name}
                     image={user.image}
                     email={user.email}
-                    size="sm"
                     className="pointer-events-none"
                   />
                   <span>Me</span>
@@ -514,7 +521,6 @@ export default function ProjectKanbanBoard({
                         name={u.name}
                         image={u.image}
                         email={u.email}
-                        size="sm"
                         className="pointer-events-none"
                       />
                       <span>{u.name}</span>
@@ -528,14 +534,14 @@ export default function ProjectKanbanBoard({
 
       {loading ? (
         <div className="text-center py-12">
-          <p className="text-gray-500">Loading documents...</p>
+          <p className="text-muted-foreground">Loading documents...</p>
         </div>
       ) : filteredDocuments.length === 0 ? (
         <div className="text-center py-12">
-          <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500">No documents found</p>
+          <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-muted-foreground">No documents found</p>
           {selectedTypes.length > 0 && documents.length > 0 && (
-            <Button variant="link" size="sm" onClick={() => handleTypeFilterChange([])}>
+            <Button variant="link" onClick={() => handleTypeFilterChange([])}>
               Clear type filter
             </Button>
           )}
@@ -584,13 +590,13 @@ export default function ProjectKanbanBoard({
                     return (
                       <Fragment key={card.id}>
                         {shouldShowSeparator && (
-                          <div key={`${card.id}__separator`} className="border-t-2 border-gray-300 my-2" />
+                          <div key={`${card.id}__separator`} className="border-t-2 border-border my-2" />
                         )}
                         <KanbanCard
                           column={column.id}
                           id={card.id}
                           name={card.name}
-                          className={hasWaitingForFinalLabel ? 'bg-green-50/50 border-green-800/40' : ''}
+                          className={hasWaitingForFinalLabel ? 'bg-success/5 border-success/40' : ''}
                         >
                           <Link
                             href={getDocumentUrl()}
@@ -605,7 +611,7 @@ export default function ProjectKanbanBoard({
                                 {hasWaitingForFinalLabel && <FileCheck className="h-4 w-4" />}
                                 <p className="m-0 flex-1 font-medium text-sm">{doc.title}</p>
                                 {openSuggestionsCount > 0 && (
-                                  <Badge variant="primary" size="xs" className="shrink-0">
+                                  <Badge variant="default" className="shrink-0">
                                     {openSuggestionsCount}
                                   </Badge>
                                 )}
@@ -646,10 +652,10 @@ export default function ProjectKanbanBoard({
                                               currentReviewerId: version?.reviewer?.id || null,
                                             });
                                           }}
-                                          className="h-6 w-6 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                                          className="h-6 w-6 rounded-full border-2 border-dashed border-border flex items-center justify-center hover:border-muted-foreground hover:bg-accent transition-colors"
                                           title="Assign translator"
                                         >
-                                          <UserPlus className="h-3 w-3 text-gray-400" />
+                                          <UserPlus className="h-3 w-3 text-muted-foreground" />
                                         </button>
                                       );
                                     }
@@ -688,17 +694,17 @@ export default function ProjectKanbanBoard({
                               <div className="flex flex-wrap gap-1 items-center">
                                 <DocumentTypeBadge type={doc.type} />
                                 {doc.sourceProject && (
-                                  <Badge variant="secondary" size="xs">
+                                  <Badge variant="secondary">
                                     {doc.sourceProject.name}
                                   </Badge>
                                 )}
                                 {language && (
-                                  <Badge variant="secondary" size="xs">
+                                  <Badge variant="secondary">
                                     {language.name}
                                   </Badge>
                                 )}
                                 {deadline && (
-                                  <Badge variant="outline" size="xs">
+                                  <Badge variant="outline">
                                     {shortDateFormatter.format(new Date(deadline))}
                                   </Badge>
                                 )}
@@ -725,7 +731,14 @@ export default function ProjectKanbanBoard({
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Translator</Label>
-              <Select value={assignUserId} onValueChange={setAssignUserId}>
+              <Select
+                value={assignUserId || null}
+                onValueChange={(v) => setAssignUserId(v ?? '')}
+                items={{
+                  [UNASSIGN_VALUE]: 'Unassign translator',
+                  ...Object.fromEntries(projectMembers.map((m) => [m.user.id, m.user.name ?? m.user.email])),
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select translator..." />
                 </SelectTrigger>
@@ -740,7 +753,14 @@ export default function ProjectKanbanBoard({
             </div>
             <div className="space-y-2">
               <Label>Reviewer</Label>
-              <Select value={assignReviewerId} onValueChange={setAssignReviewerId}>
+              <Select
+                value={assignReviewerId || null}
+                onValueChange={(v) => setAssignReviewerId(v ?? '')}
+                items={{
+                  [UNASSIGN_VALUE]: 'Unassign reviewer',
+                  ...Object.fromEntries(projectMembers.map((m) => [m.user.id, m.user.name ?? m.user.email])),
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select reviewer..." />
                 </SelectTrigger>

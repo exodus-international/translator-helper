@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { admin } from 'better-auth/plugins';
@@ -29,6 +29,11 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
+  // NOTE: better-auth's `account.identityStrategy` ("provider-id") is not part
+  // of the published 1.7.x options, so it cannot be set here yet. The issuer
+  // backfill in migration 20260905170000 matches 1.7.3's default derivation
+  // ('local:oauth:' + providerId, 'local:credential'), preserving the
+  // provider-scoped identity of pre-1.7 data. Revisit when upgrading past 1.7.x.
   emailAndPassword: {
     enabled: true,
   },
@@ -60,5 +65,9 @@ export const auth = betterAuth({
       },
     }),
   ],
+  // Without an explicit base URL better-auth derives the origin from each
+  // incoming request, which breaks redirect/callback URLs behind proxies and
+  // logs a warning on every cold start.
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   trustedOrigins: ['http://localhost:3000', process.env.NEXT_PUBLIC_APP_URL || ''],
 });

@@ -43,17 +43,15 @@ export function AdminListPage({
   children,
 }: AdminListPageProps) {
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
         title={title}
         description={description}
         actions={
           <Dialog open={dialogOpen} onOpenChange={onDialogOpenChange}>
-            <DialogTrigger asChild>
-              <Button>
+            <DialogTrigger render={<Button />}>
                 <Plus />
                 {addLabel}
-              </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -75,10 +73,10 @@ export function AdminListPage({
         }
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <div className="grid gap-4">{children}</div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -91,10 +89,8 @@ interface DeleteConfirmDialogProps {
 export function DeleteConfirmDialog({ title, description, onConfirm }: DeleteConfirmDialogProps) {
   return (
     <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm">
+      <AlertDialogTrigger render={<Button variant="outline" size="sm" />}>
           <Trash2 className="h-4 w-4" />
-        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

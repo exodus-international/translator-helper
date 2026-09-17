@@ -1,6 +1,7 @@
 "use client";
 
-import type { Column, Table } from "@tanstack/react-table";
+import type { Column, RowData } from "@tanstack/react-table";
+import type { DataTableFeatures, DataTableInstance } from "@/hooks/use-data-table";
 import { X } from "lucide-react";
 import * as React from "react";
 
@@ -10,17 +11,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-interface DataTableToolbarProps<TData> extends React.ComponentProps<"div"> {
-  table: Table<TData>;
+interface DataTableToolbarProps<TData extends RowData>
+  extends React.ComponentProps<"div"> {
+  table: DataTableInstance<TData>;
+  /**
+   * Page-specific controls (a segmented filter, a search box) rendered at the
+   * head of the filter group. They belong on the same line as the column
+   * filters — a separate row above just doubles the chrome above the table.
+   */
+  leading?: React.ReactNode;
 }
 
-export function DataTableToolbar<TData>({
+export function DataTableToolbar<TData extends RowData>({
   table,
+  leading,
   children,
   className,
   ...props
 }: DataTableToolbarProps<TData>) {
-  const isFiltered = table.getState().columnFilters.length > 0;
+  const isFiltered = table.state.columnFilters.length > 0;
 
   const columns = React.useMemo(
     () => table.getAllColumns().filter((column) => column.getCanFilter()),
@@ -42,6 +51,7 @@ export function DataTableToolbar<TData>({
       {...props}
     >
       <div className="flex flex-1 flex-wrap items-center gap-2">
+        {leading}
         {columns.map((column) => (
           <DataTableToolbarFilter key={column.id} column={column} />
         ))}
@@ -64,11 +74,11 @@ export function DataTableToolbar<TData>({
     </div>
   );
 }
-interface DataTableToolbarFilterProps<TData> {
-  column: Column<TData>;
+interface DataTableToolbarFilterProps<TData extends RowData> {
+  column: Column<DataTableFeatures, TData>;
 }
 
-function DataTableToolbarFilter<TData>({
+function DataTableToolbarFilter<TData extends RowData>({
   column,
 }: DataTableToolbarFilterProps<TData>) {
   const columnMeta = column.columnDef.meta;

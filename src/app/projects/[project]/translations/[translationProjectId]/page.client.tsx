@@ -23,13 +23,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { assignTranslatorToVersionAction } from '@/domain/document-version/document-version.actions';
 import { removeLanguageMemberAction, setLanguageMemberRoleAction } from '@/domain/user-language/user-language.actions';
 import { capture } from '@/lib/analytics';
-import { Prisma, ProjectRole } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client';
+import { ProjectRole } from '@/generated/prisma/enums';
 import { Calendar, FileText, Plus, Trash2, User, Users } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { buildProjectTranslationsPath } from '@/domain/source-project/source-project-url';
 
 interface TranslationProjectClientProps {
   translationProject: Prisma.TranslationProjectGetPayload<{
@@ -245,17 +245,13 @@ export default function TranslationProjectClient({
   const unassignedVersions = versions.filter((version) => !version.userId);
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
-        back={{
-          href: buildProjectTranslationsPath(translationProject.sourceProject.identifier),
-          label: 'Back to Translations',
-        }}
         title={translationProject.name}
         description={`${translationProject.language.name} (${translationProject.language.code})`}
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Members Section */}
           <div>
@@ -271,11 +267,9 @@ export default function TranslationProjectClient({
                   if (!open) resetMemberForm();
                 }}
               >
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Member
-                  </Button>
+                <DialogTrigger render={<Button />}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Member
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
@@ -285,7 +279,7 @@ export default function TranslationProjectClient({
                     <div>
                       <Label htmlFor="user">User *</Label>
                       <Select
-                        value={selectedUserId || undefined}
+                        value={selectedUserId || null}
                         onValueChange={(userId) => {
                           if (userId && userId.trim() !== '') {
                             setSelectedUserId(userId);
@@ -293,6 +287,15 @@ export default function TranslationProjectClient({
                         }}
                         required
                         disabled={availableUsers.length === 0}
+                        items={Object.fromEntries(
+                          availableUsers.map(
+                            (user) =>
+                              [
+                                user.id,
+                                `${user.name} (${user.email}) - ${user.languages.map((l) => l.language.code).join(', ')}`,
+                              ] as const,
+                          ),
+                        )}
                       >
                         <SelectTrigger>
                           <SelectValue
@@ -316,7 +319,11 @@ export default function TranslationProjectClient({
                     </div>
                     <div>
                       <Label htmlFor="role">Role *</Label>
-                      <Select value={selectedRole} onValueChange={(role) => setSelectedRole(role as ProjectRole)}>
+                      <Select
+                        value={selectedRole}
+                        onValueChange={(role) => role && setSelectedRole(role as ProjectRole)}
+                        items={ROLE_LABELS}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a role" />
                         </SelectTrigger>
@@ -328,7 +335,7 @@ export default function TranslationProjectClient({
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Grants this role on every {translationProject.language.name} translation project.
                       </p>
                     </div>
@@ -345,7 +352,7 @@ export default function TranslationProjectClient({
               </Dialog>
             </div>
 
-            <p className="text-sm text-gray-500 mb-2">
+            <p className="text-sm text-muted-foreground mb-2">
               These members work on every {translationProject.language.name} translation project.
             </p>
             <div className="space-y-2">
@@ -354,13 +361,14 @@ export default function TranslationProjectClient({
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="font-medium">{member.user.name}</div>
-                      <div className="text-sm text-gray-600">{member.user.email}</div>
+                      <div className="text-sm text-muted-foreground">{member.user.email}</div>
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         <Badge variant="secondary">{ROLE_LABELS[member.role]}</Badge>
                         <Select
                           value={member.role}
-                          onValueChange={(value) => handleChangeRole(member.userId, value as ProjectRole)}
+                          onValueChange={(value) => value && handleChangeRole(member.userId, value as ProjectRole)}
                           disabled={loading}
+                          items={ROLE_LABELS}
                         >
                           <SelectTrigger className="h-6 w-auto border-dashed">
                             <SelectValue placeholder="Change role" />
@@ -376,10 +384,10 @@ export default function TranslationProjectClient({
                       </div>
                     </div>
                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={loading} className="ml-4">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <AlertDialogTrigger
+                        render={<Button variant="outline" disabled={loading} className="ml-4" />}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
@@ -403,8 +411,8 @@ export default function TranslationProjectClient({
               ))}
               {sortedMembers.length === 0 && (
                 <Card className="p-6 text-center">
-                  <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600">No members yet. Add one to get started.</p>
+                  <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground">No members yet. Add one to get started.</p>
                 </Card>
               )}
             </div>
@@ -424,11 +432,9 @@ export default function TranslationProjectClient({
                   if (!open) resetAssignmentForm();
                 }}
               >
-                <DialogTrigger asChild>
-                  <Button size="sm" disabled={unassignedDocuments.length === 0}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Assign Document
-                  </Button>
+                <DialogTrigger render={<Button disabled={unassignedDocuments.length === 0} />}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Assign Document
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
@@ -437,7 +443,12 @@ export default function TranslationProjectClient({
                   <form onSubmit={handleAssignDocument} className="space-y-4">
                     <div>
                       <Label htmlFor="document">Document *</Label>
-                      <Select value={selectedDocumentId} onValueChange={setSelectedDocumentId} required>
+                      <Select
+                        value={selectedDocumentId || null}
+                        onValueChange={(v) => setSelectedDocumentId(v ?? '')}
+                        required
+                        items={Object.fromEntries(unassignedDocuments.map((doc) => [doc.id, doc.title]))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a document" />
                         </SelectTrigger>
@@ -455,8 +466,12 @@ export default function TranslationProjectClient({
                       <Select
                         value={selectedAssigneeId || UNASSIGNED_VALUE}
                         onValueChange={(value) =>
-                          setSelectedAssigneeId(value === UNASSIGNED_VALUE ? null : value)
+                          setSelectedAssigneeId(!value || value === UNASSIGNED_VALUE ? null : value)
                         }
+                        items={{
+                          [UNASSIGNED_VALUE]: 'Unassigned (visible to all)',
+                          ...Object.fromEntries(sortedMembers.map((member) => [member.userId, member.user.name ?? ''])),
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Unassigned (visible to all)" />
@@ -497,14 +512,14 @@ export default function TranslationProjectClient({
               {/* Assigned Documents */}
               {assignedVersions.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Assigned Documents</h3>
+                  <h3 className="text-sm font-medium text-foreground mb-2">Assigned Documents</h3>
                   <div className="space-y-2">
                     {assignedVersions.map((version) => (
                       <Card key={version.id} className="p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="font-medium">{version.document.title}</div>
-                            <div className="text-sm text-gray-600 flex items-center gap-4 mt-1">
+                            <div className="text-sm text-muted-foreground flex items-center gap-4 mt-1">
                               <span className="flex items-center gap-1">
                                 <User className="h-3 w-3" />
                                 {version.user?.name || 'Unknown'}
@@ -518,10 +533,8 @@ export default function TranslationProjectClient({
                             </div>
                           </div>
                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="outline" size="sm" disabled={loading}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            <AlertDialogTrigger render={<Button variant="outline" disabled={loading} />}>
+                              <Trash2 className="h-4 w-4" />
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
@@ -550,7 +563,7 @@ export default function TranslationProjectClient({
               {/* Unassigned Documents */}
               {unassignedVersions.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Unassigned Documents</h3>
+                  <h3 className="text-sm font-medium text-foreground mb-2">Unassigned Documents</h3>
                   <div className="space-y-2">
                     {unassignedVersions.map((version) => (
                       <Card key={version.id} className="p-4">
@@ -570,14 +583,14 @@ export default function TranslationProjectClient({
 
               {versions.length === 0 && (
                 <Card className="p-6 text-center">
-                  <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600">No documents in this project yet.</p>
+                  <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground">No documents in this project yet.</p>
                 </Card>
               )}
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

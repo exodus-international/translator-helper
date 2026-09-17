@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
-import { DocumentStatus, DocumentType } from '@prisma/client';
+import { DocumentStatus, DocumentType } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import {

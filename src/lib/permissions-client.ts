@@ -1,6 +1,6 @@
 'use client';
 
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { SessionUser } from './session';
 
 /**

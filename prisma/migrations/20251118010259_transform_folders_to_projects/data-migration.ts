@@ -1,3 +1,4 @@
+import 'dotenv/config';
 /**
  * Data migration script to transform folders to projects
  *
@@ -10,9 +11,12 @@
  * npx tsx prisma/migrations/20251118010259_transform_folders_to_projects/data-migration.ts
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../../src/generated/prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 async function main() {
   console.log('Starting data migration: Folders to Projects...');

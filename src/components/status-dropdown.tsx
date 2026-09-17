@@ -10,8 +10,8 @@ import { capture } from '@/lib/analytics';
 import { canDeployClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { DocumentStatus } from '@prisma/client';
-import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+import { DocumentStatus } from '@/generated/prisma/enums';
+import { Menu as DropdownMenuPrimitive } from '@base-ui/react/menu';
 import { AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
@@ -228,15 +228,16 @@ export function StatusDropdown({
     <>
       {deployDialog}
       <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
-      <DropdownMenuPrimitive.Trigger asChild>
-        {triggerButton}
-      </DropdownMenuPrimitive.Trigger>
+      <DropdownMenuPrimitive.Trigger render={triggerButton} />
 
       <DropdownMenuPrimitive.Portal>
-        <DropdownMenuPrimitive.Content
-          className="min-w-[200px] bg-white rounded-md border shadow-md p-1 z-50"
+        <DropdownMenuPrimitive.Positioner
+          className="isolate z-50 outline-none"
           align="start"
           sideOffset={4}
+        >
+        <DropdownMenuPrimitive.Popup
+          className="min-w-[200px] bg-popover text-popover-foreground rounded-md border shadow-md p-1 z-50"
         >
           {availableStatuses.map((status) => {
             const statusConfig = getDocumentStatusConfig(status);
@@ -258,11 +259,11 @@ export function StatusDropdown({
                 disabled={isDisabled}
                 className={cn(
                   'relative flex items-center gap-2 px-2 py-2 text-sm rounded-sm outline-none',
-                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100 focus:bg-gray-100',
-                  isCurrentStatus && 'bg-blue-50 opacity-60',
+                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-accent focus:bg-accent',
+                  isCurrentStatus && 'bg-info/10 opacity-60',
                 )}
-                onSelect={(e) => {
-                  e.preventDefault();
+                closeOnClick={false}
+                onClick={() => {
                   if (isBlockedByOpenSuggestions) {
                     toast.warning(`Resolve all open comments before approving (${openSuggestionsCount} remaining)`);
                     return;
@@ -272,21 +273,21 @@ export function StatusDropdown({
                   }
                 }}
               >
-                {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
+                {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-info rounded-r" />}
                 <div className="flex w-full justify-between items-center gap-2">
                   <div className="flex flex-col">
-                    <span className={cn(isDisabled ? 'text-gray-400' : 'text-gray-900 font-medium')}>
+                    <span className={cn(isDisabled ? 'text-muted-foreground' : 'text-foreground font-medium')}>
                       {getTransitionLabel(displayedStatus, status)}
                     </span>
                     {isBlockedByOpenSuggestions && (
-                      <div className="text-[12px] text-red-600 flex items-center">
+                      <div className="text-[12px] text-destructive flex items-center">
                         <AlertCircle className="h-3.5 w-3.5 mr-1" /> {openSuggestionsCount} open comment
                         {openSuggestionsCount !== 1 ? 's' : ''} remaining
                       </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <ArrowRight className={cn('h-3.5 w-3.5', isDisabled ? 'text-gray-300' : 'text-gray-400')} />
+                    <ArrowRight className={cn('h-3.5 w-3.5', isDisabled ? 'text-muted-foreground/60' : 'text-muted-foreground')} />
                     <Badge variant="secondary" className={cn('gap-1', statusConfig.color.badgeClass, 'justify-start')}>
                       <StatusIcon className={cn('h-3.5 w-3.5', statusConfig.color.textClass)} />
                       <span className={cn('font-medium', statusConfig.color.textClass)}>{statusConfig.name}</span>
@@ -296,7 +297,8 @@ export function StatusDropdown({
               </DropdownMenuPrimitive.Item>
             );
           })}
-        </DropdownMenuPrimitive.Content>
+        </DropdownMenuPrimitive.Popup>
+        </DropdownMenuPrimitive.Positioner>
       </DropdownMenuPrimitive.Portal>
     </DropdownMenuPrimitive.Root>
     </>

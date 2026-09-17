@@ -16,7 +16,8 @@ import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } f
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import { SuggestionStatus } from '@prisma/client';
+import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
+import { SuggestionStatus } from '@/generated/prisma/enums';
 import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { MarkdownPreview } from '@/components/markdown-preview';
@@ -124,9 +125,18 @@ const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number)
 export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle, SourceTranslationViewerProps>(
   function SourceTranslationViewerOuter(props, ref) {
     const hasSidebar = (props.suggestions?.length ?? 0) > 0 || props.canCreateSuggestions;
+    // Same condition the inner component renders the panel on -- keep the two
+    // in step, or a document with only a summary renders a panel that starts
+    // closed.
+    const hasPanel = hasSidebar || !!props.sidebarHeader || !!props.sidebarSummary;
     return (
       <SidebarProvider
-        defaultOpen={hasSidebar || !!props.sidebarHeader}
+        defaultOpen={hasPanel}
+        // Nested inside the app shell's own provider: keep this one from
+        // stealing ⌘B (which would toggle both sidebars at once) and from
+        // overwriting the shell's persisted state cookie.
+        keyboardShortcut={false}
+        cookieName={EDITOR_SIDEBAR_COOKIE_NAME}
         className={cn(props.className, props.layout === 'zen' && 'h-full')}
       >
         <SourceTranslationViewerInner ref={ref} {...props} />
@@ -590,6 +600,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // the docked sidebar (open). "Show panel" must appear whenever it's closed,
     // otherwise mobile users with a pre-opened desktop state can't reach it.
     const panelHidden = isMobile ? !openMobile : !sidebarOpen;
+    // The panel exists whenever it has anything to show; Document info alone is
+    // enough. `hasSidebar` is narrower -- it gates the thread list -- so using
+    // it for the reopen button made the panel a trapdoor on documents without
+    // suggestions, and hid it outright on mobile, where it starts closed.
+    const hasPanel = hasSidebar || !!sidebarHeader || !!sidebarSummary;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
@@ -661,13 +676,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {sourceBadge}
                 {canEditSource && !isSourceEditing && (
                   <>
-                    <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
+                    <Button variant="outline" onClick={enterSourceEditMode}>
                       <Edit />
                       Edit
                     </Button>
                     {/* <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline">
                         <Trash2 />
                         Delete
                       </Button>
@@ -689,11 +704,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 )}
                 {isSourceEditing && (
                   <>
-                    <Button variant="outline" size="sm" onClick={handleSourceSave} disabled={sourceSaving}>
+                    <Button variant="outline" onClick={handleSourceSave} disabled={sourceSaving}>
                       <Save />
                       {sourceSaving ? 'Saving...' : 'Save'}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleSourceCancel} disabled={sourceSaving}>
+                    <Button variant="outline" onClick={handleSourceCancel} disabled={sourceSaving}>
                       <X />
                       Cancel
                     </Button>
@@ -815,7 +830,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           Review
                           {openSuggestionsCount > 0 && (
                             <Badge
-                              variant="primary"
+                              variant="default"
                               className="absolute -top-3 -right-3 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
                             >
                               {openSuggestionsCount}
@@ -848,7 +863,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         Review
                         {openSuggestionsCount > 0 && (
                           <Badge
-                            variant="primary"
+                            variant="default"
                             className="absolute -top-1 -left-1 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
                           >
                             {openSuggestionsCount}
@@ -861,10 +876,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {translationBadge}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
-                {hasSidebar && panelHidden && (
+                {hasPanel && panelHidden && (
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={toggleSidebar}
                     className="h-7 text-xs"
                     aria-label="Show panel"
@@ -872,7 +886,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     <PanelRightOpen />
                     <span className="hidden sm:inline">Show panel</span>
                     {openSuggestionsCount > 0 && (
-                      <Badge variant="primary" className="h-4 min-w-4 px-1 text-[10px]">
+                      <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
                         {openSuggestionsCount}
                       </Badge>
                     )}
@@ -1059,7 +1073,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </AlertDialog>
         </div>
 
-        {(hasSidebar || sidebarHeader || sidebarSummary) && (
+        {hasPanel && (
           <Sidebar side="right" collapsible="offcanvas">
             <SidebarHeader className="p-0 gap-0">
               <div className="px-3 py-2 flex items-center justify-between border-b">
@@ -1068,7 +1082,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 </span>
                 <Button
                   variant="ghost"
-                  size="sm"
                   onClick={toggleSidebar}
                   className="h-7 w-7 p-0"
                   aria-label="Close panel"
@@ -1078,12 +1091,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               </div>
               {sidebarHeader}
               {sidebarSummary && (
-                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-white">
+                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-background">
                   {sidebarSummary}
                   {sidebarDetails && (
                     <Button
                       variant="ghost"
-                      size="sm"
                       className="h-7 w-full justify-start px-1 text-xs text-muted-foreground"
                       onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
                     >

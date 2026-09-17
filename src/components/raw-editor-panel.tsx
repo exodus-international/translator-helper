@@ -54,7 +54,7 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
   return (
     <div className={cn(fullHeight ? 'flex h-full flex-col space-y-2 ' : 'flex h-full flex-col space-y-2', className)}>
       {lineInfo && (
-        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 px-2 py-0.5">
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-2 py-0.5">
           <span className="font-semibold">L{lineInfo.primaryValue}</span>
           {lineInfo.secondaryLabel !== undefined && lineInfo.secondaryValue !== undefined && (
             <>

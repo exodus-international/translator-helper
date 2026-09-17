@@ -1,7 +1,7 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { canManageSourceProject } from '@/lib/permissions';
 import { listTargetLanguages } from '../language/language.repository';
 import { createTranslationProject } from '../translation-project/translation-project.repository';

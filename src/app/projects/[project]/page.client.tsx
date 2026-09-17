@@ -16,7 +16,7 @@ import { capture } from '@/lib/analytics';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { Language } from '@prisma/client';
+import type { Language } from '@/generated/prisma/client';
 import { BarChart3, CheckCircle2, LayoutDashboard, Settings, Users } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { useRouter } from 'next/navigation';
@@ -155,13 +155,16 @@ export default function ProjectDetailClient({
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
-        back={{ href: '/dashboard', label: 'Dashboard' }}
         title={sourceProject.name}
         description={sourceProject.description ?? undefined}
         actions={
-          <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+          <Select
+            value={selectedLanguage}
+            onValueChange={(v) => handleLanguageChange(v ?? '')}
+            items={Object.fromEntries(languages.map((lang) => [lang.id, lang.name]))}
+          >
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select language" />
             </SelectTrigger>
@@ -176,7 +179,7 @@ export default function ProjectDetailClient({
         }
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <Tabs defaultValue="dashboard">
           <TabsList
             className={cn(
@@ -323,6 +326,6 @@ export default function ProjectDetailClient({
           )}
         </Tabs>
       </div>
-    </div>
+    </>
   );
 }

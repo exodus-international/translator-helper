@@ -13,7 +13,11 @@ export function DocumentTypeSelect({ value, onChange }: DocumentTypeSelectProps)
   return (
     <div>
       <Label htmlFor="documentType">Document Type</Label>
-      <Select value={value} onValueChange={onChange}>
+      <Select
+        value={value || null}
+        onValueChange={(v) => onChange(v ?? '')}
+        items={Object.fromEntries(DOCUMENT_TYPE_SEQUENCE.map((type) => [type, DOCUMENT_TYPE_CONFIGS[type].name]))}
+      >
         <SelectTrigger>
           <SelectValue placeholder="Select type (optional)" />
         </SelectTrigger>
