@@ -1,5 +1,5 @@
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
-import type { Range } from '@codemirror/state';
+import type { EditorState, Range } from '@codemirror/state';
 
 /**
  * YAML frontmatter, drawn as the metadata it is.
@@ -22,19 +22,39 @@ const OPENING = /^---[ \t]*\r?\n/;
 const CLOSING = /^---[ \t]*$/;
 const KEY = /^[A-Za-z_][\w-]*:/;
 
+/**
+ * How far down to look for the closing `---`.
+ *
+ * The blocks in this library run to a handful of keys, so anything past this is
+ * not frontmatter that someone forgot to close -- and the bound is what keeps
+ * the search off the rest of the document, since this runs on every keystroke.
+ */
+const MAX_FRONTMATTER_LINES = 200;
+
+/** The line the block closes on, or 0 when the document opens no block. */
+export function closingLine(doc: EditorState['doc']): number {
+  if (!OPENING.test(doc.line(1).text + '\n')) return 0;
+  const last = Math.min(doc.lines, MAX_FRONTMATTER_LINES);
+  for (let number = 2; number <= last; number++) {
+    if (CLOSING.test(doc.line(number).text)) return number;
+  }
+  return 0;
+}
+
 function buildFrontmatter(view: EditorView): DecorationSet {
   const doc = view.state.doc;
-  const first = doc.line(1);
-  if (!OPENING.test(first.text + '\n')) return Decoration.none;
+  // Only a closed block is frontmatter. An opening `---` on its own is a
+  // horizontal rule, or a block someone is still typing, and without this the
+  // scan ran to the end of the document and drew every line of it as metadata
+  // -- the whole translation greyed out between the first `---` and the second.
+  const closing = closingLine(doc);
+  if (!closing) return Decoration.none;
 
   const ranges: Range<Decoration>[] = [];
-  for (let number = 1; number <= doc.lines; number++) {
+  for (let number = 1; number <= closing; number++) {
     const line = doc.line(number);
-    if (number > 1 && CLOSING.test(line.text)) {
-      ranges.push(frontmatterLine.range(line.from));
-      break;
-    }
     ranges.push(frontmatterLine.range(line.from));
+    if (number === closing) break;
     const key = KEY.exec(line.text);
     if (key) {
       ranges.push(frontmatterKey.range(line.from, line.from + key[0].length - 1));
