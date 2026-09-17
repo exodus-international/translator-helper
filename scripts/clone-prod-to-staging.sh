@@ -42,6 +42,12 @@ psql --quiet --set ON_ERROR_STOP=1 "$STAGING_URL" < "$dump"
 
 echo "==> Making staging safe"
 psql --quiet --set ON_ERROR_STOP=1 "$STAGING_URL" <<'SQL'
+-- All of it or none of it. Each statement in this heredoc would otherwise
+-- commit on its own, so a failure partway through leaves staging with some of
+-- these applied and the rest not -- half-sanitized, which is the one outcome
+-- this step exists to prevent.
+BEGIN;
+
 -- A deploy resolves its target branch from language.branchName in the DATABASE,
 -- while the repository comes from env. With production's rows restored, a
 -- deploy from staging would commit to the real translation branches. Clearing
@@ -55,8 +61,16 @@ TRUNCATE "session";
 TRUNCATE "verification";
 
 -- Outstanding invitation tokens would otherwise be redeemable against staging.
-DELETE FROM "invitation" WHERE "status" = 'PENDING';
+-- Redeemable is ACTIVE; the enum has no PENDING, and comparing the column to a
+-- literal that is not one of its members is an error, not an empty match. All
+-- of them go rather than the ACTIVE ones: this is a copy for a migration
+-- rehearsal, and no invitation here is meant to be accepted. CASCADE for the
+-- invitation_language rows that reference them.
+TRUNCATE "invitation" CASCADE;
 
+COMMIT;
+
+SELECT 'invitations (want 0): ' || count(*) FROM "invitation";
 SELECT 'languages with a branch (want 0): ' || count(*) FROM "language" WHERE "branchName" IS NOT NULL;
 SELECT 'sessions (want 0): ' || count(*) FROM "session";
 SELECT 'projects: ' || count(*) FROM "source_project";
