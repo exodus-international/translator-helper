@@ -80,21 +80,37 @@ export function ProjectFormFields({ values, onChange, idPrefix = 'project' }: Pr
         />
       </div>
       <div>
-        <Label htmlFor={`${idPrefix}-identifier`}>Identifier *</Label>
-        <Input
-          id={`${idPrefix}-identifier`}
-          value={values.identifier}
-          onChange={(e) => onChange('identifier', e.target.value)}
-          placeholder="e.g., exodus90, lent2026, october_2026"
-          required
-          pattern={IDENTIFIER_PATTERN}
-          className="mt-1"
-        />
+        <label htmlFor={`${idPrefix}-deploy-to-github`} className="flex items-center gap-2 text-sm font-medium">
+          <input
+            id={`${idPrefix}-deploy-to-github`}
+            type="checkbox"
+            checked={values.deployToGithub}
+            onChange={(e) => onChange('deployToGithub', e.target.checked)}
+          />
+          Deploy to GitHub
+        </label>
         <p className="text-xs text-muted-foreground mt-1">
-          Used in document URLs and as the folder name in the content repository. Lowercase letters, numbers, dashes
-          and underscores.
+          Off for projects with no content repository — their documents can't be deployed.
         </p>
       </div>
+      {values.deployToGithub && (
+        <div>
+          <Label htmlFor={`${idPrefix}-identifier`}>Identifier *</Label>
+          <Input
+            id={`${idPrefix}-identifier`}
+            value={values.identifier}
+            onChange={(e) => onChange('identifier', e.target.value)}
+            placeholder="e.g., exodus90, lent2026, october_2026"
+            required
+            pattern={IDENTIFIER_PATTERN}
+            className="mt-1"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Used in document URLs and as the folder name in the content repository. Lowercase letters, numbers,
+            dashes and underscores.
+          </p>
+        </div>
+      )}
       <div>
         <Label htmlFor={`${idPrefix}-acronym`}>Acronym</Label>
         <Input

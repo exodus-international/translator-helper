@@ -172,7 +172,7 @@ export async function getSourceProjectByIdentifier(identifier: string) {
 export async function createSourceProject(data: {
   name: string;
   description?: string | null;
-  identifier: string;
+  identifier?: string | null;
   acronym?: string | null;
 }) {
   return prisma.sourceProject.create({
@@ -185,7 +185,7 @@ export async function updateSourceProject(
   data: {
     name?: string;
     description?: string | null;
-    identifier?: string;
+    identifier?: string | null;
     acronym?: string | null;
     status?: 'ACTIVE' | 'COMPLETE';
     audioDocumentTypes?: DocumentType[];

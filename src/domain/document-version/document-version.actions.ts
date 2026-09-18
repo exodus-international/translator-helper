@@ -7,6 +7,7 @@ import { type SessionUser } from '@/lib/session';
 import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
+import { DeploySkippedError } from '../github/github.errors';
 
 /**
  * Load a version + its language and assert the caller may edit/delete a source
@@ -297,16 +298,21 @@ export async function updateDocumentVersionStatusAction(
         github = { status: 'skipped' };
       }
     } catch (error: any) {
-      console.error('[GitHub] Deploy failed:', error.message);
-      console.error('[GitHub] Full error:', error);
-      await createActivityLog({
-        documentVersionId: version.id,
-        userId: user.id,
-        action: 'github_deploy_failed',
-        details: { error: error.message },
-      });
-      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
-      github = { status: 'failed', error: error.message };
+      if (error instanceof DeploySkippedError) {
+        console.log('[GitHub] Deploy skipped:', error.message);
+        github = { status: 'skipped' };
+      } else {
+        console.error('[GitHub] Deploy failed:', error.message);
+        console.error('[GitHub] Full error:', error);
+        await createActivityLog({
+          documentVersionId: version.id,
+          userId: user.id,
+          action: 'github_deploy_failed',
+          details: { error: error.message },
+        });
+        revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
+        github = { status: 'failed', error: error.message };
+      }
     }
   }
 

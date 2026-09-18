@@ -251,7 +251,7 @@ export default function TranslationsClient({
                     <div className="flex items-center gap-3">
                       <h3 className="font-semibold text-lg">{tp.name}</h3>
                       <Link
-                        href={buildTranslationProjectPath(sourceProject.identifier, tp.id)}
+                        href={buildTranslationProjectPath(sourceProject.identifier ?? sourceProject.id, tp.id)}
                         className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
                       >
                         <Users className="h-4 w-4" />

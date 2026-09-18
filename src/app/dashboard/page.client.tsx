@@ -52,7 +52,7 @@ type VersionWithDetails = {
     sourceProject: {
       id: string;
       name: string;
-      identifier: string;
+      identifier: string | null;
     } | null;
   };
   language: {
@@ -78,7 +78,7 @@ interface DashboardClientProps {
   user: SessionUser;
   projects: {
     id: string;
-    identifier: string;
+    identifier: string | null;
     name: string;
     description: string | null;
     status: string;

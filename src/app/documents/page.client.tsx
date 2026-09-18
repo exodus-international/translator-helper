@@ -48,7 +48,7 @@ type DocumentWithVersions = {
   type: DocumentType | null;
   originalFilename: string | null;
   sourceProjectId: string | null;
-  sourceProject: { id: string; name: string; identifier: string } | null;
+  sourceProject: { id: string; name: string; identifier: string | null } | null;
   versions: Array<{
     id: string;
     languageId: string;

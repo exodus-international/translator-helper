@@ -503,7 +503,12 @@ export function DocumentEditor({
       publishTrail([
         { label: 'Documents', href: '/documents' },
         ...(document.sourceProject
-          ? [{ label: document.sourceProject.name, href: buildProjectPath(document.sourceProject.identifier) }]
+          ? [
+              {
+                label: document.sourceProject.name,
+                href: buildProjectPath(document.sourceProject.identifier ?? document.sourceProject.id),
+              },
+            ]
           : []),
         { label: document.title },
         ...(languageName ? [{ label: languageName }] : []),

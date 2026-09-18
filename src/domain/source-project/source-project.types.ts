@@ -42,7 +42,9 @@ const sourceProjectAcronym = z
 export const createSourceProjectSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
-  identifier: sourceProjectIdentifier,
+  // Optional: a project with no identifier has no content-repo folder, so its
+  // documents skip GitHub deploy instead of erroring.
+  identifier: sourceProjectIdentifier.optional(),
   acronym: sourceProjectAcronym.optional().nullable(),
 });
 
@@ -52,13 +54,15 @@ export const updateSourceProjectSchema = z.object({
   // Deliberately laxer than on create: identifiers predating the format rule
   // are still valid URL segments and still name a folder in the content repo,
   // so an admin editing an unrelated field must not be blocked by one.
+  // Nullable so an admin can turn GitHub deploy off for a project.
   identifier: z
     .string()
     .min(2)
     .max(64)
     .regex(/^[^\s/?#]+$/, 'No spaces, slashes, question marks or hashes')
     .refine(notUuidShaped, notUuidMessage)
-    .optional(),
+    .optional()
+    .nullable(),
   status: z.enum(['ACTIVE', 'COMPLETE']).optional(),
   audioDocumentTypes: z.array(z.enum(DocumentType)).optional(),
   // Nullable so an admin can clear the acronym and go back to unprefixed titles.

@@ -76,6 +76,7 @@ export default function ProjectDetailClient({
   const [settingsName, setSettingsName] = useState(sourceProject.name);
   const [settingsDescription, setSettingsDescription] = useState(sourceProject.description || '');
   const [settingsIdentifier, setSettingsIdentifier] = useState(sourceProject.identifier || '');
+  const [settingsDeployToGithub, setSettingsDeployToGithub] = useState(Boolean(sourceProject.identifier));
   const [settingsAcronym, setSettingsAcronym] = useState(sourceProject.acronym || '');
   const [settingsSaving, setSettingsSaving] = useState(false);
 
@@ -115,10 +116,10 @@ export default function ProjectDetailClient({
 
   const handleSaveSettings = async () => {
     // The identifier is a URL segment and the content repo folder name, so it
-    // cannot be cleared. Caught here to say so, rather than letting the action
-    // reject a null with a type error.
-    if (!settingsIdentifier.trim()) {
-      toast.warning('Identifier is required');
+    // is required whenever GitHub deploy is on. Caught here to say so, rather
+    // than letting the action reject it with a validation error.
+    if (settingsDeployToGithub && !settingsIdentifier.trim()) {
+      toast.warning('Identifier is required to deploy to GitHub');
       return;
     }
 
@@ -127,7 +128,7 @@ export default function ProjectDetailClient({
       await updateSourceProjectAction(sourceProject.id, {
         name: settingsName,
         description: settingsDescription || null,
-        identifier: settingsIdentifier.trim(),
+        identifier: settingsDeployToGithub ? settingsIdentifier.trim() : null,
         acronym: settingsAcronym.trim() || null,
       });
       capture('project_settings_saved');
@@ -264,18 +265,34 @@ export default function ProjectDetailClient({
                       />
                     </div>
                     <div>
-                      <Label htmlFor="settings-identifier">Repository Identifier</Label>
-                      <Input
-                        id="settings-identifier"
-                        value={settingsIdentifier}
-                        onChange={(e) => setSettingsIdentifier(e.target.value)}
-                        placeholder="e.g., exodus90, lent2026"
-                        className="mt-1"
-                      />
+                      <label htmlFor="settings-deploy-to-github" className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          id="settings-deploy-to-github"
+                          type="checkbox"
+                          checked={settingsDeployToGithub}
+                          onChange={(e) => setSettingsDeployToGithub(e.target.checked)}
+                        />
+                        Deploy to GitHub
+                      </label>
                       <p className="text-xs text-muted-foreground mt-1">
-                        GITHUB: Folder name in the content repository
+                        Off for projects with no content repository — their documents can&apos;t be deployed.
                       </p>
                     </div>
+                    {settingsDeployToGithub && (
+                      <div>
+                        <Label htmlFor="settings-identifier">Repository Identifier *</Label>
+                        <Input
+                          id="settings-identifier"
+                          value={settingsIdentifier}
+                          onChange={(e) => setSettingsIdentifier(e.target.value)}
+                          placeholder="e.g., exodus90, lent2026"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          GITHUB: Folder name in the content repository
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <Label htmlFor="settings-acronym">Acronym</Label>
                       <Input

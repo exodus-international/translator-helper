@@ -216,7 +216,7 @@ model SourceProject {
   id                  String               @id @default(uuid())
   name                String               @unique
   description         String?              @db.Text
-  identifier          String               @unique // URL segment: /documents/{identifier}/...
+  identifier          String?              @unique // URL segment: /documents/{identifier}/...; null skips GitHub deploy for this project
   acronym             String? // Short prefix for auto-named DAY titles, e.g. "SML" in "SML - DAY 03 - ..."
   status              SourceProjectStatus  @default(ACTIVE)
   audioDocumentTypes  DocumentType[]       @default([DAY, DAILY_CONTENT])

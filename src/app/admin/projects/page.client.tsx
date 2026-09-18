@@ -158,6 +158,7 @@ export default function ProjectsClient({
       description: project.description || '',
       identifier: project.identifier || '',
       acronym: project.acronym || '',
+      deployToGithub: Boolean(project.identifier),
     });
     setAudioDocumentTypes(project.audioDocumentTypes ?? DEFAULT_AUDIO_DOCUMENT_TYPES);
     setDialogOpen(true);
@@ -284,7 +285,7 @@ export default function ProjectsClient({
                       </Badge>
                     )}
                     <Link
-                      href={buildProjectTranslationsPath(project.identifier)}
+                      href={buildProjectTranslationsPath(project.identifier ?? project.id)}
                       className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
                     >
                       <Languages className="h-4 w-4" />

@@ -8,7 +8,13 @@ import {
   toUpdateProjectInput,
 } from './source-project.form';
 
-const filled = { name: 'Exodus90 2026', description: 'A description', identifier: 'exodus90', acronym: 'E90' };
+const filled = {
+  name: 'Exodus90 2026',
+  description: 'A description',
+  identifier: 'exodus90',
+  acronym: 'E90',
+  deployToGithub: true,
+};
 const minimal = { ...EMPTY_PROJECT_FORM, name: 'Exodus90 2026', identifier: 'exodus90' };
 
 describe('toCreateProjectInput', () => {
@@ -42,6 +48,7 @@ describe('toCreateProjectInput', () => {
       description: '  hello ',
       identifier: ' exodus90 ',
       acronym: ' E90 ',
+      deployToGithub: true,
     });
     assert.deepEqual(input, {
       name: 'Exodus90 2026',
@@ -49,6 +56,12 @@ describe('toCreateProjectInput', () => {
       identifier: 'exodus90',
       acronym: 'E90',
     });
+  });
+
+  it('sends a null identifier when GitHub deploy is turned off', () => {
+    const input = toCreateProjectInput({ ...minimal, identifier: 'exodus90', deployToGithub: false });
+    assert.equal(input.identifier, undefined);
+    assert.equal(createSourceProjectSchema.safeParse(input).success, true);
   });
 });
 
@@ -91,10 +104,16 @@ describe('toUpdateProjectInput', () => {
     assert.equal(updateSourceProjectSchema.safeParse(input).success, true);
   });
 
-  it('never sends a null identifier, which the update schema rejects', () => {
+  it('never sends a null identifier while GitHub deploy stays on', () => {
     const input = toUpdateProjectInput({ ...filled, identifier: '   ' });
     assert.equal(input.identifier, '');
     assert.notEqual(input.identifier, null);
+  });
+
+  it('sends a null identifier when GitHub deploy is turned off', () => {
+    const input = toUpdateProjectInput({ ...filled, deployToGithub: false });
+    assert.equal(input.identifier, null);
+    assert.equal(updateSourceProjectSchema.safeParse(input).success, true);
   });
 });
 
@@ -104,6 +123,10 @@ describe('isProjectFormComplete', () => {
     assert.equal(isProjectFormComplete(EMPTY_PROJECT_FORM), false);
     assert.equal(isProjectFormComplete({ ...minimal, name: '   ' }), false);
     assert.equal(isProjectFormComplete({ ...minimal, identifier: '' }), false);
+  });
+
+  it('does not require an identifier when GitHub deploy is off', () => {
+    assert.equal(isProjectFormComplete({ ...minimal, identifier: '', deployToGithub: false }), true);
   });
 
   it('does not require a description or an acronym', () => {

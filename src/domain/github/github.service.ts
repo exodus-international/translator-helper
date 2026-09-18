@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { App } from 'octokit';
 import { resolveFilePath } from './github.paths';
 import { createGitHubCommit } from './github.repository';
+import { DeploySkippedError } from './github.errors';
 
 const LOG_PREFIX = '[GitHub]';
 
@@ -197,7 +198,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
   }
 
   if (!document.sourceProject.identifier) {
-    throw new Error(`Source project "${document.sourceProject.name}" does not have an identifier configured`);
+    throw new DeploySkippedError(`Source project "${document.sourceProject.name}" has no GitHub identifier configured`);
   }
 
   if (!document.type) {

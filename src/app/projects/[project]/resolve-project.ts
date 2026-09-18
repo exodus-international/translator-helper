@@ -26,7 +26,13 @@ export async function resolveProject(segment: string, subPath = ''): Promise<Sou
       notFound();
     }
 
-    redirect(`${buildProjectPath(project.identifier)}${subPath}`);
+    // A project with no identifier has no readable path to redirect to, so
+    // its id-based URL is the only one it has.
+    if (project.identifier) {
+      redirect(`${buildProjectPath(project.identifier)}${subPath}`);
+    }
+
+    return project;
   }
 
   const project = await getSourceProjectByIdentifierAction(segment);

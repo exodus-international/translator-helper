@@ -9,6 +9,8 @@ export interface ProjectFormValues {
   description: string;
   identifier: string;
   acronym: string;
+  /** Whether DEPLOYED versions of this project should push to GitHub. */
+  deployToGithub: boolean;
 }
 
 export const EMPTY_PROJECT_FORM: ProjectFormValues = {
@@ -16,18 +18,23 @@ export const EMPTY_PROJECT_FORM: ProjectFormValues = {
   description: '',
   identifier: '',
   acronym: '',
+  deployToGithub: true,
 };
 
 /**
  * Create takes `description` as optional but not nullable, so an empty box has
  * to become `undefined` here. Sending `null` instead is what broke project
  * creation from the dashboard whenever the description was left blank (#140).
+ *
+ * `deployToGithub` is local form UX only, not sent to the server: it just
+ * shows/hides the identifier field. Whether GitHub deploy actually happens is
+ * entirely decided by whether `identifier` ends up set.
  */
 export function toCreateProjectInput(values: ProjectFormValues) {
   return {
     name: values.name.trim(),
     description: values.description.trim() || undefined,
-    identifier: values.identifier.trim(),
+    identifier: values.deployToGithub ? values.identifier.trim() : undefined,
     acronym: values.acronym.trim() || null,
   };
 }
@@ -41,12 +48,12 @@ export function toUpdateProjectInput(values: ProjectFormValues) {
   return {
     name: values.name.trim(),
     description: values.description.trim() || null,
-    identifier: values.identifier.trim(),
+    identifier: values.deployToGithub ? values.identifier.trim() : null,
     acronym: values.acronym.trim() || null,
   };
 }
 
 /** True when the required fields are filled, for disabling a submit button. */
 export function isProjectFormComplete(values: ProjectFormValues): boolean {
-  return Boolean(values.name.trim() && values.identifier.trim());
+  return Boolean(values.name.trim() && (!values.deployToGithub || values.identifier.trim()));
 }
