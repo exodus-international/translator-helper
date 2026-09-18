@@ -1,5 +1,6 @@
 import { createStore } from 'zustand';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
+import { assignDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { submitForReviewAction } from '@/domain/document-version/document-version.actions';
 import {
@@ -20,6 +21,7 @@ import {
   listTranslationProjectMembersAction,
 } from '@/domain/user-language/user-language.actions';
 import { deleteDocumentAction } from '@/domain/document/document.actions';
+import { translateDocumentAction } from '@/domain/translation/translation.actions';
 import { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions';
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
@@ -38,6 +40,7 @@ export type LoadingKey =
   | 'assignTranslator'
   | 'assignReviewer'
   | 'startTranslation'
+  | 'aiTranslate'
   | 'deleteTranslation'
   | 'deleteSource';
 
@@ -55,6 +58,12 @@ export type DialogState =
 
 export interface EditorStoreConfig {
   documentId: string;
+  /** Title, source language and filename feed the AI translate prompt. */
+  documentTitle: string;
+  sourceLanguageName: string;
+  originalFilename: string | null;
+  /** The language this editor page translates into; the first version is created for it. */
+  targetLanguageId: string;
   targetVersion: any | null;
   sourceContent: string;
   initialSuggestions: any[];
@@ -72,6 +81,8 @@ interface EditorState {
   savedContent: string;
   suggestions: SuggestionWithUser[];
   sourceEditContent: string;
+  /** When the last successful save landed, manual or auto. */
+  lastSavedAt: Date | null;
 
   // Loading & dialogs
   loading: Set<LoadingKey>;
@@ -95,14 +106,15 @@ interface EditorState {
 
   /**
    * The Markdown guide is opened from two places that cannot see each other:
-   * its button in the panel, and the lint tooltip inside CodeMirror — which is
+   * its button in the header, and the lint tooltip inside CodeMirror — which is
    * plain DOM, not React. One flag in the store keeps them from growing a
-   * second dialog.
+   * second way to open it.
    */
   markdownGuideOpen: boolean;
 
   // Config (set once at init)
   documentId: string;
+  targetLanguageId: string;
   translationProjectId: string | null;
   audioTextVersionId: string | null;
 }
@@ -123,6 +135,10 @@ interface EditorActions {
 
   // Version
   setTargetVersion: (version: any) => void;
+  /** Creates this language's first version and opens the editor on it. */
+  startTranslation: () => Promise<void>;
+  /** Drafts (or re-drafts) the translation with the model, into the editor. */
+  translateWithAi: () => Promise<void>;
   handleStatusChange: (status: DocumentStatus) => void;
 
   // Save
@@ -206,6 +222,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     targetVersion: config.targetVersion,
     content: initialContent,
     savedContent: initialContent,
+    lastSavedAt: null,
     suggestions: normalizeSuggestions(config.initialSuggestions),
     sourceEditContent: config.sourceContent,
     loading: new Set<LoadingKey>(),
@@ -214,6 +231,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     audioTranscriptState: null,
     markdownGuideOpen: false,
     documentId: config.documentId,
+    targetLanguageId: config.targetLanguageId,
     translationProjectId: config.translationProjectId,
     audioTextVersionId: config.audioTextVersionId,
 
@@ -224,6 +242,66 @@ export function createEditorStore(config: EditorStoreConfig) {
 
     // ─── Version ───────────────────────────────────────
     setTargetVersion: (version) => set({ targetVersion: version }),
+
+    startTranslation: async () => {
+      const { documentId, targetLanguageId } = get();
+      if (!targetLanguageId) {
+        toast.warning('Please select a target language first');
+        return;
+      }
+      // Two controls offer this, and a disabled attribute only takes effect on
+      // the next render: without this the second click of a double-click, or
+      // the panel's button racing the header's, sends a second assign for the
+      // same document and language.
+      if (get().isLoading('startTranslation')) return;
+
+      set(addLoading(get(), 'startTranslation'));
+      try {
+        const version = await assignDocumentVersionAction({
+          documentId,
+          languageId: targetLanguageId,
+          content: '',
+        });
+        set({
+          targetVersion: version,
+          content: version.content ?? '',
+          savedContent: version.content ?? '',
+          lastSavedAt: null,
+          ...removeLoading(get(), 'startTranslation'),
+        });
+        capture('translation_started');
+      } catch (error: any) {
+        set(removeLoading(get(), 'startTranslation'));
+        toast.error(error.message || 'Failed to start translation');
+      }
+    },
+
+    translateWithAi: async () => {
+      const { targetLanguageId, content } = get();
+      if (!targetLanguageId) {
+        toast.warning('Select a target language before requesting an AI translation.');
+        return;
+      }
+
+      set(addLoading(get(), 'aiTranslate'));
+      try {
+        const result = await translateDocumentAction({
+          documentTitle: config.documentTitle,
+          sourceLanguageName: config.sourceLanguageName,
+          targetLanguageId,
+          sourceContent: config.sourceContent,
+          currentTranslation: content || undefined,
+          originalFilename: config.originalFilename ?? undefined,
+        });
+        set({ content: result.translatedContent, ...removeLoading(get(), 'aiTranslate') });
+        capture('ai_translate_triggered', { overwrite: content.trim().length > 0 });
+        toast.success('AI translation generated successfully!');
+      } catch (error: any) {
+        set(removeLoading(get(), 'aiTranslate'));
+        toast.error(error.message || 'Failed to generate AI translation');
+      }
+    },
+
     handleStatusChange: (status) => {
       const { targetVersion } = get();
       if (targetVersion) {
@@ -233,8 +311,12 @@ export function createEditorStore(config: EditorStoreConfig) {
 
     // ─── Save ──────────────────────────────────────────
     saveContent: async (trigger = 'manual') => {
-      const { targetVersion, content } = get();
+      const { targetVersion, content, savedContent } = get();
       if (!targetVersion) return;
+      // A save with nothing to write costs a request and a toast for no reason;
+      // the save control stays clickable when clean, so this is the guard that
+      // makes that honest.
+      if (content === savedContent) return;
 
       set(addLoading(get(), 'save'));
       try {
@@ -242,6 +324,7 @@ export function createEditorStore(config: EditorStoreConfig) {
         set({
           targetVersion: updated,
           savedContent: content,
+          lastSavedAt: new Date(),
           ...removeLoading(get(), 'save'),
         });
         // Only track explicit user saves; the 3s-debounced auto-save would

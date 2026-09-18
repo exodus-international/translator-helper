@@ -8,6 +8,7 @@ import { updateDocumentVersionStatusAction } from '@/domain/document-version/doc
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { capture } from '@/lib/analytics';
 import { canDeployClient } from '@/lib/permissions-client';
+import { useStatusTransitionPending, useStatusTransitionStore } from '@/lib/stores/status-transition';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { DocumentStatus } from '@/generated/prisma/enums';
@@ -15,7 +16,6 @@ import { Menu as DropdownMenuPrimitive } from '@base-ui/react/menu';
 import { AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
-import { useState } from 'react';
 import { toast } from 'sonner';
 
 interface StatusDropdownProps {
@@ -43,7 +43,11 @@ export function StatusDropdown({
 }: StatusDropdownProps) {
   const router = useRouter();
   const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
-  const [loading, setLoading] = useState(false);
+  // Shared with every other mount for this version, so whichever control is
+  // clicked disables all of them rather than only itself.
+  const loading = useStatusTransitionPending(versionId);
+  const beginTransition = useStatusTransitionStore((state) => state.begin);
+  const releaseTransition = useStatusTransitionStore((state) => state.release);
   const [open, setOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
   const [displayedStatus, setDisplayedStatus] = React.useState<DocumentStatus | null>(currentStatus);
@@ -134,7 +138,10 @@ export function StatusDropdown({
       return;
     }
 
-    setLoading(true);
+    // Claiming the version is what actually prevents the race: `disabled` only
+    // takes effect on the next render, so two mounts can both be clicked before
+    // either re-renders.
+    if (!beginTransition(versionId)) return;
 
     // Show a loading toast for deploy (GitHub takes a few seconds)
     let deployToastId: string | number | undefined;
@@ -192,7 +199,7 @@ export function StatusDropdown({
       console.error('Error updating status:', error);
       toast.error(error.message || 'Failed to update status');
     } finally {
-      setLoading(false);
+      releaseTransition(versionId);
     }
   };
 
