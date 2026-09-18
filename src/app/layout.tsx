@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Alegreya, Geist, Geist_Mono } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { getCurrentUser } from '@/lib/session';
@@ -19,6 +19,18 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
+});
+
+// The serif the reading app sets its content in. Loaded here only so the
+// formatted preview can show a translator what a reader will actually see;
+// nothing in the tool's own chrome uses it. latin-ext covers the Czech and
+// Polish diacritics the translations carry.
+const alegreya = Alegreya({
+  variable: '--font-reader',
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+  display: 'swap',
 });
 
 const APP_NAME = 'Translation Helper';
@@ -62,7 +74,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${alegreya.variable} antialiased`}>
         <ThemeProvider>
           <PostHogProvider user={user}>
             <NuqsAdapter>
