@@ -22,7 +22,7 @@ import { scanFrontmatter } from '../frontmatter-entries';
  * block on a day file. All four were missing here, so the rule below reported
  * 593 of them as keys a translator had invented.
  */
-export const KNOWN_FRONTMATTER_KEYS = [
+const KNOWN_FRONTMATTER_KEYS = [
   'title',
   'subtitle',
   'caption',
@@ -37,7 +37,7 @@ export const KNOWN_FRONTMATTER_KEYS = [
 ];
 
 /** Keys whose *value* is an identifier or number, never prose to translate. */
-export const NON_TRANSLATABLE_KEYS = [
+const NON_TRANSLATABLE_KEYS = [
   'hero',
   'day',
   'verse_tag',
@@ -47,7 +47,7 @@ export const NON_TRANSLATABLE_KEYS = [
   'sort_order',
 ];
 
-export const frontmatterKeyTranslated: LintRule = {
+const frontmatterKeyTranslated: LintRule = {
   id: 'frontmatter-key-translated',
   severity: 'error',
   description: 'Frontmatter keys are identifiers and must stay in English.',
@@ -88,7 +88,7 @@ export const frontmatterKeyTranslated: LintRule = {
   },
 };
 
-export const frontmatterMissingKey: LintRule = {
+const frontmatterMissingKey: LintRule = {
   id: 'frontmatter-missing-key',
   severity: 'error',
   description: 'Every frontmatter key in the source must exist in the translation.',
@@ -134,7 +134,7 @@ export const frontmatterMissingKey: LintRule = {
   },
 };
 
-export const frontmatterValueChanged: LintRule = {
+const frontmatterValueChanged: LintRule = {
   id: 'frontmatter-value-changed',
   severity: 'error',
   description: 'Slug and numeric frontmatter values must match the source exactly.',
@@ -189,7 +189,7 @@ function destinations(text: string): Destination[] {
   return found.sort((a, b) => a.from - b.from);
 }
 
-export const linkUrlChanged: LintRule = {
+const linkUrlChanged: LintRule = {
   id: 'link-url-changed',
   severity: 'error',
   description: 'Link and media URLs must be carried over from the source unchanged.',
@@ -260,7 +260,7 @@ function headings(text: string): Heading[] {
   return found;
 }
 
-export const headingStructure: LintRule = {
+const headingStructure: LintRule = {
   id: 'heading-structure',
   severity: 'warning',
   description: 'Heading levels must mirror the source document.',
