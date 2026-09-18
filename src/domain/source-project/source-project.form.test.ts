@@ -52,6 +52,33 @@ describe('toCreateProjectInput', () => {
   });
 });
 
+describe('identifier format', () => {
+  const create = (identifier: string) =>
+    createSourceProjectSchema.safeParse(toCreateProjectInput({ ...minimal, identifier })).success;
+
+  // Content folders use both separators, so "october_2026" must pass alongside
+  // "exodus-90". This was rejected in production.
+  it('accepts underscores and dashes as separators', () => {
+    assert.equal(create('exodus90'), true);
+    assert.equal(create('exodus-90'), true);
+    assert.equal(create('october_2026'), true);
+    assert.equal(create('lent_2026-week1'), true);
+  });
+
+  it('rejects runs of separators and leading or trailing ones', () => {
+    assert.equal(create('october__2026'), false);
+    assert.equal(create('_october'), false);
+    assert.equal(create('october_'), false);
+    assert.equal(create('-october'), false);
+  });
+
+  it('rejects uppercase, spaces and other punctuation', () => {
+    assert.equal(create('October_2026'), false);
+    assert.equal(create('october 2026'), false);
+    assert.equal(create('october.2026'), false);
+  });
+});
+
 describe('toUpdateProjectInput', () => {
   it('produces something the update schema accepts', () => {
     assert.equal(updateSourceProjectSchema.safeParse(toUpdateProjectInput(filled)).success, true);
