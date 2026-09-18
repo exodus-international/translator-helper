@@ -93,6 +93,14 @@ interface EditorState {
    */
   audioTranscriptState: AudioTranscriptState | null;
 
+  /**
+   * The Markdown guide is opened from two places that cannot see each other:
+   * its button in the panel, and the lint tooltip inside CodeMirror — which is
+   * plain DOM, not React. One flag in the store keeps them from growing a
+   * second dialog.
+   */
+  markdownGuideOpen: boolean;
+
   // Config (set once at init)
   documentId: string;
   translationProjectId: string | null;
@@ -103,6 +111,7 @@ interface EditorState {
 
 interface EditorActions {
   requestTranslationView: (view: 'audio' | null) => void;
+  setMarkdownGuideOpen: (open: boolean) => void;
 
   // Audio transcript
   setAudioTranscriptState: (state: AudioTranscriptState) => void;
@@ -203,6 +212,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     dialog: { type: 'closed' },
     requestedTranslationView: null,
     audioTranscriptState: null,
+    markdownGuideOpen: false,
     documentId: config.documentId,
     translationProjectId: config.translationProjectId,
     audioTextVersionId: config.audioTextVersionId,
@@ -210,6 +220,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     // ─── Content ───────────────────────────────────────
     setContent: (content) => set({ content }),
     setSourceEditContent: (sourceEditContent) => set({ sourceEditContent }),
+    setMarkdownGuideOpen: (markdownGuideOpen) => set({ markdownGuideOpen }),
 
     // ─── Version ───────────────────────────────────────
     setTargetVersion: (version) => set({ targetVersion: version }),

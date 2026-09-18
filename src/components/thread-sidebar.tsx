@@ -1,9 +1,10 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { cn } from '@/lib/utils';
 import { SuggestionStatus } from '@/generated/prisma/enums';
-import { ChevronDown, ChevronRight, MessageSquarePlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, MessageSquare, MessageSquarePlus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import { ThreadCard } from './thread-card';
@@ -104,9 +105,9 @@ export function ThreadSidebar({
   );
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2 border-b bg-muted/60 shrink-0">
+      <div className="shrink-0 border-b bg-muted/60 px-3 py-2">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Feedback{openThreads.length > 0 ? ` (${openThreads.length} open)` : ''}
@@ -170,7 +171,17 @@ export function ThreadSidebar({
       {/* Thread list */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2">
         {suggestions.length === 0 ? (
-          <div className="text-center text-muted-foreground text-xs py-8">No feedback yet</div>
+          <Empty className="gap-3 p-6">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MessageSquare />
+              </EmptyMedia>
+              <EmptyTitle className="text-sm">No feedback yet</EmptyTitle>
+              <EmptyDescription className="text-xs">
+                Comments and suggestions on this translation appear here.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <>
             {/* Open threads */}

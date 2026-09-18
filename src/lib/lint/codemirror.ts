@@ -38,33 +38,50 @@ function contextFor(state: EditorState): { text: string; source?: string; filena
 /**
  * The lint extension. Diagnostics carry their fix as a CodeMirror action, so a
  * translator applies one from the tooltip; `runFixAll` applies every safe fix
- * at once.
+ * at once. Each one also carries a way into the Markdown guide, because the
+ * rules and the guide explain the same contract.
  */
-export function contentLinter(options: LintOptions = {}): Extension {
+export function contentLinter(options: LintOptions = {}, hooks: { onOpenGuide?: () => void } = {}): Extension {
   return [
     lintContextField,
     linter(
       (view) =>
-        lintDocument(contextFor(view.state), options).map((diagnostic): Diagnostic => {
-          const fix = diagnostic.fix;
-          return {
-            from: diagnostic.from,
-            to: Math.max(diagnostic.to, diagnostic.from),
-            severity: diagnostic.severity,
-            source: diagnostic.ruleId,
-            message: diagnostic.message,
-            actions: fix
-              ? [
-                  {
-                    name: fix.title,
-                    apply(target: EditorView) {
-                      target.dispatch({ changes: fix.edits });
-                    },
-                  },
-                ]
-              : undefined,
-          };
-        }),
+        lintDocument(contextFor(view.state), options)
+          // Document-wide findings have no range to underline; drawing them
+          // pinned an error marker to line 1, which read as a problem with that
+          // line. The status bar reports them instead.
+          .filter((diagnostic) => diagnostic.scope !== 'document')
+          .map((diagnostic): Diagnostic => {
+            const fix = diagnostic.fix;
+            return {
+              from: diagnostic.from,
+              to: Math.max(diagnostic.to, diagnostic.from),
+              severity: diagnostic.severity,
+              source: diagnostic.ruleId,
+              message: diagnostic.message,
+              actions: [
+                ...(fix
+                  ? [
+                      {
+                        name: fix.title,
+                        apply(target: EditorView) {
+                          target.dispatch({ changes: fix.edits });
+                        },
+                      },
+                    ]
+                  : []),
+                ...(hooks.onOpenGuide
+                  ? [
+                      {
+                        name: 'Markdown guide',
+                        markClass: 'cm-guide-action',
+                        apply: () => hooks.onOpenGuide?.(),
+                      },
+                    ]
+                  : []),
+              ],
+            };
+          }),
       { delay: 300 },
     ),
   ];
