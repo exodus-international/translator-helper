@@ -12,7 +12,8 @@
  */
 
 import type { LintDiagnostic, LintEdit, LintRule } from '../types';
-import { scanFrontmatter } from '../frontmatter-entries';
+import { bodyOffset, scanFrontmatter } from '../frontmatter-entries';
+import { isProtected, protectedRegions } from '../regions';
 
 /**
  * Keys the content team uses. Anything else is almost always a translated key.
@@ -68,7 +69,13 @@ const frontmatterKeyTranslated: LintRule = {
       if (KNOWN_FRONTMATTER_KEYS.includes(entry.key)) continue;
 
       // When exactly one source key is unaccounted for, this unknown key is
-      // almost certainly it, translated — so the rename is a safe autofix.
+      // probably it, translated -- probably enough to name in the message and
+      // offer as a fix, not enough for "fix all" to take on its own. The other
+      // reading is a key the translator added while a real one went missing,
+      // and there the rename relabels their line: `frontmatter-value-changed`
+      // then finds a slug that does not match the source and replaces it,
+      // because that fix *is* safe, and between the two passes the line they
+      // wrote is gone.
       const candidate = missingFromTranslation.length === 1 ? missingFromTranslation[0] : null;
 
       diagnostics.push({
@@ -83,6 +90,7 @@ const frontmatterKeyTranslated: LintRule = {
           ? {
               title: `Rename to "${candidate}"`,
               edits: [{ from: entry.keyFrom, to: entry.keyTo, insert: candidate }],
+              safe: false,
             }
           : undefined,
       });
@@ -303,10 +311,23 @@ interface Heading {
   to: number;
 }
 
+/**
+ * The document's headings -- the ones a reader sees.
+ *
+ * Filtered through the protected regions, because `^#` is not a heading
+ * everywhere it appears. The library's files show markdown to the translator
+ * inside fenced blocks, so a file with one real heading and a three-line
+ * sample counted four; and a `#` comment in the frontmatter counted as a fifth.
+ * The rule compares counts, so a translation that carried the fence over
+ * matched by luck, while dropping or adding a sample reported a heading
+ * structure that had not drifted at all.
+ */
 function headings(text: string): Heading[] {
+  const regions = protectedRegions(text);
   const found: Heading[] = [];
   for (const match of text.matchAll(/^(#{1,6})[ \t]/gm)) {
     const from = match.index ?? 0;
+    if (isProtected(regions, from)) continue;
     found.push({ level: match[1].length, from, to: from + match[1].length });
   }
   return found;
@@ -357,6 +378,45 @@ const headingStructure: LintRule = {
   },
 };
 
+const LINE_BREAK = /<br\s*\/?>/gi;
+
+/** Explicit line breaks in the body, which the corpus uses for verse and prayer. */
+function lineBreaks(text: string): number {
+  return text.slice(bodyOffset(text)).match(LINE_BREAK)?.length ?? 0;
+}
+
+/**
+ * The source breaks lines explicitly and the translation breaks none at all.
+ *
+ * The corpus sets scripture, prayers and litanies as one `<p>` full of `<br>`,
+ * so a translation with none renders the whole stanza as a paragraph. 282 of
+ * the 4,144 pairs do this. Any other difference in the count is left alone:
+ * 959 pairs have one, the deltas run from one to two thousand, and a
+ * translator who joins two short lines is not making a mistake — only losing
+ * every break is unambiguous.
+ */
+const lineBreaksDropped: LintRule = {
+  id: 'line-breaks-dropped',
+  severity: 'warning',
+  description: 'A translation must keep the explicit line breaks its source uses.',
+  requiresSource: true,
+  check({ text, source }) {
+    const original = lineBreaks(source ?? '');
+    if (original === 0 || lineBreaks(text) > 0) return [];
+    return [
+      {
+        ruleId: 'line-breaks-dropped',
+        severity: 'warning',
+        // Nothing in the text is the problem; what is missing has no position.
+        scope: 'document',
+        message: `The source breaks ${original} line(s) with <br>; this translation breaks none.`,
+        from: 0,
+        to: 0,
+      },
+    ];
+  },
+};
+
 export const parityRules: LintRule[] = [
   frontmatterKeyTranslated,
   frontmatterMissingKey,
@@ -364,4 +424,5 @@ export const parityRules: LintRule[] = [
   frontmatterValueEmpty,
   linkUrlChanged,
   headingStructure,
+  lineBreaksDropped,
 ];

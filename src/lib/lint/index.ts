@@ -9,10 +9,11 @@
 import type { LintContext, LintDiagnostic, LintEdit, LintRule } from './types';
 import { houseStyleRules } from './rules/house-style';
 import { parityRules } from './rules/parity';
+import { untranslatedRules } from './rules/untranslated';
 
 export * from './types';
 
-const allRules: LintRule[] = [...parityRules, ...houseStyleRules];
+const allRules: LintRule[] = [...parityRules, ...untranslatedRules, ...houseStyleRules];
 
 export interface LintOptions {
   rules?: LintRule[];

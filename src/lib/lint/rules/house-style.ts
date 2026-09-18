@@ -1,18 +1,37 @@
 /**
  * Rules that judge a document on its own, without comparing it to the source.
- * All but `brokenFormatting` carry a safe autofix.
+ * All carry a safe autofix except `brokenFormatting`, and `no-tab` on a tab
+ * that is setting indentation.
  *
  * Thresholds come from the 646-file 2026 corpus: bullets are written `*`
  * (26,274 occurrences vs 0 for `-`), and prose uses curly quotes
  * (20,480 `“` vs straight quotes that appear almost only inside HTML).
+ *
+ * `no-nbsp` and `no-tab` clean up after a word processor: across the 4,144
+ * translated files they find 977 no-break spaces and 692 tabs.
  */
 
 import type { LintDiagnostic, LintEdit, LintRule } from '../types';
-import { isProtected, protectedRegions } from '../regions';
+import { codeRegions, isProtected, protectedRegions } from '../regions';
+
+/**
+ * A word character in any script this library is translated into.
+ *
+ * `[0-9A-Za-z]` and `\w` were the tests, and both are only ever asked about the
+ * character beside a marker or a quote. Under ASCII the underscore in
+ * `день_1.md` had a letter on neither side, so `broken-formatting` read it
+ * as emphasis that never closes and reported an error -- in Ukrainian,
+ * Croatian, Czech and every other language whose letters are not ASCII, on a
+ * filename the translator had copied correctly. The apostrophe in Ukrainian's
+ * `п'ять` was the same test failing the other way: no letters around it, so no
+ * contraction, so it was left straight. Marks count, because a combining
+ * accent is part of the letter it sits on.
+ */
+const isWord = (char: string | undefined) => !!char && /[\p{L}\p{N}\p{M}]/u.test(char);
 
 const TRAILING_WHITESPACE = /[ \t]+$/gm;
 
-export const trailingWhitespace: LintRule = {
+const trailingWhitespace: LintRule = {
   id: 'trailing-whitespace',
   severity: 'warning',
   description: 'Lines must not end with spaces or tabs.',
@@ -34,7 +53,7 @@ export const trailingWhitespace: LintRule = {
   },
 };
 
-export const finalNewline: LintRule = {
+const finalNewline: LintRule = {
   id: 'final-newline',
   severity: 'warning',
   description: 'Files must end with exactly one newline.',
@@ -53,7 +72,7 @@ export const finalNewline: LintRule = {
   },
 };
 
-export const noCrlf: LintRule = {
+const noCrlf: LintRule = {
   id: 'no-crlf',
   severity: 'warning',
   description: 'Line endings must be LF, not CRLF.',
@@ -89,7 +108,7 @@ function sourceWritesDashBullets(source: string): boolean {
   return dashes && !stars;
 }
 
-export const bulletMarker: LintRule = {
+const bulletMarker: LintRule = {
   id: 'bullet-marker',
   severity: 'warning',
   description: 'List items use `*`, matching the source and the content library.',
@@ -120,7 +139,7 @@ export const bulletMarker: LintRule = {
 
 const EXCESS_BLANK_LINES = /\n{4,}/g;
 
-export const excessBlankLines: LintRule = {
+const excessBlankLines: LintRule = {
   id: 'excess-blank-lines',
   severity: 'info',
   description: 'At most two consecutive blank lines.',
@@ -142,9 +161,23 @@ export const excessBlankLines: LintRule = {
   },
 };
 
-const OPENS_QUOTE = /[\s([{—–“‘>]/;
+/**
+ * What a `"` can close: a letter, a digit, or the punctuation that ends a
+ * clause or a bracketed aside.
+ *
+ * This is the short, stable half of the question. The other half is not: a
+ * quote opens after whitespace and `(`, but also after `„` in German, Czech,
+ * Slovak, Polish, Croatian and Slovenian, `«` and `‹` in the romance
+ * languages, `「` and `（` in the CJK files, `¿` in Spanish, and a bare `-`
+ * where a dash was typed as a hyphen. That list was what the rule tested, and
+ * every language whose own quotes were missing from it got a closing `”`
+ * where an opening `“` belonged -- on the first quote inside every
+ * quotation. Ask whether the quote closes something instead, and the default
+ * falls the right way for punctuation nobody has enumerated yet.
+ */
+const CLOSES_QUOTE = /[\p{L}\p{N}.,;:!?%…)\]}”’»›」』）】]/u;
 
-export const smartQuotes: LintRule = {
+const smartQuotes: LintRule = {
   id: 'smart-quotes',
   severity: 'info',
   description: 'Prose uses typographic quotes and apostrophes, where the source does.',
@@ -167,8 +200,8 @@ export const smartQuotes: LintRule = {
 
       let replacement: string;
       if (char === '"') {
-        replacement = before === '' || OPENS_QUOTE.test(before) ? '“' : '”';
-      } else if (/\w/.test(before) && /\w/.test(after)) {
+        replacement = CLOSES_QUOTE.test(before) ? '”' : '“';
+      } else if (isWord(before) && isWord(after)) {
         replacement = '’'; // contraction: don't -> don’t
       } else {
         continue; // standalone single quote is ambiguous; leave it alone
@@ -259,10 +292,10 @@ function lineAt(text: string, offset: number): number {
   return text.slice(0, offset).split('\n').length;
 }
 
-const isWord = (char: string | undefined) => !!char && /[0-9A-Za-z]/.test(char);
+/** Deliberately JavaScript's `\s`, which is CommonMark's Unicode whitespace. */
 const isSpace = (char: string | undefined) => char === undefined || /\s/.test(char);
 
-export const brokenFormatting: LintRule = {
+const brokenFormatting: LintRule = {
   id: 'broken-formatting',
   severity: 'error',
   description: 'Emphasis and inline code must open and close inside one paragraph.',
@@ -382,6 +415,97 @@ export const brokenFormatting: LintRule = {
   },
 };
 
+/**
+ * Named, because the character is invisible in source and a formatter is free
+ * to normalise a literal one out of a string.
+ */
+const NBSP = String.fromCharCode(0xa0);
+
+/**
+ * A one-letter word followed by a no-break space is deliberate: Czech, Slovak
+ * and Polish typography forbids leaving a single-letter preposition at the end
+ * of a line. 87 of the corpus's 1,064 no-break spaces are that, and they are
+ * correct; the other 977 are plain spaces that came out of a word processor,
+ * including the ones indenting a `reminder:` block, where the character made
+ * the block's own keys look like top-level ones.
+ */
+function holdsAWordToTheNext(text: string, at: number): boolean {
+  const letter = text[at - 1];
+  if (!letter || !isLetter(letter)) return false;
+  const before = text[at - 2];
+  return before === undefined || !(isLetter(before) || /[0-9]/.test(before));
+}
+
+/**
+ * A letter in any of the ten alphabets the content is translated into, all of
+ * them cased Latin. Written this way because `\p{L}` needs an ES2018 regex and
+ * this project targets ES2017.
+ */
+function isLetter(char: string): boolean {
+  return char.toLowerCase() !== char.toUpperCase();
+}
+
+const noNbsp: LintRule = {
+  id: 'no-nbsp',
+  severity: 'warning',
+  description: 'No-break spaces belong only where typography needs them.',
+  check({ text }) {
+    const code = codeRegions(text);
+    const diagnostics: LintDiagnostic[] = [];
+
+    for (let at = text.indexOf(NBSP); at !== -1; at = text.indexOf(NBSP, at + 1)) {
+      if (isProtected(code, at)) continue;
+      if (holdsAWordToTheNext(text, at)) continue;
+      diagnostics.push({
+        ruleId: 'no-nbsp',
+        severity: 'warning',
+        message: 'No-break space where a normal space belongs.',
+        from: at,
+        to: at + 1,
+        fix: { title: 'Replace with a normal space', edits: [{ from: at, to: at + 1, insert: ' ' }] },
+      });
+    }
+    return diagnostics;
+  },
+};
+
+const noTab: LintRule = {
+  id: 'no-tab',
+  severity: 'warning',
+  description: 'Tabs must be spaces.',
+  check({ text }) {
+    const code = codeRegions(text);
+    const diagnostics: LintDiagnostic[] = [];
+
+    for (const match of text.matchAll(/\t/g)) {
+      const from = match.index ?? 0;
+      if (isProtected(code, from)) continue;
+
+      // Every tab in the corpus separates an ordered-list marker from its text
+      // (`1.<tab>Melchizedek`), pasted out of a word processor; one space reads
+      // and renders the same. A tab in a line's leading whitespace is different
+      // — it sets nesting depth, and how deep is the author's call — so that
+      // one is offered rather than applied.
+      const lineFrom = text.lastIndexOf('\n', from - 1) + 1;
+      const indenting = /^[^\S\r\n]*$/.test(text.slice(lineFrom, from));
+
+      diagnostics.push({
+        ruleId: 'no-tab',
+        severity: 'warning',
+        message: indenting ? 'Tab used to indent; use spaces.' : 'Tab character; use a space.',
+        from,
+        to: from + 1,
+        fix: {
+          title: 'Replace with a space',
+          edits: [{ from, to: from + 1, insert: ' ' }],
+          ...(indenting ? { safe: false } : {}),
+        },
+      });
+    }
+    return diagnostics;
+  },
+};
+
 export const houseStyleRules: LintRule[] = [
   noCrlf,
   trailingWhitespace,
@@ -390,4 +514,6 @@ export const houseStyleRules: LintRule[] = [
   excessBlankLines,
   smartQuotes,
   brokenFormatting,
+  noNbsp,
+  noTab,
 ];

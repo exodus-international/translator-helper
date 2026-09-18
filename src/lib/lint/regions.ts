@@ -60,6 +60,25 @@ export function protectedRegions(text: string): Region[] {
   return merge(regions);
 }
 
+/**
+ * Fenced and inline code, and nothing else.
+ *
+ * `protectedRegions` also covers frontmatter and markup, which the rules about
+ * stray characters need to see rather than skip: the no-break space that broke
+ * a `reminder:` block was the indentation inside a frontmatter block, and the
+ * tabs in the corpus sit in ordered-list markers.
+ */
+export function codeRegions(text: string): Region[] {
+  const regions: Region[] = [];
+  for (const pattern of [/```[\s\S]*?```/g, /`[^`\n]*`/g]) {
+    for (const match of text.matchAll(pattern)) {
+      const from = match.index ?? 0;
+      if (match[0].length > 0) regions.push({ from, to: from + match[0].length });
+    }
+  }
+  return merge(regions);
+}
+
 function merge(regions: Region[]): Region[] {
   if (regions.length === 0) return regions;
   const sorted = [...regions].sort((a, b) => a.from - b.from);

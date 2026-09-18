@@ -43,6 +43,37 @@ export interface FrontmatterScan {
 const KEY_LINE = /^([^:\n]+):(.*)$/;
 
 /**
+ * Where the scalar ends and YAML's comment begins.
+ *
+ * A translator's note belongs to nobody's value: `day: 3 # tretji dan` is day
+ * 3, but the parity rules compared the whole of `3 # tretji dan` against the
+ * source's `3`, called the day changed, and offered a safe fix that replaced
+ * the span -- deleting the note. A `#` only opens a comment where it follows
+ * whitespace outside quotes, so `title: "a # b"` and `hero: shirt#2` keep
+ * theirs.
+ */
+function scalarEnd(raw: string): number {
+  let quote: string | null = null;
+  for (let index = 0; index < raw.length; index++) {
+    const character = raw[index];
+    if (quote === '"' && character === '\\') {
+      index++; // an escaped character cannot close the quote
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === '#' && (index === 0 || /\s/.test(raw[index - 1]))) return index;
+  }
+  return raw.length;
+}
+
+/**
  * An indented line continues the key above it rather than starting one.
  *
  * Any whitespace counts, not just space and tab: files pasted out of Word
@@ -76,6 +107,13 @@ export function scanFrontmatter(text: string): FrontmatterScan {
       continue;
     }
 
+    // A comment is not an entry. `# Molitva: opomba` -- a note a translator
+    // left above the key it is about -- parsed as a key called `# Molitva`,
+    // which no rule recognised: it was reported as a translated key, and the
+    // rename offered would have turned the note into one. Only column zero is
+    // checked here, so an indented comment still extends the block above it.
+    if (line.startsWith('#')) continue;
+
     const match = KEY_LINE.exec(line);
     if (!match) continue;
 
@@ -84,8 +122,9 @@ export function scanFrontmatter(text: string): FrontmatterScan {
     const keyFrom = lineFrom + rawKey.indexOf(key);
     const keyTo = keyFrom + key.length;
 
-    const value = rawValue.trim();
-    const valueStartInLine = rawKey.length + 1 + (value ? rawValue.indexOf(value) : rawValue.length);
+    const scalar = rawValue.slice(0, scalarEnd(rawValue));
+    const value = scalar.trim();
+    const valueStartInLine = rawKey.length + 1 + (value ? scalar.indexOf(value) : scalar.length);
     const valueFrom = lineFrom + valueStartInLine;
     const lineTo = lineFrom + line.length;
 
@@ -107,12 +146,7 @@ export function scanFrontmatter(text: string): FrontmatterScan {
 
 /**
  * Offset of the body (everything after the frontmatter block and its newline).
- *
- * Nothing in the repo calls it yet -- the rules that read the prose below the
- * frontmatter are the ones that will, and the geometry belongs beside the scan
- * that produces it rather than re-derived at each call site.
  */
-// fallow-ignore-next-line unused-export
 export function bodyOffset(text: string): number {
   const region = frontmatterRegion(text);
   if (!region) return 0;
