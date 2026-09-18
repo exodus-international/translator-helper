@@ -28,11 +28,47 @@ import { editorTheme } from './cm-theme';
 
 const setHighlightLine = StateEffect.define<number | null>();
 
+const markdownSupport: Extension = markdown();
+
 /** Language ids the panes actually ask for; anything else reads as Markdown. */
 function languageSupport(language: string): Extension {
   if (language === 'yaml') return yaml();
   if (language === 'xml') return xml();
-  return markdown();
+  return markdownSupport;
+}
+
+/**
+ * Whether the content rules have anything to say about this language.
+ *
+ * They are Markdown rules -- `*` for list items, typographic quotes, heading
+ * parity against the source -- and these same panes open the library's `.yml`
+ * files and the audio panel's SSML. There a "Fix all" rewrote every `- item`
+ * of a sequence as `* item` and both quotes of a scalar as curly ones: both
+ * are safe fixes, applied without asking, and the result is not YAML the
+ * loader can read. Read off the language rather than asked of the caller,
+ * because not one of the panes passes `lint` at all -- the default carried the
+ * rules into every document the component is given. Compared against the
+ * shared instance so this cannot fall out of step with the list above.
+ */
+function lintsAsMarkdown(language: string): boolean {
+  return languageSupport(language) === markdownSupport;
+}
+
+/**
+ * Read-only panes stay focusable.
+ *
+ * CodeMirror only sets `contenteditable` on an editable view, and adds no
+ * tabindex of its own, so the source pane's content DOM cannot take focus from
+ * a click -- `.cm-focused` never lands and the theme, which paints the active
+ * line only on a focused editor, leaves the clicked line unmarked. A tabindex
+ * is the hook CodeMirror itself looks for on a non-editable view.
+ */
+function readOnlyExtensions(readOnly: boolean): Extension[] {
+  return [
+    EditorState.readOnly.of(readOnly),
+    EditorView.editable.of(!readOnly),
+    readOnly ? EditorView.contentAttributes.of({ tabindex: '0' }) : [],
+  ];
 }
 
 /** Whole-line background on the line synced from the other pane. */
@@ -190,12 +226,12 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap]),
       languageCompartment.of(languageExtension),
-      readOnlyCompartment.of([EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]),
+      readOnlyCompartment.of(readOnlyExtensions(readOnly)),
       placeholderCompartment.of(placeholder ? placeholderExtension(placeholder) : []),
       highlightLineField,
       suggestionExtension((suggestion) => callbacks.current.onSuggestionClick?.(suggestion)),
       lintCompartment.of(
-        lint
+        lintEnabled
           ? [contentLinter(lintOptions.current, { onOpenGuide: () => callbacks.current.onOpenGuide?.() }), lintGutter()]
           : [],
       ),
@@ -222,8 +258,11 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
 
   const sourceContentRef = useRef(sourceContent);
   sourceContentRef.current = sourceContent;
-  const lintRef = useRef(lint);
-  lintRef.current = lint;
+  // The prop says whether this pane wants the rules; the language says whether
+  // they mean anything here.
+  const lintEnabled = lint && lintsAsMarkdown(language);
+  const lintRef = useRef(lintEnabled);
+  lintRef.current = lintEnabled;
 
   // Both the update listener and the effect below want to report diagnostics,
   // and for a controlled editor every keystroke reaches us twice — once as a
@@ -233,7 +272,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   const reportDiagnostics = useRef<(text: string) => void>(() => {});
   reportDiagnostics.current = (text: string) => {
     if (!onDiagnosticsChange) return;
-    if (!lint) {
+    if (!lintEnabled) {
       lastReported.current = null;
       return;
     }
@@ -263,7 +302,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   useEffect(() => {
     const view = viewRef.current;
     if (view) reportDiagnostics.current(view.state.doc.toString());
-  }, [ready, value, sourceContent, lint, disabledKey]);
+  }, [ready, value, sourceContent, lintEnabled, disabledKey]);
 
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setSuggestions.of(suggestions) });
@@ -280,7 +319,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
 
   useEffect(() => {
     viewRef.current?.dispatch({
-      effects: readOnlyCompartment.reconfigure([EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]),
+      effects: readOnlyCompartment.reconfigure(readOnlyExtensions(readOnly)),
     });
   }, [readOnly, readOnlyCompartment]);
 
@@ -299,12 +338,12 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: lintCompartment.reconfigure(
-        lint
+        lintEnabled
           ? [contentLinter(lintOptions.current, { onOpenGuide: () => callbacks.current.onOpenGuide?.() }), lintGutter()]
           : [],
       ),
     });
-  }, [lint, lintCompartment]);
+  }, [lintEnabled, lintCompartment]);
 
   // Turning a rule off changes no text, so CodeMirror has no reason to lint
   // again on its own: without this the squiggles and gutter markers keep the
@@ -312,8 +351,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   // one -- the bar and the editor disagreeing, indefinitely.
   useEffect(() => {
     const view = viewRef.current;
-    if (view && lint) refreshLint(view);
-  }, [disabledKey, lint, ready]);
+    if (view && lintEnabled) refreshLint(view);
+  }, [disabledKey, lintEnabled, ready]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -335,7 +374,12 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       get view() {
         return viewRef.current;
       },
-      fixAll: () => (viewRef.current ? runFixAll(viewRef.current, lintOptions.current) : { fixed: 0, remaining: 0 }),
+      // Gated too: this is not the linter, it is a direct call, and the bar
+      // that offers it is the host's to render.
+      fixAll: () =>
+        viewRef.current && lintRef.current
+          ? runFixAll(viewRef.current, lintOptions.current)
+          : { fixed: 0, remaining: 0 },
     }),
     [],
   );
