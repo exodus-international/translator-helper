@@ -11,6 +11,10 @@ import { isUuid } from '@/lib/uuid';
  * rule: the routes read a UUID in that position as an old id-based link and
  * look the project up by id, so such a project would never resolve by its own
  * identifier.
+ *
+ * Dashes and underscores are both allowed as separators because existing
+ * content folders use either ("exodus-90", "october_2026"). Runs of
+ * separators and leading or trailing ones are still rejected.
  */
 const notUuidShaped = (value: string) => !isUuid(value);
 const notUuidMessage = 'Cannot look like an id';
@@ -19,7 +23,7 @@ export const sourceProjectIdentifier = z
   .string()
   .min(2)
   .max(64)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lowercase letters, numbers and single dashes only')
+  .regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/, 'Lowercase letters, numbers and single dashes or underscores only')
   .refine(notUuidShaped, notUuidMessage);
 
 /**
