@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
-import { forwardRef } from 'react';
-import { TextareaWithLineNumbers } from './textarea-with-line-numbers';
-import { SuggestionWithUser } from './monaco-suggestion-decorations';
+import { forwardRef, type ReactNode } from 'react';
+import { CodeEditor, type CodeEditorHandle } from './editor/code-editor';
+import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
+import type { LintDiagnostic } from '@/lib/lint';
 
 interface LineInfo {
   primaryLabel: string;
@@ -29,9 +30,16 @@ interface RawEditorPaneProps {
   onSelectionChange?: (
     range: { startLine: number; startColumn: number; endLine: number; endColumn: number } | null,
   ) => void;
+  /** The source-language text, which switches on the parity lint rules. */
+  sourceContent?: string;
+  onDiagnosticsChange?: (diagnostics: LintDiagnostic[]) => void;
+  /** Turn linting off entirely — for panes showing content the reader can't edit. */
+  lint?: boolean;
+  /** Rendered under the editor, inside the pane — the lint status bar goes here. */
+  footer?: ReactNode;
 }
 
-export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEditorPane(
+export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(function RawEditorPane(
   {
     value,
     onChange,
@@ -48,6 +56,10 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
     suggestions,
     onSuggestionClick,
     onSelectionChange,
+    sourceContent,
+    onDiagnosticsChange,
+    lint,
+    footer,
   },
   ref,
 ) {
@@ -64,8 +76,14 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
           )}
         </div>
       )}
-      <div className={cn(fullHeight ? 'flex-1' : 'flex h-full flex-col', editorContainerClassName)}>
-        <TextareaWithLineNumbers
+      {/*
+        min-h-0 is load-bearing: a column flex item defaults to min-height:auto,
+        which is the editor's full document height. Without it the container
+        grows past the pane instead of shrinking, and CodeMirror's scroller —
+        sized to that container — has nothing left to scroll.
+      */}
+      <div className={cn(fullHeight ? 'min-h-0 flex-1' : 'flex h-full min-h-0 flex-col', editorContainerClassName)}>
+        <CodeEditor
           ref={ref}
           value={value}
           onChange={onChange}
@@ -78,8 +96,12 @@ export const RawEditorPane = forwardRef<any, RawEditorPaneProps>(function RawEdi
           suggestions={suggestions}
           onSuggestionClick={onSuggestionClick}
           onSelectionChange={onSelectionChange}
+          sourceContent={sourceContent}
+          onDiagnosticsChange={onDiagnosticsChange}
+          lint={lint}
         />
       </div>
+      {footer}
     </div>
   );
 });
