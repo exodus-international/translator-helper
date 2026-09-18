@@ -48,6 +48,22 @@ describe('house style rules', () => {
     assert.equal(fixed(text), '# T\n\n* one\n* two\n');
   });
 
+  it('leaves dash bullets alone when the source writes them that way', () => {
+    assert.equal(ids('- one\n- two\n', '> Verse\n\n- one\n- two\n').includes('bullet-marker'), false);
+  });
+
+  it('still flags dash bullets when the source uses stars', () => {
+    assert.equal(ids('- one\n', '* one\n').includes('bullet-marker'), true);
+  });
+
+  it('leaves straight quotes alone when the source uses them', () => {
+    assert.equal(ids('He said "hello".\n', 'He said "hi".\n').includes('smart-quotes'), false);
+  });
+
+  it('curls quotes when the source is written with them', () => {
+    assert.equal(ids('He said "hello".\n', 'He said \u201Chi\u201D.\n').includes('smart-quotes'), true);
+  });
+
   it('does not treat the frontmatter fence as a bullet', () => {
     const text = '---\ntitle: A\n---\n\nBody\n';
     assert.equal(ids(text).includes('bullet-marker'), false);

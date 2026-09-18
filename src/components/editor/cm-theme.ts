@@ -10,9 +10,56 @@
  * so referencing the tokens lets light and dark follow the app on their own.
  */
 
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { EditorView } from '@codemirror/view';
+import { tags } from '@lezer/highlight';
 
 const MONO = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
+
+/**
+ * What the document's constructs look like — the part of the editor a
+ * translator actually reads. CodeMirror's own default style is a light-theme
+ * palette with fixed colours, so on this editor's dark surface it read as
+ * noise: headings and links were the same weight as prose, an HTML tag (the
+ * content library is full of them) was plain text, and the attributes inside
+ * one were invisible.
+ *
+ * Everything here is painted from the app's tokens, so both themes follow
+ * `.dark` the same way the editor chrome does. Colours are kept few and
+ * deliberate — a document is mostly prose, and the marks on it should say
+ * *what kind of thing* a token is at a glance, not decorate it:
+ *
+ *   foreground, heavier   headings, bold, HTML tag names
+ *   info                  links and their URLs
+ *   chart-2               HTML attributes, YAML keys
+ *   chart-3               strings and attribute values
+ *   chart-4               numbers and booleans
+ *   muted-foreground      markers, list bullets, quotes, inline code
+ */
+export const editorHighlightStyle = HighlightStyle.define([
+  { tag: tags.heading1, color: 'var(--foreground)', fontWeight: '700', fontSize: '1.35em' },
+  { tag: tags.heading2, color: 'var(--foreground)', fontWeight: '700', fontSize: '1.2em' },
+  { tag: tags.heading3, color: 'var(--foreground)', fontWeight: '650', fontSize: '1.08em' },
+  { tag: [tags.heading4, tags.heading5, tags.heading6], color: 'var(--foreground)', fontWeight: '650' },
+  { tag: tags.strong, color: 'var(--foreground)', fontWeight: '700' },
+  { tag: tags.emphasis, fontStyle: 'italic' },
+  { tag: tags.strikethrough, textDecoration: 'line-through' },
+  { tag: [tags.link, tags.url], color: 'var(--info)' },
+  { tag: tags.monospace, color: 'var(--muted-foreground)' },
+  { tag: tags.quote, color: 'var(--muted-foreground)', fontStyle: 'italic' },
+  { tag: [tags.contentSeparator, tags.list], color: 'var(--muted-foreground)' },
+  { tag: tags.processingInstruction, color: 'var(--muted-foreground)' },
+  // HTML: the content library embeds it, so tags, attributes and the strings
+  // they carry all need to be told apart.
+  { tag: tags.tagName, color: 'var(--foreground)', fontWeight: '600' },
+  { tag: tags.attributeName, color: 'var(--chart-2)' },
+  { tag: [tags.attributeValue, tags.string], color: 'var(--chart-3)' },
+  { tag: [tags.number, tags.bool, tags.null], color: 'var(--chart-4)' },
+  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: 'var(--chart-2)' },
+  { tag: [tags.comment, tags.meta], color: 'var(--muted-foreground)', fontStyle: 'italic' },
+]);
+
+export const editorHighlighting = syntaxHighlighting(editorHighlightStyle);
 
 /** lucide `book-open`, stroked so the mask reads it by alpha. */
 const BOOK_OPEN = `data:image/svg+xml,${encodeURIComponent(
@@ -63,6 +110,23 @@ export const editorTheme = EditorView.theme({
   },
   '&.cm-focused': {
     outline: 'none',
+  },
+  /*
+   * Frontmatter: the parser sees prose ending in `---`, i.e. a setext heading,
+   * so the block arrives at 1.2em bold. These two rules outrank the token
+   * classes it got (two classes beat one), so the metadata reads as metadata:
+   * a quiet block with its keys picked out.
+   */
+  '.cm-frontmatter, .cm-frontmatter span': {
+    fontSize: '0.875rem',
+    fontWeight: '400',
+    lineHeight: '20px',
+    color: 'var(--muted-foreground)',
+  },
+  // The key's own contents are wrapped in a token span, so the tint has to
+  // reach through it -- the parser still thinks this is prose.
+  '.cm-frontmatter .cm-frontmatter-key, .cm-frontmatter .cm-frontmatter-key span': {
+    color: 'var(--chart-2)',
   },
   '.cm-suggestion-gutter': {
     width: '18px',

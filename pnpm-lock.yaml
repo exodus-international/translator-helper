@@ -181,6 +181,9 @@ importers:
       '@codemirror/commands':
         specifier: ^6.11.0
         version: 6.11.0
+      '@codemirror/lang-html':
+        specifier: ^6.4.12
+        version: 6.4.12
       '@codemirror/lang-markdown':
         specifier: ^6.5.2
         version: 6.5.2
@@ -214,6 +217,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.8)
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
       '@prisma/adapter-pg':
         specifier: 7.10.0
         version: 7.10.0

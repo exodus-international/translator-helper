@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { markdown } from '@codemirror/lang-markdown';
+import { html } from '@codemirror/lang-html';
 import { yaml } from '@codemirror/lang-yaml';
 import { xml } from '@codemirror/lang-xml';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
@@ -24,11 +25,31 @@ import type { LintDiagnostic, LintOptions } from '@/lib/lint';
 import { lintDocument } from '@/lib/lint';
 import { createEditorApi, offsetToPosition, type EditorApi } from './editor-api';
 import { setSuggestions, suggestionExtension } from './cm-suggestions';
-import { editorTheme } from './cm-theme';
+import { frontmatterDecoration } from './cm-frontmatter';
+import { editorHighlighting, editorTheme } from './cm-theme';
 
 const setHighlightLine = StateEffect.define<number | null>();
 
-const markdownSupport: Extension = markdown();
+/**
+ * Markdown carries the rest of the document inside it: the content library
+ * embeds `<div class="…">`, `<style>` blocks and inline CSS in most files, and
+ * a fenced block is usually YAML or CSS when it is not plain text. Each of
+ * those is a language of its own, so the markdown parser is given them to hand
+ * their contents to -- otherwise an HTML tag is prose and a stylesheet is not
+ * even that.
+ */
+const markdownSupport: Extension = markdown({
+  // No `base`: the default is GFM, which is what these documents are written
+  // in. Only the languages it can hand its contents to are added.
+  htmlTagLanguage: html(),
+  codeLanguages: (info) => {
+    const name = info.toLowerCase();
+    if (name.startsWith('yaml') || name.startsWith('yml')) return yaml().language;
+    if (name.startsWith('html')) return html().language;
+    if (name.startsWith('xml') || name.startsWith('svg')) return xml().language;
+    return null;
+  },
+});
 
 /** Language ids the panes actually ask for; anything else reads as Markdown. */
 function languageSupport(language: string): Extension {
@@ -57,11 +78,15 @@ function lintsAsMarkdown(language: string): boolean {
 /**
  * Read-only panes stay focusable.
  *
- * CodeMirror only sets `contenteditable` on an editable view, and adds no
- * tabindex of its own, so the source pane's content DOM cannot take focus from
- * a click -- `.cm-focused` never lands and the theme, which paints the active
- * line only on a focused editor, leaves the clicked line unmarked. A tabindex
- * is the hook CodeMirror itself looks for on a non-editable view.
+ * The source pane is read-only but still clickable -- a translator points at a
+ * line to see its counterpart -- and CodeMirror only sets `contenteditable` on
+ * an editable view, adding no tabindex of its own. So the pane's content DOM
+ * could not take focus from a click: `.cm-focused` never landed and the theme,
+ * which paints the active line only on a focused editor, left the clicked line
+ * unmarked. The tabindex is the hook CodeMirror itself looks for on a
+ * non-editable view, and it buys the cursor back without claiming to be an
+ * editable box -- which `editable: true` would, down to a virtual keyboard on
+ * a phone and a text field announced to a screen reader.
  */
 function readOnlyExtensions(readOnly: boolean): Extension[] {
   return [
@@ -223,6 +248,9 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       lineNumbers(),
       history(),
       highlightActiveLine(),
+      // The app's own palette first, CodeMirror's default underneath it for
+      // anything it does not name.
+      editorHighlighting,
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap]),
       languageCompartment.of(languageExtension),
@@ -236,6 +264,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
           : [],
       ),
       EditorView.lineWrapping,
+      frontmatterDecoration,
       editorTheme,
       updateListener,
     ];

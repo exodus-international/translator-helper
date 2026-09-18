@@ -27,7 +27,7 @@ import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { useEditorStore } from '@/lib/stores/editor-provider';
-import { CloudCheck, CloudOff, Loader2, Maximize2, Minimize2, Save, Send, Sparkles, Trash2 } from 'lucide-react';
+import { CloudCheck, CloudOff, Loader2, Maximize2, Minimize2, Save, Sparkles, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -341,7 +341,6 @@ function TranslateWorkflowActions({ user, targetLanguageId }: { user: SessionUse
   const setTargetVersion = useEditorStore((s) => s.setTargetVersion);
   const setContent = useEditorStore((s) => s.setContent);
   const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
-  const openReviewDialog = useEditorStore((s) => s.openReviewDialog);
   const translateWithAi = useEditorStore((s) => s.translateWithAi);
   const aiTranslating = useEditorStore((s) => s.isLoading('aiTranslate'));
   const [deleting, setDeleting] = useState(false);
@@ -376,12 +375,6 @@ function TranslateWorkflowActions({ user, targetLanguageId }: { user: SessionUse
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
-      {targetVersion.status === DocumentStatus.IN_PROGRESS && (
-        <Button size="sm" className="w-full" onClick={openReviewDialog} disabled={busy}>
-          <Send />
-          Submit for review
-        </Button>
-      )}
       <Button variant="outline" size="sm" className="w-full justify-start" onClick={translateWithAi} disabled={busy}>
         {aiTranslating ? <Loader2 className="animate-spin" /> : <Sparkles />}
         {aiTranslating ? 'Translating…' : 'AI translate'}
