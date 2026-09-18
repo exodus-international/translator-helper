@@ -11,9 +11,8 @@ import { houseStyleRules } from './rules/house-style';
 import { parityRules } from './rules/parity';
 
 export * from './types';
-export { KNOWN_FRONTMATTER_KEYS, NON_TRANSLATABLE_KEYS } from './rules/parity';
 
-export const allRules: LintRule[] = [...parityRules, ...houseStyleRules];
+const allRules: LintRule[] = [...parityRules, ...houseStyleRules];
 
 export interface LintOptions {
   rules?: LintRule[];
