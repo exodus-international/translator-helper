@@ -39,6 +39,7 @@ export type LoadingKey =
   | 'submitForReview'
   | 'assignTranslator'
   | 'assignReviewer'
+  | 'setDeadline'
   | 'startTranslation'
   | 'aiTranslate'
   | 'deleteTranslation'
@@ -53,8 +54,9 @@ export interface MemberInfo {
 export type DialogState =
   | { type: 'closed' }
   | { type: 'submitReview'; reviewers: MemberInfo[] }
-  | { type: 'assignTranslator'; members: MemberInfo[]; deadline: Date | string | null }
-  | { type: 'assignReviewer'; candidates: MemberInfo[] };
+  | { type: 'assignTranslator'; members: MemberInfo[] }
+  | { type: 'assignReviewer'; candidates: MemberInfo[] }
+  | { type: 'deadline' };
 
 export interface EditorStoreConfig {
   documentId: string;
@@ -170,6 +172,9 @@ interface EditorActions {
   openAssignReviewerDialog: () => Promise<void>;
   assignReviewer: (userId: string) => Promise<void>;
   unassignReviewer: () => Promise<void>;
+  /** Opens the small modal that sets or clears this version's deadline. */
+  openDeadlineDialog: () => void;
+  setDeadline: (deadline: Date | null) => Promise<void>;
   closeDialog: () => void;
 
   // Loading helpers
@@ -206,6 +211,24 @@ function removeLoading(state: EditorState, key: LoadingKey): Partial<EditorState
   const next = new Set(state.loading);
   next.delete(key);
   return { loading: next };
+}
+
+/**
+ * Writes anything typed but not yet saved, before an action that replaces the
+ * document with the server's copy. Returns false when the write failed, in
+ * which case the caller must not go on and overwrite the edits it has just
+ * failed to preserve.
+ */
+async function flushPendingEdits(get: () => EditorStore): Promise<boolean> {
+  const { content, savedContent } = get();
+  if (content === savedContent) return true;
+  try {
+    await get().saveContent('auto');
+    return true;
+  } catch {
+    // `saveContent` has already told the reader why.
+    return false;
+  }
 }
 
 // ─── Store factory ───────────────────────────────────────────
@@ -381,6 +404,16 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     applySuggestion: async (suggestionId) => {
+      // This and `reopenSuggestion` replace the whole document with the
+      // server's copy, so anything typed and not yet saved would be thrown
+      // away -- and, because `savedContent` is replaced too, the UI would read
+      // "saved" over text it had just discarded, with no dirty flag left for
+      // autosave to recover from. Writing the edits first loses nothing and is
+      // what the reader meant anyway: the server applies the suggestion to the
+      // stored version, so unsaved edits would otherwise be overwritten by a
+      // suggestion applied to text that never included them.
+      if (!(await flushPendingEdits(get))) return;
+
       set(addLoading(get(), 'applySuggestion'));
       try {
         const updatedVersion = await applySuggestionAction({ suggestionId });
@@ -414,6 +447,8 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     reopenSuggestion: async (suggestionId) => {
+      if (!(await flushPendingEdits(get))) return;
+
       set(addLoading(get(), 'reopenSuggestion'));
       try {
         const result = await reopenSuggestionAction({ suggestionId });
@@ -542,11 +577,11 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     openAssignTranslatorDialog: async () => {
-      const { translationProjectId, targetVersion } = get();
+      const { translationProjectId } = get();
       if (!translationProjectId) return;
       try {
         const members = await listTranslationProjectMembersAction(translationProjectId);
-        set({ dialog: { type: 'assignTranslator', members, deadline: targetVersion?.deadline ?? null } });
+        set({ dialog: { type: 'assignTranslator', members } });
         capture('dialog_opened', { dialog: 'assign_translator' });
       } catch (error) {
         toast.error('Failed to load team members');
@@ -647,6 +682,40 @@ export function createEditorStore(config: EditorStoreConfig) {
         toast.success('Reviewer unassigned');
       } catch (error: any) {
         toast.error(error.message || 'Failed to unassign reviewer');
+      }
+    },
+
+    // ─── Deadline ──────────────────────────────────────
+    openDeadlineDialog: () => {
+      set({ dialog: { type: 'deadline' } });
+      capture('dialog_opened', { dialog: 'deadline' });
+    },
+
+    setDeadline: async (deadline) => {
+      const { documentId, translationProjectId, targetVersion } = get();
+      if (!translationProjectId || !targetVersion) return;
+
+      set(addLoading(get(), 'setDeadline'));
+      try {
+        // The deadline travels with the assignment, the way the translations
+        // page sets it: same action, same permission, same activity entry --
+        // only the translator stays whoever it already was.
+        const updated = await assignTranslatorToVersionAction({
+          documentId,
+          translationProjectId,
+          userId: targetVersion.user?.id ?? null,
+          deadline,
+        });
+        set({
+          targetVersion: { ...targetVersion, deadline: updated?.deadline ?? deadline },
+          dialog: { type: 'closed' },
+          ...removeLoading(get(), 'setDeadline'),
+        });
+        capture('dialog_opened', { dialog: 'deadline_set' });
+        toast.success(deadline ? 'Deadline set' : 'Deadline cleared');
+      } catch (error: any) {
+        set(removeLoading(get(), 'setDeadline'));
+        toast.error(error.message || 'Failed to set the deadline');
       }
     },
 

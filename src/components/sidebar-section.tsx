@@ -2,13 +2,14 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * The one frame every right-sidebar panel uses: an uppercase label row with
- * an optional action, then flat content. No rounded cards, no margins, so
- * document info, audio, deploy, activity log and feedback read as one list.
+ * The one frame every right-sidebar section uses: an uppercase label row with
+ * an optional action, then flat content. No rounded corners or margins of its
+ * own, so the sections stack as one list inside whichever card holds them --
+ * assignment, audio, deploy, activity log.
  *
- * It paints no surface of its own: it is always mounted inside the editor's
- * right panel, and a second background there would band the panel in dark mode,
- * where `--background` is darker than the sidebar it sits on.
+ * It paints no surface beyond its label row: it is always mounted inside the
+ * editor's right panel, and a second background there would band the panel in
+ * dark mode, where `--background` is darker than the sidebar it sits on.
  */
 export function SidebarSection({
   title,
