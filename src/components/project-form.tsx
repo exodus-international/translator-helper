@@ -30,7 +30,7 @@ export { isProjectFormComplete, toCreateProjectInput, toUpdateProjectInput };
  * `pattern` it is enforced by the browser on submit, so both dialogs reject a
  * bad identifier before it becomes a masked server action error.
  */
-const IDENTIFIER_PATTERN = '[a-z0-9]+(-[a-z0-9]+)*';
+const IDENTIFIER_PATTERN = '[a-z0-9]+([-_][a-z0-9]+)*';
 
 /** A lone dash turns day naming off, so it has to pass alongside real acronyms. */
 const ACRONYM_PATTERN = '-|[^\\s-]+';
@@ -85,14 +85,14 @@ export function ProjectFormFields({ values, onChange, idPrefix = 'project' }: Pr
           id={`${idPrefix}-identifier`}
           value={values.identifier}
           onChange={(e) => onChange('identifier', e.target.value)}
-          placeholder="e.g., exodus90, lent2026"
+          placeholder="e.g., exodus90, lent2026, october_2026"
           required
           pattern={IDENTIFIER_PATTERN}
           className="mt-1"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Used in document URLs and as the folder name in the content repository. Lowercase letters, numbers and
-          dashes.
+          Used in document URLs and as the folder name in the content repository. Lowercase letters, numbers, dashes
+          and underscores.
         </p>
       </div>
       <div>
