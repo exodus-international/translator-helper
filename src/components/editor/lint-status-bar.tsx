@@ -33,7 +33,8 @@ export function LintStatusBar({
   className,
 }: {
   diagnostics: LintDiagnostic[];
-  onFixAll: () => void;
+  /** Absent where the text cannot be edited — a preview, for instance. */
+  onFixAll?: () => void;
   className?: string;
 }) {
   const errors = diagnostics.filter((d) => d.severity === 'error').length;
@@ -73,7 +74,7 @@ export function LintStatusBar({
             </>
           )}
         </div>
-        {fixable > 0 && (
+        {fixable > 0 && onFixAll && (
           <button
             type="button"
             onClick={onFixAll}
