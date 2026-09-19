@@ -447,7 +447,12 @@ export default function ProjectKanbanBoard({
               from: getStatusForColumn(oldCard.column),
               to: newStatus,
               via: 'kanban_dnd',
+              documentId: doc.id,
+              documentVersionId: versionId,
             });
+            if (newStatus === DocumentStatus.DEPLOYED) {
+              capture('document_deployed', { documentId: doc.id, documentVersionId: versionId, via: 'kanban_dnd' });
+            }
             await loadDocuments();
           } catch (error) {
             console.error('Error updating document status:', error);
