@@ -59,7 +59,12 @@ async function seedLanguages() {
   for (const lang of LANGUAGES) {
     const result = await prisma.language.upsert({
       where: { code: lang.code },
-      update: { name: lang.name, branchName: lang.branchName ?? null, translationInstructions: lang.translationInstructions ?? null },
+      update: {
+        name: lang.name,
+        branchName: lang.branchName ?? null,
+        translationInstructions: lang.translationInstructions ?? null,
+        isSource: lang.isSource ?? false,
+      },
       create: lang,
     });
     langs[lang.code] = result.id;
