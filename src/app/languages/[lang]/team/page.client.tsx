@@ -40,6 +40,7 @@ export default function LanguageTeamClient({ language, members, users }: Languag
   const [newRole, setNewRole] = useState<ProjectRole>(ProjectRole.TRANSLATOR);
   const [pending, setPending] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Member | null>(null);
+  const [demoting, setDemoting] = useState<{ member: Member; role: ProjectRole } | null>(null);
 
   useEffect(() => {
     capture('language_page_viewed', { language: language.code, tab: 'team' });
@@ -66,18 +67,23 @@ export default function LanguageTeamClient({ language, members, users }: Languag
   const handleRoleChange = async (member: Member, role: ProjectRole) => {
     if (role === member.role) return;
 
+    // The last manager stepping down is worth a sentence before it happens,
+    // not a toast afterwards. Everything else applies straight away.
     if (isLastManager(member) && role !== ProjectRole.PROJECT_MANAGER) {
-      const confirmed = window.confirm(
-        `${member.user.name} is the only Project Manager in ${language.name}. Changing their role leaves nobody who can manage it.`,
-      );
-      if (!confirmed) return;
+      setDemoting({ member, role });
+      return;
     }
 
+    await applyRole(member, role);
+  };
+
+  const applyRole = async (member: Member, role: ProjectRole) => {
     setPending(member.userId);
     try {
       await setLanguageMemberRoleAction({ languageId: language.id, userId: member.userId, role });
       capture('language_member_role_changed', { role });
       toast.success(`${member.user.name} is now a ${PROJECT_ROLE_LABELS[role]}`);
+      setDemoting(null);
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to change the role');
@@ -257,6 +263,33 @@ export default function LanguageTeamClient({ language, members, users }: Languag
           status is neither approved nor deployed — the same rule the dashboard&apos;s My Work uses.
         </p>
       </div>
+
+      <Dialog open={!!demoting} onOpenChange={(open) => !open && setDemoting(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change {demoting?.member.user.name}&apos;s role?</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 space-y-3 text-sm">
+            <p>
+              {demoting?.member.user.name} is the only Project Manager in {language.name}. Making them{' '}
+              {demoting && `a ${PROJECT_ROLE_LABELS[demoting.role]}`} leaves nobody who can manage it — no deploys, no
+              assignments, until someone is promoted.
+            </p>
+            <p className="text-muted-foreground">You can promote someone else at any time.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDemoting(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => demoting && applyRole(demoting.member, demoting.role)}
+              disabled={pending === demoting?.member.userId}
+            >
+              {pending === demoting?.member.userId ? 'Changing…' : 'Change role'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!removing} onOpenChange={(open) => !open && setRemoving(null)}>
         <DialogContent>

@@ -102,6 +102,7 @@ export default function ProjectTeamTab({
         {canManage && (
           <Button
             variant="outline"
+            nativeButton={false}
             render={<Link href={`/languages/${encodeURIComponent(selectedLanguageCode)}/team`} />}
           >
             Manage team
