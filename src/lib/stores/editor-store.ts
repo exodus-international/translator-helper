@@ -51,7 +51,7 @@ export interface MemberInfo {
   user: { id: string; name: string | null; email: string; image?: string | null };
 }
 
-export type DialogState =
+type DialogState =
   | { type: 'closed' }
   | { type: 'submitReview'; reviewers: MemberInfo[] }
   | { type: 'assignTranslator'; members: MemberInfo[] }
