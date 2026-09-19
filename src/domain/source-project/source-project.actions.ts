@@ -11,7 +11,7 @@ import {
   listSourceProjects,
   listSourceProjectsPaginated,
   getSourceProjectById,
-  getSourceProjectByIdentifier,
+  getSourceProjectBySlug,
   getSourceProjectsForUser,
   createSourceProject,
   updateSourceProject,
@@ -59,9 +59,9 @@ export async function getSourceProjectAction(id: string) {
   return await getSourceProjectById(id);
 }
 
-export async function getSourceProjectByIdentifierAction(identifier: string) {
+export async function getSourceProjectBySlugAction(slug: string) {
   await authorize('authenticated');
-  return await getSourceProjectByIdentifier(identifier);
+  return await getSourceProjectBySlug(slug);
 }
 
 export async function createSourceProjectAction(input: unknown) {
@@ -71,7 +71,8 @@ export async function createSourceProjectAction(input: unknown) {
   const sourceProject = await createSourceProject({
     name: validated.name,
     description: validated.description,
-    identifier: validated.identifier,
+    slug: validated.slug,
+    repositoryDirectory: validated.repositoryDirectory,
     acronym: validated.acronym,
   });
 
@@ -116,7 +117,8 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
   return await updateSourceProject(id, {
     name: validated.name,
     description: validated.description,
-    identifier: validated.identifier,
+    slug: validated.slug,
+    repositoryDirectory: validated.repositoryDirectory,
     acronym: validated.acronym,
     status: validated.status,
     audioDocumentTypes: validated.audioDocumentTypes,

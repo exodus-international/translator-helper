@@ -162,9 +162,9 @@ export async function getSourceProjectById(id: string) {
 }
 
 /** The readable URL segment, e.g. "advent2025" in /projects/advent2025. */
-export async function getSourceProjectByIdentifier(identifier: string) {
+export async function getSourceProjectBySlug(slug: string) {
   return prisma.sourceProject.findUnique({
-    where: { identifier },
+    where: { slug },
     include: sourceProjectDetailInclude,
   });
 }
@@ -172,7 +172,8 @@ export async function getSourceProjectByIdentifier(identifier: string) {
 export async function createSourceProject(data: {
   name: string;
   description?: string | null;
-  identifier?: string | null;
+  slug: string;
+  repositoryDirectory?: string | null;
   acronym?: string | null;
 }) {
   return prisma.sourceProject.create({
@@ -185,7 +186,8 @@ export async function updateSourceProject(
   data: {
     name?: string;
     description?: string | null;
-    identifier?: string | null;
+    slug?: string;
+    repositoryDirectory?: string | null;
     acronym?: string | null;
     status?: 'ACTIVE' | 'COMPLETE';
     audioDocumentTypes?: DocumentType[];

@@ -506,7 +506,7 @@ export function DocumentEditor({
           ? [
               {
                 label: document.sourceProject.name,
-                href: buildProjectPath(document.sourceProject.identifier ?? document.sourceProject.id),
+                href: buildProjectPath(document.sourceProject.slug),
               },
             ]
           : []),

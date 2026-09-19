@@ -4,6 +4,7 @@ import { createSourceProjectSchema, updateSourceProjectSchema } from './source-p
 import {
   EMPTY_PROJECT_FORM,
   isProjectFormComplete,
+  slugifyProjectName,
   toCreateProjectInput,
   toUpdateProjectInput,
 } from './source-project.form';
@@ -11,11 +12,17 @@ import {
 const filled = {
   name: 'Exodus90 2026',
   description: 'A description',
-  identifier: 'exodus90',
+  slug: 'exodus90',
+  repositoryDirectory: 'exodus90',
   acronym: 'E90',
   deployToGithub: true,
 };
-const minimal = { ...EMPTY_PROJECT_FORM, name: 'Exodus90 2026', identifier: 'exodus90' };
+const minimal = {
+  ...EMPTY_PROJECT_FORM,
+  name: 'Exodus90 2026',
+  slug: 'exodus90',
+  repositoryDirectory: 'exodus90',
+};
 
 describe('toCreateProjectInput', () => {
   it('produces something the create schema accepts', () => {
@@ -46,28 +53,40 @@ describe('toCreateProjectInput', () => {
     const input = toCreateProjectInput({
       name: '  Exodus90 2026 ',
       description: '  hello ',
-      identifier: ' exodus90 ',
+      slug: ' exodus90 ',
+      repositoryDirectory: ' exodus-90 ',
       acronym: ' E90 ',
       deployToGithub: true,
     });
     assert.deepEqual(input, {
       name: 'Exodus90 2026',
       description: 'hello',
-      identifier: 'exodus90',
+      slug: 'exodus90',
+      repositoryDirectory: 'exodus-90',
       acronym: 'E90',
     });
   });
 
-  it('sends a null identifier when GitHub deploy is turned off', () => {
-    const input = toCreateProjectInput({ ...minimal, identifier: 'exodus90', deployToGithub: false });
-    assert.equal(input.identifier, undefined);
+  // The slug is what the project is addressed by, so it survives the toggle;
+  // only the repository directory is dropped.
+  it('omits the repository directory when GitHub deploy is turned off, and keeps the slug', () => {
+    const input = toCreateProjectInput({ ...minimal, deployToGithub: false });
+    assert.equal(input.repositoryDirectory, undefined);
+    assert.equal(input.slug, 'exodus90');
     assert.equal(createSourceProjectSchema.safeParse(input).success, true);
+  });
+
+  it('rejects a project with no slug, deploying or not', () => {
+    for (const deployToGithub of [true, false]) {
+      const input = toCreateProjectInput({ ...minimal, slug: '', deployToGithub });
+      assert.equal(createSourceProjectSchema.safeParse(input).success, false);
+    }
   });
 });
 
-describe('identifier format', () => {
-  const create = (identifier: string) =>
-    createSourceProjectSchema.safeParse(toCreateProjectInput({ ...minimal, identifier })).success;
+describe('slug and repository directory format', () => {
+  const create = (slug: string) =>
+    createSourceProjectSchema.safeParse(toCreateProjectInput({ ...minimal, slug })).success;
 
   // Content folders use both separators, so "october_2026" must pass alongside
   // "exodus-90". This was rejected in production.
@@ -90,6 +109,35 @@ describe('identifier format', () => {
     assert.equal(create('october 2026'), false);
     assert.equal(create('october.2026'), false);
   });
+
+  it('holds the repository directory to the same rules', () => {
+    const bad = toCreateProjectInput({ ...minimal, repositoryDirectory: 'October 2026' });
+    assert.equal(createSourceProjectSchema.safeParse(bad).success, false);
+  });
+});
+
+describe('slugifyProjectName', () => {
+  it('proposes a slug the create schema accepts', () => {
+    for (const name of ['Exodus90 2026', 'Lent 2026', 'Advent — Week 1', 'Čeština Projekt']) {
+      const slug = slugifyProjectName(name);
+      const input = toCreateProjectInput({ ...minimal, slug });
+      assert.equal(createSourceProjectSchema.safeParse(input).success, true, `${name} -> ${slug}`);
+    }
+  });
+
+  it('folds accents, lowercases, and collapses everything else to single dashes', () => {
+    assert.equal(slugifyProjectName('Exodus90 2026'), 'exodus90-2026');
+    assert.equal(slugifyProjectName('Advent — Week 1'), 'advent-week-1');
+    assert.equal(slugifyProjectName('Čeština'), 'cestina');
+    assert.equal(slugifyProjectName('  spaced  out  '), 'spaced-out');
+  });
+
+  // Nothing usable is better than something broken: the field stays empty and
+  // the submit button stays disabled until the admin fills it in.
+  it('returns an empty string when a name has nothing to slugify', () => {
+    assert.equal(slugifyProjectName('!!!'), '');
+    assert.equal(slugifyProjectName('日本語'), '');
+  });
 });
 
 describe('toUpdateProjectInput', () => {
@@ -104,29 +152,31 @@ describe('toUpdateProjectInput', () => {
     assert.equal(updateSourceProjectSchema.safeParse(input).success, true);
   });
 
-  it('never sends a null identifier while GitHub deploy stays on', () => {
-    const input = toUpdateProjectInput({ ...filled, identifier: '   ' });
-    assert.equal(input.identifier, '');
-    assert.notEqual(input.identifier, null);
+  it('never sends a null repository directory while GitHub deploy stays on', () => {
+    const input = toUpdateProjectInput({ ...filled, repositoryDirectory: '   ' });
+    assert.equal(input.repositoryDirectory, '');
+    assert.notEqual(input.repositoryDirectory, null);
   });
 
-  it('sends a null identifier when GitHub deploy is turned off', () => {
+  it('clears the repository directory when GitHub deploy is turned off', () => {
     const input = toUpdateProjectInput({ ...filled, deployToGithub: false });
-    assert.equal(input.identifier, null);
+    assert.equal(input.repositoryDirectory, null);
+    assert.equal(input.slug, 'exodus90');
     assert.equal(updateSourceProjectSchema.safeParse(input).success, true);
   });
 });
 
 describe('isProjectFormComplete', () => {
-  it('needs both a name and an identifier', () => {
+  it('needs a name and a slug', () => {
     assert.equal(isProjectFormComplete(minimal), true);
     assert.equal(isProjectFormComplete(EMPTY_PROJECT_FORM), false);
     assert.equal(isProjectFormComplete({ ...minimal, name: '   ' }), false);
-    assert.equal(isProjectFormComplete({ ...minimal, identifier: '' }), false);
+    assert.equal(isProjectFormComplete({ ...minimal, slug: '' }), false);
   });
 
-  it('does not require an identifier when GitHub deploy is off', () => {
-    assert.equal(isProjectFormComplete({ ...minimal, identifier: '', deployToGithub: false }), true);
+  it('needs a repository directory only while GitHub deploy is on', () => {
+    assert.equal(isProjectFormComplete({ ...minimal, repositoryDirectory: '' }), false);
+    assert.equal(isProjectFormComplete({ ...minimal, repositoryDirectory: '', deployToGithub: false }), true);
   });
 
   it('does not require a description or an acronym', () => {
