@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Ban, Lock } from 'lucide-react';
+import Link from 'next/link';
+import { Ban, Lock, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/page-header';
@@ -298,6 +299,16 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
               ) : (
                 <>
                   <LanguageHealthPills pills={pills} className="flex-col items-start" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    nativeButton={false}
+                    render={<Link href={`/instructions?lang=${encodeURIComponent(language.code)}`} />}
+                  >
+                    <ScrollText />
+                    AI instructions
+                  </Button>
                   <p className="text-muted-foreground text-xs">
                     {members.memberCount === 0
                       ? 'No members yet.'
