@@ -5,7 +5,7 @@ import { rollUpLanguageProgress, type LanguageDocumentRow } from './language-pro
 
 const EXODUS = { projectId: 'p1', projectName: 'Exodus90 2026', projectStatus: SourceProjectStatus.ACTIVE };
 const ADVENT = { projectId: 'p2', projectName: 'Advent 2025', projectStatus: SourceProjectStatus.ACTIVE };
-const SUMMER = { projectId: 'p3', projectName: 'Summer 2025', projectStatus: SourceProjectStatus.COMPLETE };
+const SUMMER = { projectId: 'p3', projectName: 'Summer Retreat 2025', projectStatus: SourceProjectStatus.COMPLETE };
 
 const doc = (project: Omit<LanguageDocumentRow, 'status'>, status: DocumentStatus | null): LanguageDocumentRow => ({
   ...project,
@@ -60,20 +60,39 @@ describe('rollUpLanguageProgress', () => {
     assert.equal(progress.percent, 0);
   });
 
-  it('still reports completed projects, with their own final figures', () => {
+  it('counts a completed project in the lifetime totals rather than listing it', () => {
+    // A list of finished projects only grows; the work still has to be counted.
     const progress = rollUpLanguageProgress([
       doc(EXODUS, DocumentStatus.DEPLOYED),
       doc(SUMMER, DocumentStatus.DEPLOYED),
       doc(SUMMER, DocumentStatus.APPROVED),
     ]);
 
-    assert.deepEqual(progress.completedProjects, [
-      { id: 'p3', name: 'Summer 2025', documents: 2, deployed: 1, percent: 50 },
-    ]);
+    assert.deepEqual(progress.lifetime, {
+      projects: 2,
+      completedProjects: 1,
+      documents: 3,
+      translated: 3,
+      translatedPercent: 100,
+      deployed: 2,
+    });
     assert.deepEqual(
       progress.projects.map((p) => p.name),
       ['Exodus90 2026'],
     );
+  });
+
+  it('counts approved and deployed as translated, and nothing earlier', () => {
+    const progress = rollUpLanguageProgress([
+      doc(EXODUS, DocumentStatus.DEPLOYED),
+      doc(EXODUS, DocumentStatus.APPROVED),
+      doc(EXODUS, DocumentStatus.PENDING_REVIEW),
+      doc(EXODUS, null),
+    ]);
+
+    assert.equal(progress.lifetime.translated, 2);
+    assert.equal(progress.lifetime.translatedPercent, 50);
+    assert.equal(progress.lifetime.deployed, 1);
   });
 
   it('leaves a completed project out of the status breakdown too', () => {

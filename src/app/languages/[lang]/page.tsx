@@ -48,6 +48,7 @@ export default async function LanguageOverviewPage({ params }: { params: Promise
     <LanguageOverviewClient
       language={{ code: language.code, name: language.name }}
       progress={progress}
+      lastDeployAt={progress.lastDeployAt?.toISOString() ?? null}
       pills={languageHealth({ ...language, ...members })}
       memberCount={roster.length}
       roster={roster.slice(0, 5).map((member) => ({

@@ -148,14 +148,25 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
  * document, with the version's status when there is one -- the roll-up decides
  * what that means.
  */
-export async function getLanguageProgress(languageId: string): Promise<LanguageProgress> {
-  const documents = await prisma.document.findMany({
-    where: { sourceProject: { translationProjects: { some: { languageId } } } },
-    select: {
-      sourceProject: { select: { id: true, name: true, status: true } },
-      versions: { where: { languageId }, select: { status: true }, take: 1 },
-    },
-  });
+export async function getLanguageProgress(
+  languageId: string,
+): Promise<LanguageProgress & { lastDeployAt: Date | null }> {
+  const [documents, lastDeploy] = await Promise.all([
+    prisma.document.findMany({
+      where: { sourceProject: { translationProjects: { some: { languageId } } } },
+      select: {
+        sourceProject: { select: { id: true, name: true, status: true } },
+        versions: { where: { languageId }, select: { status: true }, take: 1 },
+      },
+    }),
+    // A real timestamp for "last deploy": a commit is written the moment a
+    // version reaches the content repository, where a status has no history.
+    prisma.gitHubCommit.findFirst({
+      where: { documentVersion: { languageId } },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+  ]);
 
   const rows: LanguageDocumentRow[] = documents.flatMap((document) =>
     document.sourceProject
@@ -170,7 +181,7 @@ export async function getLanguageProgress(languageId: string): Promise<LanguageP
       : [],
   );
 
-  return rollUpLanguageProgress(rows);
+  return { ...rollUpLanguageProgress(rows), lastDeployAt: lastDeploy?.createdAt ?? null };
 }
 
 /** The manager names and member count one language's settings page shows. */

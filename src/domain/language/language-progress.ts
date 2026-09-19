@@ -16,8 +16,10 @@ import { DocumentStatus, SourceProjectStatus } from '@/generated/prisma/enums';
  *
  * Completed projects are excluded from the headline. "How is Croatian doing" is
  * a question about live work; a finished project would either inflate it
- * forever or drag it down forever. They are still returned, so the page can
- * show them below the line rather than silently dropping work that happened.
+ * forever or drag it down forever. They are not listed either -- a list of
+ * finished projects only grows, and each entry matters less as it ages -- but
+ * everything they hold is counted in the lifetime totals, so finished work is
+ * summarised rather than dropped.
  */
 
 export interface LanguageDocumentRow {
@@ -36,6 +38,17 @@ export interface LanguageProjectProgress {
   percent: number;
 }
 
+/** Everything this language has ever done, finished projects included. */
+export interface LanguageLifetime {
+  projects: number;
+  completedProjects: number;
+  documents: number;
+  /** Approved or deployed: the translation work itself is finished. */
+  translated: number;
+  translatedPercent: number;
+  deployed: number;
+}
+
 export interface LanguageProgress {
   /** Active projects only. */
   deployed: number;
@@ -43,7 +56,7 @@ export interface LanguageProgress {
   percent: number;
   byStatus: Record<DocumentStatus, number>;
   projects: LanguageProjectProgress[];
-  completedProjects: LanguageProjectProgress[];
+  lifetime: LanguageLifetime;
   /**
    * Documents with no version in this language. Counted as pending above; named
    * separately because it means a document escaped both seeding paths.
@@ -63,6 +76,8 @@ export function rollUpLanguageProgress(rows: LanguageDocumentRow[]): LanguagePro
   const byStatus = EMPTY_STATUS_COUNTS();
   const projects = new Map<string, LanguageProjectProgress & { status: SourceProjectStatus }>();
   let missingVersions = 0;
+  let lifetimeTranslated = 0;
+  let lifetimeDeployed = 0;
 
   for (const row of rows) {
     // A document nobody has started is untranslated work, not absent work.
@@ -83,6 +98,10 @@ export function rollUpLanguageProgress(rows: LanguageDocumentRow[]): LanguagePro
     project.documents += 1;
     if (status === DocumentStatus.DEPLOYED) {
       project.deployed += 1;
+      lifetimeDeployed += 1;
+    }
+    if (status === DocumentStatus.APPROVED || status === DocumentStatus.DEPLOYED) {
+      lifetimeTranslated += 1;
     }
     projects.set(row.projectId, project);
 
@@ -106,7 +125,14 @@ export function rollUpLanguageProgress(rows: LanguageDocumentRow[]): LanguagePro
     percent: percentage(deployed, documents),
     byStatus,
     projects: sortByName(active),
-    completedProjects: sortByName(all.filter((project) => project.status === SourceProjectStatus.COMPLETE)),
+    lifetime: {
+      projects: all.length,
+      completedProjects: all.filter((project) => project.status === SourceProjectStatus.COMPLETE).length,
+      documents: rows.length,
+      translated: lifetimeTranslated,
+      translatedPercent: percentage(lifetimeTranslated, rows.length),
+      deployed: lifetimeDeployed,
+    },
     missingVersions,
   };
 }
