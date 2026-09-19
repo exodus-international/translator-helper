@@ -68,7 +68,7 @@ export function languageHealth(language: LanguageHealthInput): LanguageHealthPil
 
   pills.push(
     language.translationInstructions?.trim()
-      ? { key: 'instructions', state: 'ok', label: 'Instructions written' }
+      ? { key: 'instructions', state: 'ok', label: 'AI Instructions written' }
       : { key: 'instructions', state: 'missing', label: 'No AI instructions', detail: 'translations use the base prompt only' },
   );
 
