@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { auth } from '@/lib/auth';
-import { DocumentStatus, PrismaClient } from '../src/generated/prisma/client';
+import { AudioProvider, DocumentStatus, GitHubPRStatus, PrismaClient } from '../src/generated/prisma/client';
 
 import { CONTENT_BY_LANGUAGE, ENGLISH_CONTENT } from './seed-data/content';
 import {
@@ -460,6 +460,86 @@ async function seedComments(
   console.log(`Created ${COMMENTS.length} comments`);
 }
 
+
+// ---------------------------------------------------------------------------
+// Language configuration scenarios
+// ---------------------------------------------------------------------------
+
+/**
+ * Coverage for the language pages: each target language is deliberately broken
+ * in a different way, so the health checks, the delete guard and the overview
+ * all have something real to report.
+ *
+ *   cs  fully configured, deployed work, a PM
+ *   sk  no AI instructions
+ *   de  no voice
+ *   hr  no branch, no PM, no voice, no instructions -- every check failing
+ *   fr  configured but barely started
+ *   pt  no projects at all, so it is the one language that can be deleted
+ */
+async function seedLanguageScenarios(langs: Record<string, string>, users: Record<string, string>) {
+  console.log('\n--- Language scenarios ---');
+
+  const voices: Record<string, string> = { cs: 'cs-CZ-AntoninNeural', sk: 'sk-SK-LukasNeural', fr: 'fr-FR-HenriNeural' };
+  for (const [code, audioVoice] of Object.entries(voices)) {
+    await prisma.language.update({
+      where: { id: langs[code] },
+      data: { audioProvider: AudioProvider.AZURE_SPEECH, audioVoice },
+    });
+  }
+
+  // Slovak deploys and speaks, but nobody has written its AI instructions.
+  await prisma.language.update({ where: { id: langs.sk }, data: { translationInstructions: null } });
+
+  // An empty language: a branch, no projects, no translations. The only one the
+  // delete guard should let through.
+  const portuguese = await prisma.language.upsert({
+    where: { code: 'pt' },
+    update: {},
+    create: { code: 'pt', name: 'Portuguese', branchName: 'translations/pt' },
+  });
+
+  // A pending invitation scoped to it, so the delete dialog has a row to name.
+  await prisma.invitation.create({
+    data: {
+      token: 'seed-invite-portuguese',
+      createdById: users.admin,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      languages: { create: [{ languageId: portuguese.id }] },
+    },
+  });
+
+  // Deploy history: a commit per deployed version, so "last deploy" has a real
+  // timestamp rather than a status with no history behind it.
+  const deployed = await prisma.documentVersion.findMany({
+    where: { status: DocumentStatus.DEPLOYED },
+    select: { id: true, languageId: true, document: { select: { slug: true } } },
+  });
+  const branchByLanguage = new Map(
+    (await prisma.language.findMany({ select: { id: true, code: true, branchName: true } })).map((l) => [
+      l.id,
+      l.branchName ?? `translations/${l.code}`,
+    ]),
+  );
+  let day = 0;
+  for (const version of deployed) {
+    await prisma.gitHubCommit.create({
+      data: {
+        documentVersionId: version.id,
+        commitSha: `seed${version.id.slice(0, 7)}`,
+        branchName: branchByLanguage.get(version.languageId) ?? 'translations/unknown',
+        filePath: `translations/${version.document.slug}.md`,
+        prNumber: 100 + day,
+        prStatus: GitHubPRStatus.MERGED,
+        // Spread backwards so the newest is a few days old, not all identical.
+        createdAt: new Date(Date.now() - (day += 2) * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+
+  console.log(`Voices for ${Object.keys(voices).length} languages, Portuguese as an empty language, ${deployed.length} deploy commits`);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -479,6 +559,7 @@ async function main() {
   await seedSuggestions(versions, users);
   await seedActivityLogs(versions, users);
   await seedComments(versions, users);
+  await seedLanguageScenarios(langs, users);
 
   console.log('\n=== Database seeding completed! ===\n');
   console.log('Login credentials:');
