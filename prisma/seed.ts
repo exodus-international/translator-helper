@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { auth } from '@/lib/auth';
-import { AudioProvider, DocumentStatus, GitHubPRStatus, PrismaClient } from '../src/generated/prisma/client';
+import { AudioProvider, DocumentStatus, GitHubPRStatus, PrismaClient, ProjectRole } from '../src/generated/prisma/client';
 
 import { CONTENT_BY_LANGUAGE, ENGLISH_CONTENT } from './seed-data/content';
 import {
@@ -491,6 +491,15 @@ async function seedLanguageScenarios(langs: Record<string, string>, users: Recor
   // Slovak deploys and speaks, but nobody has written its AI instructions.
   await prisma.language.update({ where: { id: langs.sk }, data: { translationInstructions: null } });
 
+  // A Project Manager who is not an administrator. Without one, the split the
+  // instructions page rests on -- a PM writes, members read, and neither can
+  // reach /languages -- cannot be exercised at all. German gets a second PM
+  // with it, so it is also the one language where demoting one is harmless.
+  await prisma.userLanguage.update({
+    where: { userId_languageId: { userId: users.translator2, languageId: langs.de } },
+    data: { role: ProjectRole.PROJECT_MANAGER },
+  });
+
   // An empty language: a branch, no projects, no translations. The only one the
   // delete guard should let through.
   const portuguese = await prisma.language.upsert({
@@ -503,7 +512,7 @@ async function seedLanguageScenarios(langs: Record<string, string>, users: Recor
   await prisma.invitation.create({
     data: {
       token: 'seed-invite-portuguese',
-      createdById: users.admin,
+      createdById: users.admin1,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       languages: { create: [{ languageId: portuguese.id }] },
     },
