@@ -29,7 +29,10 @@ export function daysFromNow(n: number): Date {
 // ---------------------------------------------------------------------------
 
 export const LANGUAGES = [
-  { code: 'en', name: 'English' },
+  // Documents are authored in English and translated out of it. Without the
+  // flag a fresh database has no source language at all, so every query that
+  // asks for target languages offers English a page it can never use.
+  { code: 'en', name: 'English', isSource: true },
   {
     code: 'cs',
     name: 'Czech',
