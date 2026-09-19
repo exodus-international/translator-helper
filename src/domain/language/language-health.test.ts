@@ -22,7 +22,7 @@ describe('languageHealth', () => {
       'Manager: Toma Z.',
       'Branch hr-croatian-translation',
       'Voice hr-HR-SreckoNeural',
-      'Instructions written',
+      'AI Instructions written',
     ]);
     assert.equal(countHealthProblems(languageHealth(HEALTHY)), 0);
   });
