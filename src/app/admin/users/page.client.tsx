@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { UserAvatar } from '@/components/user-avatar';
 import { DataTable } from '@/components/data-table/data-table';
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header';
@@ -39,9 +40,8 @@ import {
   getInvitationDisplayStatus,
   type InvitationDisplayStatus,
 } from '@/domain/invitation/invitation.display-status';
-import { adminSetUserLanguagesAction } from '@/domain/user-language/user-language.actions';
 import { buildUserCsv } from '@/domain/user/user-csv';
-import { compareByLanguageThenName, matchesSearch, resolveSelectedLanguages } from '@/domain/user/user-table';
+import { compareByLanguageThenName, matchesSearch } from '@/domain/user/user-table';
 import { formatExactDateTime, formatLastActive, formatUnambiguousDate } from '@/lib/format';
 import { downloadCsv } from '@/lib/download';
 import { adminUpdateUserProfileAction, updateUserRoleAction } from '@/domain/user/user.actions';
@@ -58,7 +58,6 @@ import {
   Clock,
   Copy,
   Download,
-  Globe,
   Key,
   Link2,
   MoreHorizontal,
@@ -222,9 +221,6 @@ export default function UsersClient({
   } | null>(null);
 
   // Language edit state
-  const [languageDialogOpen, setLanguageDialogOpen] = useState(false);
-  const [languageUser, setLanguageUser] = useState<User | null>(null);
-  const [selectedLanguageIds, setSelectedLanguageIds] = useState<string[]>([]);
 
   // Profile edit state
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -389,46 +385,8 @@ export default function UsersClient({
     }
   };
 
-  // ─── Language editing ──────────────────────────────────
 
-  const openLanguageDialog = (user: User) => {
-    setLanguageUser(user);
-    setSelectedLanguageIds(user.languages.map((ul) => ul.language.id));
-    setLanguageDialogOpen(true);
-  };
 
-  const handleSaveLanguages = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!languageUser) return;
-    setLoading(true);
-    try {
-      await adminSetUserLanguagesAction(languageUser.id, selectedLanguageIds);
-      // Resolve against the user's current languages too: the dialog only offers
-      // target languages, so an already-assigned English would not resolve.
-      const knownLanguages = [...availableLanguages, ...languageUser.languages.map((ul) => ul.language)];
-      setUsers(
-        users.map((u) =>
-          u.id === languageUser.id
-            ? { ...u, languages: resolveSelectedLanguages(selectedLanguageIds, knownLanguages) }
-            : u,
-        ),
-      );
-      capture('admin_user_languages_updated', { language_count: selectedLanguageIds.length });
-      toast.success(`Languages updated for ${languageUser.name}`);
-      setLanguageDialogOpen(false);
-      setLanguageUser(null);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update languages');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleLanguageSelection = (languageId: string) => {
-    setSelectedLanguageIds((prev) =>
-      prev.includes(languageId) ? prev.filter((id) => id !== languageId) : [...prev, languageId],
-    );
-  };
 
   // ─── Profile editing ──────────────────────────────────
 
@@ -597,9 +555,16 @@ export default function UsersClient({
               {/* Capped so a polyglot's row stays the same height as everyone
                   else's; the full list is one hover away. */}
               {row.original.languages.slice(0, LANGUAGES_SHOWN).map((ul) => (
-                <Badge key={ul.language.id} variant="outline">
-                  {ul.language.name}
-                </Badge>
+                <Link
+                  key={ul.language.id}
+                  href={`/languages/${encodeURIComponent(ul.language.code)}/team`}
+                  onClick={(event) => event.stopPropagation()}
+                  title={`Open the ${ul.language.name} team`}
+                >
+                  <Badge variant="outline" className="hover:bg-accent transition-colors">
+                    {ul.language.name}
+                  </Badge>
+                </Link>
               ))}
               {row.original.languages.length > LANGUAGES_SHOWN && (
                 <Badge
@@ -707,10 +672,6 @@ export default function UsersClient({
                       <DropdownMenuItem onClick={() => openProfileDialog(user)}>
                         <Pencil className="h-4 w-4 mr-2" />
                         Edit Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openLanguageDialog(user)}>
-                        <Globe className="h-4 w-4 mr-2" />
-                        Edit Languages
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openPasswordDialog(user)}>
                         <Key className="h-4 w-4 mr-2" />
@@ -1098,48 +1059,6 @@ export default function UsersClient({
               </div>
             </form>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Edit Languages Dialog ────────────────────────── */}
-      <Dialog
-        open={languageDialogOpen}
-        onOpenChange={(open) => {
-          setLanguageDialogOpen(open);
-          if (!open) {
-            setLanguageUser(null);
-            setSelectedLanguageIds([]);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Languages for {languageUser?.name}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSaveLanguages} className="space-y-4">
-            <div className="border rounded-md p-3 max-h-64 overflow-y-auto space-y-1">
-              {availableLanguages.map((lang) => (
-                <label key={lang.id} className="flex items-center gap-2 cursor-pointer hover:bg-accent p-1.5 rounded">
-                  <input
-                    type="checkbox"
-                    checked={selectedLanguageIds.includes(lang.id)}
-                    onChange={() => toggleLanguageSelection(lang.id)}
-                    className="h-4 w-4 rounded border-border"
-                  />
-                  <span className="text-sm font-medium">{lang.name}</span>
-                  <span className="text-xs text-muted-foreground">({lang.code})</span>
-                </label>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setLanguageDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Saving...' : 'Save Languages'}
-              </Button>
-            </div>
-          </form>
         </DialogContent>
       </Dialog>
 

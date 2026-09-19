@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   compareByLanguageThenName,
   matchesSearch,
-  resolveSelectedLanguages,
   type UserTableRow,
   type UserSearchRow,
 } from './user-table';
@@ -101,53 +100,3 @@ describe('matchesSearch', () => {
   });
 });
 
-describe('resolveSelectedLanguages', () => {
-  const ENGLISH = { id: 'en-id', name: 'English' };
-  const CZECH = { id: 'cs-id', name: 'Czech' };
-  const SLOVAK = { id: 'sk-id', name: 'Slovak' };
-
-  // The admin dialog only offers target languages, so English is never in it.
-  const assignable = [CZECH, SLOVAK];
-
-  it('resolves ids to their language objects, preserving selection order', () => {
-    assert.deepEqual(resolveSelectedLanguages([SLOVAK.id, CZECH.id], assignable), [
-      { language: SLOVAK },
-      { language: CZECH },
-    ]);
-  });
-
-  it('resolves an already-assigned English when it is among the known languages', () => {
-    assert.deepEqual(resolveSelectedLanguages([ENGLISH.id, CZECH.id], [...assignable, ENGLISH]), [
-      { language: ENGLISH },
-      { language: CZECH },
-    ]);
-  });
-
-  it('never yields an entry with an undefined language', () => {
-    const resolved = resolveSelectedLanguages([ENGLISH.id, CZECH.id], assignable);
-
-    assert.deepEqual(resolved, [{ language: CZECH }]);
-    assert.ok(resolved.every((entry) => entry.language !== undefined));
-  });
-
-  it('keeps the result usable by the table consumers that crashed', () => {
-    const resolved = resolveSelectedLanguages([ENGLISH.id, CZECH.id], assignable);
-
-    // These are the exact reads that threw: the languages accessorFn and the sorter.
-    assert.deepEqual(
-      resolved.map((ul) => ul.language.id),
-      [CZECH.id],
-    );
-    assert.doesNotThrow(() =>
-      compareByLanguageThenName({ name: 'Anna', languages: resolved }, { name: 'Bob', languages: [] }),
-    );
-  });
-
-  it('returns an empty list when nothing is selected', () => {
-    assert.deepEqual(resolveSelectedLanguages([], assignable), []);
-  });
-
-  it('returns an empty list when nothing resolves', () => {
-    assert.deepEqual(resolveSelectedLanguages([ENGLISH.id], assignable), []);
-  });
-});

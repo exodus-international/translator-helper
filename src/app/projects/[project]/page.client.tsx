@@ -220,9 +220,9 @@ export default function ProjectDetailClient({
           <TabsContent value="team" className="mt-4">
             <ProjectTeamTab
               translationProjectId={selectedTranslationProject?.id || null}
-              user={user}
               canManage={isAdminClient(user)}
               selectedLanguageName={languages.find((l) => l.id === selectedLanguage)?.name || ''}
+              selectedLanguageCode={languages.find((l) => l.id === selectedLanguage)?.code || ''}
             />
           </TabsContent>
 

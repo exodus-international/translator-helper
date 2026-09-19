@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/page-header';
 import { LanguageHealthPills } from '@/components/language-health-pills';
+import { LanguageTabs } from '@/components/language-tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,9 +125,11 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
         description={
           language.isSource
             ? 'The language documents are written in. Nothing translates into it.'
-            : `Everything scoped to ${language.name} lives here. What you change applies to every ${language.name} project.`
+            : `Everything scoped to ${language.name} lives here.`
         }
-      />
+      >
+        <LanguageTabs code={language.code} memberCount={members.memberCount} includeTeam={!language.isSource} />
+      </PageHeader>
 
       <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row">
         <div className="flex max-w-2xl flex-1 flex-col gap-4">
@@ -299,7 +302,7 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                     {members.memberCount === 0
                       ? 'No members yet.'
                       : `${members.memberCount} ${members.memberCount === 1 ? 'member' : 'members'}.`}{' '}
-                    Editing the team stays on the project Team tab until it moves here.
+                    Roles are edited on the Team tab.
                   </p>
                 </>
               )}
