@@ -132,6 +132,9 @@ export type AnalyticsEvent =
   | 'language_updated'
   | 'language_deleted'
   | 'language_instructions_saved'
+  // The existing names survive the move to /languages so their funnels do; the
+  // tab is a property rather than a name per tab.
+  | 'language_page_viewed'
   // ── Generic UI ───────────────────────────────────────────────────────
   | 'dialog_opened'
   | 'document_type_filter_changed'

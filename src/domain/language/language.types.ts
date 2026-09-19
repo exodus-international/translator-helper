@@ -3,34 +3,37 @@ import { AudioProvider } from '@/generated/prisma/enums';
 
 export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
 
+/**
+ * A branch is required from the moment a language exists. Every language has at
+ * least one project that deploys, so an absent branch is not a configuration
+ * an admin might have meant -- it is a deploy that will throw, which is exactly
+ * the failure the language pages exist to move forward in time.
+ */
 export const createLanguageSchema = z.object({
-  code: z.string().min(2).max(5), // e.g., "en", "cs", "en-US"
-  name: z.string().min(2),
-  branchName: z.string().optional(),
+  code: z.string().trim().min(2).max(5), // e.g., "en", "cs", "en-US"
+  name: z.string().trim().min(2),
+  branchName: z.string().trim().min(1),
 });
 
-export const updateLanguageSchema = z.object({
-  name: z.string().min(2).optional(),
-});
+/**
+ * `code` is the URL: /languages/hr and /documents/exodus90/day-1/hr both key off
+ * it. Immutability used to be an accident of the admin form disabling the input
+ * -- a strict object makes the action itself reject a change, which is where the
+ * rule has to live for those URLs to be safe.
+ */
+export const updateLanguageSettingsSchema = z
+  .strictObject({
+    name: z.string().trim().min(2),
+    branchName: z.string().trim().min(1).nullable(),
+    audioProvider: z.enum(AudioProvider).nullable(),
+    audioVoice: z.string().trim().max(100).nullable(),
+  })
+  .transform((v) => ({ ...v, audioVoice: v.audioVoice || null }))
+  .refine((v) => !v.audioProvider || !!v.audioVoice, { message: 'A voice is required when a provider is selected' });
 
 export const updateLanguageInstructionsSchema = z.object({
   translationInstructions: z.string().max(TRANSLATION_INSTRUCTIONS_MAX_LENGTH).optional(),
 });
-
-export const updateLanguageBranchNameSchema = z.object({
-  branchName: z.string().nullable(),
-});
-
-export const updateLanguageAudioSchema = z
-  .object({
-    audioProvider: z.enum(AudioProvider).nullable(),
-    audioVoice: z.string().trim().max(100).nullable(),
-  })
-  .transform((v) => ({
-    audioProvider: v.audioProvider,
-    audioVoice: v.audioVoice || null,
-  }))
-  .refine((v) => !v.audioProvider || !!v.audioVoice, { message: 'A voice is required when a provider is selected' });
 
 /**
  * Team policy: always the male voice per locale. Used as defaults when a
