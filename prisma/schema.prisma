@@ -190,6 +190,9 @@ model Language {
   name                    String // e.g., "English", "Czech", "German"
   translationInstructions String?              @db.Text
   branchName              String?
+  /// Documents are authored in the source language and translated out of it.
+  /// Read by listTargetLanguages() instead of comparing `code` to "en".
+  isSource                Boolean              @default(false)
   audioProvider           AudioProvider?
   audioVoice              String? // provider voice id, e.g. "cs-CZ-AntoninNeural"
   createdAt               DateTime             @default(now())
