@@ -1,6 +1,7 @@
 import prisma from '@/lib/db';
-import { AudioProvider, DocumentStatus, ProjectRole } from '@/generated/prisma/enums';
+import { AudioProvider, DocumentStatus, ProjectRole, SourceProjectStatus } from '@/generated/prisma/enums';
 import type { LanguageDependents } from './language-delete';
+import { rollUpLanguageProgress, percentage, type LanguageDocumentRow, type LanguageProgress } from './language-progress';
 
 /** Everything a document can be translated *into*, which is every language but the source. */
 export async function listTargetLanguages() {
@@ -69,19 +70,24 @@ export interface LanguageListRow {
   memberCount: number;
   projectCount: number;
   managerNames: string[];
-  /** DEPLOYED versions over all versions, the definition the Statistics tab calls progress. */
+  /** DEPLOYED documents over every document in the language's active projects. */
   deployedCount: number;
-  versionCount: number;
+  documentCount: number;
+  percent: number;
 }
 
 /**
  * The index answers "which language will fail, and how far along is it" in one
- * screen, which no page does today. Three queries rather than one per language:
- * the rows, their managers, and one grouped count over DocumentVersion --
- * @@index([languageId]) covers the grouping.
+ * screen, which no page does today.
+ *
+ * Progress counts DEPLOYED documents over every document in the language's
+ * active projects -- the denominator `rollUpLanguageProgress` and the project
+ * Statistics tab both use. Counting versions instead was cheaper and wrong: a
+ * document nobody had started simply left the denominator, so a language read
+ * further along than it was.
  */
 export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
-  const [languages, managers, versionCounts] = await Promise.all([
+  const [languages, managers, documentTotals, deployedCounts] = await Promise.all([
     prisma.language.findMany({
       // Targets first, the source language last: it is context, not work.
       orderBy: [{ isSource: 'asc' }, { name: 'asc' }],
@@ -92,8 +98,17 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
       select: { languageId: true, user: { select: { name: true } } },
       orderBy: { user: { name: 'asc' } },
     }),
+    // Every document in an active project the language is translated in.
+    prisma.translationProject.findMany({
+      where: { sourceProject: { status: SourceProjectStatus.ACTIVE } },
+      select: { languageId: true, sourceProject: { select: { _count: { select: { documents: true } } } } },
+    }),
     prisma.documentVersion.groupBy({
-      by: ['languageId', 'status'],
+      by: ['languageId'],
+      where: {
+        status: DocumentStatus.DEPLOYED,
+        document: { sourceProject: { status: SourceProjectStatus.ACTIVE } },
+      },
       _count: { _all: true },
     }),
   ]);
@@ -103,15 +118,13 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
     managerNames.set(manager.languageId, [...(managerNames.get(manager.languageId) ?? []), manager.user.name]);
   }
 
-  const totals = new Map<string, { deployed: number; all: number }>();
-  for (const group of versionCounts) {
-    const current = totals.get(group.languageId) ?? { deployed: 0, all: 0 };
-    current.all += group._count._all;
-    if (group.status === DocumentStatus.DEPLOYED) {
-      current.deployed += group._count._all;
-    }
-    totals.set(group.languageId, current);
+  const documents = new Map<string, number>();
+  for (const translationProject of documentTotals) {
+    const current = documents.get(translationProject.languageId) ?? 0;
+    documents.set(translationProject.languageId, current + translationProject.sourceProject._count.documents);
   }
+
+  const deployed = new Map(deployedCounts.map((group) => [group.languageId, group._count._all]));
 
   return languages.map((language) => ({
     id: language.id,
@@ -124,9 +137,40 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
     memberCount: language._count.users,
     projectCount: language._count.translationProjects,
     managerNames: managerNames.get(language.id) ?? [],
-    deployedCount: totals.get(language.id)?.deployed ?? 0,
-    versionCount: totals.get(language.id)?.all ?? 0,
+    deployedCount: deployed.get(language.id) ?? 0,
+    documentCount: documents.get(language.id) ?? 0,
+    percent: percentage(deployed.get(language.id) ?? 0, documents.get(language.id) ?? 0),
   }));
+}
+
+/**
+ * One language's work across every project it appears in. The rows are one per
+ * document, with the version's status when there is one -- the roll-up decides
+ * what that means.
+ */
+export async function getLanguageProgress(languageId: string): Promise<LanguageProgress> {
+  const documents = await prisma.document.findMany({
+    where: { sourceProject: { translationProjects: { some: { languageId } } } },
+    select: {
+      sourceProject: { select: { id: true, name: true, status: true } },
+      versions: { where: { languageId }, select: { status: true }, take: 1 },
+    },
+  });
+
+  const rows: LanguageDocumentRow[] = documents.flatMap((document) =>
+    document.sourceProject
+      ? [
+          {
+            projectId: document.sourceProject.id,
+            projectName: document.sourceProject.name,
+            projectStatus: document.sourceProject.status,
+            status: document.versions[0]?.status ?? null,
+          },
+        ]
+      : [],
+  );
+
+  return rollUpLanguageProgress(rows);
 }
 
 /** The manager names and member count one language's settings page shows. */
