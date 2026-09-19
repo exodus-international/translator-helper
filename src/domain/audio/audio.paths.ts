@@ -30,10 +30,10 @@ export function resolveAudioObjectKey(params: FilePathParams & { audioFileId: st
  * so the type is left out for them.
  */
 export function resolveAudioFilename(params: FilePathParams): string {
-  const { documentType, languageCode, identifier, originalFilename, slug } = params;
+  const { documentType, languageCode, repositoryDirectory, originalFilename, slug } = params;
   const base = slugify((originalFilename || slug).replace(/\.[^.]+$/, ''));
   const lang = slugify(languageCode);
-  const project = slugify(identifier);
+  const project = slugify(repositoryDirectory);
 
   const parts =
     documentType === DocumentType.DAILY_CONTENT

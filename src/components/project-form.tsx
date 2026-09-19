@@ -3,10 +3,12 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useState } from 'react';
+import { TriangleAlert } from 'lucide-react';
+import { useRef, useState } from 'react';
 import {
   EMPTY_PROJECT_FORM,
   isProjectFormComplete,
+  slugifyProjectName,
   toCreateProjectInput,
   toUpdateProjectInput,
   type ProjectFormValues,
@@ -26,22 +28,41 @@ export type { ProjectFormValues };
 export { isProjectFormComplete, toCreateProjectInput, toUpdateProjectInput };
 
 /**
- * Mirrors `sourceProjectIdentifier` in source-project.types.ts. As an input
- * `pattern` it is enforced by the browser on submit, so both dialogs reject a
- * bad identifier before it becomes a masked server action error.
+ * Mirrors `segment` in source-project.types.ts. As an input `pattern` it is
+ * enforced by the browser on submit, so both dialogs reject a bad slug or
+ * directory before it becomes a masked server action error.
  */
-const IDENTIFIER_PATTERN = '[a-z0-9]+([-_][a-z0-9]+)*';
+const SEGMENT_PATTERN = '[a-z0-9]+([-_][a-z0-9]+)*';
 
 /** A lone dash turns day naming off, so it has to pass alongside real acronyms. */
 const ACRONYM_PATTERN = '-|[^\\s-]+';
 
+/**
+ * The slug follows the name while it is being typed, and stops as soon as
+ * someone edits it by hand — the two are only coupled until the admin says
+ * otherwise. Editing an existing project starts detached: its slug is already
+ * in URLs people hold, so renaming the project must not quietly move it.
+ */
 export function useProjectForm(initial?: Partial<ProjectFormValues>) {
   const [values, setValues] = useState<ProjectFormValues>({ ...EMPTY_PROJECT_FORM, ...initial });
+  const slugDetached = useRef(Boolean(initial?.slug));
 
-  const set = <K extends keyof ProjectFormValues>(key: K, value: ProjectFormValues[K]) =>
-    setValues((current) => ({ ...current, [key]: value }));
+  const set = <K extends keyof ProjectFormValues>(key: K, value: ProjectFormValues[K]) => {
+    if (key === 'slug') slugDetached.current = true;
 
-  const reset = (next?: Partial<ProjectFormValues>) => setValues({ ...EMPTY_PROJECT_FORM, ...next });
+    setValues((current) => {
+      const next = { ...current, [key]: value };
+      if (key === 'name' && !slugDetached.current) {
+        next.slug = slugifyProjectName(value as string);
+      }
+      return next;
+    });
+  };
+
+  const reset = (next?: Partial<ProjectFormValues>) => {
+    slugDetached.current = Boolean(next?.slug);
+    setValues({ ...EMPTY_PROJECT_FORM, ...next });
+  };
 
   return { values, set, reset };
 }
@@ -80,21 +101,50 @@ export function ProjectFormFields({ values, onChange, idPrefix = 'project' }: Pr
         />
       </div>
       <div>
-        <Label htmlFor={`${idPrefix}-identifier`}>Identifier *</Label>
+        <Label htmlFor={`${idPrefix}-slug`}>URL Slug *</Label>
         <Input
-          id={`${idPrefix}-identifier`}
-          value={values.identifier}
-          onChange={(e) => onChange('identifier', e.target.value)}
-          placeholder="e.g., exodus90, lent2026, october_2026"
+          id={`${idPrefix}-slug`}
+          value={values.slug}
+          onChange={(e) => onChange('slug', e.target.value)}
+          placeholder="e.g., exodus90, lent2026"
           required
-          pattern={IDENTIFIER_PATTERN}
+          pattern={SEGMENT_PATTERN}
           className="mt-1"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Used in document URLs and as the folder name in the content repository. Lowercase letters, numbers, dashes
-          and underscores.
+          Where the project lives: /projects/{values.slug || 'exodus90'}. Filled in from the name, and editable.
         </p>
       </div>
+      <div>
+        <label htmlFor={`${idPrefix}-deploy-to-github`} className="flex items-center gap-2 text-sm font-medium">
+          <input
+            id={`${idPrefix}-deploy-to-github`}
+            type="checkbox"
+            checked={values.deployToGithub}
+            onChange={(e) => onChange('deployToGithub', e.target.checked)}
+          />
+          Deploy to GitHub
+        </label>
+      </div>
+      {values.deployToGithub ? (
+        <div>
+          <Label htmlFor={`${idPrefix}-repository-directory`}>Repository Directory *</Label>
+          <Input
+            id={`${idPrefix}-repository-directory`}
+            value={values.repositoryDirectory}
+            onChange={(e) => onChange('repositoryDirectory', e.target.value)}
+            placeholder="e.g., exodus90, lent2026, october_2026"
+            required
+            pattern={SEGMENT_PATTERN}
+            className="mt-1"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Folder name in the content repository. Lowercase letters, numbers, dashes and underscores.
+          </p>
+        </div>
+      ) : (
+        <DeployOffWarning />
+      )}
       <div>
         <Label htmlFor={`${idPrefix}-acronym`}>Acronym</Label>
         <Input
@@ -111,5 +161,23 @@ export function ProjectFormFields({ values, onChange, idPrefix = 'project' }: Pr
         </p>
       </div>
     </>
+  );
+}
+
+/**
+ * Turning the toggle off is not a neutral setting: translations still move
+ * through the workflow and still reach Deployed, they just never reach the
+ * content repository. Said plainly here so nobody discovers it by looking for
+ * a pull request that was never opened.
+ */
+export function DeployOffWarning() {
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-warning">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+      <p className="text-xs">
+        Documents in this project will not be deployed to the GitHub content repository. They can still be translated,
+        reviewed and marked as deployed — nothing will be published.
+      </p>
+    </div>
   );
 }

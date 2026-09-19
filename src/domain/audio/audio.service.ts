@@ -74,7 +74,7 @@ export interface VersionForGeneration {
     type: DocumentType | null;
     originalFilename: string | null;
     slug: string;
-    sourceProject: { identifier: string | null; audioDocumentTypes: DocumentType[] } | null;
+    sourceProject: { slug: string; repositoryDirectory: string | null; audioDocumentTypes: DocumentType[] } | null;
   };
 }
 
@@ -323,14 +323,16 @@ async function complete(
   audioFile: AudioFile,
   result: SynthesisResult,
   ctx: {
-    document: { type: import('@/generated/prisma/client').DocumentType | null; originalFilename: string | null; slug: string; sourceProject: { identifier: string | null } | null };
+    document: { type: import('@/generated/prisma/client').DocumentType | null; originalFilename: string | null; slug: string; sourceProject: { slug: string; repositoryDirectory: string | null } | null };
     languageCode: string;
   },
 ): Promise<AudioFile> {
   const relativeKey = resolveAudioObjectKey({
     documentType: ctx.document.type!,
     languageCode: ctx.languageCode,
-    identifier: ctx.document.sourceProject?.identifier ?? 'unknown',
+    // Audio is generated for every approved document, including projects that
+    // do not deploy, so the slug stands in when there is no repo directory.
+    repositoryDirectory: ctx.document.sourceProject?.repositoryDirectory ?? ctx.document.sourceProject?.slug ?? 'unknown',
     originalFilename: ctx.document.originalFilename,
     slug: ctx.document.slug,
     audioFileId: audioFile.id,
