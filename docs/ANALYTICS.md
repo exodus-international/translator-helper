@@ -41,6 +41,13 @@ How we track usage, and how to turn the raw events into insight in the PostHog U
 Events fired outside a project (global dashboard, admin) carry whatever project was set
 last. Always **filter project-level insights by the `project` group** — there it's accurate.
 
+### Document IDs on workflow events
+Events fired from the editor store, the status dropdown and the kanban board carry
+`documentId` and `documentVersionId`. Use them to follow one document through
+translate → review → approve → deploy, or to count review rounds per document
+(`document_status_changed` with `from = PENDING_REVIEW`, `to = IN_PROGRESS`).
+Events before this change don't have them.
+
 ### Language as a team dimension (super property)
 Every event carries a `language` super property (the readable code, e.g. `es`) plus
 `language_name`, set via `setActiveLanguage` / `useActiveLanguage` on the editors and the
@@ -56,10 +63,12 @@ groups: it reflects the user's most-recently-worked language until changed or lo
 1. **Set up the `project` group type:** Project → Settings → *Group Analytics* →
    ensure a group type named `project` exists (it's created automatically once events
    with `$groups.project` arrive).
-2. **Enable Session Replay** (optional, recommended): Project → Settings → *Replay*.
-   ⚠️ Before enabling, add masking for translation content (the code editor, rendered
-   markdown, suggestion text) so real user content isn't recorded. Ask before turning
-   this on.
+2. **Session Replay** is on for production only (`recording_domains`), sessions
+   shorter than 2s are dropped, and the replay spend limit is $0, so it stops at the
+   5,000 free recordings a month. Masking is set in the project, not in code:
+   `maskAllInputs` plus `maskTextSelector: ".monaco-editor, .ph-mask"`. Monaco covers
+   the editors and diff views. Add the `ph-mask` class to any new element that renders
+   translation or suggestion text (see `markdown-preview.tsx`, `thread-card.tsx`).
 3. **Enable Error Tracking:** Project → Settings → *Error Tracking* (the SDK already
    sends exceptions via `capture_exceptions`).
 

@@ -176,9 +176,10 @@ export function StatusDropdown({
         toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
       }
 
-      capture('document_status_changed', { from: displayedStatus, to: newStatus, via: 'dropdown' });
+      const ids = { documentId: documentId ?? null, documentVersionId: versionId };
+      capture('document_status_changed', { from: displayedStatus, to: newStatus, via: 'dropdown', ...ids });
       if (newStatus === DocumentStatus.DEPLOYED) {
-        capture('document_deployed');
+        capture('document_deployed', { via: 'dropdown', ...ids });
       }
 
       // Update displayed status immediately for optimistic UI update

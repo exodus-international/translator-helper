@@ -161,12 +161,12 @@ export function ThreadCard({
       ) : (
         <>
           {suggestion.comment?.trim() && (
-            <p className="mt-1.5 text-sm text-foreground whitespace-pre-wrap break-words">{suggestion.comment}</p>
+            <p className="ph-mask mt-1.5 text-sm text-foreground whitespace-pre-wrap break-words">{suggestion.comment}</p>
           )}
 
           {suggestion.type === SuggestionType.CHANGE && suggestion.proposedText && isAnchored && (
             <div
-              className="mt-2 text-[11px] leading-5 rounded bg-muted/40 px-2 py-1.5 space-y-0.5"
+              className="ph-mask mt-2 text-[11px] leading-5 rounded bg-muted/40 px-2 py-1.5 space-y-0.5"
               style={{ fontFamily: MONO_FONT }}
             >
               <div className="text-destructive/80 line-through whitespace-pre-wrap break-words">
@@ -190,7 +190,7 @@ export function ThreadCard({
                 <span className="font-medium">{reply.user.name}</span>
                 <span className="text-muted-foreground">{formatTimeAgo(reply.createdAt)}</span>
               </div>
-              <p className="text-foreground whitespace-pre-wrap break-words mt-0.5">{reply.content}</p>
+              <p className="ph-mask text-foreground whitespace-pre-wrap break-words mt-0.5">{reply.content}</p>
             </div>
           ))}
         </div>

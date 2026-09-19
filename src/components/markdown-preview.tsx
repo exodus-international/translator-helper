@@ -3,6 +3,7 @@
 import DOMPurify from 'dompurify';
 import { useEffect, useState } from 'react';
 import { parseMarkdown } from '@/lib/markdown';
+import { cn } from '@/lib/utils';
 
 /**
  * Renders Markdown as the deployed translation app does (marked v15), sanitized.
@@ -22,5 +23,7 @@ export function MarkdownPreview({ content, className }: { content: string; class
     setHtml(DOMPurify.sanitize(parseMarkdown(content)));
   }, [content]);
 
-  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+  // `ph-mask` hides the rendered text in PostHog session replays. Translations
+  // are client content; the project's masking selector already covers Monaco.
+  return <div className={cn('ph-mask', className)} dangerouslySetInnerHTML={{ __html: html }} />;
 }
