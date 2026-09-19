@@ -24,6 +24,6 @@ export function MarkdownPreview({ content, className }: { content: string; class
   }, [content]);
 
   // `ph-mask` hides the rendered text in PostHog session replays. Translations
-  // are client content; the project's masking selector already covers Monaco.
+  // are client content; the project's masking selector already covers the editors.
   return <div className={cn('ph-mask', className)} dangerouslySetInnerHTML={{ __html: html }} />;
 }

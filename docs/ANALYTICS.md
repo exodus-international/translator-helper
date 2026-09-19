@@ -66,9 +66,12 @@ groups: it reflects the user's most-recently-worked language until changed or lo
 2. **Session Replay** is on for production only (`recording_domains`), sessions
    shorter than 2s are dropped, and the replay spend limit is $0, so it stops at the
    5,000 free recordings a month. Masking is set in the project, not in code:
-   `maskAllInputs` plus `maskTextSelector: ".monaco-editor, .ph-mask"`. Monaco covers
-   the editors and diff views. Add the `ph-mask` class to any new element that renders
-   translation or suggestion text (see `markdown-preview.tsx`, `thread-card.tsx`).
+   `maskAllInputs` plus `maskTextSelector: ".monaco-editor, .cm-editor, .ph-mask"`.
+   `.cm-editor` is the CodeMirror root, so it covers the editors and the diff views
+   (`@codemirror/merge` renders its panes as `.cm-editor` too). `.monaco-editor` is
+   for production builds that still ship Monaco; drop it once no release uses it.
+   Add the `ph-mask` class to any other element that renders translation or
+   suggestion text (see `markdown-preview.tsx`, `thread-card.tsx`).
 3. **Enable Error Tracking:** Project → Settings → *Error Tracking* (the SDK already
    sends exceptions via `capture_exceptions`).
 
