@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { countHealthProblems, languageHealth } from '@/domain/language/language-health';
 import { createLanguageAction } from '@/domain/language/language.actions';
 import type { LanguageListRow } from '@/domain/language/language.repository';
+import { languageHomePath } from '@/domain/language/language-url';
 import { capture } from '@/lib/analytics';
 
 /**
@@ -151,7 +152,7 @@ export default function LanguagesIndexClient({ languages }: { languages: Languag
           {rows.map(({ language, pills }) => (
             <Link
               key={language.id}
-              href={`/languages/${encodeURIComponent(language.code)}/settings`}
+              href={languageHomePath(language)}
               className="hover:bg-muted/40 flex flex-col gap-2.5 border-t px-4 py-3.5 transition-colors lg:grid lg:grid-cols-[minmax(0,13rem)_minmax(18rem,1fr)_9rem_1.25rem] lg:items-center lg:gap-4"
             >
               <div className="min-w-0">
