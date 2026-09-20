@@ -246,6 +246,32 @@ describe('authorize { language, role }', () => {
     });
   });
 
+  it('maps every role onto the language hierarchy the same way as a project', async () => {
+    // Instruction writing rests on this mapping: a reviewer or editor may read
+    // a language's page, and only a manager may save it. The project-scoped
+    // branch has its own tests; this is the language-scoped one.
+    const cases: [ProjectRole, { manager: boolean; editor: boolean; reviewer: boolean; translator: boolean }][] = [
+      [ProjectRole.PROJECT_MANAGER, { manager: true, editor: true, reviewer: true, translator: true }],
+      [ProjectRole.EDITOR, { manager: false, editor: true, reviewer: true, translator: true }],
+      [ProjectRole.REVIEWER, { manager: false, editor: false, reviewer: true, translator: true }],
+      [ProjectRole.TRANSLATOR, { manager: false, editor: false, reviewer: false, translator: true }],
+    ];
+
+    for (const [held, expected] of cases) {
+      const authorize = createAuthorize(createDeps({ getUserRoleForLanguage: async () => held }));
+
+      for (const [required, allowed] of Object.entries(expected)) {
+        const attempt = authorize({ language: CROATIAN, role: required as 'manager' });
+
+        if (allowed) {
+          await attempt;
+        } else {
+          await assert.rejects(() => attempt, new RegExp(`requires '${required}' permission in language`));
+        }
+      }
+    }
+  });
+
   it('lets any role on the language pass a member check', async () => {
     for (const role of [ProjectRole.TRANSLATOR, ProjectRole.REVIEWER, ProjectRole.EDITOR, ProjectRole.PROJECT_MANAGER]) {
       const authorize = createAuthorize(createDeps({ getUserRoleForLanguage: async () => role }));
