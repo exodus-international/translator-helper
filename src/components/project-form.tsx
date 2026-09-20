@@ -106,13 +106,14 @@ export function ProjectFormFields({ values, onChange, idPrefix = 'project' }: Pr
           id={`${idPrefix}-slug`}
           value={values.slug}
           onChange={(e) => onChange('slug', e.target.value)}
-          placeholder="e.g., exodus90, lent2026"
+          placeholder="e.g., exodus90, lent2026, october_2026"
           required
           pattern={SEGMENT_PATTERN}
           className="mt-1"
         />
         <p className="text-xs text-muted-foreground mt-1">
           Where the project lives: /projects/{values.slug || 'exodus90'}. Filled in from the name, and editable.
+          Lowercase letters, numbers, dashes and underscores.
         </p>
       </div>
       <div>

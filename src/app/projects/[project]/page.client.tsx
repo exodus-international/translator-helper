@@ -289,7 +289,7 @@ export default function ProjectDetailClient({
                         id="settings-slug"
                         value={settingsSlug}
                         onChange={(e) => setSettingsSlug(e.target.value)}
-                        placeholder="e.g., exodus90, lent2026"
+                        placeholder="e.g., exodus90, lent2026, october_2026"
                         className="mt-1"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
