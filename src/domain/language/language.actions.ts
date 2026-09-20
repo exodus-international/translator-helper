@@ -1,6 +1,7 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
+import { parseInput } from '@/lib/validation';
 import {
   countLanguageDependents,
   createLanguage,
@@ -19,7 +20,7 @@ import {
 export async function createLanguageAction(input: unknown) {
   await authorize('can:manage-languages');
 
-  const validated = createLanguageSchema.parse(input);
+  const validated = parseInput(createLanguageSchema, input);
   return await createLanguage(validated.code, validated.name, validated.branchName);
 }
 
@@ -38,7 +39,7 @@ export async function updateLanguageSettingsAction(id: string, input: unknown) {
     throw new Error('Language not found');
   }
 
-  const validated = updateLanguageSettingsSchema.parse(input);
+  const validated = parseInput(updateLanguageSettingsSchema, input);
 
   // Nothing deploys into the source language and nothing is spoken in it, so
   // its branch and voice stay null rather than being editable and inert.
@@ -67,7 +68,7 @@ export async function updateLanguageSettingsAction(id: string, input: unknown) {
 export async function updateLanguageInstructionsAction(id: string, input: unknown) {
   await authorize({ language: id, role: 'manager' });
 
-  const validated = updateLanguageInstructionsSchema.parse(input);
+  const validated = parseInput(updateLanguageInstructionsSchema, input);
   return await updateLanguageInstructions(id, validated.translationInstructions ?? null);
 }
 

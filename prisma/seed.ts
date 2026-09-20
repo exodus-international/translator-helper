@@ -99,6 +99,10 @@ async function seedUsers(langs: Record<string, string>) {
       body: { email: u.email, name: u.name, password: 'Hello123456', role: u.role },
     });
     users[u.key] = result.user.id;
+    // Seeded people already have the name the profile form asks for, so the
+    // onboarding gate would only stand between them and the app -- and the
+    // first thing it offers is an edit to the name they already have.
+    await prisma.user.update({ where: { id: result.user.id }, data: { onboarded: true } });
     console.log(`User ${u.name} (${u.email}) -> ${u.key}`);
 
     // UserLanguage records — the language assignment carries the project role

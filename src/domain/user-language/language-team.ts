@@ -1,6 +1,7 @@
 import { ProjectRole } from '@/generated/prisma/enums';
 import { userExistsById } from '@/domain/user/user.repository';
 import { removeUserFromLanguage, setUserLanguageRole } from './user-language.repository';
+import { parseInput } from '@/lib/validation';
 import { removeLanguageMemberSchema, setLanguageMemberRoleSchema } from './user-language.types';
 
 /**
@@ -37,7 +38,7 @@ export function createLanguageTeam(deps: LanguageTeamDeps = defaultDeps) {
   return {
     /** Adds a member or changes their role -- the same upsert either way. */
     async setMemberRole(input: unknown) {
-      const { languageId, userId, role } = setLanguageMemberRoleSchema.parse(input);
+      const { languageId, userId, role } = parseInput(setLanguageMemberRoleSchema, input);
 
       if (!(await deps.userExists(userId))) {
         throw new Error('User not found');
@@ -53,7 +54,7 @@ export function createLanguageTeam(deps: LanguageTeamDeps = defaultDeps) {
      * documents intact and the decision visible.
      */
     async removeMember(input: unknown) {
-      const { languageId, userId } = removeLanguageMemberSchema.parse(input);
+      const { languageId, userId } = parseInput(removeLanguageMemberSchema, input);
 
       return await deps.removeUserFromLanguage(userId, languageId);
     },
