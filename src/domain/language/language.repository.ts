@@ -68,8 +68,9 @@ export interface LanguageListRow {
   audioVoice: string | null;
   translationInstructions: string | null;
   memberCount: number;
-  projectCount: number;
   managerNames: string[];
+  /** Active projects only, so the count cannot contradict the percentage beside it. */
+  projectCount: number;
   /** DEPLOYED documents over every document in the language's active projects. */
   deployedCount: number;
   documentCount: number;
@@ -91,7 +92,7 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
     prisma.language.findMany({
       // Targets first, the source language last: it is context, not work.
       orderBy: [{ isSource: 'asc' }, { name: 'asc' }],
-      include: { _count: { select: { users: true, translationProjects: true } } },
+      include: { _count: { select: { users: true } } },
     }),
     prisma.userLanguage.findMany({
       where: { role: ProjectRole.PROJECT_MANAGER },
@@ -119,9 +120,11 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
   }
 
   const documents = new Map<string, number>();
+  const activeProjects = new Map<string, number>();
   for (const translationProject of documentTotals) {
     const current = documents.get(translationProject.languageId) ?? 0;
     documents.set(translationProject.languageId, current + translationProject.sourceProject._count.documents);
+    activeProjects.set(translationProject.languageId, (activeProjects.get(translationProject.languageId) ?? 0) + 1);
   }
 
   const deployed = new Map(deployedCounts.map((group) => [group.languageId, group._count._all]));
@@ -135,7 +138,7 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
     audioVoice: language.audioVoice,
     translationInstructions: language.translationInstructions,
     memberCount: language._count.users,
-    projectCount: language._count.translationProjects,
+    projectCount: activeProjects.get(language.id) ?? 0,
     managerNames: managerNames.get(language.id) ?? [],
     deployedCount: deployed.get(language.id) ?? 0,
     documentCount: documents.get(language.id) ?? 0,

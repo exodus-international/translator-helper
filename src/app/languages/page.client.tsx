@@ -164,7 +164,7 @@ export default function LanguagesIndexClient({ languages }: { languages: Languag
                 <p className="text-muted-foreground mt-0.5 text-xs">
                   {language.isSource
                     ? 'Documents originate here'
-                    : `${language.memberCount === 0 ? 'No members' : `${language.memberCount} ${language.memberCount === 1 ? 'member' : 'members'}`} · ${language.projectCount} ${language.projectCount === 1 ? 'project' : 'projects'}`}
+                    : `${language.memberCount === 0 ? 'No members' : `${language.memberCount} ${language.memberCount === 1 ? 'member' : 'members'}`} · ${language.projectCount} active ${language.projectCount === 1 ? 'project' : 'projects'}`}
                 </p>
               </div>
 
