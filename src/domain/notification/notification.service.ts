@@ -9,7 +9,7 @@ import {
 } from '@/generated/prisma/enums';
 import { wantsEmail } from './notification.catalog';
 import { effectiveDueAt, formatDueDate, reminderFor } from './notification.deadlines';
-import { EMAIL_MAX_AGE, isDigestDue, renderDigestEmail } from './notification.email';
+import { EMAIL_MAX_AGE, EMAILS_PER_RUN, isDigestDue, renderDigestEmail } from './notification.email';
 import { getEmailPreferencesFor, insertNotifications } from './notification.repository';
 
 const LOG_PREFIX = '[Notifications]';
@@ -533,8 +533,6 @@ async function sweepDeadlines(now = new Date()): Promise<{ checked: number; crea
 
 // ─── Email sweep ─────────────────────────────────────────────
 
-/** Resend's free tier allows 100 emails a day; spread them over the day's sweeps. */
-const MAX_EMAILS_PER_RUN = 25;
 const MAX_ATTEMPTS = 5;
 /** Resend's default rate limit is a few requests a second. */
 const SEND_SPACING_MS = 600;
@@ -556,7 +554,7 @@ interface EmailSweepResult {
  * cannot go out now stays pending for the next run; what keeps failing, or has
  * waited 36 hours, is given up on.
  */
-async function sendPendingEmails(now = new Date()): Promise<EmailSweepResult> {
+async function sendPendingEmails(now = new Date(), { ignoreSchedule = false } = {}): Promise<EmailSweepResult> {
   const result: EmailSweepResult = { sent: 0, failed: 0, waiting: 0, dropped: 0, rateLimited: false };
 
   if (!isEmailConfigured()) {
@@ -598,6 +596,7 @@ async function sendPendingEmails(now = new Date()): Promise<EmailSweepResult> {
   let sentThisRun = 0;
   for (const rows of byUser.values()) {
     if (
+      !ignoreSchedule &&
       !isDigestDue(
         rows.map((row) => row.createdAt),
         now,
@@ -616,7 +615,7 @@ async function sendPendingEmails(now = new Date()): Promise<EmailSweepResult> {
       continue;
     }
 
-    if (sentThisRun >= MAX_EMAILS_PER_RUN) {
+    if (sentThisRun >= EMAILS_PER_RUN) {
       result.waiting += rows.length;
       continue;
     }
@@ -680,23 +679,51 @@ async function sendPendingEmails(now = new Date()): Promise<EmailSweepResult> {
 const SWEEP_LOCK_KEY = 7_140_211;
 
 /**
- * One scheduled run: reminders first, so a reminder created now can make this
- * run's digest when it runs at noon. Overlapping runs would email the same
- * digest twice, so a run that finds another one still going does nothing.
+ * Runs `work` only if no other sweep is running. Overlapping runs would email
+ * the same digest twice, so a run that finds another one still going does
+ * nothing.
  */
-export async function runNotificationSweep(now = new Date()) {
+async function withSweepLock<T>(work: () => Promise<T>) {
   return prisma.$transaction(
     async (tx) => {
       const [{ locked }] = await tx.$queryRaw<
         { locked: boolean }[]
       >`SELECT pg_try_advisory_xact_lock(${SWEEP_LOCK_KEY}) AS locked`;
       if (!locked) return { skipped: 'another sweep is running' as const };
-      const deadlines = await sweepDeadlines(now);
-      const email = await sendPendingEmails(now);
-      return { deadlines, email };
+      return work();
     },
     // The lock lives as long as this transaction; sending a run's worth of
     // spaced-out emails takes a while.
     { timeout: 5 * 60 * 1000, maxWait: 10 * 1000 },
   );
+}
+
+/**
+ * One scheduled run: reminders first, so a reminder created now can make this
+ * run's digest when it runs at noon.
+ */
+export async function runNotificationSweep(now = new Date()) {
+  return withSweepLock(async () => {
+    const deadlines = await sweepDeadlines(now);
+    const email = await sendPendingEmails(now);
+    return { deadlines, email };
+  });
+}
+
+/**
+ * Sends everyone's waiting digest now instead of at noon, for an admin who
+ * needs it out sooner. The per-run limit still applies; whatever it leaves
+ * goes out on the next sweep after noon.
+ */
+export async function sendWaitingEmailsNow() {
+  return withSweepLock(async () => ({ email: await sendPendingEmails(new Date(), { ignoreSchedule: true }) }));
+}
+
+/** How many people have an email waiting, for the admin's confirmation. */
+export async function countWaitingEmailRecipients() {
+  const recipients = await prisma.notification.groupBy({
+    by: ['userId'],
+    where: { emailStatus: NotificationEmailStatus.PENDING },
+  });
+  return recipients.length;
 }

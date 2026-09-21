@@ -15,6 +15,7 @@ import { BellOff, CheckCheck, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { SendEmailsNow } from './send-emails-now';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -53,7 +54,7 @@ function groupByDay(notifications: InboxNotification[]) {
  * what is unread, a day at a time. Opening a notification marks it read and
  * goes to the document (and, for suggestions, the thread) it is about.
  */
-export default function NotificationsClient({ initial }: { initial: Page }) {
+export default function NotificationsClient({ initial, isAdmin }: { initial: Page; isAdmin: boolean }) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('all');
   const [notifications, setNotifications] = useState(initial.notifications);
@@ -105,25 +106,23 @@ export default function NotificationsClient({ initial }: { initial: Page }) {
 
   return (
     <>
-      <PageHeader
-        title="Notifications"
-        description={unread === 0 ? 'You are all caught up.' : `${unread} unread`}
-        actions={
-          <Button variant="outline" size="sm" disabled={unread === 0} onClick={() => markRead()}>
+      <PageHeader title="Notifications">
+        {/* The unread count is on the tab, so the header needs no description. */}
+        <div className="flex items-center justify-between gap-3">
+          <Tabs value={filter} onValueChange={(value) => changeFilter(value as Filter)}>
+            <TabsList>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="unread">
+                Unread
+                <UnreadCount count={unread} />
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button variant="outline" disabled={unread === 0} onClick={() => markRead()}>
             <CheckCheck data-icon="inline-start" />
             Mark all read
           </Button>
-        }
-      >
-        <Tabs value={filter} onValueChange={(value) => changeFilter(value as Filter)}>
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="unread">
-              Unread
-              <UnreadCount count={unread} />
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        </div>
       </PageHeader>
 
       <div
@@ -188,6 +187,11 @@ export default function NotificationsClient({ initial }: { initial: Page }) {
             Choose which emails you get
           </Link>
         </p>
+        {isAdmin && (
+          <div className="-mt-4 flex justify-center">
+            <SendEmailsNow />
+          </div>
+        )}
       </div>
     </>
   );

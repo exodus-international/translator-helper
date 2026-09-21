@@ -11,6 +11,8 @@ const HOUR = 60 * 60 * 1000;
 const DIGEST_TIME_ZONE = 'Europe/Zagreb';
 const DIGEST_HOUR = 12;
 /** Unsent notifications older than this are dropped rather than emailed a day late. */
+/** Resend's free tier allows 100 emails a day; no one run may use them all. */
+export const EMAILS_PER_RUN = 25;
 export const EMAIL_MAX_AGE = 36 * HOUR;
 
 /** How far `timeZone`'s wall clock is ahead of UTC at `date`. */

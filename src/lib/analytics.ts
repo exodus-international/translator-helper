@@ -67,6 +67,7 @@ export type AnalyticsEvent =
   | 'notifications_opened'
   | 'notification_clicked'
   | 'notification_preference_changed'
+  | 'notification_emails_sent_now'
   // ── Documents ────────────────────────────────────────────────────────
   | 'document_upload_started'
   | 'document_upload_rejected'

@@ -13,6 +13,7 @@ import {
   markNotificationsRead,
   setEmailPreference,
 } from './notification.repository';
+import { countWaitingEmailRecipients, sendWaitingEmailsNow } from './notification.service';
 
 /** What the bell shows: the latest notifications and how many are unread. */
 export async function getInboxAction() {
@@ -59,4 +60,18 @@ export async function getEmailPreferencesAction() {
 export async function setEmailPreferenceAction(type: NotificationType, email: boolean) {
   const { user } = await authorize('authenticated');
   await setEmailPreference(user.id, z.enum(NotificationType).parse(type), z.boolean().parse(email));
+}
+
+/** How many people would get an email if an admin sent the waiting ones now. */
+export async function countWaitingEmailRecipientsAction() {
+  await authorize('admin');
+  return isEmailConfigured() ? countWaitingEmailRecipients() : 0;
+}
+
+/** Sends the waiting digests now instead of at noon. */
+export async function sendWaitingEmailsNowAction() {
+  await authorize('admin');
+  const result = await sendWaitingEmailsNow();
+  if ('skipped' in result) return { ok: false as const, reason: 'busy' as const };
+  return { ok: true as const, ...result.email };
 }

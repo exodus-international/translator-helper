@@ -56,6 +56,11 @@ the next sweep, up to 5 times, and a rate-limited provider stops the run.
 The time and zone are `DIGEST_HOUR` and `DIGEST_TIME_ZONE` in
 `src/domain/notification/notification.email.ts`.
 
+An admin who needs the emails out sooner can use **Send waiting emails now**
+under the list on `/notifications`. It sends every waiting email at once instead
+of at noon, under the same lock and 25-email limit as the sweep, and never sends
+anything twice.
+
 ### Look
 
 `renderDigestEmail` in `src/domain/notification/notification.email.ts` follows
