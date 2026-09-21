@@ -8,6 +8,11 @@ import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
 import { DeploySkippedError } from '../github/github.errors';
+import {
+  notifyReviewerAssignment,
+  notifyStatusChange,
+  notifyTranslatorAssignment,
+} from '../notification/notification.service';
 
 /**
  * Load a version + its language and assert the caller may edit/delete a source
@@ -62,18 +67,41 @@ import {
   updateDocumentVersionSchema,
 } from './document-version.types';
 
-export async function assignReviewerToVersionAction(versionId: string, reviewerId: string | null) {
-  await authorize('admin');
+/**
+ * Sets or clears a version's reviewer. `reviewDeadline` is left as it is when
+ * omitted; null clears it, and the review then answers to the version's own
+ * deadline. Clearing the reviewer always clears the review deadline.
+ */
+export async function assignReviewerToVersionAction(
+  versionId: string,
+  reviewerId: string | null,
+  reviewDeadline?: Date | null,
+) {
+  const { user } = await authorize('admin');
+
+  const previous = await prisma.documentVersion.findUnique({
+    where: { id: versionId },
+    select: { reviewerId: true, reviewDeadline: true },
+  });
 
   const version = await prisma.documentVersion.update({
     where: { id: versionId },
-    data: { reviewerId },
+    // A review deadline belongs to a review: removing the reviewer clears it, so
+    // the next one assigned doesn't silently inherit a stale date.
+    data: {
+      reviewerId,
+      ...(reviewerId === null ? { reviewDeadline: null } : reviewDeadline !== undefined ? { reviewDeadline } : {}),
+    },
     include: {
       language: true,
       user: userBrief,
       reviewer: userBrief,
     },
   });
+
+  if (previous) {
+    await notifyReviewerAssignment({ versionId, actorId: user.id, previous });
+  }
 
   revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   return version;
@@ -97,6 +125,13 @@ export async function assignTranslatorToVersionAction(input: unknown) {
     throw new Error('Translation project not found');
   }
 
+  const previous = await prisma.documentVersion.findUnique({
+    where: {
+      documentId_languageId: { documentId: validated.documentId, languageId: translationProject.languageId },
+    },
+    select: { userId: true, deadline: true },
+  });
+
   const version = await assignDocumentVersion({
     documentId: validated.documentId,
     languageId: translationProject.languageId,
@@ -104,6 +139,8 @@ export async function assignTranslatorToVersionAction(input: unknown) {
     deadline: validated.deadline ?? null,
     assignedById: user.id,
   });
+
+  await notifyTranslatorAssignment({ versionId: version.id, actorId: user.id, previous });
 
   revalidatePath('/dashboard');
   revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
@@ -134,28 +171,6 @@ export async function listVersionsForTranslationProjectAction(translationProject
   }
 
   return await listVersionsForTranslationProject(translationProject.sourceProjectId, translationProject.languageId);
-}
-
-export async function createDocumentVersionAction(input: unknown) {
-  const { user } = await authorize('authenticated');
-  const validated = createDocumentVersionSchema.parse(input);
-
-  const version = await createDocumentVersion({
-    documentId: validated.documentId,
-    languageId: validated.languageId,
-    content: validated.content,
-    userId: user.id,
-  });
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'created_translation',
-    details: { language: version.language.name },
-  });
-
-  return version;
 }
 
 export async function updateDocumentVersionAction(id: string, input: unknown) {
@@ -225,6 +240,13 @@ export async function submitForReviewAction(input: unknown) {
     details: { reviewerId: validated.reviewerId },
   });
 
+  await notifyStatusChange({
+    versionId: version.id,
+    actorId: user.id,
+    from: existingVersion.status,
+    to: DocumentStatus.PENDING_REVIEW,
+  });
+
   return version;
 }
 
@@ -272,6 +294,8 @@ export async function updateDocumentVersionStatusAction(
     action: 'status_updated',
     details: { status: status },
   });
+
+  await notifyStatusChange({ versionId: version.id, actorId: user.id, from: existingVersion.status, to: status });
 
   // If transitioning to DEPLOYED, attempt GitHub deploy
   let github: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string } | undefined;

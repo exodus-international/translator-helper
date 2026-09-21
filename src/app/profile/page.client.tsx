@@ -17,6 +17,7 @@ import { formatUnambiguousDate } from '@/lib/format';
 import { TShirtSize } from '@/generated/prisma/enums';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { NotificationPreferences } from './notification-preferences';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
@@ -44,16 +45,18 @@ interface UserProfile {
 interface ProfileClientProps {
   profile: UserProfile;
   avatarUploadEnabled: boolean;
+  notificationPreferences: React.ComponentProps<typeof NotificationPreferences>;
 }
 
-export default function ProfileClient({ profile, avatarUploadEnabled }: ProfileClientProps) {
+export default function ProfileClient({ profile, avatarUploadEnabled, notificationPreferences }: ProfileClientProps) {
   return (
     <>
-      <PageHeader title="Profile" description="Your picture, contact details and password." />
+      <PageHeader title="Profile" description="Your picture, contact details, notifications and password." />
 
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <IdentityCard profile={profile} avatarUploadEnabled={avatarUploadEnabled} />
         <ProfileDetailsForm profile={profile} />
+        <NotificationPreferences {...notificationPreferences} />
         <ChangePasswordSection />
       </div>
     </>
@@ -61,7 +64,7 @@ export default function ProfileClient({ profile, avatarUploadEnabled }: ProfileC
 }
 
 /** Who you are: picture, and the things only an administrator can change. */
-function IdentityCard({ profile, avatarUploadEnabled }: ProfileClientProps) {
+function IdentityCard({ profile, avatarUploadEnabled }: Pick<ProfileClientProps, 'profile' | 'avatarUploadEnabled'>) {
   return (
     <Card>
       <CardContent className="space-y-5 py-3">
@@ -74,9 +77,7 @@ function IdentityCard({ profile, avatarUploadEnabled }: ProfileClientProps) {
             <span className="break-all">{profile.email}</span>
           </Detail>
           <Detail label="Role">
-            <Badge variant={profile.role === 'ADMIN' ? 'default' : 'secondary'}>
-              {profile.role}
-            </Badge>
+            <Badge variant={profile.role === 'ADMIN' ? 'default' : 'secondary'}>{profile.role}</Badge>
           </Detail>
           <Detail label="Languages">
             {profile.languages.length > 0 ? (

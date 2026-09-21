@@ -12,6 +12,7 @@ A comprehensive translation management system built with Next.js, Prisma, and Be
 - ✅ **Deploy Feature**: Download translated files with status tracking
 - ✅ **Activity Logging**: Track all changes with user attribution
 - ✅ **Profile Pictures**: Upload an avatar on your profile — see [docs/AVATARS.md](docs/AVATARS.md)
+- ✅ **Notifications**: In-app bell and email digests for assignments, reviews and deadlines — see [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md)
 - ✅ **Admin Panel**: Manage languages and folders
 
 ## Tech Stack

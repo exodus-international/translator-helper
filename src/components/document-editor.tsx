@@ -275,6 +275,7 @@ function EditorViewer({
           reviewer={targetVersion?.reviewer}
           language={targetVersion?.language?.name}
           deadline={targetVersion?.deadline}
+          reviewDeadline={targetVersion?.reviewDeadline}
           onAssignTranslator={
             isAdminClient(user) && translationProjectId && targetVersion ? openAssignTranslatorDialog : undefined
           }
