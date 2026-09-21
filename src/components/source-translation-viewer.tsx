@@ -1,6 +1,6 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
 import type { CodeEditorHandle } from '@/components/editor/code-editor';
-import { useScrollSync } from '@/components/editor/scroll-sync';
+import { alignLines } from '@/components/editor/align-lines';
 import { selectionBox, useFollowSelection, type SelectionBox } from '@/components/editor/toolbar-placement';
 import {
   AlertDialog,
@@ -376,9 +376,17 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const isReviewMode = variant === 'review' && reviewViewMode === 'review';
     // The cursor chip only means something when both panes are showing editors:
     // it names this pane's line and the line the other pane is parked on. It is
-    // also when the two scroll together -- side by side, not a tab apart.
+    // also when a line moved to in one comes level in the other -- side by
+    // side, not a tab apart.
     const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
-    const alignPanes = useScrollSync(sourceEditorRef, translationEditorRef, showCursorSync && !isMobile);
+    const alignPanes = (pane: 'source' | 'translation') => {
+      if (!showCursorSync || isMobile) return;
+      const source = sourceEditorRef.current?.view;
+      const translation = translationEditorRef.current?.view;
+      if (!source || !translation) return;
+      if (pane === 'source') alignLines(source, translation);
+      else alignLines(translation, source);
+    };
     // The suggestion toolbar is placed where the selection is on screen, so it
     // moves with the selection as the pane scrolls.
     useFollowSelection(toolbarPosition !== null, translationContainerRef, translationEditorRef, setToolbarPosition);
@@ -420,7 +428,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setSourceViewMode('raw');
     };
 
-    const handleSourceCursorChange = (lineNumber: number) => {
+    const handleSourceCursorChange = (lineNumber: number, toLine: boolean) => {
       setSourceLine(lineNumber);
       // Clear stale decoration on the source pane (user is now active here)
       setSyncedSourceLine(undefined);
@@ -428,6 +436,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
         setSyncedTranslationLine(undefined);
         return;
       }
+
+      // A key moving the cursor along its line, or typing, is not a move to
+      // another line: the other pane stays where it was scrolled to, and keeps
+      // the line it marks. A click on the line is one, and brings it back.
+      if (!toLine) return;
 
       const sourceTotalLines = sourceLineCount;
       const translationTotalLines = translationLineCount;
@@ -438,7 +451,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       alignPanes('source');
     };
 
-    const handleTranslationCursorChange = (lineNumber: number) => {
+    const handleTranslationCursorChange = (lineNumber: number, toLine: boolean) => {
       setTranslationLine(lineNumber);
       // Clear stale decoration on the translation pane (user is now active here)
       setSyncedTranslationLine(undefined);
@@ -446,6 +459,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
         setSyncedSourceLine(undefined);
         return;
       }
+
+      // Along the line: as in handleSourceCursorChange, the source stays put.
+      if (!toLine) return;
 
       const sourceTotalLines = sourceLineCount;
       const translationTotalLines = translationLineCount;
@@ -1205,7 +1221,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               ) : isReviewEditing ? (
                 <div className="h-full flex flex-col space-y-2">
                   {/* The one translation editor on screen while editing, so it
-                      is the one the source keeps in step with (scroll-sync). */}
+                      is the one the source lines up with (align-lines). */}
                   <RawEditorPane
                     ref={translationEditorRef}
                     value={translationContent}

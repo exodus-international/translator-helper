@@ -104,7 +104,11 @@ export interface CodeEditorHandle {
 interface CodeEditorProps {
   value: string;
   onChange?: (value: string) => void;
-  onCursorChange?: (lineNumber: number) => void;
+  /**
+   * `toLine` when the cursor was taken to a line -- a click, or a key that
+   * left the line it was on -- rather than along the one it is on.
+   */
+  onCursorChange?: (lineNumber: number, toLine: boolean) => void;
   onSelectionChange?: (
     range: { startLine: number; startColumn: number; endLine: number; endColumn: number } | null,
   ) => void;
@@ -207,7 +211,10 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
         // `update.docChanged` selection moves are echoes of our own edits, not
         // the translator navigating, so they must not move the other pane.
         if (!update.docChanged) {
-          callbacks.current.onCursorChange?.(update.state.doc.lineAt(main.head).number);
+          const line = update.state.doc.lineAt(main.head).number;
+          const was = update.startState.doc.lineAt(update.startState.selection.main.head).number;
+          const toLine = line !== was || update.transactions.some((tr) => tr.isUserEvent('select.pointer'));
+          callbacks.current.onCursorChange?.(line, toLine);
         }
         if (main.empty) {
           callbacks.current.onSelectionChange?.(null);
@@ -222,6 +229,26 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
           });
         }
       }
+    });
+
+    // A click on the spot the cursor is already at moves nothing, so the
+    // listener above never hears of it. It is still the translator pointing
+    // at the line -- the way to bring the other pane back to it once it has
+    // been scrolled away -- so it is reported here instead.
+    let pressedAt: number | null = null;
+    const clickListener = EditorView.domEventHandlers({
+      mousedown: (_event, view) => {
+        pressedAt = view.state.selection.main.empty ? view.state.selection.main.head : null;
+        return false;
+      },
+      click: (_event, view) => {
+        const { main } = view.state.selection;
+        if (pressedAt !== null && main.empty && main.head === pressedAt) {
+          callbacks.current.onCursorChange?.(view.state.doc.lineAt(main.head).number, true);
+        }
+        pressedAt = null;
+        return false;
+      },
     });
 
     const extensions: Extension[] = [
@@ -245,6 +272,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       frontmatterDecoration,
       editorTheme,
       updateListener,
+      clickListener,
     ];
 
     const view = new EditorView({
@@ -323,8 +351,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({ effects: setHighlightLine.of(highlightLine ?? null) });
-    // Only when it is out of sight. A pane kept in step with the other (see
-    // scroll-sync) already shows the line level with its counterpart, and
+    // Only when it is out of sight. A pane lined up with the other (see
+    // align-lines) already shows the line level with its counterpart, and
     // centring it would undo that.
     if (highlightLine) createEditorApi(view).revealLineIfOutsideViewport(highlightLine);
   }, [highlightLine]);

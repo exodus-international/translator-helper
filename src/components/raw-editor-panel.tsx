@@ -7,7 +7,7 @@ import type { LintDiagnostic } from '@/lib/lint';
 interface RawEditorPaneProps {
   value: string;
   onChange?: (value: string) => void;
-  onCursorChange?: (line: number) => void;
+  onCursorChange?: (line: number, toLine: boolean) => void;
   readOnly?: boolean;
   placeholder?: string;
   currentLine?: number;
