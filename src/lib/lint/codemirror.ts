@@ -145,14 +145,3 @@ export function runFixAll(view: EditorView, options: LintOptions = {}): FixAllOu
 export function refreshLint(view: EditorView): void {
   forceLinting(view);
 }
-
-/** Pushes a new source document (or filename) into a mounted editor. */
-export function updateLintContext(view: EditorView, value: LintContextValue): void {
-  view.dispatch({ effects: setLintContext.of(value) });
-  forceLinting(view);
-}
-
-/** Current diagnostics without waiting for the debounce — for a status bar. */
-export function currentDiagnostics(state: EditorState, options: LintOptions = {}) {
-  return lintDocument(contextFor(state), options);
-}

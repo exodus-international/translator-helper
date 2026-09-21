@@ -23,7 +23,7 @@ import type { EditorView } from '@codemirror/view';
 import { useEffect, useRef, type RefObject } from 'react';
 import type { CodeEditorHandle } from './code-editor';
 
-export type SyncedPane = 'source' | 'translation';
+type SyncedPane = 'source' | 'translation';
 
 const other = (pane: SyncedPane): SyncedPane => (pane === 'source' ? 'translation' : 'source');
 

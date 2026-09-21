@@ -45,7 +45,7 @@ const MONO = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberat
  * (colours, units, keywords, selectors), and it was one undifferentiated run
  * until they were listed.
  */
-export const editorHighlightStyle = HighlightStyle.define([
+const editorHighlightStyle = HighlightStyle.define([
   { tag: tags.heading1, color: 'var(--foreground)', fontWeight: '700', fontSize: '1.35em' },
   { tag: tags.heading2, color: 'var(--foreground)', fontWeight: '700', fontSize: '1.2em' },
   { tag: tags.heading3, color: 'var(--foreground)', fontWeight: '650', fontSize: '1.08em' },
