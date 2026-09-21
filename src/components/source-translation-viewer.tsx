@@ -736,6 +736,33 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     };
 
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
+
+    // A notification about a suggestion links here with ?thread=<id>. Once that
+    // thread has loaded, open the panel on it and bring its lines into view,
+    // the same as clicking it. Only once: after that the panel is the user's.
+    const threadLinkHandled = useRef(false);
+    useEffect(() => {
+      if (!mounted || threadLinkHandled.current) return;
+      const threadId = new URLSearchParams(window.location.search).get('thread');
+      if (!threadId) {
+        threadLinkHandled.current = true;
+        return;
+      }
+      const suggestion = suggestions.find((s) => s.id === threadId);
+      if (!suggestion) return;
+      threadLinkHandled.current = true;
+      setSidebarView('threads');
+      if (isMobile) {
+        // On a phone the thread list is a sheet; show the thread there.
+        setActiveThreadId(suggestion.id);
+        setOpenMobile(true);
+        return;
+      }
+      if (!sidebarOpen) toggleSidebar();
+      // The editor mounts after the page; give it a moment before scrolling it.
+      setTimeout(() => handleSuggestionClickInternal(suggestion), 300);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the linked thread first appears
+    }, [mounted, suggestions]);
     // On mobile the panel is the offcanvas Sheet (openMobile); on desktop it's
     // the docked sidebar (open). "Show panel" must appear whenever it's closed,
     // otherwise mobile users with a pre-opened desktop state can't reach it.

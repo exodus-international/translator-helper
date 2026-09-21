@@ -47,6 +47,19 @@ export function formatLastActive(value: Date | string | null | undefined, now: D
 }
 
 /**
+ * How long ago something happened, as the notification bell shows it:
+ * "just now", "5 min ago", "3 h ago", then the days and dates of
+ * `formatLastActive`.
+ */
+export function formatTimeAgo(value: Date | string, now: Date = new Date()): string {
+  const minutes = Math.floor((now.getTime() - new Date(value).getTime()) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} h ago`;
+  return formatLastActive(value, now);
+}
+
+/**
  * Initials for an avatar fallback: the first letter of the first and last
  * word, so "Marie Anne Dubois" reads as "MD" rather than "MAD". Falls back to
  * "?" for people whose name we do not have.

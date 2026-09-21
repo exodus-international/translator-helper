@@ -4,6 +4,7 @@ import * as React from 'react';
 
 import { Logo } from '@/components/logo';
 import { ModeToggle } from '@/components/mode-toggle';
+import { NotificationBell } from '@/components/notification-bell';
 import { SUPPORT_URL, bugReportUrl } from '@/components/feedback-button';
 import { UserAvatar } from '@/components/user-avatar';
 import {
@@ -41,12 +42,15 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
+import { UnreadCount } from '@/components/notification-item';
 import { capture } from '@/lib/analytics';
+import { useNotificationCount } from '@/lib/notification-count';
 import { signOut } from '@/lib/auth-client';
 import { isAdminClient } from '@/lib/permissions-client';
 import { useTrailStore, type TrailCrumb } from '@/lib/page-trail';
 import { SessionUser } from '@/lib/session';
 import {
+  Bell,
   Bug,
   ChevronsUpDown,
   FileText,
@@ -77,6 +81,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   admin: 'Admin',
   settings: 'Settings',
   profile: 'Profile',
+  notifications: 'Notifications',
   onboarding: 'Onboarding',
   new: 'New',
   edit: 'Edit',
@@ -269,6 +274,7 @@ function NavSecondary({ isAdmin }: { isAdmin: boolean }) {
 function NavUser({ user }: { user: SessionUser }) {
   const router = useRouter();
   const { isMobile } = useSidebar();
+  const unread = useNotificationCount((state) => state.unread);
 
   const handleSignOut = async () => {
     capture('user_signed_out');
@@ -311,6 +317,11 @@ function NavUser({ user }: { user: SessionUser }) {
               <DropdownMenuItem render={<Link href="/profile" />}>
                 <User />
                 Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/notifications" />}>
+                <Bell />
+                Notifications
+                <UnreadCount count={unread} className="ml-auto" />
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -403,7 +414,8 @@ export function AppShell({ user, defaultOpen = true, children }: AppShellProps) 
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
             <HeaderBreadcrumb />
           </div>
-          <div className="ml-auto flex items-center px-4">
+          <div className="ml-auto flex items-center gap-1 px-4">
+            <NotificationBell />
             <ModeToggle />
           </div>
         </header>

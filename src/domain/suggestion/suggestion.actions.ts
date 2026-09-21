@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
 import { resolveTranslationProject } from '../document-version/resolve-translation-project';
+import { notifySuggestionAdded, notifySuggestionReply } from '../notification/notification.service';
 import {
   applySuggestionSchema,
   createSuggestionReplySchema,
@@ -77,6 +78,14 @@ export async function createSuggestionAction(input: unknown) {
       endLine: validated.endLine ?? null,
       comment: validated.comment ? truncate(validated.comment) : null,
     },
+  });
+
+  await notifySuggestionAdded({
+    suggestionId: suggestion.id,
+    versionId: validated.documentVersionId,
+    actorId: user.id,
+    type: validated.type,
+    comment: validated.comment ?? null,
   });
 
   revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
@@ -336,9 +345,13 @@ export async function createSuggestionReplyAction(input: unknown) {
     throw new Error('Suggestion not found');
   }
 
-  return await createSuggestionReply({
+  const reply = await createSuggestionReply({
     suggestionId: validated.suggestionId,
     userId: user.id,
     content: validated.content,
   });
+
+  await notifySuggestionReply({ suggestionId: validated.suggestionId, actorId: user.id, content: validated.content });
+
+  return reply;
 }
