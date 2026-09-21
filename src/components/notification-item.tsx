@@ -1,6 +1,8 @@
 'use client';
 
-import { NOTIFICATION_CATALOG, type NotificationTone } from '@/domain/notification/notification.catalog';
+import { Badge } from '@/components/ui/badge';
+import { getDocumentStatusConfig, NO_STATUS } from '@/constants/document-status';
+import { NOTIFICATION_CATALOG } from '@/domain/notification/notification.catalog';
 import type { InboxNotification } from '@/domain/notification/notification.repository';
 import { NotificationType } from '@/generated/prisma/enums';
 import { formatTimeAgo } from '@/lib/format';
@@ -37,13 +39,21 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   [NotificationType.SUGGESTION_REPLY]: MessageSquareText,
 };
 
-/** The same tones as the email, in the app's own colours. */
-const TONE_CLASSES: Record<NotificationTone, { icon: string; tag: string }> = {
-  overdue: { icon: 'bg-destructive/10 text-destructive', tag: 'text-destructive' },
-  soon: { icon: 'bg-warning/15 text-warning', tag: 'text-warning' },
-  action: { icon: 'bg-foreground text-background', tag: 'text-foreground' },
-  info: { icon: 'bg-muted text-muted-foreground', tag: 'text-muted-foreground' },
-};
+/**
+ * The tag and icon tile reuse the app's chips: a notification about a document
+ * status takes that status's badge colours, deadlines take the destructive and
+ * warning badges, and the rest is the neutral No Status chip.
+ */
+function appearance(type: NotificationType): {
+  badge: 'destructive' | 'warning' | 'secondary';
+  className: string;
+} {
+  const { tone, status } = NOTIFICATION_CATALOG[type];
+  if (tone === 'overdue') return { badge: 'destructive', className: 'border border-destructive/25 bg-destructive/10 text-destructive' };
+  if (tone === 'soon') return { badge: 'warning', className: 'border border-warning/25 bg-warning/10 text-warning' };
+  const { badgeClass } = (status ? getDocumentStatusConfig(status) : NO_STATUS).color;
+  return { badge: 'secondary', className: badgeClass };
+}
 
 interface NotificationItemProps {
   notification: InboxNotification;
@@ -54,9 +64,9 @@ interface NotificationItemProps {
 
 /** One row of the inbox: what happened, to what, and when, with its unread state. */
 export function NotificationItem({ notification, onSelect, size = 'compact' }: NotificationItemProps) {
-  const { tag, tone } = NOTIFICATION_CATALOG[notification.type];
+  const { tag } = NOTIFICATION_CATALOG[notification.type];
   const Icon = ICONS[notification.type];
-  const classes = TONE_CLASSES[tone];
+  const look = appearance(notification.type);
   const unread = !notification.readAt;
 
   return (
@@ -77,17 +87,18 @@ export function NotificationItem({ notification, onSelect, size = 'compact' }: N
         className={cn(
           'flex shrink-0 items-center justify-center rounded-md',
           size === 'compact' ? 'size-8' : 'size-9',
-          classes.icon,
+          look.className,
         )}
       >
         <Icon className="size-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5 text-[11px] leading-none">
-          <span className={cn('font-semibold tracking-wide uppercase', classes.tag)}>{tag}</span>
-          <span className="text-muted-foreground">·</span>
+        <span className="flex items-center gap-2">
+          <Badge variant={look.badge} className={look.badge === 'secondary' ? look.className : undefined}>
+            {tag}
+          </Badge>
           <time
-            className="text-muted-foreground tabular-nums"
+            className="text-xs text-muted-foreground tabular-nums"
             dateTime={new Date(notification.createdAt).toISOString()}
           >
             {formatTimeAgo(notification.createdAt)}
@@ -95,7 +106,7 @@ export function NotificationItem({ notification, onSelect, size = 'compact' }: N
         </span>
         <span
           className={cn(
-            'mt-1.5 block leading-snug text-pretty',
+            'mt-2 block leading-snug text-pretty',
             size === 'compact' ? 'text-sm' : 'text-[15px]',
             unread ? 'font-semibold' : 'font-medium text-foreground/80',
           )}
@@ -149,7 +160,7 @@ export function NotificationItemSkeleton() {
     <div className="flex gap-3 px-4 py-3" aria-hidden>
       <Skeleton className="size-8 shrink-0" />
       <div className="flex flex-1 flex-col gap-2 pt-0.5">
-        <Skeleton className="h-2.5 w-24" />
+        <Skeleton className="h-5 w-24 rounded-4xl" />
         <Skeleton className="h-3.5 w-4/5" />
         <Skeleton className="h-3 w-3/5" />
       </div>

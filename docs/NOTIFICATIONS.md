@@ -63,17 +63,24 @@ anything twice.
 
 ### Look
 
-`renderDigestEmail` in `src/domain/notification/notification.email.ts` follows
-the Exodus 90 brand standards: the white-and-orange logo on brand black
-(`public/email/exodus90-white-orange.png`, loaded from `NEXT_PUBLIC_APP_URL`),
-Clash Display for headings, Lato for body text, orange only as an accent.
-Each type has a tag and one of four tones, and the digest is sorted loudest
-first: overdue work on brand black with an *Open now* button, work due soon
-tinted and outlined in orange, things to act on (assignments, reviews, changes requested)
-outlined in black, and the rest as quiet cards. The subject counts what is
-late, e.g. "3 updates in Translation Helper (1 overdue, 1 due soon)". The
-fonts load in Apple Mail and iOS; Gmail and Outlook fall back to Helvetica or
-Arial, which the layout is built to survive.
+`renderDigestEmail` in `src/domain/notification/notification.email.ts` puts
+the app's look inside an Exodus 90 frame. The frame is the white-and-orange logo
+on brand black (`public/email/exodus90-white-orange.png`, loaded from
+`NEXT_PUBLIC_APP_URL`) and an orange accent under the list. Everything inside
+uses the app's light theme written out as hex: Geist, its neutrals and its
+chips. Emails can't read the CSS variables, so the hex values in the file are
+copied from `src/app/globals.css`.
+
+Each notification shows the same chip in the email as in the app. Overdue work
+uses the destructive chip and work due soon the warning chip. A notification
+about a document status uses that status's badge from
+`src/constants/document-status.ts`: a new assignment or changes requested is
+In Progress blue, a review In Review amber, an approval Approved green. The
+catalogue's `status` field sets this. The digest is sorted loudest first.
+Overdue and due-soon cards are tinted in their chip's colour, and overdue work
+gets an *Open now* button. The subject counts what is late, e.g. "3 updates in
+Translation Helper (1 overdue, 1 due soon)". Gmail and Outlook ignore web fonts
+and fall back to the system sans.
 
 ### Providers
 

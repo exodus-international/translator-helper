@@ -1,4 +1,4 @@
-import { NotificationType } from '@/generated/prisma/enums';
+import { DocumentStatus, NotificationType } from '@/generated/prisma/enums';
 
 /**
  * How loudly a notification speaks, loudest first. Overdue work must not be
@@ -6,7 +6,7 @@ import { NotificationType } from '@/generated/prisma/enums';
  * plain, and the rest is quiet. The email, the bell and the notifications page
  * all read it.
  */
-export type NotificationTone = 'overdue' | 'soon' | 'action' | 'info';
+type NotificationTone = 'overdue' | 'soon' | 'action' | 'info';
 
 export const TONE_ORDER: NotificationTone[] = ['overdue', 'soon', 'action', 'info'];
 
@@ -16,6 +16,12 @@ interface NotificationTypeInfo {
   /** The short tag on the notification itself. */
   tag: string;
   tone: NotificationTone;
+  /**
+   * The document status the notification is about, if any. Its tag and icon
+   * take that status's colours, so "Ready for review" looks like the In Review
+   * badge everywhere else in the app.
+   */
+  status?: DocumentStatus;
   description: string;
   /** Whether it is emailed when the user has not chosen either way. */
   emailByDefault: boolean;
@@ -31,6 +37,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationType, NotificationTypeInfo
     label: 'Assigned to translate',
     tag: 'New assignment',
     tone: 'action',
+    status: DocumentStatus.IN_PROGRESS,
     description: 'A document is assigned to you for translation.',
     emailByDefault: true,
   },
@@ -38,6 +45,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationType, NotificationTypeInfo
     label: 'Assigned to review',
     tag: 'Review assignment',
     tone: 'action',
+    status: DocumentStatus.PENDING_REVIEW,
     description: 'You are made the reviewer of a translation.',
     emailByDefault: true,
   },
@@ -52,6 +60,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationType, NotificationTypeInfo
     label: 'Ready for review',
     tag: 'Ready for review',
     tone: 'action',
+    status: DocumentStatus.PENDING_REVIEW,
     description: 'A translation you review is submitted, or one without a reviewer needs one.',
     emailByDefault: true,
   },
@@ -87,6 +96,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationType, NotificationTypeInfo
     label: 'Changes requested',
     tag: 'Changes requested',
     tone: 'action',
+    status: DocumentStatus.IN_PROGRESS,
     description: 'A reviewer sends your translation back.',
     emailByDefault: true,
   },
@@ -94,6 +104,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationType, NotificationTypeInfo
     label: 'Approved',
     tag: 'Approved',
     tone: 'info',
+    status: DocumentStatus.APPROVED,
     description: 'Your translation is approved.',
     emailByDefault: false,
   },
