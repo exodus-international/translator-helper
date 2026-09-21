@@ -17,17 +17,22 @@ import {
 import type { CSSProperties } from 'react';
 
 /**
- * The Exodus 90 frame (black header, logo, orange accent) around content that
- * looks like the app: its neutrals, its font and its chips. Email clients know
- * nothing of oklch or CSS variables, so these are the light theme's tokens
+ * The header is the app's link preview image (src/app/opengraph-image.jpg),
+ * cropped to a banner, so the email looks like every other place the app is
+ * shared. Its ink and gold carry into the frame; everything below looks like
+ * the app: its neutrals, its font and its chips. Email clients know nothing of
+ * oklch or CSS variables, so these are the light theme's tokens
  * (src/app/globals.css) written out as hex.
  */
-const BRAND = {
-  orange: '#FF4800',
-  black: '#171618',
-  white: '#FFFFFF',
-  display: "'Clash Display','Helvetica Neue',Helvetica,Arial,sans-serif",
+const HEADER = {
+  /** The banner's darkest edge, shown while images are blocked. */
+  ink: '#11100E',
+  /** The banner's subtitle gold. */
+  gold: '#CFA758',
+  cream: '#F3E6C8',
+  serif: "Georgia,'Times New Roman',serif",
 };
+const WHITE = '#FFFFFF';
 const APP = {
   foreground: '#0A0A0A',
   primary: '#171717',
@@ -81,7 +86,7 @@ export interface DigestEmailProps {
   intro: string;
   /** Already sorted loudest first. */
   cards: DigestCard[];
-  logoUrl: string;
+  headerUrl: string;
   preferencesUrl: string;
 }
 
@@ -91,7 +96,7 @@ export interface DigestEmailProps {
  * font has a system fallback and the layout never depends on CSS a client may
  * strip; React Email's components produce that markup.
  */
-export function DigestEmail({ subject, greeting, intro, cards, logoUrl, preferencesUrl }: DigestEmailProps) {
+export function DigestEmail({ subject, greeting, intro, cards, headerUrl, preferencesUrl }: DigestEmailProps) {
   return (
     <Html lang="en">
       <Head>
@@ -99,47 +104,32 @@ export function DigestEmail({ subject, greeting, intro, cards, logoUrl, preferen
         <meta name="color-scheme" content="light only" />
         <meta name="supported-color-schemes" content="light only" />
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet" />
-        <link href="https://api.fontshare.com/v2/css?f[]=clash-display@600&display=swap" rel="stylesheet" />
       </Head>
       <Preview>{cards.map((card) => card.title).join(' · ')}</Preview>
       <Body style={{ margin: 0, padding: '32px 16px', backgroundColor: APP.canvas, fontFamily: APP.font }}>
         <Container style={{ width: '100%', maxWidth: '560px' }}>
-          <Section
-            align="center"
-            style={{ backgroundColor: BRAND.black, padding: '36px 32px 28px', textAlign: 'center' }}
-          >
-            {/* 480 × 136, shown at a third of that so it stays sharp on high-density screens. */}
+          <Section style={{ backgroundColor: HEADER.ink }}>
+            {/* 1120 × 429, shown at half that so it stays sharp on high-density screens. The alt
+                text stands in, styled like the banner's title, where images are blocked. */}
             <Img
-              src={logoUrl}
-              width="160"
-              height="45"
-              alt="Exodus 90"
+              src={headerUrl}
+              width="560"
+              height="215"
+              alt="Translation Helper"
               style={{
-                margin: '0 auto',
-                color: BRAND.white,
-                fontFamily: BRAND.display,
-                fontSize: '20px',
-                fontWeight: 600,
-                letterSpacing: '4px',
+                width: '100%',
+                height: 'auto',
+                color: HEADER.cream,
+                fontFamily: HEADER.serif,
+                fontSize: '28px',
+                fontWeight: 700,
+                lineHeight: '48px',
+                textAlign: 'center',
               }}
             />
-            <Text
-              style={{
-                margin: '20px 0 0',
-                fontFamily: BRAND.display,
-                fontSize: '11px',
-                lineHeight: '16px',
-                fontWeight: 600,
-                letterSpacing: '3px',
-                textTransform: 'uppercase',
-                color: BRAND.orange,
-              }}
-            >
-              Translation Helper
-            </Text>
           </Section>
 
-          <Section style={{ backgroundColor: BRAND.white, padding: '36px 32px 32px' }}>
+          <Section style={{ backgroundColor: WHITE, padding: '36px 32px 32px' }}>
             <Heading
               as="h1"
               style={{
@@ -164,7 +154,7 @@ export function DigestEmail({ subject, greeting, intro, cards, logoUrl, preferen
                 height: '4px',
                 width: '48px',
                 marginTop: '8px',
-                backgroundColor: BRAND.orange,
+                backgroundColor: HEADER.gold,
                 fontSize: 0,
                 lineHeight: 0,
               }}
@@ -210,7 +200,7 @@ function DigestCardView({ card }: { card: DigestCard }) {
     <Section
       style={{
         marginBottom: '12px',
-        backgroundColor: urgent ? chip.fill : BRAND.white,
+        backgroundColor: urgent ? chip.fill : WHITE,
         border: `1px solid ${urgent ? chip.border : APP.border}`,
         borderRadius: APP.radius,
         padding: '16px 20px',
@@ -259,7 +249,7 @@ function DigestCardView({ card }: { card: DigestCard }) {
               padding: '8px 16px',
               borderRadius: '8px',
               backgroundColor: APP.primary,
-              color: BRAND.white,
+              color: WHITE,
             }}
           >
             Open now &rarr;
@@ -282,7 +272,7 @@ DigestEmail.PreviewProps = {
   subject: '4 updates in Translation Helper (1 overdue, 1 due soon)',
   greeting: 'Hi Sarah,',
   intro: 'There are 4 updates on your work, and one deadline has passed.',
-  logoUrl: 'http://localhost:3000/email/exodus90-white-orange.png',
+  headerUrl: 'http://localhost:3000/email/header.jpg',
   preferencesUrl: 'http://localhost:3000/profile#notifications',
   cards: [
     {

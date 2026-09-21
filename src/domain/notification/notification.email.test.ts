@@ -65,7 +65,7 @@ describe('renderDigestEmail', () => {
     assert.equal(email.subject, 'Translate "Day 3" (Croatian)');
     assert.match(email.html, /href="https:\/\/translate\.example\.org\/documents\/sml\/day-3\/hr"/);
     assert.match(email.text, /^Hi Ana,/);
-    assert.match(email.html, /src="https:\/\/translate\.example\.org\/email\/exodus90-white-orange\.png"/);
+    assert.match(email.html, /src="https:\/\/translate\.example\.org\/email\/header\.jpg"/);
     assert.match(email.text, /https:\/\/translate\.example\.org\/profile#notifications/);
   });
 

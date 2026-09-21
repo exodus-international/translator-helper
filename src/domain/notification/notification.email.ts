@@ -78,7 +78,7 @@ function absolute(appUrl: string, path: string): string {
   return new URL(path, appUrl).toString();
 }
 
-const LOGO_PATH = '/email/exodus90-white-orange.png';
+const HEADER_PATH = '/email/header.jpg';
 
 /**
  * One email for everything that is waiting for one person, loudest first. A
@@ -113,7 +113,7 @@ export async function renderDigestEmail(
       greeting,
       intro,
       cards: sorted.map((item) => ({ ...item, href: item.url ? absolute(appUrl, item.url) : null })),
-      logoUrl: absolute(appUrl, LOGO_PATH),
+      headerUrl: absolute(appUrl, HEADER_PATH),
       preferencesUrl,
     }),
   );

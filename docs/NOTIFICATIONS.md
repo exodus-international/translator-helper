@@ -68,11 +68,11 @@ The email is a React Email component, `src/emails/notification-digest.tsx`;
 the subject, greeting and order and renders it. `pnpm email:dev` opens a live
 preview at <http://localhost:4001> using the component's `PreviewProps`.
 
-The app's look sits inside an Exodus 90 frame. The frame is the white-and-orange
-logo on brand black (`public/email/exodus90-white-orange.png`, loaded from
-`NEXT_PUBLIC_APP_URL`) and an orange accent under the list. Everything inside
-uses the app's light theme written out as hex: Geist, its neutrals and its
-chips. Emails can't read the CSS variables, so the hex values in the component
+The header is the app's link preview image (`src/app/opengraph-image.jpg`)
+cropped to a banner, `public/email/header.jpg`, loaded from
+`NEXT_PUBLIC_APP_URL`. If the preview image changes, crop the banner again. A
+gold accent from the banner closes the list. Everything else uses the app's
+light theme written out as hex: Geist, its neutrals and its chips. Emails can't read the CSS variables, so the hex values in the component
 are copied from `src/app/globals.css`.
 
 Each notification shows the same chip in the email as in the app. Overdue work
