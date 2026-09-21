@@ -1,5 +1,6 @@
 import prisma from '@/lib/db';
 import { isEmailConfigured, sendEmail } from '@/lib/email';
+import { buildDocumentPath } from '../document/document-url';
 import {
   DocumentStatus,
   NotificationEmailStatus,
@@ -92,7 +93,7 @@ async function loadVersion(versionId: string) {
       deadline: true,
       reviewDeadline: true,
       languageId: true,
-      document: { select: { title: true, slug: true, sourceProject: { select: { identifier: true } } } },
+      document: { select: { id: true, title: true, slug: true, sourceProject: { select: { slug: true } } } },
       language: { select: { name: true, code: true } },
       user: { select: { name: true } },
     },
@@ -106,15 +107,19 @@ function workName(version: VersionContext): string {
   return `"${version.document.title}" (${version.language.name})`;
 }
 
-function versionUrl(version: VersionContext): string | null {
-  const project = version.document.sourceProject?.identifier;
-  return project ? `/documents/${project}/${version.document.slug}/${version.language.code}` : null;
+function versionUrl(version: VersionContext): string {
+  return buildDocumentPath({
+    projectSlug: version.document.sourceProject?.slug,
+    slug: version.document.slug,
+    languageCode: version.language.code,
+    documentId: version.document.id,
+  });
 }
 
 /** The version's editor with one suggestion thread open and in view. */
-function threadUrl(version: VersionContext, suggestionId: string): string | null {
+function threadUrl(version: VersionContext, suggestionId: string): string {
   const url = versionUrl(version);
-  return url ? `${url}?thread=${suggestionId}` : null;
+  return `${url}${url.includes('?') ? '&' : '?'}thread=${encodeURIComponent(suggestionId)}`;
 }
 
 async function nameOf(userId: string | null | undefined): Promise<string> {
@@ -406,7 +411,7 @@ const deadlineSelect = {
   deadline: true,
   reviewDeadline: true,
   languageId: true,
-  document: { select: { title: true, slug: true, sourceProject: { select: { identifier: true } } } },
+  document: { select: { id: true, title: true, slug: true, sourceProject: { select: { slug: true } } } },
   language: { select: { name: true, code: true } },
   user: { select: { name: true } },
   reviewer: { select: { name: true } },
