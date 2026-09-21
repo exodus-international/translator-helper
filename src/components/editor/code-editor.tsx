@@ -1,13 +1,10 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { markdown } from '@codemirror/lang-markdown';
-import { html } from '@codemirror/lang-html';
 import { yaml } from '@codemirror/lang-yaml';
 import { xml } from '@codemirror/lang-xml';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { lintGutter, lintKeymap } from '@codemirror/lint';
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { Compartment, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
 import {
   Decoration,
@@ -26,30 +23,10 @@ import { lintDocument } from '@/lib/lint';
 import { createEditorApi, offsetToPosition, type EditorApi } from './editor-api';
 import { setSuggestions, suggestionExtension } from './cm-suggestions';
 import { frontmatterDecoration } from './cm-frontmatter';
+import { markdownSupport } from './cm-markdown';
 import { editorHighlighting, editorTheme } from './cm-theme';
 
 const setHighlightLine = StateEffect.define<number | null>();
-
-/**
- * Markdown carries the rest of the document inside it: the content library
- * embeds `<div class="…">`, `<style>` blocks and inline CSS in most files, and
- * a fenced block is usually YAML or CSS when it is not plain text. Each of
- * those is a language of its own, so the markdown parser is given them to hand
- * their contents to -- otherwise an HTML tag is prose and a stylesheet is not
- * even that.
- */
-const markdownSupport: Extension = markdown({
-  // No `base`: the default is GFM, which is what these documents are written
-  // in. Only the languages it can hand its contents to are added.
-  htmlTagLanguage: html(),
-  codeLanguages: (info) => {
-    const name = info.toLowerCase();
-    if (name.startsWith('yaml') || name.startsWith('yml')) return yaml().language;
-    if (name.startsWith('html')) return html().language;
-    if (name.startsWith('xml') || name.startsWith('svg')) return xml().language;
-    return null;
-  },
-});
 
 /** Language ids the panes actually ask for; anything else reads as Markdown. */
 function languageSupport(language: string): Extension {
@@ -141,6 +118,8 @@ interface CodeEditorProps {
   onSuggestionClick?: (suggestion: SuggestionWithUser) => void;
   /** The English source, enabling the parity rules. Omit to lint style only. */
   sourceContent?: string;
+  /** This editor holds the English source itself: see `LintContext.isSource`. */
+  isSource?: boolean;
   /** Fires whenever diagnostics change, for a status bar or badge. */
   onDiagnosticsChange?: (diagnostics: LintDiagnostic[]) => void;
   /** Rule ids to skip. */
@@ -166,6 +145,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     suggestions = [],
     onSuggestionClick,
     sourceContent,
+    isSource = false,
     onDiagnosticsChange,
     disabledRules,
     lint = true,
@@ -248,10 +228,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       lineNumbers(),
       history(),
       highlightActiveLine(),
-      // The app's own palette first, CodeMirror's default underneath it for
-      // anything it does not name.
+      // The app's own palette, and nothing under it: see cm-theme.
       editorHighlighting,
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap]),
       languageCompartment.of(languageExtension),
       readOnlyCompartment.of(readOnlyExtensions(readOnly)),
@@ -287,6 +265,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
 
   const sourceContentRef = useRef(sourceContent);
   sourceContentRef.current = sourceContent;
+  const isSourceRef = useRef(isSource);
+  isSourceRef.current = isSource;
   // The prop says whether this pane wants the rules; the language says whether
   // they mean anything here.
   const lintEnabled = lint && lintsAsMarkdown(language);
@@ -297,7 +277,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   // and for a controlled editor every keystroke reaches us twice — once as a
   // doc change, once as the value prop echoing back. Reporting is keyed on the
   // text and source that produced it, so the second call is a no-op.
-  const lastReported = useRef<{ text: string; source?: string } | null>(null);
+  const lastReported = useRef<{ text: string; source?: string; isSource: boolean } | null>(null);
   const reportDiagnostics = useRef<(text: string) => void>(() => {});
   reportDiagnostics.current = (text: string) => {
     if (!onDiagnosticsChange) return;
@@ -306,9 +286,11 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       return;
     }
     const source = sourceContentRef.current;
-    if (lastReported.current?.text === text && lastReported.current.source === source) return;
-    lastReported.current = { text, source };
-    onDiagnosticsChange(lintDocument({ text, source }, lintOptions.current));
+    const isSource = isSourceRef.current;
+    const last = lastReported.current;
+    if (last?.text === text && last.source === source && last.isSource === isSource) return;
+    lastReported.current = { text, source, isSource };
+    onDiagnosticsChange(lintDocument({ text, source, isSource }, lintOptions.current));
   };
 
   // Controlled value: only write when the prop genuinely diverges, otherwise
@@ -323,27 +305,28 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   }, [value]);
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: setLintContext.of({ source: sourceContent }) });
-  }, [sourceContent]);
+    viewRef.current?.dispatch({ effects: setLintContext.of({ source: sourceContent, isSource }) });
+  }, [sourceContent, isSource]);
 
   // Diagnostics for a document nobody has typed in yet — on mount, and again
   // whenever the source it is compared against changes.
   useEffect(() => {
     const view = viewRef.current;
     if (view) reportDiagnostics.current(view.state.doc.toString());
-  }, [ready, value, sourceContent, lintEnabled, disabledKey]);
+  }, [ready, value, sourceContent, isSource, lintEnabled, disabledKey]);
 
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setSuggestions.of(suggestions) });
   }, [suggestions]);
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: setHighlightLine.of(highlightLine ?? null) });
-    if (highlightLine && viewRef.current) {
-      const view = viewRef.current;
-      const line = Math.min(Math.max(highlightLine, 1), view.state.doc.lines);
-      view.dispatch({ effects: EditorView.scrollIntoView(view.state.doc.line(line).from, { y: 'center' }) });
-    }
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({ effects: setHighlightLine.of(highlightLine ?? null) });
+    // Only when it is out of sight. A pane kept in step with the other (see
+    // scroll-sync) already shows the line level with its counterpart, and
+    // centring it would undo that.
+    if (highlightLine) createEditorApi(view).revealLineIfOutsideViewport(highlightLine);
   }, [highlightLine]);
 
   useEffect(() => {

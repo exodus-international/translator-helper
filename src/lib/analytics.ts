@@ -82,6 +82,7 @@ export type AnalyticsEvent =
   | 'translation_deleted'
   | 'ai_translate_triggered'
   | 'source_saved'
+  | 'editor_content_copied'
   | 'zen_mode_toggled'
   // ── Workflow / status ────────────────────────────────────────────────
   | 'document_status_changed'

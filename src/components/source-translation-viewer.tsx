@@ -1,5 +1,6 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
 import type { CodeEditorHandle } from '@/components/editor/code-editor';
+import { useScrollSync } from '@/components/editor/scroll-sync';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +59,7 @@ import { LintStatusBar } from '@/components/editor/lint-status-bar';
 import { MarkdownGuideDialog } from '@/components/markdown-guide';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
+import { CopyAllButton } from './editor/copy-all-button';
 import { FormattingToolbar } from './editor/formatting-toolbar';
 import { useFormattingToolbar } from './editor/use-formatting-toolbar';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
@@ -371,6 +373,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const translationRawVisible =
       variant === 'translate' ? translateTab === 'edit' : isReviewEditing || reviewViewMode === 'review';
     const isReviewMode = variant === 'review' && reviewViewMode === 'review';
+    // The cursor chip only means something when both panes are showing editors:
+    // it names this pane's line and the line the other pane is parked on. It is
+    // also when the two scroll together -- side by side, not a tab apart.
+    const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
+    const alignPanes = useScrollSync(sourceEditorRef, translationEditorRef, showCursorSync && !isMobile);
 
     // Update source edit value when sourceEditContent prop changes
     useEffect(() => {
@@ -424,6 +431,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setSyncedTranslationLine(translationTargetLine);
       // Update the translation pane's displayed line to match the synced target
       setTranslationLine(translationTargetLine);
+      alignPanes('source');
     };
 
     const handleTranslationCursorChange = (lineNumber: number) => {
@@ -441,6 +449,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setSyncedSourceLine(sourceTargetLine);
       // Update the source pane's displayed line to match the synced target
       setSourceLine(sourceTargetLine);
+      alignPanes('translation');
     };
 
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
@@ -507,16 +516,16 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // (The rules themselves already stay quiet on an empty document; this keeps
     // the bar from saying anything at all until there is work to judge.)
     const translationHasContent = translationContent.trim().length > 0;
-    // The source pane is linted like the translation, against itself: the
-    // parity rules come out even and the style rules adopt whatever the source
-    // already does. In Preview there is no editor to report them, so they are
-    // computed from the text.
+    // The source pane is linted like the translation, as the source: the style
+    // rules adopt whatever it already does, and the rules that compare a
+    // translation with its source stay out of it. In Preview there is no editor
+    // to report them, so they are computed from the text.
     // `!isYaml` for the same reason the editor gates itself on the language:
     // these are Markdown rules, and the Preview branch below is not the only
     // reader of this flag.
     const inSourcePreview = !isYaml && !isSourceEditing && sourceViewMode === 'formatted';
     const sourcePreviewDiagnostics = useMemo(
-      () => (inSourcePreview ? lintDocument({ text: sourceContent, source: sourceContent }) : []),
+      () => (inSourcePreview ? lintDocument({ text: sourceContent, isSource: true }) : []),
       [inSourcePreview, sourceContent],
     );
     // Whichever view is up owns the bar. Falling back to the editor's last
@@ -527,9 +536,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // no longer on screen and there is no Fix all to clear it with. Nothing
     // clears `sourceDiagnostics` on the way out, so it sat there.
     const sourcePaneDiagnostics = inSourcePreview ? sourcePreviewDiagnostics : sourceDiagnostics;
-    // The cursor chip only means something when both panes are showing editors:
-    // it names this pane's line and the line the other pane is parked on.
-    const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -772,6 +778,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // it for the reopen button made the panel a trapdoor on documents without
     // suggestions, and hid it outright on mobile, where it starts closed.
     const hasPanel = hasSidebar || !!sidebarHeader || !!sidebarSummary;
+    // There is a translation to copy once one has been started, and the Audio
+    // text tab shows a different text -- the transcript, with its own editor
+    // -- so a button there reading "copy translation" would not copy what is
+    // on screen.
+    const showingAudioText =
+      variant === 'review' && !isReviewEditing && !!audioTabVersionId && reviewViewMode === 'audio';
+    const showTranslationCopy = (variant === 'review' || translationStarted) && !showingAudioText;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
@@ -913,6 +926,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     </Button>
                   </>
                 )}
+                {/* Last in the row, so it keeps its place while Edit turns
+                    into Save and Cancel. What is being edited is what gets
+                    copied. */}
+                <CopyAllButton pane="source" text={isSourceEditing ? sourceEditValue : sourceContent} />
                 {sourceHeaderExtra}
               </div>
             </div>
@@ -920,6 +937,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               {sourceFormatting.position && (
                 <FormattingToolbar
                   position={sourceFormatting.position}
+                  active={sourceFormatting.active}
                   containerRef={sourceContainerRef}
                   onFormat={sourceFormatting.onFormat}
                 />
@@ -935,7 +953,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
                   language={contentLanguage}
-                  sourceContent={sourceContent}
+                  isSource
                   onDiagnosticsChange={setSourceDiagnostics}
                   onOpenGuide={onOpenGuide}
                   footer={
@@ -962,7 +980,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
-                  sourceContent={sourceContent}
+                  isSource
                   onDiagnosticsChange={setSourceDiagnostics}
                   onOpenGuide={onOpenGuide}
                   footer={
@@ -1086,6 +1104,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     </div>
                   )
                 ) : null}
+                {showTranslationCopy && <CopyAllButton pane="translation" text={translationContent} />}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
                 {/* On desktop the panel folds to its own rail, so it needs no
@@ -1159,6 +1178,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     {translationFormatting.position && (
                       <FormattingToolbar
                         position={translationFormatting.position}
+                        active={translationFormatting.active}
                         containerRef={translationContainerRef}
                         onFormat={translationFormatting.onFormat}
                       />
