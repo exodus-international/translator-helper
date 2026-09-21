@@ -23,6 +23,7 @@ describe('the markdown the editor reads', () => {
   const constructs: { name: string; doc: string; node: string; html: RegExp }[] = [
     { name: 'a table', doc: '| a | b |\n| - | - |\n| 1 | 2 |', node: 'Table', html: /<table>/ },
     { name: 'strikethrough', doc: 'the ~~old~~ price', node: 'Strikethrough', html: /<del>old<\/del>/ },
+    { name: 'single-tilde strikethrough', doc: 'the ~old~ price', node: 'Strikethrough', html: /<del>old<\/del>/ },
     { name: 'a task list', doc: '- [x] done', node: 'Task', html: /type="checkbox"/ },
     { name: 'a bare link', doc: 'see https://exodus90.com', node: 'URL', html: /<a href="https:\/\/exodus90.com"/ },
   ];
@@ -33,6 +34,14 @@ describe('the markdown the editor reads', () => {
       assert.ok(editorReads(doc).has(node), `no ${node} in ${JSON.stringify(doc)}`);
     });
   }
+
+  it('strikes through with tildes only where the preview does', () => {
+    // One tilde closes only one tilde, and one beside a space opens nothing.
+    for (const doc of ['a ~x~~ b', 'a ~~x~ b', 'a ~ x~ b', '~~~x~~~', 'about ~5 minutes']) {
+      assert.doesNotMatch(parseMarkdown(doc), /<del>/, doc);
+      assert.ok(!editorReads(doc).has('Strikethrough'), `Strikethrough in ${JSON.stringify(doc)}`);
+    }
+  });
 
   it('does not read syntax the preview leaves as text', () => {
     for (const [doc, node] of [

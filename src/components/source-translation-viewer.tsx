@@ -1,6 +1,7 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
 import type { CodeEditorHandle } from '@/components/editor/code-editor';
 import { useScrollSync } from '@/components/editor/scroll-sync';
+import { selectionBox, useFollowSelection, type SelectionBox } from '@/components/editor/toolbar-placement';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -341,7 +342,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [showDiscardDialog, setShowDiscardDialog] = useState(false);
     const [discardKind, setDiscardKind] = useState<'suggestion' | 'audioText'>('suggestion');
     const pendingDiscardActionRef = useRef<(() => void) | null>(null);
-    const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
+    const [toolbarPosition, setToolbarPosition] = useState<SelectionBox | null>(null);
     const translationEditorRef = useRef<CodeEditorHandle | null>(null);
     const [translationDiagnostics, setTranslationDiagnostics] = useState<LintDiagnostic[]>([]);
     const [sourceDiagnostics, setSourceDiagnostics] = useState<LintDiagnostic[]>([]);
@@ -378,6 +379,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // also when the two scroll together -- side by side, not a tab apart.
     const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
     const alignPanes = useScrollSync(sourceEditorRef, translationEditorRef, showCursorSync && !isMobile);
+    // The suggestion toolbar is placed where the selection is on screen, so it
+    // moves with the selection as the pane scrolls.
+    useFollowSelection(toolbarPosition !== null, translationContainerRef, translationEditorRef, setToolbarPosition);
 
     // Update source edit value when sourceEditContent prop changes
     useEffect(() => {
@@ -698,26 +702,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
       const showToolbar =
         !!range && ((canCreateSuggestions && (isReviewMode || suggestions.length > 0)) || formattingEnabled);
-      if (showToolbar) {
-        // Try to get actual position from editor
-        const editor = (translationEditorRef.current || externalEditorRef?.current)?.editor;
-        if (editor) {
-          try {
-            const pos = editor.coordsAt({ line: range.endLine, column: range.endColumn });
-            if (pos) {
-              setToolbarPosition({ x: pos.left + 20, y: pos.top + pos.height + 4 });
-            } else {
-              setToolbarPosition({ x: 180, y: 20 });
-            }
-          } catch {
-            setToolbarPosition({ x: 180, y: 20 });
-          }
-        } else {
-          setToolbarPosition({ x: 180, y: 20 });
-        }
-      } else {
-        setToolbarPosition(null);
-      }
+      const view = showToolbar ? (translationEditorRef.current || externalEditorRef?.current)?.view : null;
+      setToolbarPosition(view ? selectionBox(view) : null);
     };
 
     const handleCreateSuggestion = (type: SuggestionType) => {
@@ -1218,7 +1204,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 )
               ) : isReviewEditing ? (
                 <div className="h-full flex flex-col space-y-2">
+                  {/* The one translation editor on screen while editing, so it
+                      is the one the source keeps in step with (scroll-sync). */}
                   <RawEditorPane
+                    ref={translationEditorRef}
                     value={translationContent}
                     onChange={onTranslationChange}
                     onCursorChange={handleTranslationCursorChange}

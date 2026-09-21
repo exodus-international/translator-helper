@@ -17,27 +17,10 @@ import {
   Quote,
   Strikethrough,
 } from 'lucide-react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { type FormattingAction } from './formatting';
-
-/**
- * Where a selection is on screen, in viewport pixels: the left edge of its
- * first character, the top of its first line and the bottom of its last. A
- * selection that runs past the top or bottom of what the editor has drawn
- * reaches -Infinity or Infinity on that side.
- */
-export interface SelectionBox {
-  left: number;
-  top: number;
-  bottom: number;
-  /**
-   * The band the editor shows its text in. The pane around it also holds a
-   * header and a status bar, and text scrolled under those is out of sight.
-   */
-  viewTop: number;
-  viewBottom: number;
-}
+import { useToolbarPlacement, type SelectionBox } from './toolbar-placement';
 
 interface FormattingToolbarProps {
   onFormat: (action: FormattingAction) => void;
@@ -51,10 +34,6 @@ interface FormattingToolbarProps {
    */
   containerRef?: React.RefObject<HTMLElement | null>;
 }
-
-/** Between the toolbar and the selection, and the toolbar and the pane's edge. */
-const GAP = 6;
-const INSET = 8;
 
 /** Commands rather than states: they act on the text and have nothing to be "on". */
 const COMMANDS: readonly FormattingAction[] = ['lineBreak', 'clear'];
@@ -121,43 +100,8 @@ const GROUPS: Tool[][] = [
  */
 export function FormattingToolbar({ onFormat, position, active = [], containerRef }: FormattingToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ left: number; top: number; below: boolean } | null>(null);
-
-  // Placed from its own measured size, before paint, so it never shows a frame
-  // in the wrong place. It used to be placed from the bottom of the selection's
-  // last line, less a guess at its height that was shorter than the toolbar --
-  // so it sat on the words it was about to format.
-  useLayoutEffect(() => {
-    const toolbar = toolbarRef.current;
-    if (!toolbar) return;
-    const pane = containerRef?.current?.getBoundingClientRect();
-    const visibleTop = Math.max(pane?.top ?? 0, position.viewTop, 0);
-    const visibleBottom = Math.min(pane?.bottom ?? Infinity, position.viewBottom, window.innerHeight);
-    // Scrolled out of sight: there is nothing on screen to act on.
-    if (position.bottom <= visibleTop || position.top >= visibleBottom) {
-      setCoords(null);
-      return;
-    }
-    const bounds = {
-      left: Math.max(pane?.left ?? 0, 0) + INSET,
-      top: visibleTop + INSET,
-      right: Math.min(pane?.right ?? Infinity, window.innerWidth) - INSET,
-      bottom: visibleBottom - INSET,
-    };
-    const width = toolbar.offsetWidth;
-    const height = toolbar.offsetHeight;
-
-    // Above the selection, clear of its first line. Without the room for that
-    // -- a selection on the pane's first lines -- below its last line instead,
-    // and only onto the selection when it fills the pane and there is nowhere
-    // else to go.
-    const above = position.top - GAP - height;
-    const below = above < bounds.top;
-    const top = below ? Math.max(bounds.top, Math.min(position.bottom + GAP, bounds.bottom - height)) : above;
-    const left = Math.max(bounds.left, Math.min(position.left, bounds.right - width));
-
-    setCoords({ left, top, below });
-  }, [position.left, position.top, position.bottom, position.viewTop, position.viewBottom, containerRef]);
+  // Above the selection, or below it without the room, and never on it.
+  const coords = useToolbarPlacement(toolbarRef, position, containerRef);
 
   if (typeof document === 'undefined') return null;
 

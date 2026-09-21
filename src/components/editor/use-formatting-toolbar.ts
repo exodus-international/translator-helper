@@ -1,39 +1,16 @@
 'use client';
 
-import type { EditorView } from '@codemirror/view';
 import { useCallback, useEffect, useState } from 'react';
 import { inlineSpansAround } from './cm-inline-spans';
 import type { CodeEditorHandle } from './code-editor';
 import { activeFormattingActions, applyFormattingAction, type FormattingAction } from './formatting';
-import type { SelectionBox } from './formatting-toolbar';
+import { selectionBox, useFollowSelection, type SelectionBox } from './toolbar-placement';
 
 interface SelectionRange {
   startLine: number;
   startColumn: number;
   endLine: number;
   endColumn: number;
-}
-
-/**
- * The box around the selection's text on screen, for the toolbar to keep
- * clear of: its first character gives the top and left, its last the bottom.
- *
- * The editor only draws the text in and near view, and has no coordinates for
- * the rest, so a selection that runs off one end -- select-all in a long
- * document -- is open on that side, and the toolbar goes to the other.
- */
-function selectionBox(view: EditorView): SelectionBox {
-  const { from, to } = view.state.selection.main;
-  const first = view.coordsAtPos(from, 1);
-  const last = view.coordsAtPos(to, -1);
-  const scroller = view.scrollDOM.getBoundingClientRect();
-  return {
-    left: (first ?? last ?? view.contentDOM.getBoundingClientRect()).left,
-    top: first ? first.top : -Infinity,
-    bottom: last ? last.bottom : Infinity,
-    viewTop: scroller.top,
-    viewBottom: scroller.bottom,
-  };
 }
 
 /**
@@ -78,27 +55,16 @@ export function useFormattingToolbar({
   // gives an element that is about to leave the document, or nothing at all.
   // A ref object's identity never changes, so the effect would not run again
   // to notice.
-  //
-  // The box is in screen pixels, so it is measured again as the text scrolls
-  // under it; otherwise the toolbar stays put and the selection slides beneath
-  // it. Scrolls do not bubble, so it listens on the way down instead.
   const open = position !== null;
   useEffect(() => {
     if (!open) return;
     const container = containerRef.current;
     if (!container) return;
     const clear = () => setPosition(null);
-    const follow = () => {
-      const view = editorRef.current?.view;
-      if (view && !view.state.selection.main.empty) setPosition(selectionBox(view));
-    };
     container.addEventListener('focusout', clear);
-    container.addEventListener('scroll', follow, true);
-    return () => {
-      container.removeEventListener('focusout', clear);
-      container.removeEventListener('scroll', follow, true);
-    };
-  }, [open, containerRef, editorRef]);
+    return () => container.removeEventListener('focusout', clear);
+  }, [open, containerRef]);
+  useFollowSelection(open, containerRef, editorRef, setPosition);
 
   const onSelectionChange = useCallback(
     (range: SelectionRange | null) => {

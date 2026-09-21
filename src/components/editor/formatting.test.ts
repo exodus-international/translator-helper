@@ -103,6 +103,12 @@ describe('formatting actions', () => {
     assert.equal(run('_really_ snake_case_here', 0, 24, 'clear').text, 'really snake_case_here');
   });
 
+  it('clears a single-tilde strikethrough, but not a lone tilde', () => {
+    assert.equal(run('~struck~ and ~~struck~~', 0, 23, 'clear').text, 'struck and struck');
+    // "About five minutes", not a marker: the preview shows it as written.
+    assert.equal(run('about ~5 minutes', 0, 16, 'clear').text, 'about ~5 minutes');
+  });
+
   it('leaves the selection on the block after a line action, not past the document', () => {
     // These offsets are dispatched as a selection, so they are read in the
     // document the changes leave behind. When they were not, taking a marker
@@ -200,6 +206,7 @@ describe('taking a span off some of its words', () => {
 
   it('splits a struck phrase the same way', () => {
     assert.equal(runAt('~~the «old» price~~', 'strikethrough'), '~~the~~ «old» ~~price~~');
+    assert.equal(runAt('~the «old» price~', 'strikethrough'), '~the~ «old» ~price~');
     assert.equal(runAt('**~~a «b» c~~**', 'strikethrough'), '**~~a~~ «b» ~~c~~**');
   });
 
@@ -228,6 +235,14 @@ describe('active formatting', () => {
     assert.deepEqual(activeAt('say «**grace**»').active, ['bold']);
     assert.deepEqual(activeAt('say *«grace»*').active, ['italic']);
     assert.deepEqual(activeAt('say ~~«grace»~~').active, ['strikethrough']);
+  });
+
+  it('reads one tilde each side as struck through, as the preview does', () => {
+    assert.deepEqual(activeAt('say ~«grace»~').active, ['strikethrough']);
+    assert.deepEqual(activeAt('say «~grace~»').active, ['strikethrough']);
+    assert.equal(runAt('say ~«grace»~ now', 'strikethrough'), 'say «grace» now');
+    assert.equal(runAt('say «~grace~» now', 'strikethrough'), 'say «grace» now');
+    assert.deepEqual(activeAt('about «~5» minutes').active, []);
   });
 
   it('tells bold from italic by the length of the run', () => {
@@ -314,6 +329,9 @@ describe('active formatting', () => {
       '__«disc»ipline__',
       '~~a «b» c~~',
       '**~~a «b» c~~**',
+      'say ~«grace»~ now',
+      'say «~grace~» now',
+      '~a «b» c~',
       'read [the «full» page](https://example.org)',
       'read [the «full» page][ref]',
       'a [«bracketed» phrase] here',

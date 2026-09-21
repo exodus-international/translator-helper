@@ -82,6 +82,12 @@ const LINE_PREFIXES: Partial<Record<FormattingAction, RegExp>> = {
  */
 const ANY_BLOCK_PREFIX = /^\s*(?:#{1,6}\s+|>\s?|[*+-]\s+|\d+\.\s+)/;
 const INLINE_MARKERS = /\*\*|__|~~|`|\*|_/g;
+/**
+ * `~x~`: one tilde each side, which the preview strikes through as it does
+ * `~~x~~`. Only as a pair -- a lone tilde is prose ("~5 minutes"), and taking
+ * it out would change what the text says.
+ */
+const SINGLE_TILDE_PAIR = /(?<!~)~(?=[^\s~])([^~]*?[^\s~])~(?!~)/g;
 
 /** How many `character` the string starts with. */
 function leadingRun(text: string, character: string): number {
@@ -120,10 +126,11 @@ function runCarries(run: number, marker: string): boolean {
  * `_` as emphasis either, so a selected key keeps its name.
  */
 function stripInlineMarkers(selected: string): string {
-  return selected.replace(INLINE_MARKERS, (marker, offset: number) => {
+  const unstruck = selected.replace(SINGLE_TILDE_PAIR, '$1');
+  return unstruck.replace(INLINE_MARKERS, (marker, offset: number) => {
     if (marker[0] !== '_') return '';
     const isWord = (character: string | undefined) => !!character && /\w/.test(character);
-    return isWord(selected[offset - 1]) && isWord(selected[offset + marker.length]) ? marker : '';
+    return isWord(unstruck[offset - 1]) && isWord(unstruck[offset + marker.length]) ? marker : '';
   });
 }
 
@@ -276,7 +283,13 @@ function linkAround(text: string, from: number, to: number): LinkSpan | null {
   return null;
 }
 
-/** The span of this kind that a selection sits inside, markers and all. */
+/**
+ * The span of this kind that a selection sits inside, or is, markers and all.
+ *
+ * The whole span selected is usually caught by the markers at the selection's
+ * ends (see wrapAround), but only for the markers the toolbar writes: `~x~`
+ * is struck through as surely as `~~x~~` and has no `~~` to find.
+ */
 function spanAround(
   spans: readonly InlineSpan[],
   action: FormattingAction,
@@ -285,8 +298,18 @@ function spanAround(
 ): InlineSpan | undefined {
   // A caret is not "in" a span a click could split.
   if (from === to) return undefined;
-  return spans.find((span) => span.action === action && span.textFrom <= from && to <= span.textTo);
+  return spans.find(
+    (span) =>
+      span.action === action &&
+      ((span.textFrom <= from && to <= span.textTo) || (span.from === from && span.to === to)),
+  );
 }
+
+/** The part of a selection that is a span's text, without its markers. */
+const wordsOf = (span: InlineSpan, from: number, to: number) => ({
+  from: Math.max(from, span.textFrom),
+  to: Math.min(to, span.textTo),
+});
 
 const isSpace = (character: string | undefined) => character === undefined || /\s/.test(character);
 const isPunctuation = (character: string | undefined) => !!character && /[\p{P}\p{S}]/u.test(character);
@@ -440,12 +463,13 @@ export function applyFormattingAction(
     const span = spanAround(spans, action, from, to);
     if (span) {
       const opening = span.textFrom - span.from;
+      const words = wordsOf(span, from, to);
       return {
         changes: [
           { from: span.from, to: span.textFrom, insert: '' },
           { from: span.textTo, to: span.to, insert: '' },
         ],
-        selection: { anchor: from - opening, head: to - opening },
+        selection: { anchor: words.from - opening, head: words.to - opening },
       };
     }
     // A link wraps the selection as its text and leaves the destination
@@ -479,7 +503,10 @@ export function applyFormattingAction(
   }
 
   const span = spanAround(spans, action, from, to);
-  if (span) return splitSpan(text, from, to, span);
+  if (span) {
+    const words = wordsOf(span, from, to);
+    return splitSpan(text, words.from, words.to, span);
+  }
 
   // Nothing selected: insert the pair and sit between the markers.
   if (selected.length === 0) {
