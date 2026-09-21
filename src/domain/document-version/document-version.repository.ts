@@ -33,7 +33,7 @@ export const assignmentSelect = {
       type: true,
       labels: true,
       sourceProjectId: true,
-      sourceProject: { select: { id: true, name: true, identifier: true, acronym: true } },
+      sourceProject: { select: { id: true, name: true, slug: true, acronym: true } },
     },
   },
   language: { select: { id: true, name: true, code: true } },

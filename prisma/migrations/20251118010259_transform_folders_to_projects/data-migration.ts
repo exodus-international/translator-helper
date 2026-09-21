@@ -26,10 +26,12 @@ async function main() {
   const folders = await prisma.folder.findMany();
 
   for (const folder of folders) {
+    const segment = folder.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const sourceProject = await prisma.sourceProject.create({
       data: {
         id: folder.id,
-        identifier: folder.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+        slug: segment,
+        repositoryDirectory: segment,
         name: folder.name,
         createdAt: folder.createdAt,
         updatedAt: folder.updatedAt,

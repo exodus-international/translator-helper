@@ -3,7 +3,7 @@ import test from 'node:test';
 import { DocumentType } from '@/generated/prisma/enums';
 import { resolveAudioFilename, resolveAudioObjectKey } from './audio.paths';
 
-const base = { languageCode: 'cs', identifier: 'lent2026', slug: 'some-doc', audioFileId: 'abc-123' };
+const base = { languageCode: 'cs', repositoryDirectory: 'lent2026', slug: 'some-doc', audioFileId: 'abc-123' };
 
 test('DAY audio key mirrors the repo path, nests the record id, ends in a readable filename', () => {
   const key = resolveAudioObjectKey({ ...base, documentType: DocumentType.DAY, originalFilename: '20.md' });

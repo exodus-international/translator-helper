@@ -16,6 +16,7 @@ import { validateFilename } from '@/domain/document/validate-filename';
 import { buildDefaultTitle, dayNumberFromFilename, parseDayNumber } from '@/domain/document/document-title';
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import { slugifyProjectName } from '@/domain/source-project/source-project.form';
 import { capture } from '@/lib/analytics';
 import { parseFrontmatter } from '@/lib/frontmatter';
 import { FileText, Upload } from 'lucide-react';
@@ -42,11 +43,11 @@ function generateSlug(title: string): string {
   return base ? `${base}-${suffix}` : '';
 }
 
-// Mirrors `sourceProjectIdentifier` in source-project.types.ts. Checked here
-// because the Create button is not a submit, so the input's `pattern` never
-// runs, and a server action's zod error reaches production as a generic
-// failure rather than something the user can act on.
-const IDENTIFIER_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// Mirrors `segment` in source-project.types.ts. Checked here because the
+// Create button is not a submit, so the input's `pattern` never runs, and a
+// server action's zod error reaches production as a generic failure rather
+// than something the user can act on.
+const SEGMENT_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
 function extractLabelsFromFrontmatter(frontmatter: Record<string, unknown>): string[] {
   const labels: string[] = [];
@@ -73,7 +74,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [content, setContent] = useState('');
   const [sourceProjectId, setSourceProjectId] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectIdentifier, setNewProjectIdentifier] = useState('');
+  const [newProjectSlug, setNewProjectSlug] = useState('');
   const [showNewProjectInput, setShowNewProjectInput] = useState(false);
   const [labels, setLabels] = useState<string[]>([]);
   const [deadline, setDeadline] = useState('');
@@ -181,21 +182,25 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       toast.warning('Please enter a project name');
       return;
     }
-    const identifier = newProjectIdentifier.trim();
-    if (!identifier) {
-      toast.warning('Please enter a project identifier');
+    const slug = newProjectSlug.trim();
+    if (!slug) {
+      toast.warning('Please enter a URL slug');
       return;
     }
-    if (!IDENTIFIER_PATTERN.test(identifier)) {
-      toast.warning('Identifier can only contain lowercase letters, numbers and single dashes');
+    if (!SEGMENT_PATTERN.test(slug)) {
+      toast.warning('The slug can only contain lowercase letters, numbers and single dashes');
       return;
     }
 
     setCreatingProject(true);
     try {
+      // The shortcut creates a project that deploys, which is what it did when
+      // one field was both the URL and the repo folder. Settings can turn that
+      // off, or point it at a different folder.
       const project = await createSourceProjectAction({
         name: newProjectName.trim(),
-        identifier,
+        slug,
+        repositoryDirectory: slug,
       });
       setSourceProjects([
         ...sourceProjects,
@@ -204,7 +209,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       setSourceProjectId(project.id);
       setShowNewProjectInput(false);
       setNewProjectName('');
-      setNewProjectIdentifier('');
+      setNewProjectSlug('');
       capture('source_project_created', { location: 'document_new' });
     } catch (error: any) {
       console.error('Error creating project:', error);
@@ -357,26 +362,29 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                         <div className="space-y-2">
                           <Input
                             value={newProjectName}
-                            onChange={(e) => setNewProjectName(e.target.value)}
+                            onChange={(e) => {
+                              setNewProjectName(e.target.value);
+                              setNewProjectSlug(slugifyProjectName(e.target.value));
+                            }}
                             placeholder="Enter project name"
                             onKeyDown={handleNewProjectKeyDown}
                           />
                           <Input
-                            value={newProjectIdentifier}
-                            onChange={(e) => setNewProjectIdentifier(e.target.value)}
+                            value={newProjectSlug}
+                            onChange={(e) => setNewProjectSlug(e.target.value)}
                             placeholder="e.g., exodus90, lent2026"
-                            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                            pattern="[a-z0-9]+([-_][a-z0-9]+)*"
                             onKeyDown={handleNewProjectKeyDown}
                           />
                           <p className="text-xs text-muted-foreground">
-                            The identifier is used in document URLs and as the folder name in the content repository.
+                            The slug is the project&apos;s URL, and names its folder in the content repository.
                             Lowercase letters, numbers and dashes.
                           </p>
                           <div className="flex gap-2">
                             <Button
                               type="button"
                               onClick={handleCreateProject}
-                              disabled={creatingProject || !newProjectName.trim() || !newProjectIdentifier.trim()}
+                              disabled={creatingProject || !newProjectName.trim() || !newProjectSlug.trim()}
                             >
                               {creatingProject ? 'Creating...' : 'Create'}
                             </Button>
@@ -386,7 +394,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                               onClick={() => {
                                 setShowNewProjectInput(false);
                                 setNewProjectName('');
-                                setNewProjectIdentifier('');
+                                setNewProjectSlug('');
                               }}
                             >
                               Cancel

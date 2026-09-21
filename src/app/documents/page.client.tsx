@@ -48,7 +48,7 @@ type DocumentWithVersions = {
   type: DocumentType | null;
   originalFilename: string | null;
   sourceProjectId: string | null;
-  sourceProject: { id: string; name: string; identifier: string } | null;
+  sourceProject: { id: string; name: string; slug: string } | null;
   versions: Array<{
     id: string;
     languageId: string;
@@ -159,13 +159,13 @@ export default function DocumentsClient({
     const code = languages.find((l) => l.id === existing?.languageId)?.code ?? languages[0]?.code;
     if (!code) {
       return buildDocumentEditPath({
-        projectIdentifier: doc.sourceProject?.identifier,
+        projectSlug: doc.sourceProject?.slug,
         slug: doc.slug,
         documentId: doc.id,
       });
     }
     return buildDocumentPath({
-      projectIdentifier: doc.sourceProject?.identifier,
+      projectSlug: doc.sourceProject?.slug,
       slug: doc.slug,
       languageCode: code,
       documentId: doc.id,
@@ -391,7 +391,7 @@ export default function DocumentsClient({
 
                       // One URL per language; the status decides which editor opens.
                       const href = buildDocumentPath({
-                        projectIdentifier: doc.sourceProject?.identifier,
+                        projectSlug: doc.sourceProject?.slug,
                         slug: doc.slug,
                         languageCode: lang.code,
                         documentId: doc.id,
@@ -415,7 +415,7 @@ export default function DocumentsClient({
                         <div className="flex justify-end gap-1">
                           <Link
                             href={buildDocumentEditPath({
-                              projectIdentifier: doc.sourceProject?.identifier,
+                              projectSlug: doc.sourceProject?.slug,
                               slug: doc.slug,
                               documentId: doc.id,
                             })}

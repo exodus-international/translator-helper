@@ -21,8 +21,8 @@
  */
 
 export interface DocumentRef {
-  /** SourceProject.identifier, e.g. "exodus90" */
-  projectIdentifier: string | null | undefined;
+  /** SourceProject.slug, e.g. "exodus90" */
+  projectSlug: string | null | undefined;
   /** Document.slug, e.g. "day-1" */
   slug: string;
   /** Language.code, e.g. "cs" */
@@ -34,25 +34,25 @@ export interface DocumentRef {
 /**
  * The canonical path for opening a document in a language.
  *
- * Falls back to the id-based shape when the project has no identifier. That is
+ * Falls back to the id-based shape when the document has no project. That is
  * reachable: Document.sourceProjectId is nullable with onDelete: SetNull, so
  * deleting a project orphans its documents. The legacy route accepts `lang` as
  * either an id or a code and renders the editor in place for such a document,
  * so this path resolves rather than 404s.
  */
 export function buildDocumentPath(ref: DocumentRef): string {
-  if (!ref.projectIdentifier) {
+  if (!ref.projectSlug) {
     return `/documents/${encode(ref.documentId)}/translate?lang=${encode(ref.languageCode)}`;
   }
-  return `/documents/${encode(ref.projectIdentifier)}/${encode(ref.slug)}/${encode(ref.languageCode)}`;
+  return `/documents/${encode(ref.projectSlug)}/${encode(ref.slug)}/${encode(ref.languageCode)}`;
 }
 
 /** The edit form for a document, which is not language-specific. */
-export function buildDocumentEditPath(ref: Pick<DocumentRef, 'projectIdentifier' | 'slug' | 'documentId'>): string {
-  if (!ref.projectIdentifier) {
+export function buildDocumentEditPath(ref: Pick<DocumentRef, 'projectSlug' | 'slug' | 'documentId'>): string {
+  if (!ref.projectSlug) {
     return `/documents/${encode(ref.documentId)}/edit`;
   }
-  return `/documents/${encode(ref.projectIdentifier)}/${encode(ref.slug)}/edit`;
+  return `/documents/${encode(ref.projectSlug)}/${encode(ref.slug)}/edit`;
 }
 
 /**
