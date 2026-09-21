@@ -637,7 +637,7 @@ async function sendPendingEmails(now = new Date(), { ignoreSchedule = false } = 
     const ids = live.map((row) => row.id);
     const pendingIds = { id: { in: ids }, emailStatus: NotificationEmailStatus.PENDING };
 
-    const outcome = await sendEmail({ to: user.email, ...renderDigestEmail(user.name, live, appUrl()) });
+    const outcome = await sendEmail({ to: user.email, ...(await renderDigestEmail(user.name, live, appUrl())) });
     sentThisRun++;
 
     if (outcome.ok) {

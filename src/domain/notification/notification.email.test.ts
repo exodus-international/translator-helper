@@ -49,8 +49,8 @@ describe('isDigestDue', () => {
 describe('renderDigestEmail', () => {
   const appUrl = 'https://translate.example.org';
 
-  it('uses a lone notification as the subject and links it absolutely', () => {
-    const email = renderDigestEmail(
+  it('uses a lone notification as the subject and links it absolutely', async () => {
+    const email = await renderDigestEmail(
       'Ana Horvat',
       [
         {
@@ -69,16 +69,16 @@ describe('renderDigestEmail', () => {
     assert.match(email.text, /https:\/\/translate\.example\.org\/profile#notifications/);
   });
 
-  it('counts several notifications in the subject', () => {
+  it('counts several notifications in the subject', async () => {
     const items = [
       { type: 'UNASSIGNED' as const, title: 'One', body: null, url: null },
       { type: 'UNASSIGNED' as const, title: 'Two', body: null, url: null },
     ];
-    assert.equal(renderDigestEmail('Ana', items, appUrl).subject, '2 updates in Translation Helper');
+    assert.equal((await renderDigestEmail('Ana', items, appUrl)).subject, '2 updates in Translation Helper');
   });
 
-  it('escapes what users typed', () => {
-    const email = renderDigestEmail(
+  it('escapes what users typed', async () => {
+    const email = await renderDigestEmail(
       'Ana',
       [{ type: 'SUGGESTION_ADDED', title: '<script>x</script>', body: 'a & b', url: null }],
       appUrl,
@@ -88,8 +88,8 @@ describe('renderDigestEmail', () => {
     assert.match(email.html, /a &amp; b/);
   });
 
-  it('puts late work first and says so in the subject', () => {
-    const email = renderDigestEmail(
+  it('puts late work first and says so in the subject', async () => {
+    const email = await renderDigestEmail(
       'Ana',
       [
         { type: 'ASSIGNED_TRANSLATOR', title: 'Assigned', body: null, url: null },
@@ -103,8 +103,12 @@ describe('renderDigestEmail', () => {
     assert.match(email.html, /Open now/);
   });
 
-  it('leads with the deadline when that is all there is', () => {
-    const email = renderDigestEmail('Ana', [{ type: 'DEADLINE_PASSED', title: 'Late', body: null, url: null }], appUrl);
+  it('leads with the deadline when that is all there is', async () => {
+    const email = await renderDigestEmail(
+      'Ana',
+      [{ type: 'DEADLINE_PASSED', title: 'Late', body: null, url: null }],
+      appUrl,
+    );
     assert.match(email.text, /A deadline has passed\./);
   });
 });
