@@ -552,9 +552,9 @@ interface EmailSweepResult {
 }
 
 /**
- * Sends one digest per person whose pending notifications have settled. What
+ * Sends each person their daily digest once noon (CET) has passed. What
  * cannot go out now stays pending for the next run; what keeps failing, or has
- * waited three days, is given up on.
+ * waited 36 hours, is given up on.
  */
 export async function sendPendingEmails(now = new Date()): Promise<EmailSweepResult> {
   const result: EmailSweepResult = { sent: 0, failed: 0, waiting: 0, dropped: 0, rateLimited: false };
@@ -681,7 +681,7 @@ const SWEEP_LOCK_KEY = 7_140_211;
 
 /**
  * One scheduled run: reminders first, so a reminder created now can make this
- * run's digest once it has settled. Overlapping runs would email the same
+ * run's digest when it runs at noon. Overlapping runs would email the same
  * digest twice, so a run that finds another one still going does nothing.
  */
 export async function runNotificationSweep(now = new Date()) {

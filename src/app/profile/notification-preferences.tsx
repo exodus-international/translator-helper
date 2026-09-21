@@ -38,8 +38,8 @@ export function NotificationPreferences({ emailConfigured, preferences }: Notifi
       <CardHeader>
         <CardTitle>Email notifications</CardTitle>
         <CardDescription>
-          Everything shows under the bell in the app. Choose what also comes by email; several updates close together
-          arrive as one email.
+          Everything shows under the bell in the app straight away. Choose what also comes by email: one summary a day,
+          at noon Central European Time.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

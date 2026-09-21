@@ -1,27 +1,59 @@
 import type { NotificationType } from '@/generated/prisma/enums';
 import { NOTIFICATION_CATALOG, TONE_ORDER } from './notification.catalog';
 
-const MINUTE = 60 * 1000;
-
-/** How long a burst of activity must go quiet before its digest is sent. */
-export const DIGEST_QUIET_PERIOD = 5 * MINUTE;
-/** The longest a notification waits for a busy burst to go quiet. */
-export const DIGEST_MAX_WAIT = 30 * MINUTE;
-/** Older unsent notifications are dropped from email, not sent days late. */
-export const EMAIL_MAX_AGE = 3 * 24 * 60 * MINUTE;
+const HOUR = 60 * 60 * 1000;
 
 /**
- * Whether a user's pending notifications should go out now. A manager
- * assigning thirty documents produces thirty notifications in a minute; waiting
- * for the burst to settle turns them into one email instead of thirty, which
- * also keeps the whole team inside a small daily sending quota.
+ * Email goes out once a day, at noon Central European Time, as one digest per
+ * person. The zone follows the clocks (CET in winter, CEST in summer), so the
+ * digest always lands at 12:00 on the team's wall clock.
+ */
+export const DIGEST_TIME_ZONE = 'Europe/Zagreb';
+export const DIGEST_HOUR = 12;
+/** Unsent notifications older than this are dropped rather than emailed a day late. */
+export const EMAIL_MAX_AGE = 36 * HOUR;
+
+/** How far `timeZone`'s wall clock is ahead of UTC at `date`. */
+function zoneOffset(date: Date, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+      .formatToParts(date)
+      .map((part) => [part.type, part.value]),
+  );
+  const wallClock = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return wallClock - Math.floor(date.getTime() / 1000) * 1000;
+}
+
+/** The latest digest time at or before `now`: today's noon, or yesterday's if it is still morning. */
+export function lastDigestTime(now: Date): Date {
+  const local = new Date(now.getTime() + zoneOffset(now, DIGEST_TIME_ZONE));
+  const noonOn = (dayOffset: number) => {
+    const wallNoon = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + dayOffset, DIGEST_HOUR);
+    // Clocks change at night, so the offset at noon is the offset all afternoon.
+    return new Date(wallNoon - zoneOffset(new Date(wallNoon), DIGEST_TIME_ZONE));
+  };
+  const today = noonOn(0);
+  return today <= now ? today : noonOn(-1);
+}
+
+/**
+ * Whether a person's pending notifications should be emailed now: once
+ * anything of theirs was waiting at the last noon. What arrives after noon
+ * waits for the next one, so nobody gets more than one digest a day, and a
+ * send that failed is simply retried by the next sweep.
  */
 export function isDigestDue(createdAts: Date[], now: Date): boolean {
-  if (createdAts.length === 0) return false;
-  const times = createdAts.map((date) => date.getTime());
-  const newest = Math.max(...times);
-  const oldest = Math.min(...times);
-  return now.getTime() - newest >= DIGEST_QUIET_PERIOD || now.getTime() - oldest >= DIGEST_MAX_WAIT;
+  const slot = lastDigestTime(now);
+  return createdAts.some((createdAt) => createdAt <= slot);
 }
 
 export interface DigestItem {
@@ -186,7 +218,7 @@ function renderItem(item: DigestItem, appUrl: string): string {
     action: `background:${BRAND.black};color:${BRAND.white}`,
     info: `background:${BRAND.canvas};color:${BRAND.muted}`,
   }[tone];
-  const tag = `<span style="display:inline-block;padding:4px 8px;${tagColors};font-family:${BRAND.display};font-size:10px;line-height:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase">${escapeHtml(label)}</span>`;
+  const tag = `<span style="display:inline-block;padding:4px 8px;${tagColors};font-family:${BRAND.display};font-size:10px;line-height:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;white-space:nowrap">${escapeHtml(label)}</span>`;
 
   const title = escapeHtml(item.title);
   const href = item.url ? escapeHtml(absolute(appUrl, item.url)) : null;
@@ -199,8 +231,8 @@ function renderItem(item: DigestItem, appUrl: string): string {
   const open = !href
     ? ''
     : dark
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px"><tr><td bgcolor="${BRAND.orange}" style="background:${BRAND.orange}"><a href="${href}" style="display:inline-block;padding:10px 18px;font-family:${BRAND.display};font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${BRAND.white};text-decoration:none">Open now &rarr;</a></td></tr></table>`
-      : `<div style="margin-top:12px"><a href="${href}" style="font-family:${BRAND.display};font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${BRAND.black};text-decoration:none">Open <span style="color:${BRAND.orange}">&rarr;</span></a></div>`;
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px"><tr><td bgcolor="${BRAND.orange}" style="background:${BRAND.orange}"><a href="${href}" style="display:inline-block;padding:10px 18px;font-family:${BRAND.display};font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${BRAND.white};text-decoration:none;white-space:nowrap">Open now &rarr;</a></td></tr></table>`
+      : `<div style="margin-top:12px"><a href="${href}" style="font-family:${BRAND.display};font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${BRAND.black};text-decoration:none;white-space:nowrap">Open <span style="color:${BRAND.orange}">&rarr;</span></a></div>`;
 
   return `<tr><td style="padding:0 0 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="${bgcolor}" style="${card};padding:20px">

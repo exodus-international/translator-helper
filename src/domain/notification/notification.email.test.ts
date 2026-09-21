@@ -1,25 +1,48 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DIGEST_MAX_WAIT, DIGEST_QUIET_PERIOD, isDigestDue, renderDigestEmail } from './notification.email';
+import { isDigestDue, lastDigestTime, renderDigestEmail } from './notification.email';
 
-const now = new Date('2026-09-21T12:00:00Z');
-const ago = (ms: number) => new Date(now.getTime() - ms);
+describe('lastDigestTime', () => {
+  it('is today at noon CET once noon has passed', () => {
+    // Winter: CET is UTC+1, so noon is 11:00 UTC.
+    assert.equal(lastDigestTime(new Date('2026-01-15T13:00:00Z')).toISOString(), '2026-01-15T11:00:00.000Z');
+  });
+
+  it('is yesterday at noon while it is still morning', () => {
+    assert.equal(lastDigestTime(new Date('2026-01-15T10:59:00Z')).toISOString(), '2026-01-14T11:00:00.000Z');
+  });
+
+  it('follows summer time', () => {
+    // Summer: CEST is UTC+2, so noon is 10:00 UTC.
+    assert.equal(lastDigestTime(new Date('2026-07-01T10:00:00Z')).toISOString(), '2026-07-01T10:00:00.000Z');
+  });
+
+  it('crosses a clock change', () => {
+    // Clocks go forward early on 29 March 2026; noon the day before was still CET.
+    assert.equal(lastDigestTime(new Date('2026-03-29T09:00:00Z')).toISOString(), '2026-03-28T11:00:00.000Z');
+    assert.equal(lastDigestTime(new Date('2026-03-29T10:00:00Z')).toISOString(), '2026-03-29T10:00:00.000Z');
+  });
+});
 
 describe('isDigestDue', () => {
-  it('waits while nothing is pending', () => {
-    assert.equal(isDigestDue([], now), false);
+  const noon = new Date('2026-01-15T11:00:00Z');
+
+  it('waits for noon', () => {
+    assert.equal(isDigestDue([new Date('2026-01-15T08:00:00Z')], new Date('2026-01-15T10:59:00Z')), false);
   });
 
-  it('waits while the burst is still going', () => {
-    assert.equal(isDigestDue([ago(DIGEST_QUIET_PERIOD - 1), ago(60_000)], now), false);
+  it('sends what was waiting at noon', () => {
+    assert.equal(isDigestDue([new Date('2026-01-15T08:00:00Z')], new Date('2026-01-15T11:05:00Z')), true);
   });
 
-  it('sends once the newest notification has gone quiet', () => {
-    assert.equal(isDigestDue([ago(DIGEST_QUIET_PERIOD), ago(DIGEST_QUIET_PERIOD + 60_000)], now), true);
+  it('holds what arrived after noon until the next day', () => {
+    const afternoon = new Date('2026-01-15T14:00:00Z');
+    assert.equal(isDigestDue([afternoon], new Date('2026-01-15T18:00:00Z')), false);
+    assert.equal(isDigestDue([afternoon], new Date('2026-01-16T11:00:00Z')), true);
   });
 
-  it('sends a burst that never goes quiet after the maximum wait', () => {
-    assert.equal(isDigestDue([ago(DIGEST_MAX_WAIT), ago(1_000)], now), true);
+  it('is never due with nothing pending', () => {
+    assert.equal(isDigestDue([], noon), false);
   });
 });
 

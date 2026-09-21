@@ -41,13 +41,20 @@ app anyway.
 
 ## Email
 
-Emails are digests: notifications for one person are gathered and sent as one
-message once nothing new has arrived for 5 minutes, or 30 minutes after the
-oldest one at the latest. Reading a notification in the app before then
-cancels its email. Emails older than 3 days are dropped rather than sent late.
+Email is one daily digest per person, sent at noon Central European Time
+(`Europe/Zagreb`: CET in winter, CEST in summer, so always 12:00 on the clock).
+It holds everything that was waiting at noon; what arrives in the afternoon
+waits for the next day's digest, so nobody gets more than one email a day.
+The bell shows everything straight away. Reading a notification in the app
+before noon takes it out of the email. Anything unsent after 36 hours is
+dropped rather than sent a day late.
 
-Each sweep sends at most 25 emails, 600 ms apart, retries a failed send up to 5
-times, and stops for the run when the provider says it is rate limited.
+The sweep still runs every 5 minutes for the in-app reminders; only the first
+runs after noon send email. Each sweep sends at most 25 emails, 600 ms apart,
+so a larger team is emailed over the next few runs. A failed send is retried by
+the next sweep, up to 5 times, and a rate-limited provider stops the run.
+The time and zone are `DIGEST_HOUR` and `DIGEST_TIME_ZONE` in
+`src/domain/notification/notification.email.ts`.
 
 ### Look
 
@@ -131,13 +138,14 @@ were that moment, so reminders and digests don't need waiting for:
 curl -X POST -H "Authorization: Bearer local-sweep-secret" "http://localhost:4000/api/notifications/sweep?now=2026-09-25T09:00:00Z"
 ```
 
-Pick a `now` at least 5 minutes after the notifications were created, or the
+Pick a `now` after the next noon (CET) following the notifications, e.g.
+`2026-09-22T11:00:00Z` for anything created on 21 September; before that the
 digest reports them as `waiting`. The bell shows them straight away.
 
 To see missed deadlines, pick a `now` after a seeded deadline (they fall in
 early October): the first run creates the overdue reminders and escalations,
-and each email is sent by the same run because the pretend time is already
-past their quiet period. Reminders made this way are real rows dated from a
+and the same run emails them when the pretend time is after noon (CET) on a
+later day than they were created. Reminders made this way are real rows dated from a
 pretend future. They show in the bell and, because each reminder is sent once,
 they stop the real ones from being created later. Clear them when done:
 
