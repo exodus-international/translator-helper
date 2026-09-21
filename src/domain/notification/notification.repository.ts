@@ -2,7 +2,7 @@ import prisma from '@/lib/db';
 import { Prisma } from '@/generated/prisma/client';
 import { NotificationEmailStatus, NotificationType } from '@/generated/prisma/enums';
 
-export const INBOX_PAGE_SIZE = 30;
+const INBOX_PAGE_SIZE = 30;
 
 const inboxSelect = {
   id: true,

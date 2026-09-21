@@ -427,7 +427,7 @@ interface StageDeadline {
  * naming its deadline, so a rerun creates nothing new and a moved deadline
  * starts its reminders over.
  */
-export async function sweepDeadlines(now = new Date()): Promise<{ checked: number; created: number }> {
+async function sweepDeadlines(now = new Date()): Promise<{ checked: number; created: number }> {
   // Wide enough for a bare date (due at the end of its day) three days out,
   // and for weekly overdue reminders on work up to three months late.
   const window = { gte: new Date(now.getTime() - 90 * DAY), lte: new Date(now.getTime() + 4 * DAY) };
@@ -556,7 +556,7 @@ interface EmailSweepResult {
  * cannot go out now stays pending for the next run; what keeps failing, or has
  * waited 36 hours, is given up on.
  */
-export async function sendPendingEmails(now = new Date()): Promise<EmailSweepResult> {
+async function sendPendingEmails(now = new Date()): Promise<EmailSweepResult> {
   const result: EmailSweepResult = { sent: 0, failed: 0, waiting: 0, dropped: 0, rateLimited: false };
 
   if (!isEmailConfigured()) {

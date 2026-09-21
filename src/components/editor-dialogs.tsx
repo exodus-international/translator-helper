@@ -1,6 +1,6 @@
 'use client';
 
-import { UserSelect, type SelectableUser } from '@/components/user-select';
+import { UserSelect } from '@/components/user-select';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -260,4 +260,3 @@ export function EditorDialogs() {
   );
 }
 
-export type { SelectableUser };

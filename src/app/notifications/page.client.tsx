@@ -109,16 +109,10 @@ export default function NotificationsClient({ initial }: { initial: Page }) {
         title="Notifications"
         description={unread === 0 ? 'You are all caught up.' : `${unread} unread`}
         actions={
-          <>
-            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/profile#notifications" />}>
-              <Mail data-icon="inline-start" />
-              Email settings
-            </Button>
-            <Button variant="outline" size="sm" disabled={unread === 0} onClick={() => markRead()}>
-              <CheckCheck data-icon="inline-start" />
-              Mark all read
-            </Button>
-          </>
+          <Button variant="outline" size="sm" disabled={unread === 0} onClick={() => markRead()}>
+            <CheckCheck data-icon="inline-start" />
+            Mark all read
+          </Button>
         }
       >
         <Tabs value={filter} onValueChange={(value) => changeFilter(value as Filter)}>
@@ -183,6 +177,17 @@ export default function NotificationsClient({ initial }: { initial: Page }) {
             </Button>
           </div>
         )}
+
+        <p className="text-center text-sm text-balance text-muted-foreground">
+          <Mail aria-hidden className="mr-1.5 inline size-4 align-[-3px]" />
+          Email arrives once a day, at noon{'\u00a0'}CET.{' '}
+          <Link
+            href="/profile#notifications"
+            className="font-medium whitespace-nowrap text-foreground underline-offset-4 hover:underline"
+          >
+            Choose which emails you get
+          </Link>
+        </p>
       </div>
     </>
   );

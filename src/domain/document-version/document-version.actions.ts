@@ -173,28 +173,6 @@ export async function listVersionsForTranslationProjectAction(translationProject
   return await listVersionsForTranslationProject(translationProject.sourceProjectId, translationProject.languageId);
 }
 
-export async function createDocumentVersionAction(input: unknown) {
-  const { user } = await authorize('authenticated');
-  const validated = createDocumentVersionSchema.parse(input);
-
-  const version = await createDocumentVersion({
-    documentId: validated.documentId,
-    languageId: validated.languageId,
-    content: validated.content,
-    userId: user.id,
-  });
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'created_translation',
-    details: { language: version.language.name },
-  });
-
-  return version;
-}
-
 export async function updateDocumentVersionAction(id: string, input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = updateDocumentVersionSchema.parse(input);

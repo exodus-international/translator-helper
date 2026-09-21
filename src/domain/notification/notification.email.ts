@@ -8,8 +8,8 @@ const HOUR = 60 * 60 * 1000;
  * person. The zone follows the clocks (CET in winter, CEST in summer), so the
  * digest always lands at 12:00 on the team's wall clock.
  */
-export const DIGEST_TIME_ZONE = 'Europe/Zagreb';
-export const DIGEST_HOUR = 12;
+const DIGEST_TIME_ZONE = 'Europe/Zagreb';
+const DIGEST_HOUR = 12;
 /** Unsent notifications older than this are dropped rather than emailed a day late. */
 export const EMAIL_MAX_AGE = 36 * HOUR;
 
