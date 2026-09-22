@@ -84,9 +84,11 @@ export function createEditorApi(view: EditorView): EditorApi {
     revealLineIfOutsideViewport(line) {
       const offset = positionToOffset(view, line, 1);
       const block = view.lineBlockAt(offset);
-      const { top, bottom } = view.scrollDOM.getBoundingClientRect();
-      const visible =
-        block.top >= view.scrollDOM.scrollTop && block.bottom <= view.scrollDOM.scrollTop + (bottom - top);
+      // In screen pixels: block heights start at the document, which sits
+      // below the editor's top padding, not at the scroller's edge.
+      const top = view.scrollDOM.getBoundingClientRect().top;
+      const lineTop = view.documentTop + block.top;
+      const visible = lineTop >= top && lineTop + block.height <= top + view.scrollDOM.clientHeight;
       if (!visible) reveal(view, offset);
     },
     revealRange(range) {

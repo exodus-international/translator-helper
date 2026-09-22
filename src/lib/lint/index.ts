@@ -21,12 +21,17 @@ export interface LintOptions {
   disabled?: string[];
 }
 
-export function lintDocument(context: LintContext, options: LintOptions = {}): LintDiagnostic[] {
+export function lintDocument(input: LintContext, options: LintOptions = {}): LintDiagnostic[] {
   const { rules = allRules, disabled = [] } = options;
   const diagnostics: LintDiagnostic[] = [];
+  const context = input.isSource ? { ...input, source: input.text } : input;
 
   for (const rule of rules) {
     if (disabled.includes(rule.id)) continue;
+    // The source has no source. Compared with the saved copy of itself, an
+    // edit read as a translation, and every heading it had not changed as
+    // "still the English one".
+    if (rule.requiresSource && context.isSource) continue;
     if (rule.requiresSource && !context.source) continue;
     // The mirror of the line above. A parity rule compares this document
     // against its source, so with nothing typed on this side there is nothing
