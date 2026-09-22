@@ -3,7 +3,7 @@ import { Alegreya, Geist, Geist_Mono } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { getCurrentUser } from '@/lib/session';
-import { countUserTargetLanguages } from '@/domain/user-language/user-language.repository';
+import { countManagedLanguages, countUserTargetLanguages } from '@/domain/user-language/user-language.repository';
 import { SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { AppShell } from '@/components/app-shell';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -73,8 +73,14 @@ export default async function RootLayout({
   // The AI instructions entry is for people with a language to instruct, which
   // is every admin and anyone assigned to one. This runs on every request for
   // every signed-in user, so it asks for a number rather than the rows.
-  const canReadInstructions =
-    !!user && (user.role === 'ADMIN' || (await countUserTargetLanguages(user.id)) > 0);
+  const isAdmin = user?.role === 'ADMIN';
+  const [instructionLanguages, managedLanguages] = user
+    ? await Promise.all([countUserTargetLanguages(user.id), countManagedLanguages(user.id)])
+    : [0, 0];
+  const canReadInstructions = !!user && (isAdmin || instructionLanguages > 0);
+  // A manager reaches their languages from the same entry an admin does; the
+  // index shows them only what they manage.
+  const canSeeLanguages = !!user && (isAdmin || managedLanguages > 0);
   // First paint already has the width the user last chose.
   const sidebarOpen = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value !== 'false';
 
@@ -84,7 +90,12 @@ export default async function RootLayout({
         <ThemeProvider>
           <PostHogProvider user={user}>
             <NuqsAdapter>
-              <AppShell user={user} canReadInstructions={canReadInstructions} defaultOpen={sidebarOpen}>
+              <AppShell
+                user={user}
+                canReadInstructions={canReadInstructions}
+                canSeeLanguages={canSeeLanguages}
+                defaultOpen={sidebarOpen}
+              >
                 {children}
               </AppShell>
               {/* Signed-in users get these two links in the sidebar footer instead. */}

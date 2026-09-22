@@ -51,7 +51,7 @@ export function languageHealth(language: LanguageHealthInput): LanguageHealthPil
   pills.push(
     language.managerNames.length > 0
       ? { key: 'manager', state: 'ok', label: `Manager: ${language.managerNames[0]}` }
-      : { key: 'manager', state: 'missing', label: 'No project manager', detail: 'nobody can manage this language' },
+      : { key: 'manager', state: 'missing', label: 'No language manager', detail: 'nobody can manage this language' },
   );
 
   pills.push(

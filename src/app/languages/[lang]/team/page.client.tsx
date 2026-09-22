@@ -29,11 +29,13 @@ interface Member {
 
 interface LanguageTeamClientProps {
   language: { id: string; code: string; name: string };
+  /** Settings are administration; the tab is not shown to a manager. */
+  canAdminister: boolean;
   members: Member[];
   users: { id: string; name: string; email: string }[];
 }
 
-export default function LanguageTeamClient({ language, members, users }: LanguageTeamClientProps) {
+export default function LanguageTeamClient({ language, canAdminister, members, users }: LanguageTeamClientProps) {
   const router = useRouter();
   const [addOpen, setAddOpen] = useState(false);
   const [newUserId, setNewUserId] = useState('');
@@ -185,7 +187,7 @@ export default function LanguageTeamClient({ language, members, users }: Languag
           </Dialog>
         }
       >
-        <LanguageTabs code={language.code} memberCount={members.length} />
+        <LanguageTabs code={language.code} memberCount={members.length} includeSettings={canAdminister} />
       </PageHeader>
 
       <div className="flex flex-col gap-4 px-4 py-4">
@@ -193,7 +195,7 @@ export default function LanguageTeamClient({ language, members, users }: Languag
           <div className="border-warning/40 bg-warning/10 flex items-start gap-2.5 rounded-lg border px-3 py-2.5">
             <TriangleAlert className="text-warning mt-0.5 size-4 shrink-0" aria-hidden />
             <p className="text-warning text-xs">
-              <span className="font-semibold">No project manager.</span> Nobody can manage {language.name} until
+              <span className="font-semibold">No language manager.</span> Nobody can manage {language.name} until
               someone here is given that role.
             </p>
           </div>
@@ -271,7 +273,7 @@ export default function LanguageTeamClient({ language, members, users }: Languag
           </DialogHeader>
           <div className="mt-2 space-y-3 text-sm">
             <p>
-              {demoting?.member.user.name} is the only Project Manager in {language.name}. Making them{' '}
+              {demoting?.member.user.name} is the only Language Manager in {language.name}. Making them{' '}
               {demoting && `a ${PROJECT_ROLE_LABELS[demoting.role]}`} leaves nobody who can manage it — no deploys, no
               assignments, until someone is promoted.
             </p>
@@ -311,7 +313,7 @@ export default function LanguageTeamClient({ language, members, users }: Languag
             )}
             {removing && isLastManager(removing) && (
               <p className="text-warning">
-                They are the only Project Manager. Removing them leaves nobody who can manage {language.name}.
+                They are the only Language Manager. Removing them leaves nobody who can manage {language.name}.
               </p>
             )}
             <p className="text-muted-foreground">

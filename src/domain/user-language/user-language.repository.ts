@@ -173,6 +173,11 @@ export async function countUserTargetLanguages(userId: string): Promise<number> 
   return prisma.userLanguage.count({ where: { userId, language: { isSource: false } } });
 }
 
+/** Whether this person manages any language, for the sidebar's Languages entry. */
+export async function countManagedLanguages(userId: string): Promise<number> {
+  return prisma.userLanguage.count({ where: { userId, role: ProjectRole.PROJECT_MANAGER } });
+}
+
 /**
  * A language's roster. The language-scoped read the team page needs: the
  * project-scoped `listTranslationProjectMembers` answers the same question

@@ -36,7 +36,7 @@ describe('languageHealth', () => {
     assert.deepEqual(pill, {
       key: 'manager',
       state: 'missing',
-      label: 'No project manager',
+      label: 'No language manager',
       detail: 'nobody can manage this language',
     });
   });
@@ -107,7 +107,7 @@ describe('languageHealth', () => {
 
     assert.deepEqual(pills.map((pill) => pill.label), [
       'No members',
-      'No project manager',
+      'No language manager',
       'No GitHub branch',
       'No voice',
       'No AI instructions',

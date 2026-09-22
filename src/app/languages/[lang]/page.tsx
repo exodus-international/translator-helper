@@ -2,6 +2,8 @@ import { notFound, redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { getLanguageByCode, getLanguageProgress } from '@/domain/language/language.repository';
 import { ProjectRole } from '@/generated/prisma/enums';
+import { canAdministerLanguages, canViewLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
+import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { languageHealth } from '@/domain/language/language-health';
 import { listLanguageMembers } from '@/domain/user-language/user-language.repository';
 import LanguageOverviewClient from './page.client';
@@ -18,15 +20,20 @@ export default async function LanguageOverviewPage({ params }: { params: Promise
     redirect('/login');
   }
 
-  if (user.role !== 'ADMIN') {
-    redirect('/dashboard');
-  }
-
   const { lang } = await params;
   const language = await getLanguageByCode(lang);
 
   if (!language) {
     notFound();
+  }
+
+  const viewer = resolveLanguageViewer({
+    isAdmin: user.role === 'ADMIN',
+    memberships: user.role === 'ADMIN' ? [] : await getUserLanguages(user.id),
+  });
+
+  if (!canViewLanguage(viewer, language.id)) {
+    redirect('/dashboard');
   }
 
   // Nothing is translated into the source language, so there is no progress to
@@ -42,6 +49,7 @@ export default async function LanguageOverviewPage({ params }: { params: Promise
   return (
     <LanguageOverviewClient
       language={{ code: language.code, name: language.name }}
+      canAdminister={canAdministerLanguages(viewer)}
       progress={progress}
       lastDeployAt={progress.lastDeployAt?.toISOString() ?? null}
       pills={languageHealth({
