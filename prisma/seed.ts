@@ -14,6 +14,7 @@ import {
   SUGGESTIONS,
   TARGET_VERSIONS,
   USERS,
+  INVITE_TOKEN,
   daysAgo,
   daysFromNow,
 } from './seed-data/datasets';
@@ -42,6 +43,8 @@ async function cleanup() {
     prisma.folder.deleteMany(),
     prisma.session.deleteMany(),
     prisma.account.deleteMany(),
+    prisma.invitationLanguage.deleteMany(),
+    prisma.invitation.deleteMany(),
     prisma.verification.deleteMany(),
     prisma.user.deleteMany(),
   ]);
@@ -563,6 +566,25 @@ async function seedLanguageScenarios(langs: Record<string, string>, users: Recor
 // Main
 // ---------------------------------------------------------------------------
 
+/**
+ * A ready-made invitation, so the registration flow can be exercised without
+ * an admin first creating one by hand. The token is fixed rather than random
+ * for the same reason the passwords are: a fixture you can type.
+ */
+async function seedInvitation(users: Record<string, string>, langs: Record<string, string>) {
+  const invitation = await prisma.invitation.create({
+    data: {
+      token: INVITE_TOKEN,
+      maxUses: null, // unlimited: re-running a test must not exhaust it
+      expiresAt: daysFromNow(365),
+      createdById: users.admin1,
+      languages: { create: [{ languageId: langs.sk }] },
+    },
+  });
+  console.log(`Invitation ${invitation.token} (Slovak, unlimited)`);
+  return invitation;
+}
+
 async function main() {
   console.log('Starting comprehensive database seeding...\n');
 
@@ -579,6 +601,7 @@ async function main() {
   await seedActivityLogs(versions, users);
   await seedComments(versions, users);
   await seedLanguageScenarios(langs, users);
+  await seedInvitation(users, langs);
 
   console.log('\n=== Database seeding completed! ===\n');
   console.log('Login credentials:');
@@ -588,6 +611,7 @@ async function main() {
   console.log('  Translator 2: translator2@example.org / Hello123456');
   console.log('  Reviewer:     reviewer@example.org / Hello123456');
   console.log('  Banned:       banned@example.org / Hello123456');
+  console.log(`\nOpen invitation: /register/${INVITE_TOKEN}`);
 }
 
 main()

@@ -479,3 +479,9 @@ export const COMMENTS: { versionKey: string; userKey: string; content: string }[
   { versionKey: 'le-d20:cs', userKey: 'translator1', content: 'I have some questions about the liturgical terminology — see the suggestion thread.' },
   { versionKey: 'ex-d1:sk', userKey: 'reviewer1', content: 'Good work on the Slovak translation. One term updated.' },
 ];
+
+/**
+ * Token for the seeded open invitation. Fixed so the registration flow can be
+ * driven without an admin creating one first.
+ */
+export const INVITE_TOKEN = 'seed-invite-open-sk';
