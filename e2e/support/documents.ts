@@ -15,13 +15,13 @@ import { buildDocumentPath } from '@/domain/document/document-url';
  * has sk and hr.
  */
 const SEEDED = [
-  { title: 'Day 14 - The Desert', projectIdentifier: 'exodus90', slug: 'ex90-day-14', languageCode: 'sk' },
-  { title: 'Friday of the First Week', projectIdentifier: 'lent2026', slug: 'lent-day-5', languageCode: 'sk' },
-  { title: 'Palm Sunday Meditation', projectIdentifier: 'lent2026', slug: 'lent-palm-sunday', languageCode: 'cs' },
-  { title: 'Day 45 - Midpoint Reflection', projectIdentifier: 'exodus90', slug: 'ex90-day-45', languageCode: 'cs' },
-  { title: 'Day 2 - Discipline of Prayer', projectIdentifier: 'exodus90', slug: 'ex90-day-2', languageCode: 'sk' },
-  { title: 'Day 1 - The Call', projectIdentifier: 'exodus90', slug: 'ex90-day-1', languageCode: 'hr' },
-  { title: 'Day 3 - Fasting and Freedom', projectIdentifier: 'exodus90', slug: 'ex90-day-3', languageCode: 'cs' },
+  { title: 'Day 14 - The Desert', projectSlug: 'exodus90', slug: 'ex90-day-14', languageCode: 'sk' },
+  { title: 'Friday of the First Week', projectSlug: 'lent2026', slug: 'lent-day-5', languageCode: 'sk' },
+  { title: 'Palm Sunday Meditation', projectSlug: 'lent2026', slug: 'lent-palm-sunday', languageCode: 'cs' },
+  { title: 'Day 45 - Midpoint Reflection', projectSlug: 'exodus90', slug: 'ex90-day-45', languageCode: 'cs' },
+  { title: 'Day 2 - Discipline of Prayer', projectSlug: 'exodus90', slug: 'ex90-day-2', languageCode: 'sk' },
+  { title: 'Day 1 - The Call', projectSlug: 'exodus90', slug: 'ex90-day-1', languageCode: 'hr' },
+  { title: 'Day 3 - Fasting and Freedom', projectSlug: 'exodus90', slug: 'ex90-day-3', languageCode: 'cs' },
 ] as const;
 
 const LANGUAGE_CODES: Record<string, string> = {
