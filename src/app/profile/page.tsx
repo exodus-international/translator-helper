@@ -1,3 +1,4 @@
+import { getEmailPreferencesAction } from '@/domain/notification/notification.actions';
 import { getUserProfileAction } from '@/domain/user/user.actions';
 import { isObjectStorageConfigured } from '@/lib/object-storage';
 import { getCurrentUser } from '@/lib/session';
@@ -11,7 +12,13 @@ export default async function ProfilePage() {
     redirect('/login');
   }
 
-  const profile = await getUserProfileAction();
+  const [profile, notificationPreferences] = await Promise.all([getUserProfileAction(), getEmailPreferencesAction()]);
 
-  return <ProfileClient profile={profile!} avatarUploadEnabled={isObjectStorageConfigured()} />;
+  return (
+    <ProfileClient
+      profile={profile!}
+      avatarUploadEnabled={isObjectStorageConfigured()}
+      notificationPreferences={notificationPreferences}
+    />
+  );
 }

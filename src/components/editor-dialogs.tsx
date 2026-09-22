@@ -1,6 +1,6 @@
 'use client';
 
-import { UserSelect, type SelectableUser } from '@/components/user-select';
+import { UserSelect } from '@/components/user-select';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -147,9 +147,10 @@ function AssignReviewerForm({ candidates }: { candidates: MemberInfo[] }) {
   const targetVersion = useEditorStore((s) => s.targetVersion);
   const isAssigning = useDialogLoading('assignReviewer');
   const [userId, setUserId] = useState(targetVersion?.reviewer?.id ?? '');
+  const [reviewDeadline, setReviewDeadline] = useState(toDateInputValue(targetVersion?.reviewDeadline));
 
   const handleAssign = async () => {
-    await assignReviewer(userId);
+    await assignReviewer(userId, reviewDeadline || undefined);
   };
 
   return (
@@ -173,6 +174,19 @@ function AssignReviewerForm({ candidates }: { candidates: MemberInfo[] }) {
               current={targetVersion?.reviewer ?? null}
               placeholder="Select reviewer..."
             />
+          </div>
+          <div>
+            <Label htmlFor="review-deadline">Review deadline (optional)</Label>
+            <Input
+              id="review-deadline"
+              type="date"
+              value={reviewDeadline}
+              onChange={(e) => setReviewDeadline(e.target.value)}
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Without one, the review is held to the document&apos;s deadline.
+            </p>
           </div>
           <Button onClick={handleAssign} disabled={!userId || isAssigning} className="w-full">
             {isAssigning ? 'Assigning...' : 'Assign Reviewer'}
@@ -246,4 +260,3 @@ export function EditorDialogs() {
   );
 }
 
-export type { SelectableUser };

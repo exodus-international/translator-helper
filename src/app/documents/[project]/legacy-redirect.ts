@@ -13,16 +13,16 @@ import { notFound, redirect } from 'next/navigation';
  *   /documents/{documentId}/edit
  *
  * A 307 rather than a permanent redirect on purpose: the target is built from
- * the project identifier and the document slug, and an admin can change the
- * identifier. A 308 would be cached by the browser indefinitely and keep
- * sending people to a path that no longer exists.
+ * the project slug and the document slug, and an admin can change the slug. A
+ * 308 would be cached by the browser indefinitely and keep sending people to a
+ * path that no longer exists.
  */
 export async function resolveLegacy(
   documentId: string,
   opts: { lang?: string; versionId?: string } = {},
 ): Promise<{ document: DocumentRecord; language: LanguageRecord } | never> {
-  // The segment is a document id only if it looks like one. A project
-  // identifier here means someone reached a legacy path that is not one.
+  // The segment is a document id only if it looks like one. A project slug
+  // here means someone reached a legacy path that is not one.
   if (!isUuid(documentId)) {
     notFound();
   }
@@ -41,10 +41,10 @@ export async function resolveLegacy(
 
   // A document whose project was deleted has no canonical URL. Hand it back so
   // the caller can render the editor in place rather than redirect nowhere.
-  if (document.sourceProject?.identifier) {
+  if (document.sourceProject?.slug) {
     redirect(
       buildDocumentPath({
-        projectIdentifier: document.sourceProject.identifier,
+        projectSlug: document.sourceProject.slug,
         slug: document.slug,
         languageCode: language.code,
         documentId: document.id,
@@ -66,13 +66,13 @@ export async function redirectToLegacyEdit(documentId: string): Promise<void> {
     notFound();
   }
 
-  if (!document.sourceProject?.identifier) {
+  if (!document.sourceProject?.slug) {
     return; // No canonical URL; the caller renders the edit form in place.
   }
 
   redirect(
     buildDocumentEditPath({
-      projectIdentifier: document.sourceProject.identifier,
+      projectSlug: document.sourceProject.slug,
       slug: document.slug,
       documentId: document.id,
     }),

@@ -2,7 +2,7 @@ import { getSessionCookie } from 'better-auth/cookies';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Paths that require authentication
-const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding', '/profile'];
+const protectedPaths = ['/dashboard', '/documents', '/admin', '/onboarding', '/profile', '/notifications'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -22,7 +22,7 @@ export async function proxy(request: NextRequest) {
   // NOTE: This is NOT a security check - actual validation happens in each page
   if (isProtectedPath && !sessionCookie) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('from', pathname);
+    loginUrl.searchParams.set('from', pathname + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);
   }
 

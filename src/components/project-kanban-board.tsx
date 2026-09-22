@@ -561,7 +561,7 @@ export default function ProjectKanbanBoard({
 
                     const getDocumentUrl = () =>
                       buildDocumentPath({
-                        projectIdentifier: doc.sourceProject?.identifier,
+                        projectSlug: doc.sourceProject?.slug,
                         slug: doc.slug,
                         languageCode: language?.code ?? '',
                         documentId: doc.id,

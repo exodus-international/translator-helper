@@ -53,3 +53,4 @@ next-env.d.ts
 
 # Staging area for uploaded brand artwork; derived files are committed instead
 generated-images/
+.react-email

@@ -1,5 +1,7 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
 import type { CodeEditorHandle } from '@/components/editor/code-editor';
+import { alignLines } from '@/components/editor/align-lines';
+import { selectionBox, useFollowSelection, type SelectionBox } from '@/components/editor/toolbar-placement';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +60,7 @@ import { LintStatusBar } from '@/components/editor/lint-status-bar';
 import { MarkdownGuideDialog } from '@/components/markdown-guide';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
+import { CopyAllButton } from './editor/copy-all-button';
 import { FormattingToolbar } from './editor/formatting-toolbar';
 import { useFormattingToolbar } from './editor/use-formatting-toolbar';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
@@ -339,7 +342,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [showDiscardDialog, setShowDiscardDialog] = useState(false);
     const [discardKind, setDiscardKind] = useState<'suggestion' | 'audioText'>('suggestion');
     const pendingDiscardActionRef = useRef<(() => void) | null>(null);
-    const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
+    const [toolbarPosition, setToolbarPosition] = useState<SelectionBox | null>(null);
     const translationEditorRef = useRef<CodeEditorHandle | null>(null);
     const [translationDiagnostics, setTranslationDiagnostics] = useState<LintDiagnostic[]>([]);
     const [sourceDiagnostics, setSourceDiagnostics] = useState<LintDiagnostic[]>([]);
@@ -371,6 +374,22 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const translationRawVisible =
       variant === 'translate' ? translateTab === 'edit' : isReviewEditing || reviewViewMode === 'review';
     const isReviewMode = variant === 'review' && reviewViewMode === 'review';
+    // The cursor chip only means something when both panes are showing editors:
+    // it names this pane's line and the line the other pane is parked on. It is
+    // also when a line moved to in one comes level in the other -- side by
+    // side, not a tab apart.
+    const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
+    const alignPanes = (pane: 'source' | 'translation') => {
+      if (!showCursorSync || isMobile) return;
+      const source = sourceEditorRef.current?.view;
+      const translation = translationEditorRef.current?.view;
+      if (!source || !translation) return;
+      if (pane === 'source') alignLines(source, translation);
+      else alignLines(translation, source);
+    };
+    // The suggestion toolbar is placed where the selection is on screen, so it
+    // moves with the selection as the pane scrolls.
+    useFollowSelection(toolbarPosition !== null, translationContainerRef, translationEditorRef, setToolbarPosition);
 
     // Update source edit value when sourceEditContent prop changes
     useEffect(() => {
@@ -409,7 +428,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setSourceViewMode('raw');
     };
 
-    const handleSourceCursorChange = (lineNumber: number) => {
+    const handleSourceCursorChange = (lineNumber: number, toLine: boolean) => {
       setSourceLine(lineNumber);
       // Clear stale decoration on the source pane (user is now active here)
       setSyncedSourceLine(undefined);
@@ -418,15 +437,21 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
         return;
       }
 
+      // A key moving the cursor along its line, or typing, is not a move to
+      // another line: the other pane stays where it was scrolled to, and keeps
+      // the line it marks. A click on the line is one, and brings it back.
+      if (!toLine) return;
+
       const sourceTotalLines = sourceLineCount;
       const translationTotalLines = translationLineCount;
       const translationTargetLine = mapLineNumber(lineNumber, sourceTotalLines, translationTotalLines);
       setSyncedTranslationLine(translationTargetLine);
       // Update the translation pane's displayed line to match the synced target
       setTranslationLine(translationTargetLine);
+      alignPanes('source');
     };
 
-    const handleTranslationCursorChange = (lineNumber: number) => {
+    const handleTranslationCursorChange = (lineNumber: number, toLine: boolean) => {
       setTranslationLine(lineNumber);
       // Clear stale decoration on the translation pane (user is now active here)
       setSyncedTranslationLine(undefined);
@@ -435,12 +460,16 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
         return;
       }
 
+      // Along the line: as in handleSourceCursorChange, the source stays put.
+      if (!toLine) return;
+
       const sourceTotalLines = sourceLineCount;
       const translationTotalLines = translationLineCount;
       const sourceTargetLine = mapLineNumber(lineNumber, translationTotalLines, sourceTotalLines);
       setSyncedSourceLine(sourceTargetLine);
       // Update the source pane's displayed line to match the synced target
       setSourceLine(sourceTargetLine);
+      alignPanes('translation');
     };
 
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
@@ -507,16 +536,16 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // (The rules themselves already stay quiet on an empty document; this keeps
     // the bar from saying anything at all until there is work to judge.)
     const translationHasContent = translationContent.trim().length > 0;
-    // The source pane is linted like the translation, against itself: the
-    // parity rules come out even and the style rules adopt whatever the source
-    // already does. In Preview there is no editor to report them, so they are
-    // computed from the text.
+    // The source pane is linted like the translation, as the source: the style
+    // rules adopt whatever it already does, and the rules that compare a
+    // translation with its source stay out of it. In Preview there is no editor
+    // to report them, so they are computed from the text.
     // `!isYaml` for the same reason the editor gates itself on the language:
     // these are Markdown rules, and the Preview branch below is not the only
     // reader of this flag.
     const inSourcePreview = !isYaml && !isSourceEditing && sourceViewMode === 'formatted';
     const sourcePreviewDiagnostics = useMemo(
-      () => (inSourcePreview ? lintDocument({ text: sourceContent, source: sourceContent }) : []),
+      () => (inSourcePreview ? lintDocument({ text: sourceContent, isSource: true }) : []),
       [inSourcePreview, sourceContent],
     );
     // Whichever view is up owns the bar. Falling back to the editor's last
@@ -527,9 +556,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // no longer on screen and there is no Fix all to clear it with. Nothing
     // clears `sourceDiagnostics` on the way out, so it sat there.
     const sourcePaneDiagnostics = inSourcePreview ? sourcePreviewDiagnostics : sourceDiagnostics;
-    // The cursor chip only means something when both panes are showing editors:
-    // it names this pane's line and the line the other pane is parked on.
-    const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -692,26 +718,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
       const showToolbar =
         !!range && ((canCreateSuggestions && (isReviewMode || suggestions.length > 0)) || formattingEnabled);
-      if (showToolbar) {
-        // Try to get actual position from editor
-        const editor = (translationEditorRef.current || externalEditorRef?.current)?.editor;
-        if (editor) {
-          try {
-            const pos = editor.coordsAt({ line: range.endLine, column: range.endColumn });
-            if (pos) {
-              setToolbarPosition({ x: pos.left + 20, y: pos.top + pos.height + 4 });
-            } else {
-              setToolbarPosition({ x: 180, y: 20 });
-            }
-          } catch {
-            setToolbarPosition({ x: 180, y: 20 });
-          }
-        } else {
-          setToolbarPosition({ x: 180, y: 20 });
-        }
-      } else {
-        setToolbarPosition(null);
-      }
+      const view = showToolbar ? (translationEditorRef.current || externalEditorRef?.current)?.view : null;
+      setToolbarPosition(view ? selectionBox(view) : null);
     };
 
     const handleCreateSuggestion = (type: SuggestionType) => {
@@ -736,6 +744,33 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     };
 
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
+
+    // A notification about a suggestion links here with ?thread=<id>. Once that
+    // thread has loaded, open the panel on it and bring its lines into view,
+    // the same as clicking it. Only once: after that the panel is the user's.
+    const threadLinkHandled = useRef(false);
+    useEffect(() => {
+      if (!mounted || threadLinkHandled.current) return;
+      const threadId = new URLSearchParams(window.location.search).get('thread');
+      if (!threadId) {
+        threadLinkHandled.current = true;
+        return;
+      }
+      const suggestion = suggestions.find((s) => s.id === threadId);
+      if (!suggestion) return;
+      threadLinkHandled.current = true;
+      setSidebarView('threads');
+      if (isMobile) {
+        // On a phone the thread list is a sheet; show the thread there.
+        setActiveThreadId(suggestion.id);
+        setOpenMobile(true);
+        return;
+      }
+      if (!sidebarOpen) toggleSidebar();
+      // The editor mounts after the page; give it a moment before scrolling it.
+      setTimeout(() => handleSuggestionClickInternal(suggestion), 300);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the linked thread first appears
+    }, [mounted, suggestions]);
     // On mobile the panel is the offcanvas Sheet (openMobile); on desktop it's
     // the docked sidebar (open). "Show panel" must appear whenever it's closed,
     // otherwise mobile users with a pre-opened desktop state can't reach it.
@@ -745,6 +780,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // it for the reopen button made the panel a trapdoor on documents without
     // suggestions, and hid it outright on mobile, where it starts closed.
     const hasPanel = hasSidebar || !!sidebarHeader || !!sidebarSummary;
+    // There is a translation to copy once one has been started, and the Audio
+    // text tab shows a different text -- the transcript, with its own editor
+    // -- so a button there reading "copy translation" would not copy what is
+    // on screen.
+    const showingAudioText =
+      variant === 'review' && !isReviewEditing && !!audioTabVersionId && reviewViewMode === 'audio';
+    const showTranslationCopy = (variant === 'review' || translationStarted) && !showingAudioText;
 
     // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
     const showSuggestionDecorations = suggestions.length > 0;
@@ -886,6 +928,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     </Button>
                   </>
                 )}
+                {/* Last in the row, so it keeps its place while Edit turns
+                    into Save and Cancel. What is being edited is what gets
+                    copied. */}
+                <CopyAllButton pane="source" text={isSourceEditing ? sourceEditValue : sourceContent} />
                 {sourceHeaderExtra}
               </div>
             </div>
@@ -893,6 +939,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               {sourceFormatting.position && (
                 <FormattingToolbar
                   position={sourceFormatting.position}
+                  active={sourceFormatting.active}
                   containerRef={sourceContainerRef}
                   onFormat={sourceFormatting.onFormat}
                 />
@@ -908,7 +955,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
                   language={contentLanguage}
-                  sourceContent={sourceContent}
+                  isSource
                   onDiagnosticsChange={setSourceDiagnostics}
                   onOpenGuide={onOpenGuide}
                   footer={
@@ -935,7 +982,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
-                  sourceContent={sourceContent}
+                  isSource
                   onDiagnosticsChange={setSourceDiagnostics}
                   onOpenGuide={onOpenGuide}
                   footer={
@@ -1059,6 +1106,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     </div>
                   )
                 ) : null}
+                {showTranslationCopy && <CopyAllButton pane="translation" text={translationContent} />}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
                 {/* On desktop the panel folds to its own rail, so it needs no
@@ -1132,6 +1180,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     {translationFormatting.position && (
                       <FormattingToolbar
                         position={translationFormatting.position}
+                        active={translationFormatting.active}
                         containerRef={translationContainerRef}
                         onFormat={translationFormatting.onFormat}
                       />
@@ -1171,7 +1220,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 )
               ) : isReviewEditing ? (
                 <div className="h-full flex flex-col space-y-2">
+                  {/* The one translation editor on screen while editing, so it
+                      is the one the source lines up with (align-lines). */}
                   <RawEditorPane
+                    ref={translationEditorRef}
                     value={translationContent}
                     onChange={onTranslationChange}
                     onCursorChange={handleTranslationCursorChange}
