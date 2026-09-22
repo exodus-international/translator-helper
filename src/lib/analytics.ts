@@ -123,7 +123,6 @@ export type AnalyticsEvent =
   | 'user_banned'
   | 'user_unbanned'
   | 'admin_user_password_reset'
-  | 'admin_user_languages_updated'
   | 'admin_user_profile_updated'
   | 'invitation_created'
   | 'invitation_link_copied'

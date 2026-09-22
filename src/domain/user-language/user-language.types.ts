@@ -11,12 +11,12 @@ import { z } from 'zod';
  * version needs no signature change.
  */
 export const setLanguageMemberRoleSchema = z.object({
-  languageId: z.string().uuid(),
+  languageId: z.uuid(),
   userId: z.string(),
-  role: z.nativeEnum(ProjectRole),
+  role: z.enum(ProjectRole),
 });
 
 export const removeLanguageMemberSchema = z.object({
-  languageId: z.string().uuid(),
+  languageId: z.uuid(),
   userId: z.string(),
 });
