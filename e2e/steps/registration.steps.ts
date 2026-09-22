@@ -14,3 +14,10 @@ When(
     await page.getByRole('button', { name: 'Create Account' }).click();
   },
 );
+
+When('I open the invitation link signed out', async ({ page, world, context }) => {
+  // The link was captured while signed in as an administrator; the person
+  // following it is not signed in at all.
+  await context.clearCookies();
+  await page.goto(world.inviteUrl);
+});
