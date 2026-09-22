@@ -144,7 +144,7 @@ export function rollUpLanguageProgress(rows: LanguageDocumentRow[]): LanguagePro
   };
 }
 
-export function percentage(part: number, total: number): number {
+function percentage(part: number, total: number): number {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
