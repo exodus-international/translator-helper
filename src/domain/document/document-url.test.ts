@@ -3,7 +3,7 @@ import test from 'node:test';
 import { buildDocumentEditPath, buildDocumentPath, isReservedSlug } from './document-url';
 
 const ref = {
-  projectIdentifier: 'exodus90',
+  projectSlug: 'exodus90',
   slug: 'day-1',
   languageCode: 'cs',
   documentId: 'aa5eec1f-e70b-4877-aefd-bf837587ae31',
@@ -17,13 +17,13 @@ test('the edit path drops the language', () => {
   assert.equal(buildDocumentEditPath(ref), '/documents/exodus90/day-1/edit');
 });
 
-test('a project with no identifier falls back to the id-based path', () => {
+test('a document with no project falls back to the id-based path', () => {
   assert.equal(
-    buildDocumentPath({ ...ref, projectIdentifier: null }),
+    buildDocumentPath({ ...ref, projectSlug: null }),
     '/documents/aa5eec1f-e70b-4877-aefd-bf837587ae31/translate?lang=cs',
   );
   assert.equal(
-    buildDocumentEditPath({ ...ref, projectIdentifier: undefined }),
+    buildDocumentEditPath({ ...ref, projectSlug: undefined }),
     '/documents/aa5eec1f-e70b-4877-aefd-bf837587ae31/edit',
   );
 });

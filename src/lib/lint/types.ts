@@ -56,6 +56,15 @@ export interface LintContext {
   source?: string;
   /** e.g. '20260302-2.md' — used by rules that key off the document type. */
   filename?: string;
+  /**
+   * The document is the English source itself -- the source pane, linted like
+   * the translation so its style rules report the same way. It is its own
+   * `source`, so the style rules follow the conventions it already keeps, and
+   * the rules that compare a translation with its source are skipped: against
+   * itself they either find nothing or, for the untranslated checks, find all
+   * of it.
+   */
+  isSource?: boolean;
 }
 
 export interface LintRule {

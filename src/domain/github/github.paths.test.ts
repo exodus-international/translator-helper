@@ -5,7 +5,7 @@ import { resolveFilePath } from './github.paths';
 
 const base = {
   languageCode: 'cs',
-  identifier: 'summer_2025',
+  repositoryDirectory: 'summer_2025',
   slug: 'some-doc',
 };
 

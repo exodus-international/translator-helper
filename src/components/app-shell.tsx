@@ -4,6 +4,7 @@ import * as React from 'react';
 
 import { Logo } from '@/components/logo';
 import { ModeToggle } from '@/components/mode-toggle';
+import { NotificationBell } from '@/components/notification-bell';
 import { SUPPORT_URL, bugReportUrl } from '@/components/feedback-button';
 import { UserAvatar } from '@/components/user-avatar';
 import {
@@ -41,12 +42,15 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
+import { UnreadCount } from '@/components/notification-item';
 import { capture } from '@/lib/analytics';
+import { useNotificationCount } from '@/lib/notification-count';
 import { signOut } from '@/lib/auth-client';
 import { isAdminClient } from '@/lib/permissions-client';
 import { useTrailStore, type TrailCrumb } from '@/lib/page-trail';
 import { SessionUser } from '@/lib/session';
 import {
+  Bell,
   Bug,
   ChevronsUpDown,
   FileText,
@@ -79,6 +83,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   languages: 'Languages',
   settings: 'Settings',
   profile: 'Profile',
+  notifications: 'Notifications',
   onboarding: 'Onboarding',
   new: 'New',
   edit: 'Edit',
@@ -158,10 +163,7 @@ interface NavItem {
 // Grouped by route prefix, and sorted by href inside each group. The group
 // labels are the same ones the breadcrumb uses for those segments, so the trail
 // in the topbar names the section the sidebar highlights.
-const ROOT_NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/documents', label: 'Documents', icon: FileText },
-];
+const ROOT_NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
 
 // Editorial rather than administrative: a language's Project Manager writes the
 // guidance and everyone on the language can read it, so it sits with the work
@@ -170,13 +172,21 @@ const INSTRUCTIONS_NAV_ITEM: NavItem = { href: '/instructions', label: 'AI instr
 
 // Languages sits at /languages rather than under /admin: the page is a place of
 // its own, and its URL is what stops the language-wide effect of a change from
-// needing a caption. A manager reaches it too, so for them it joins the root
-// group -- an "Admin" heading over a single entry would misname what they have.
+// needing a caption. Defined once and used twice -- it is in the Admin group for
+// an administrator, and in the root group for a manager, where an "Admin"
+// heading over a single entry would misname what they have.
 const LANGUAGES_NAV_ITEM: NavItem = { href: '/languages', label: 'Languages', icon: Languages };
 
+// Documents keeps a root-level href while sitting in this group: what puts an
+// item here is who it is for, not the namespace it sits under. Managing source
+// documents is admin-only, so the group is where it belongs -- hiding it in the
+// root group instead named the section it answers to nowhere in the UI.
+//
 // Announcements is deliberately absent: it authors what What's New shows, so it
 // lives next to it in the footer rather than a section away.
 const ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: '/documents', label: 'Documents', icon: FileText },
+  LANGUAGES_NAV_ITEM,
   { href: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { href: '/admin/users', label: 'Users', icon: Users },
 ];
@@ -277,6 +287,7 @@ function NavSecondary({ isAdmin }: { isAdmin: boolean }) {
 function NavUser({ user }: { user: SessionUser }) {
   const router = useRouter();
   const { isMobile } = useSidebar();
+  const unread = useNotificationCount((state) => state.unread);
 
   const handleSignOut = async () => {
     capture('user_signed_out');
@@ -319,6 +330,11 @@ function NavUser({ user }: { user: SessionUser }) {
               <DropdownMenuItem render={<Link href="/profile" />}>
                 <User />
                 Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/notifications" />}>
+                <Bell />
+                Notifications
+                <UnreadCount count={unread} className="ml-auto" />
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
@@ -371,16 +387,15 @@ function AppSidebar(
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {/* Documents is admin-only like the two namespaces below it, so it joins
-            the root group only for admins rather than forming a group of one. */}
         <SidebarNavGroup
           items={[
-            ...(isAdmin ? ROOT_NAV_ITEMS : ROOT_NAV_ITEMS.slice(0, 1)),
+            ...ROOT_NAV_ITEMS,
+            // An admin gets Languages in the Admin group below instead.
             ...(canSeeLanguages && !isAdmin ? [LANGUAGES_NAV_ITEM] : []),
             ...(canReadInstructions ? [INSTRUCTIONS_NAV_ITEM] : []),
           ]}
         />
-        {isAdmin && <SidebarNavGroup items={[LANGUAGES_NAV_ITEM, ...ADMIN_NAV_ITEMS]} label="Admin" />}
+        {isAdmin && <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />}
       </SidebarContent>
       <SidebarFooter>
         <NavSecondary isAdmin={isAdmin} />
@@ -428,7 +443,8 @@ export function AppShell({
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
             <HeaderBreadcrumb />
           </div>
-          <div className="ml-auto flex items-center px-4">
+          <div className="ml-auto flex items-center gap-1 px-4">
+            <NotificationBell />
             <ModeToggle />
           </div>
         </header>

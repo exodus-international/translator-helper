@@ -3,6 +3,7 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { admin } from 'better-auth/plugins';
 import { createAccessControl } from 'better-auth/plugins/access';
+import { nextCookies } from 'better-auth/next-js';
 import prisma from './db';
 
 // Create access control with user management permissions (mirrored in src/lib/auth-client.ts by better-auth convention)
@@ -63,6 +64,12 @@ export const auth = betterAuth({
         USER: userRole,
       },
     }),
+    // Must stay last. Calling `auth.api.*` from a server action returns the
+    // Set-Cookie header to the caller rather than to the browser, so a
+    // server-side sign-up created a session the client never received: the
+    // user was registered and still anonymous on the next navigation. This
+    // plugin forwards those cookies onto the outgoing response.
+    nextCookies(),
   ],
   // Without an explicit base URL better-auth derives the origin from each
   // incoming request, which breaks redirect/callback URLs behind proxies and

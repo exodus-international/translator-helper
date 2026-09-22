@@ -156,8 +156,10 @@ export default function ProjectsClient({
     reset({
       name: project.name,
       description: project.description || '',
-      identifier: project.identifier || '',
+      slug: project.slug,
+      repositoryDirectory: project.repositoryDirectory || '',
       acronym: project.acronym || '',
+      deployToGithub: Boolean(project.repositoryDirectory),
     });
     setAudioDocumentTypes(project.audioDocumentTypes ?? DEFAULT_AUDIO_DOCUMENT_TYPES);
     setDialogOpen(true);
@@ -284,7 +286,7 @@ export default function ProjectsClient({
                       </Badge>
                     )}
                     <Link
-                      href={buildProjectTranslationsPath(project.identifier)}
+                      href={buildProjectTranslationsPath(project.slug)}
                       className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
                     >
                       <Languages className="h-4 w-4" />
@@ -292,9 +294,10 @@ export default function ProjectsClient({
                     </Link>
                   </div>
                   {project.description && <p className="text-sm text-muted-foreground mt-1">{project.description}</p>}
-                  {(project as any).identifier && (
-                    <p className="text-xs text-muted-foreground mt-1">ID: {(project as any).identifier}</p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    /{project.slug}
+                    {project.repositoryDirectory && <> · repo: {project.repositoryDirectory}</>}
+                  </p>
                   <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
                     <span>{project._count.documents} document(s)</span>
                     <span>{project._count.translationProjects} translation project(s)</span>
