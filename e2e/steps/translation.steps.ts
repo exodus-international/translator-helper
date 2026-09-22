@@ -56,3 +56,10 @@ Then('the translation should read {string}', async ({ page }, text: string) => {
     .poll(() => translationText(page), { message: 'translation did not persist' })
     .toContain(text);
 });
+
+When('I ask the AI to translate', async ({ page }) => {
+  await page.getByRole('button', { name: 'AI translate' }).click();
+  // The button renames itself while the request is in flight and back when it
+  // settles, which is the app's own signal that the draft has landed.
+  await expect(page.getByRole('button', { name: 'AI translate' })).toBeVisible({ timeout: 30_000 });
+});

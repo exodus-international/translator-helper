@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { Given, When, Then } from './fixtures';
-import { signIn } from '../support/sign-in';
+import { signIn, signInAndSettle } from '../support/sign-in';
 
 Given('I am signed out', async ({ page }) => {
   // Untagged scenarios already start with no session; this makes the
@@ -51,4 +51,29 @@ Then('I should be sent to the login page', async ({ page }) => {
   // the URL is not a bare /login.
   await page.waitForURL(/\/login(\?|$)/);
   await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+});
+
+Given('I am signed in fresh as {string}', async ({ page }, email: string) => {
+  await signInAndSettle(page, email);
+});
+
+When('I sign out', async ({ page }) => {
+  // Behind the account menu in the sidebar, which is named after the person.
+  await page.getByRole('button', { name: /@example\.org/ }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
+});
+
+Then('I should be on the login page', async ({ page }) => {
+  await page.waitForURL(/\/login(\?|$)/);
+  await expect(page.getByRole('button', { name: 'Login' })).toBeVisible();
+});
+
+Then('I should not be on {string}', async ({ page }, target: string) => {
+  await expect(page).not.toHaveURL(new RegExp(`${target.replace(/\//g, '\\/')}$`));
+});
+
+Then('I should be refused with a message', async ({ page }) => {
+  // The wording differs by reason (wrong password, banned account), so this
+  // asserts the person is told something rather than pinning the sentence.
+  await expect(page.getByRole('alert')).toBeVisible();
 });

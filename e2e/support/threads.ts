@@ -62,3 +62,16 @@ export async function dismissThread(page: Page, text: string) {
 export async function reopenThread(page: Page, text: string) {
   await threadContaining(page, text).getByRole('button', { name: 'Reopen' }).click();
 }
+
+/**
+ * Reveals resolved threads.
+ *
+ * They stay in the list but collapse behind a counter once the first one is
+ * resolved, so anything looking for a dismissed thread has to open that first.
+ */
+export async function showResolved(page: Page) {
+  const toggle = feedbackPanel(page).getByRole('button', { name: /^Resolved \(/ });
+  if ((await toggle.count()) === 0) return;
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}

@@ -13,6 +13,7 @@ const testDir = defineBddConfig({
 });
 
 const PORT = process.env.PORT || '3100';
+const OPENAI_MOCK_PORT = process.env.OPENAI_MOCK_PORT || '3199';
 const baseURL = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${PORT}`;
 
 export default defineConfig({
@@ -41,7 +42,17 @@ export default defineConfig({
       dependencies: ['setup'],
     },
   ],
-  webServer: {
+  webServer: [
+    {
+      // Stands in for the chat completions endpoint. AI translation runs in a
+      // server action, so the request never passes through the browser and
+      // page.route cannot reach it.
+      command: 'node e2e/support/openai-mock.mjs',
+      url: `http://localhost:${OPENAI_MOCK_PORT}`,
+      timeout: 30_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
     // Bypasses the repo's own `dev` script on purpose: that script sources
     // `.env`, which carries the development database URL.
     command: `pnpm exec next dev --port ${PORT}`,
@@ -58,7 +69,9 @@ export default defineConfig({
       BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET!,
       NEXT_PUBLIC_APP_URL: baseURL,
       CHATGPT_API: process.env.CHATGPT_API || 'sk-test-not-used',
+      CHATGPT_API_BASE_URL: `http://localhost:${OPENAI_MOCK_PORT}`,
       PORT,
     },
-  },
+    },
+  ],
 });

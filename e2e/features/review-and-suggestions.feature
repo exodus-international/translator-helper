@@ -28,3 +28,12 @@ Feature: Review and suggestions
     And there should be no open feedback
     When I approve the translation
     Then its status should be "APPROVED"
+
+  @reviewer @high-usage
+  Scenario: A dismissed comment can be brought back
+    Given I open "Day 1 - The Call" in Croatian
+    And there should be open feedback
+    When I dismiss the comment mentioning "Check if this paragraph"
+    Then the comment mentioning "Check if this paragraph" should be resolved
+    When I reopen the comment mentioning "Check if this paragraph"
+    Then the comment mentioning "Check if this paragraph" should be open again
