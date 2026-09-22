@@ -132,7 +132,13 @@ async function seedSourceProjects() {
   const projects: Record<string, string> = {};
   for (const p of SOURCE_PROJECTS) {
     const result = await prisma.sourceProject.create({
-      data: { name: p.name, description: p.description, identifier: p.identifier, status: p.status },
+      data: {
+        name: p.name,
+        description: p.description,
+        slug: p.slug,
+        repositoryDirectory: p.repositoryDirectory,
+        status: p.status,
+      },
     });
     projects[p.key] = result.id;
     console.log(`Project ${p.name} (${p.status})`);

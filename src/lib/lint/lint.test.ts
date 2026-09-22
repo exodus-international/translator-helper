@@ -340,7 +340,9 @@ describe('parity rules', () => {
     // Whitespace only is the same story for the parity rules; the house-style
     // rules still have their own say about the whitespace itself.
     assert.deepEqual(
-      ids('   \n\n', source).filter((id) => id.startsWith('frontmatter-') || id === 'link-url-changed' || id === 'heading-structure'),
+      ids('   \n\n', source).filter(
+        (id) => id.startsWith('frontmatter-') || id === 'link-url-changed' || id === 'heading-structure',
+      ),
       [],
     );
   });
@@ -407,14 +409,15 @@ describe('parity rules', () => {
     // them meant a translation that dropped a sample reported a heading
     // structure that had not drifted.
     const fenced = source.replace('# Heading\n', '# Heading\n\n```md\n# Sample\n## Another\n```\n');
-    const translation = '---\ntitle: Prvi dan\nsubtitle: Podnaslov\ncaption: Natpis\nhero: shirt-e90_2026\n---\n\n# Naslov\n\nPro\u010ditaj [vodi\u010d](https://exodus90.com/guide).\n';
+    const translation =
+      '---\ntitle: Prvi dan\nsubtitle: Podnaslov\ncaption: Natpis\nhero: shirt-e90_2026\n---\n\n# Naslov\n\nPro\u010ditaj [vodi\u010d](https://exodus90.com/guide).\n';
     assert.ok(!ids(translation, fenced).includes('heading-structure'));
     // And a `#` comment in the frontmatter is not a heading either.
     const commented = translation.replace('hero:', '# opomba: ne prevajaj\nhero:');
     assert.ok(!ids(commented, fenced).includes('heading-structure'));
   });
 
-  it('leaves a translator\'s note on a slug alone', () => {
+  it("leaves a translator's note on a slug alone", () => {
     // `day: 3 # tretji dan` is day 3. Comparing the raw text called the day
     // changed, and the fix offered -- a safe one, applied by "fix all" --
     // replaced the whole span and deleted the note.
@@ -536,6 +539,38 @@ describe('untranslated content', () => {
     const source = '---\ntitle: T\n---\n\n# Amen\n\nLet us pray for the grace to begin again.\n';
     const text = '---\ntitle: P\n---\n\n# Amen\n\nModleme se za milost za\u010D\u00EDt znovu.\n';
     assert.deepEqual(ids(text, source), []);
+  });
+});
+
+describe('linting the source itself', () => {
+  const english =
+    '---\ntitle: T\n---\n\n# Freedom, Family, and Vocation\n\n' +
+    'A man who has never been asked to give anything up has never been asked to choose. '.repeat(4).trim() +
+    '\n\n## What the ninety days ask\n\nSilence, fasting and prayer.\n';
+
+  it('does not call a source untranslated for being English', () => {
+    assert.deepEqual(lintDocument({ text: english, isSource: true }), []);
+  });
+
+  it('does not read an edit as a translation of the saved copy', () => {
+    // The source pane in Edit: the editor held the saved source as the one to
+    // compare with, so one added paragraph made every heading "still English".
+    const edited = english.replace('## What', 'A new paragraph.\n\n## What');
+    assert.deepEqual(ids(edited, english).sort(), ['heading-untranslated', 'heading-untranslated']);
+    assert.deepEqual(lintDocument({ text: edited, source: english, isSource: true }), []);
+  });
+
+  it('skips every rule that compares, however far the edit goes', () => {
+    const edited = english + '\n## A heading the saved copy never had\n\n[A link](https://exodus90.com)\n';
+    assert.notDeepEqual(ids(edited, english), []);
+    assert.deepEqual(lintDocument({ text: edited, source: english, isSource: true }), []);
+  });
+
+  it('still holds the source to the style it keeps', () => {
+    // Dashes throughout: the source is its own authority on bullets.
+    assert.equal(ids('- one\n- two\n').includes('bullet-marker'), true);
+    const own = lintDocument({ text: '- one\n- two\n', isSource: true }).map((d) => d.ruleId);
+    assert.equal(own.includes('bullet-marker'), false);
   });
 });
 

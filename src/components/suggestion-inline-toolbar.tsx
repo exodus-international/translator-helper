@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { useToolbarPlacement, type SelectionBox } from '@/components/editor/toolbar-placement';
+import { cn } from '@/lib/utils';
 import { MessageSquare, Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,39 +10,25 @@ import { createPortal } from 'react-dom';
 interface SuggestionInlineToolbarProps {
   onComment: () => void;
   onSuggestEdit: () => void;
-  position: { x: number; y: number };
-  /** Ref to the container element for computing viewport-relative position */
+  /** The selection it acts on, which it sits above -- or below, without room. */
+  position: SelectionBox;
+  /** The pane the editor is in, which the toolbar stays inside. */
   containerRef?: React.RefObject<HTMLElement | null>;
 }
 
-export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position, containerRef }: SuggestionInlineToolbarProps) {
+export function SuggestionInlineToolbar({
+  onComment,
+  onSuggestEdit,
+  position,
+  containerRef,
+}: SuggestionInlineToolbarProps) {
   const [isVisible, setIsVisible] = useState(true);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
-
-  useEffect(() => {
-    const container = containerRef?.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const viewportX = rect.left + position.x;
-    const viewportY = rect.top + position.y;
-
-    // Position above the selection by default
-    let top = viewportY - 46;
-    // If that would go off-screen, position below instead
-    if (top < 8) {
-      top = viewportY + 28;
-    }
-
-    // Clamp left to stay within viewport
-    const el = toolbarRef.current;
-    const toolbarWidth = el?.offsetWidth ?? 200;
-    const left = Math.max(8, Math.min(viewportX, window.innerWidth - toolbarWidth - 8));
-
-    setCoords({ left, top });
-  }, [position.x, position.y, containerRef]);
+  // Placed as the formatting toolbar is. It used to go 46px above a point just
+  // under the selection's last line -- onto that line, over the words a
+  // reviewer had picked out to comment on.
+  const coords = useToolbarPlacement(toolbarRef, position, containerRef);
 
   useEffect(() => {
     return () => {
@@ -68,11 +56,11 @@ export function SuggestionInlineToolbar({ onComment, onSuggestEdit, position, co
   const toolbar = (
     <div
       ref={toolbarRef}
-      className="fixed z-[100] flex gap-1 bg-popover text-popover-foreground border rounded-md shadow-lg p-1"
-      style={{
-        left: `${coords.left}px`,
-        top: `${coords.top}px`,
-      }}
+      className={cn(
+        'fixed z-[100] flex gap-1 bg-popover text-popover-foreground border rounded-md shadow-lg p-1 transition-opacity',
+        coords ? 'opacity-100' : 'pointer-events-none opacity-0',
+      )}
+      style={{ left: coords?.left ?? -9999, top: coords?.top ?? -9999 }}
       onMouseLeave={handleMouseLeave}
       onMouseEnter={handleMouseEnter}
     >

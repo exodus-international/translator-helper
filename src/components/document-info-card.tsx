@@ -27,6 +27,8 @@ interface DocumentInfoCardProps {
   language?: string;
   /** When this version is due, as the assignment carried it. */
   deadline?: Date | string | null;
+  /** When the review is due, if it has a date of its own. */
+  reviewDeadline?: Date | string | null;
   /** Opens the modal that sets or clears the deadline. Absent for readers. */
   onEditDeadline?: () => void;
   onAssignTranslator?: () => void;
@@ -49,6 +51,7 @@ export function DocumentInfoCard({
   reviewer,
   language,
   deadline,
+  reviewDeadline,
   onEditDeadline,
   onAssignTranslator,
   onUnassignTranslator,
@@ -177,6 +180,24 @@ export function DocumentInfoCard({
               <span className="text-xs text-muted-foreground italic">Not set</span>
             )}
           </Row>
+
+          {/* Review deadline: set with the reviewer, so it is changed there too. */}
+          {reviewDeadline && (
+            <Row icon={CalendarDays} label="Review due">
+              {onAssignReviewer ? (
+                <button
+                  onClick={onAssignReviewer}
+                  className="group -mr-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted"
+                  title="Change review deadline"
+                >
+                  <span className="text-xs font-medium">{new Date(reviewDeadline).toLocaleDateString()}</span>
+                  <Pencil className="size-2.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                </button>
+              ) : (
+                <span className="text-xs font-medium">{new Date(reviewDeadline).toLocaleDateString()}</span>
+              )}
+            </Row>
+          )}
         </CardContent>
       </Card>
 

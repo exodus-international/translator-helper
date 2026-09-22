@@ -7,7 +7,7 @@ import type { LintDiagnostic } from '@/lib/lint';
 interface RawEditorPaneProps {
   value: string;
   onChange?: (value: string) => void;
-  onCursorChange?: (line: number) => void;
+  onCursorChange?: (line: number, toLine: boolean) => void;
   readOnly?: boolean;
   placeholder?: string;
   currentLine?: number;
@@ -23,6 +23,8 @@ interface RawEditorPaneProps {
   ) => void;
   /** The source-language text, which switches on the parity lint rules. */
   sourceContent?: string;
+  /** This pane holds the English source itself, and is linted as one. */
+  isSource?: boolean;
   onDiagnosticsChange?: (diagnostics: LintDiagnostic[]) => void;
   /** Turn linting off entirely — for panes showing content the reader can't edit. */
   lint?: boolean;
@@ -49,6 +51,7 @@ export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(fu
     onSuggestionClick,
     onSelectionChange,
     sourceContent,
+    isSource,
     onDiagnosticsChange,
     lint,
     onOpenGuide,
@@ -79,6 +82,7 @@ export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(fu
           onSuggestionClick={onSuggestionClick}
           onSelectionChange={onSelectionChange}
           sourceContent={sourceContent}
+          isSource={isSource}
           onDiagnosticsChange={onDiagnosticsChange}
           lint={lint}
           onOpenGuide={onOpenGuide}
