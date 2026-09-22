@@ -7,15 +7,15 @@ import { FilePathParams } from './github.types';
  * in isolation across every document type.
  */
 export function resolveFilePath(params: FilePathParams): string {
-  const { documentType, languageCode, identifier, originalFilename, slug } = params;
+  const { documentType, languageCode, repositoryDirectory, originalFilename, slug } = params;
   const filename = originalFilename || `${slug}.md`;
 
   switch (documentType) {
     case DocumentType.DAY:
-      return `translations/${languageCode}/exercises/${identifier}/days/${filename}`;
+      return `translations/${languageCode}/exercises/${repositoryDirectory}/days/${filename}`;
 
     case DocumentType.FIELD_GUIDE:
-      return `translations/${languageCode}/exercises/${identifier}/field_guide/${filename}`;
+      return `translations/${languageCode}/exercises/${repositoryDirectory}/field_guide/${filename}`;
 
     case DocumentType.DAILY_CONTENT: {
       const { year, month } = parseDailyContentDate(originalFilename);
@@ -23,13 +23,13 @@ export function resolveFilePath(params: FilePathParams): string {
     }
 
     case DocumentType.MEETING:
-      return `translations/${languageCode}/exercises/${identifier}/meetings/${requireOriginalFilename(
+      return `translations/${languageCode}/exercises/${repositoryDirectory}/meetings/${requireOriginalFilename(
         originalFilename,
         documentType,
       )}`;
 
     case DocumentType.ROOT_FILE:
-      return `translations/${languageCode}/exercises/${identifier}/${requireOriginalFilename(
+      return `translations/${languageCode}/exercises/${repositoryDirectory}/${requireOriginalFilename(
         originalFilename,
         documentType,
       )}`;

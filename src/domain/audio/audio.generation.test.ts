@@ -24,7 +24,7 @@ function versionFixture(overrides: Partial<VersionForGeneration> = {}): VersionF
       type: DocumentType.DAY,
       originalFilename: null,
       slug: 'day-03',
-      sourceProject: { identifier: 'exodus90', audioDocumentTypes: [DocumentType.DAY] },
+      sourceProject: { slug: 'exodus90', repositoryDirectory: 'exodus90', audioDocumentTypes: [DocumentType.DAY] },
     },
     ...overrides,
   };
@@ -190,7 +190,7 @@ test('a document whose project has the type turned off is skipped, not failed', 
         type: DocumentType.MEETING,
         originalFilename: 'meeting.md',
         slug: 'meeting',
-        sourceProject: { identifier: 'exodus90', audioDocumentTypes: [DocumentType.DAY] },
+        sourceProject: { slug: 'exodus90', repositoryDirectory: 'exodus90', audioDocumentTypes: [DocumentType.DAY] },
       },
     }),
   );

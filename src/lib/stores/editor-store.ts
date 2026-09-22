@@ -170,7 +170,8 @@ interface EditorActions {
   assignTranslator: (userId: string, deadline?: string) => Promise<void>;
   unassignTranslator: () => Promise<void>;
   openAssignReviewerDialog: () => Promise<void>;
-  assignReviewer: (userId: string) => Promise<void>;
+  /** `reviewDeadline` is a `yyyy-mm-dd` date; empty clears it. */
+  assignReviewer: (userId: string, reviewDeadline?: string) => Promise<void>;
   unassignReviewer: () => Promise<void>;
   /** Opens the small modal that sets or clears this version's deadline. */
   openDeadlineDialog: () => void;
@@ -703,18 +704,23 @@ export function createEditorStore(config: EditorStoreConfig) {
       }
     },
 
-    assignReviewer: async (userId) => {
+    assignReviewer: async (userId, reviewDeadline?) => {
       const { targetVersion, dialog } = get();
       if (!targetVersion) return;
 
       set(addLoading(get(), 'assignReviewer'));
       try {
-        await assignReviewerToVersionAction(targetVersion.id, userId);
+        const due = reviewDeadline ? new Date(reviewDeadline) : null;
+        await assignReviewerToVersionAction(targetVersion.id, userId, due);
         if (dialog.type === 'assignReviewer') {
           const assignedReviewer = dialog.candidates.find((m) => m.user.id === userId)?.user ?? null;
-          if (assignedReviewer) {
-            set({ targetVersion: { ...targetVersion, reviewer: assignedReviewer } });
-          }
+          set({
+            targetVersion: {
+              ...targetVersion,
+              ...(assignedReviewer ? { reviewer: assignedReviewer } : {}),
+              reviewDeadline: due,
+            },
+          });
         }
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignReviewer') });
         track('reviewer_assigned');

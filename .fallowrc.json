@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-  "entry": ["**/*.test.{ts,tsx}", "tests/**", "scripts/**", "prisma/seed.ts"],
+  "entry": ["**/*.test.{ts,tsx}", "tests/**", "scripts/**", "prisma/seed.ts", "src/emails/**"],
   "ignorePatterns": ["**/components/ui/*.tsx", "src/hooks/use-mobile.ts", "prisma/migrations/**"],
   "ignoreDependencies": [
     "@base-ui/react",
@@ -20,7 +20,8 @@
     "tunnel-rat",
     "import-in-the-middle",
     "require-in-the-middle",
-    "baseline-browser-mapping"
+    "baseline-browser-mapping",
+    "@react-email/ui"
   ],
   "rules": {}
 }

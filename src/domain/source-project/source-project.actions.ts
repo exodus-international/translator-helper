@@ -6,12 +6,13 @@ import { canManageSourceProject } from '@/lib/permissions';
 import { listTargetLanguages } from '../language/language.repository';
 import { createTranslationProject } from '../translation-project/translation-project.repository';
 import { createSourceProjectSchema, updateSourceProjectSchema } from './source-project.types';
+import { rethrowUniqueViolation } from './source-project.errors';
 import {
   countSourceProjects,
   listSourceProjects,
   listSourceProjectsPaginated,
   getSourceProjectById,
-  getSourceProjectByIdentifier,
+  getSourceProjectBySlug,
   getSourceProjectsForUser,
   createSourceProject,
   updateSourceProject,
@@ -59,9 +60,9 @@ export async function getSourceProjectAction(id: string) {
   return await getSourceProjectById(id);
 }
 
-export async function getSourceProjectByIdentifierAction(identifier: string) {
+export async function getSourceProjectBySlugAction(slug: string) {
   await authorize('authenticated');
-  return await getSourceProjectByIdentifier(identifier);
+  return await getSourceProjectBySlug(slug);
 }
 
 export async function createSourceProjectAction(input: unknown) {
@@ -71,9 +72,10 @@ export async function createSourceProjectAction(input: unknown) {
   const sourceProject = await createSourceProject({
     name: validated.name,
     description: validated.description,
-    identifier: validated.identifier,
+    slug: validated.slug,
+    repositoryDirectory: validated.repositoryDirectory,
     acronym: validated.acronym,
-  });
+  }).catch(rethrowUniqueViolation);
 
   // Auto-create translation projects for all target languages (excluding English)
   const targetLanguages = await listTargetLanguages();
@@ -116,11 +118,12 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
   return await updateSourceProject(id, {
     name: validated.name,
     description: validated.description,
-    identifier: validated.identifier,
+    slug: validated.slug,
+    repositoryDirectory: validated.repositoryDirectory,
     acronym: validated.acronym,
     status: validated.status,
     audioDocumentTypes: validated.audioDocumentTypes,
-  });
+  }).catch(rethrowUniqueViolation);
 }
 
 export async function deleteSourceProjectAction(id: string) {
