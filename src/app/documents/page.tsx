@@ -39,6 +39,14 @@ export default async function DocumentsPage({
     redirect('/login');
   }
 
+  // Managing source documents is an admin job, so the overview is admin-only --
+  // the same guard the edit pages under it already carry. Translators reach
+  // their work through /dashboard and the translate/review editors, which stay
+  // open to everyone assigned to the language.
+  if (user.role !== 'ADMIN') {
+    redirect('/dashboard');
+  }
+
   const params = await searchParams;
 
   // Server-side pagination, search, and sorting (issue #51): the URL is the

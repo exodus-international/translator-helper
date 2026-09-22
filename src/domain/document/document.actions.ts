@@ -34,7 +34,8 @@ export async function listDocumentsAction(filters?: {
 }
 
 export async function createDocumentAction(input: unknown) {
-  const { user } = await authorize('authenticated');
+  // Source documents are admin-managed, like updating and deleting them below.
+  const { user } = await authorize('admin');
   const validated = createDocumentSchema.parse(input);
 
   // Create the document
@@ -132,7 +133,9 @@ export async function listDocumentsOverviewAction(filters: {
   skip?: number;
   take?: number;
 }) {
-  await authorize('authenticated');
+  // Feeds the admin-only /documents overview; the per-language boards read
+  // through listDocumentsAction and getDashboardDocumentsAction instead.
+  await authorize('admin');
   const [documents, total] = await Promise.all([
     listDocumentsOverviewPaginated(filters),
     countDocumentsOverview(filters),

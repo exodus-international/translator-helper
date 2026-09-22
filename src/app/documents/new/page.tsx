@@ -10,6 +10,10 @@ export default async function NewDocumentPage() {
     redirect('/login');
   }
 
+  if (user.role !== 'ADMIN') {
+    redirect('/dashboard');
+  }
+
   const sourceProjects = await listSourceProjectsAction();
 
   return <NewDocumentClient sourceProjects={sourceProjects} />;
