@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { inlineSpansAround } from './cm-inline-spans';
+import { inlineSpansOf } from './cm-inline-spans';
 import type { CodeEditorHandle } from './code-editor';
 import { activeFormattingActions, applyFormattingAction, type FormattingAction } from './formatting';
 import { selectionBox, useFollowSelection, type SelectionBox } from './toolbar-placement';
@@ -76,7 +76,7 @@ export function useFormattingToolbar({
       if (!editor) return;
       const { state } = editor.view;
       const { from, to } = state.selection.main;
-      const next = activeFormattingActions(state.doc.toString(), { from, to }, inlineSpansAround(state, from, to));
+      const next = activeFormattingActions(state.doc.toString(), { from, to }, inlineSpansOf(state, from, to));
       // A drag reports every step, and nearly every step leaves the same set:
       // keep the old array so the pane does not re-render for nothing.
       setActive((previous) =>
@@ -97,7 +97,7 @@ export function useFormattingToolbar({
         view.state.doc.toString(),
         { from, to },
         action,
-        inlineSpansAround(view.state, from, to),
+        inlineSpansOf(view.state, from, to),
       );
       if (!outcome) return;
       view.dispatch({ changes: outcome.changes, selection: outcome.selection });

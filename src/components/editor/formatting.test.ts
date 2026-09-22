@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { EditorState } from '@codemirror/state';
-import { inlineSpansAround } from './cm-inline-spans';
+import { inlineSpansOf } from './cm-inline-spans';
 import { markdownSupport } from './cm-markdown';
 import { activeFormattingActions, applyFormattingAction, type FormattingAction } from './formatting';
 
-/** The spans the editor's parser finds around a selection, as the toolbar asks for them. */
+/** The spans the editor's parser finds around a selection and in it, as the toolbar asks for them. */
 function spans(text: string, from: number, to: number) {
-  return inlineSpansAround(EditorState.create({ doc: text, extensions: markdownSupport }), from, to);
+  return inlineSpansOf(EditorState.create({ doc: text, extensions: markdownSupport }), from, to);
 }
 
 /** The document after the action, and what ends up selected. */
@@ -229,6 +229,32 @@ describe('taking a span off some of its words', () => {
   });
 });
 
+describe('a selection partly formatted already', () => {
+  it('is not on when its ends belong to two different spans', () => {
+    // Each starts and ends with asterisks, and none is one span: the `*` and
+    // the `**` close different ones, and so do the two `**` of the last.
+    // Taking a marker off each end broke both and took no formatting off.
+    assert.deepEqual(activeAt('«*it* and **Bold**»').active, []);
+    assert.deepEqual(activeAt('«**Bold** and *it*»').active, []);
+    assert.deepEqual(activeAt('«**Start** middle **end**»').active, []);
+    assert.deepEqual(activeAt('«*it* and *more*»').active, []);
+  });
+
+  it('takes the spans of that kind inside off, and wraps the whole once', () => {
+    assert.equal(runAt('«*it* and **Bold**»', 'italic'), '*«it and **Bold**»*');
+    assert.equal(runAt('«*it* and **Bold**»', 'bold'), '**«*it* and Bold»**');
+    assert.equal(runAt('«**Bold** and *it*»', 'italic'), '*«**Bold** and it»*');
+    assert.equal(runAt('«**Start** middle **end**»', 'bold'), '**«Start middle end»**');
+    assert.equal(runAt('«**Start** middle **end**»', 'italic'), '*«**Start** middle **end**»*');
+  });
+
+  it('still takes each layer off a run of three selected whole', () => {
+    assert.deepEqual(activeAt('say «***grace***»').active, ['bold', 'italic']);
+    assert.equal(runAt('say «***grace***»', 'bold'), 'say *«grace»*');
+    assert.equal(runAt('say «***grace***»', 'italic'), 'say «**grace**»');
+  });
+});
+
 describe('active formatting', () => {
   it('reads bold, italic and strikethrough from outside or inside the selection', () => {
     assert.deepEqual(activeAt('say **«grace»**').active, ['bold']);
@@ -335,11 +361,17 @@ describe('active formatting', () => {
       'read [the «full» page](https://example.org)',
       'read [the «full» page][ref]',
       'a [«bracketed» phrase] here',
+      '«*it* and **Bold**»',
+      '«**Start** middle **end**»',
     ];
+    const inline: FormattingAction[] = ['bold', 'italic', 'strikethrough', 'link'];
 
     for (const sample of samples) {
       const { text, from, to, active } = activeAt(sample);
       for (const action of toggles) {
+        // Emphasis cannot reach from one list item into the next, so a wrap
+        // round two of them is not bold in the preview either.
+        if (inline.includes(action) && text.slice(from, to).includes('\n')) continue;
         const after = run(text, from, to, action);
         let selection = {
           from: Math.min(after.selection.anchor, after.selection.head),

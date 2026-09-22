@@ -1,6 +1,6 @@
 /**
- * The bold, italic, struck and link spans around a selection, as the Markdown
- * parser reads them.
+ * The bold, italic, struck and link spans around a selection and inside it, as
+ * the Markdown parser reads them.
  *
  * The formatting toolbar needs to know when a selection sits *inside* one: a
  * translator double-clicks a word in `**a discipline you commit to**`, and the
@@ -43,14 +43,30 @@ function textRange(node: SyntaxNode): { from: number; to: number } | null {
   return { from: marks[0].to, to: marks[1].from };
 }
 
-/** Every span that holds the whole selection, innermost first. */
-export function inlineSpansAround(state: EditorState, from: number, to: number): InlineSpan[] {
+/**
+ * Every span that holds the whole selection, innermost first, then every one
+ * the selection holds -- the ones a wrap round the whole takes the place of.
+ */
+export function inlineSpansOf(state: EditorState, from: number, to: number): InlineSpan[] {
   const spans: InlineSpan[] = [];
-  for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(from, 1); node; node = node.parent) {
+  const add = (node: SyntaxNode) => {
     const action = SPAN_NODES[node.name];
-    if (!action || node.from > from || node.to < to) continue;
-    const text = textRange(node);
+    const text = action && textRange(node);
     if (text) spans.push({ action, from: node.from, to: node.to, textFrom: text.from, textTo: text.to });
+  };
+  const tree = syntaxTree(state);
+  for (let node: SyntaxNode | null = tree.resolveInner(from, 1); node; node = node.parent) {
+    if (node.from <= from && to <= node.to) add(node);
+  }
+  if (from < to) {
+    tree.iterate({
+      from,
+      to,
+      enter: (node) => {
+        // The selection exactly is one of the spans around it, found above.
+        if (from <= node.from && node.to <= to && !(node.from === from && node.to === to)) add(node.node);
+      },
+    });
   }
   return spans;
 }

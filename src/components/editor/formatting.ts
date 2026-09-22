@@ -34,13 +34,13 @@ export interface FormattingResult {
 }
 
 /**
- * A bold, italic, struck or linked span around a selection, as the editor's
- * Markdown parser reads it (see cm-inline-spans).
+ * A bold, italic, struck or linked span around a selection or inside it, as
+ * the editor's Markdown parser reads it (see cm-inline-spans).
  *
- * The markers beside a selection only say it is bold when the whole bold run
- * is selected. A word in the middle of `**a discipline you commit to**` has
- * none next to it, and it is the parser that knows the word is bold. Callers
- * without a parser pass none, and get what the markers alone say.
+ * The markers beside a selection cannot say whether it is bold. A word in the
+ * middle of `**a discipline you commit to**` has none next to it, and in
+ * `**a** b **c**` the `**` on each side of `b` close and open two other spans:
+ * it is the parser that knows which marker closes which.
  */
 export interface InlineSpan {
   action: 'bold' | 'italic' | 'strikethrough' | 'link';
@@ -88,35 +88,6 @@ const INLINE_MARKERS = /\*\*|__|~~|`|\*|_/g;
  * it out would change what the text says.
  */
 const SINGLE_TILDE_PAIR = /(?<!~)~(?=[^\s~])([^~]*?[^\s~])~(?!~)/g;
-
-/** How many `character` the string starts with. */
-function leadingRun(text: string, character: string): number {
-  let run = 0;
-  while (run < text.length && text[run] === character) run += 1;
-  return run;
-}
-
-/** How many `character` the string ends with. */
-function trailingRun(text: string, character: string): number {
-  let run = 0;
-  while (run < text.length && text[text.length - 1 - run] === character) run += 1;
-  return run;
-}
-
-/**
- * Whether a run of that many marker characters carries this marker.
- *
- * Emphasis and strong emphasis are written with the same character -- `*` is a
- * prefix of `**` -- so asking only whether the text beside the selection
- * begins with the marker reads the inner asterisks of `**bold**` as italic,
- * and "unwraps" it by taking one from each side: the bold is destroyed and no
- * italic arrives. The length of the whole run is what tells them apart. One is
- * italic, two are bold, three are both.
- */
-function runCarries(run: number, marker: string): boolean {
-  if (marker.length === 1) return run === 1 || run >= 3;
-  return run >= marker.length;
-}
 
 /**
  * The inline markers stripped out of a selection.
@@ -202,29 +173,6 @@ function everyLine(text: string, from: number, to: number, test: (line: string) 
 
 const headingPrefix = (level: number) => `${'#'.repeat(level)} `;
 
-/**
- * Where a selection already carries a wrap: with the markers just outside it
- * (the words were selected) or at its own ends (the markers were selected
- * too). Null when clicking the button would add the marker rather than take it
- * off.
- */
-function wrapAround(text: string, from: number, to: number, marker: string): 'outside' | 'inside' | null {
-  const selected = text.slice(from, to);
-  const character = marker[0];
-  // Two past the marker is as far as this has to look to tell a run of one
-  // from two from three.
-  const look = marker.length + 2;
-  const outsideRun = Math.min(
-    trailingRun(text.slice(Math.max(0, from - look), from), character),
-    leadingRun(text.slice(to, Math.min(text.length, to + look)), character),
-  );
-  if (runCarries(outsideRun, marker)) return 'outside';
-
-  const insideRun = Math.min(leadingRun(selected, character), trailingRun(selected, character));
-  if (selected.length >= marker.length * 2 && runCarries(insideRun, marker)) return 'inside';
-  return null;
-}
-
 /** The index of the `)` closing the parenthesis at `open`, on the same line; -1 if none. */
 function closingParen(text: string, open: number): number {
   let depth = 0;
@@ -286,11 +234,14 @@ function linkAround(text: string, from: number, to: number): LinkSpan | null {
 /**
  * The span of this kind that a selection sits inside, or is, markers and all.
  *
- * The whole span selected is usually caught by the markers at the selection's
- * ends (see wrapAround), but only for the markers the toolbar writes: `~x~`
- * is struck through as surely as `~~x~~` and has no `~~` to find.
+ * Asked of the parser rather than read from the markers at the selection's
+ * ends: `*it* and **Bold**` selected whole starts and ends with asterisks, and
+ * is neither italic nor bold -- the `*` and the `**` close two other spans,
+ * and so do the two `**` of `**Start** middle **end**`. Taking a marker off
+ * each end of those broke both spans and removed no formatting at all.
  */
 function spanAround(
+  text: string,
   spans: readonly InlineSpan[],
   action: FormattingAction,
   from: number,
@@ -300,9 +251,44 @@ function spanAround(
   if (from === to) return undefined;
   return spans.find(
     (span) =>
-      span.action === action &&
-      ((span.textFrom <= from && to <= span.textTo) || (span.from === from && span.to === to)),
+      span.action === action && ((span.textFrom <= from && to <= span.textTo) || isSpanSelected(text, span, from, to)),
   );
+}
+
+/**
+ * Whether the selection is the span, markers and all. It may reach past them
+ * into the markers of a span around this one: `***grace***` selected whole is
+ * bold as much as it is italic, and its bold is the inner `**` pair.
+ */
+function isSpanSelected(text: string, span: InlineSpan, from: number, to: number): boolean {
+  if (span.from < from || to < span.to) return false;
+  const marker = text[span.from];
+  const onlyMarkers = (part: string) => [...part].every((character) => character === marker);
+  return (
+    (span.from === from && span.to === to) ||
+    (span.action !== 'link' && onlyMarkers(text.slice(from, span.from)) && onlyMarkers(text.slice(span.to, to)))
+  );
+}
+
+/**
+ * `text` between `from` and `to`, with these spans' markers taken out: the
+ * spans of a kind already inside a selection, before one pair of that kind
+ * goes round the whole.
+ */
+function withoutMarkers(text: string, from: number, to: number, spans: readonly InlineSpan[]): string {
+  const cuts = spans
+    .flatMap((span) => [
+      [span.from, span.textFrom],
+      [span.textTo, span.to],
+    ])
+    .sort((a, b) => a[0] - b[0]);
+  let words = '';
+  let at = from;
+  for (const [cutFrom, cutTo] of cuts) {
+    words += text.slice(at, cutFrom);
+    at = cutTo;
+  }
+  return words + text.slice(at, to);
 }
 
 /** The part of a selection that is a span's text, without its markers. */
@@ -388,15 +374,15 @@ function splitSpan(text: string, from: number, to: number, span: InlineSpan): Fo
 export function activeFormattingActions(
   text: string,
   selection: { from: number; to: number },
-  spans: readonly InlineSpan[] = [],
+  spans: readonly InlineSpan[],
 ): FormattingAction[] {
   const { from, to } = selection;
   const active: FormattingAction[] = [];
 
-  for (const [action, marker] of Object.entries(WRAPS) as [FormattingAction, string][]) {
-    if (wrapAround(text, from, to, marker) || spanAround(spans, action, from, to)) active.push(action);
+  for (const action of Object.keys(WRAPS) as FormattingAction[]) {
+    if (spanAround(text, spans, action, from, to)) active.push(action);
   }
-  if (linkAround(text, from, to) || spanAround(spans, 'link', from, to)) active.push('link');
+  if (linkAround(text, from, to) || spanAround(text, spans, 'link', from, to)) active.push('link');
   for (const [action, level] of Object.entries(HEADING_LEVELS) as [FormattingAction, number][]) {
     const want = headingPrefix(level);
     if (everyLine(text, from, to, (line) => line.trimStart().startsWith(want))) active.push(action);
@@ -412,7 +398,7 @@ export function applyFormattingAction(
   text: string,
   selection: { from: number; to: number },
   action: FormattingAction,
-  spans: readonly InlineSpan[] = [],
+  spans: readonly InlineSpan[],
 ): FormattingResult | null {
   const { from, to } = selection;
   const selected = text.slice(from, to);
@@ -460,7 +446,7 @@ export function applyFormattingAction(
     }
     // Some of a link's words: a link cannot be split, so it comes off whole
     // and the words that were selected stay selected.
-    const span = spanAround(spans, action, from, to);
+    const span = spanAround(text, spans, action, from, to);
     if (span) {
       const opening = span.textFrom - span.from;
       const words = wordsOf(span, from, to);
@@ -485,24 +471,8 @@ export function applyFormattingAction(
 
   const marker = WRAPS[action];
   if (!marker) return null;
-  const wrapped = wrapAround(text, from, to, marker);
 
-  if (wrapped === 'outside') {
-    return {
-      changes: [
-        { from: from - marker.length, to: from, insert: '' },
-        { from: to, to: to + marker.length, insert: '' },
-      ],
-      selection: { anchor: from - marker.length, head: to - marker.length },
-    };
-  }
-
-  if (wrapped === 'inside') {
-    const bare = selected.slice(marker.length, -marker.length);
-    return { changes: [{ from, to, insert: bare }], selection: { anchor: from, head: from + bare.length } };
-  }
-
-  const span = spanAround(spans, action, from, to);
+  const span = spanAround(text, spans, action, from, to);
   if (span) {
     const words = wordsOf(span, from, to);
     return splitSpan(text, words.from, words.to, span);
@@ -516,8 +486,13 @@ export function applyFormattingAction(
     };
   }
 
+  // Some of the selection may carry this already -- `*it* and **Bold**` made
+  // bold. Those markers come off and one pair goes round the whole: a pair
+  // written round the others reads as neither in the preview.
+  const inside = spans.filter((span) => span.action === action && from <= span.from && span.to <= to);
+  const words = withoutMarkers(text, from, to, inside);
   return {
-    changes: [{ from, to, insert: marker + selected + marker }],
-    selection: { anchor: from + marker.length, head: from + marker.length + selected.length },
+    changes: [{ from, to, insert: marker + words + marker }],
+    selection: { anchor: from + marker.length, head: from + marker.length + words.length },
   };
 }
