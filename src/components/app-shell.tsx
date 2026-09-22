@@ -161,14 +161,17 @@ interface NavItem {
 // Grouped by route prefix, and sorted by href inside each group. The group
 // labels are the same ones the breadcrumb uses for those segments, so the trail
 // in the topbar names the section the sidebar highlights.
-const ROOT_NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/documents', label: 'Documents', icon: FileText },
-];
+const ROOT_NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
 
+// Documents keeps a root-level href while sitting in this group: what puts an
+// item here is who it is for, not the namespace it sits under. Managing source
+// documents is admin-only, so the group is where it belongs -- hiding it in the
+// root group instead named the section it answers to nowhere in the UI.
+//
 // Announcements is deliberately absent: it authors what What's New shows, so it
 // lives next to it in the footer rather than a section away.
 const ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/admin/languages', label: 'Languages', icon: Languages },
   { href: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { href: '/admin/users', label: 'Users', icon: Users },
@@ -368,9 +371,7 @@ function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: Sessio
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {/* Documents is admin-only like the two namespaces below it, so it joins
-            the root group only for admins rather than forming a group of one. */}
-        <SidebarNavGroup items={isAdmin ? ROOT_NAV_ITEMS : ROOT_NAV_ITEMS.slice(0, 1)} />
+        <SidebarNavGroup items={ROOT_NAV_ITEMS} />
         {isAdmin && (
           <>
             <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />
