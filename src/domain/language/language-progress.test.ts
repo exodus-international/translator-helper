@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentStatus, SourceProjectStatus } from '@/generated/prisma/enums';
-import { rollUpLanguageProgress, type LanguageDocumentRow } from './language-progress';
+import { buildLanguageDocumentRows, rollUpLanguageProgress, type LanguageDocumentRow } from './language-progress';
 
 const EXODUS = { projectId: 'p1', projectName: 'Exodus90 2026', projectStatus: SourceProjectStatus.ACTIVE };
 const ADVENT = { projectId: 'p2', projectName: 'Advent 2025', projectStatus: SourceProjectStatus.ACTIVE };
@@ -40,6 +40,18 @@ describe('rollUpLanguageProgress', () => {
     const progress = rollUpLanguageProgress([doc(EXODUS, null), doc(EXODUS, null), doc(ADVENT, DocumentStatus.APPROVED)]);
 
     assert.equal(progress.missingVersions, 2);
+  });
+
+  it('does not count a gap in a completed project, which the headline never shows', () => {
+    // The banner says these documents "count as untranslated above". One in a
+    // completed project is not above at all, so counting it made the warning
+    // contradict the figure it sits under.
+    const progress = rollUpLanguageProgress([doc(EXODUS, DocumentStatus.DEPLOYED), doc(SUMMER, null)]);
+
+    assert.equal(progress.documents, 1);
+    assert.equal(progress.percent, 100);
+    assert.equal(progress.byStatus[DocumentStatus.PENDING_TRANSLATION], 0);
+    assert.equal(progress.missingVersions, 0);
   });
 
   it('says nothing is missing when every document has a version', () => {
@@ -156,5 +168,80 @@ describe('rollUpLanguageProgress', () => {
 
     assert.equal(progress.documents, 21);
     assert.equal(progress.percent, 38);
+  });
+});
+
+describe('buildLanguageDocumentRows', () => {
+  const project = (id: string, name: string, status: SourceProjectStatus = SourceProjectStatus.ACTIVE) => ({
+    id,
+    name,
+    status,
+  });
+
+  it('gives a language one row per document in every project it is translated in', () => {
+    const rows = buildLanguageDocumentRows({
+      translationProjects: [
+        { languageId: 'hr', sourceProject: project('p1', 'Exodus90 2026') },
+        { languageId: 'cs', sourceProject: project('p1', 'Exodus90 2026') },
+      ],
+      documents: [
+        { id: 'd1', sourceProjectId: 'p1' },
+        { id: 'd2', sourceProjectId: 'p1' },
+      ],
+      versions: [{ documentId: 'd1', languageId: 'cs', status: DocumentStatus.DEPLOYED }],
+    });
+
+    assert.equal(rows.get('hr')?.length, 2);
+    assert.deepEqual(
+      rows.get('cs')?.map((row) => row.status),
+      [DocumentStatus.DEPLOYED, null],
+    );
+  });
+
+  it('gives a language nothing from a project it is not translated in', () => {
+    // The numerator used to ignore this, so a deployed version in a project the
+    // language had no translation project on counted without its document ever
+    // reaching the denominator -- which can read above 100%.
+    const rows = buildLanguageDocumentRows({
+      translationProjects: [{ languageId: 'hr', sourceProject: project('p1', 'Exodus90 2026') }],
+      documents: [{ id: 'd9', sourceProjectId: 'p2' }],
+      versions: [{ documentId: 'd9', languageId: 'hr', status: DocumentStatus.DEPLOYED }],
+    });
+
+    assert.deepEqual(rows.get('hr'), []);
+  });
+
+  it('keeps a project a language joined before anyone added documents', () => {
+    const rows = buildLanguageDocumentRows({
+      translationProjects: [{ languageId: 'hr', sourceProject: project('p1', 'Lent 2026') }],
+      documents: [],
+      versions: [],
+    });
+
+    assert.deepEqual(rows.get('hr'), []);
+    assert.equal(rollUpLanguageProgress(rows.get('hr') ?? []).percent, 0);
+  });
+
+  it('carries the project status through, so completed work can be told apart', () => {
+    const rows = buildLanguageDocumentRows({
+      translationProjects: [
+        { languageId: 'hr', sourceProject: project('p3', 'Summer Retreat 2025', SourceProjectStatus.COMPLETE) },
+      ],
+      documents: [{ id: 'd1', sourceProjectId: 'p3' }],
+      versions: [{ documentId: 'd1', languageId: 'hr', status: DocumentStatus.DEPLOYED }],
+    });
+
+    assert.equal(rows.get('hr')?.[0].projectStatus, SourceProjectStatus.COMPLETE);
+    assert.equal(rollUpLanguageProgress(rows.get('hr') ?? []).documents, 0);
+  });
+
+  it('ignores a document with no source project', () => {
+    const rows = buildLanguageDocumentRows({
+      translationProjects: [{ languageId: 'hr', sourceProject: project('p1', 'Exodus90 2026') }],
+      documents: [{ id: 'd1', sourceProjectId: null }],
+      versions: [],
+    });
+
+    assert.deepEqual(rows.get('hr'), []);
   });
 });

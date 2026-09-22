@@ -58,8 +58,10 @@ export interface LanguageProgress {
   projects: LanguageProjectProgress[];
   lifetime: LanguageLifetime;
   /**
-   * Documents with no version in this language. Counted as pending above; named
-   * separately because it means a document escaped both seeding paths.
+   * Documents in ACTIVE projects with no version in this language. Counted as
+   * pending above, and reported separately because it means a document escaped
+   * both seeding paths. Scoped like the figures beside it, so the warning
+   * cannot describe work the headline never counted.
    */
   missingVersions: number;
 }
@@ -82,7 +84,12 @@ export function rollUpLanguageProgress(rows: LanguageDocumentRow[]): LanguagePro
   for (const row of rows) {
     // A document nobody has started is untranslated work, not absent work.
     const status = row.status ?? DocumentStatus.PENDING_TRANSLATION;
-    if (row.status === null) {
+    const isActive = row.projectStatus === SourceProjectStatus.ACTIVE;
+
+    // Scoped to active projects like everything it is shown beside: the page
+    // says these documents "count as untranslated above", and one in a
+    // completed project does not appear above at all.
+    if (row.status === null && isActive) {
       missingVersions += 1;
     }
 
@@ -105,7 +112,7 @@ export function rollUpLanguageProgress(rows: LanguageDocumentRow[]): LanguagePro
     }
     projects.set(row.projectId, project);
 
-    if (row.projectStatus === SourceProjectStatus.ACTIVE) {
+    if (isActive) {
       byStatus[status] += 1;
     }
   }
@@ -152,4 +159,63 @@ function sortByName(projects: (LanguageProjectProgress & { status: SourceProject
       deployed: project.deployed,
       percent: project.percent,
     }));
+}
+
+// ─── Building the rows ───────────────────────────────────────
+
+export interface LanguageRowInputs {
+  /** Which language is translated in which project. */
+  translationProjects: { languageId: string; sourceProject: { id: string; name: string; status: SourceProjectStatus } }[];
+  documents: { id: string; sourceProjectId: string | null }[];
+  versions: { documentId: string; languageId: string; status: DocumentStatus }[];
+}
+
+/**
+ * One row per document a language is expected to translate, keyed by language.
+ *
+ * The index needs this for every language at once and the overview for one, but
+ * they must mean the same thing: a language is expected to translate a document
+ * when it has a translation project on that document's source project, and the
+ * document's status in that language is whatever version exists, or none.
+ *
+ * Written apart from the queries so it can be tested without a database --
+ * the index used to restate this in SQL aggregates, which is how it came to
+ * disagree with the overview.
+ */
+export function buildLanguageDocumentRows({
+  translationProjects,
+  documents,
+  versions,
+}: LanguageRowInputs): Map<string, LanguageDocumentRow[]> {
+  const documentsByProject = new Map<string, string[]>();
+  for (const document of documents) {
+    if (!document.sourceProjectId) continue;
+    documentsByProject.set(document.sourceProjectId, [
+      ...(documentsByProject.get(document.sourceProjectId) ?? []),
+      document.id,
+    ]);
+  }
+
+  const statusByDocumentAndLanguage = new Map<string, DocumentStatus>();
+  for (const version of versions) {
+    statusByDocumentAndLanguage.set(`${version.documentId}:${version.languageId}`, version.status);
+  }
+
+  const rows = new Map<string, LanguageDocumentRow[]>();
+  for (const { languageId, sourceProject } of translationProjects) {
+    const forLanguage = rows.get(languageId) ?? [];
+
+    for (const documentId of documentsByProject.get(sourceProject.id) ?? []) {
+      forLanguage.push({
+        projectId: sourceProject.id,
+        projectName: sourceProject.name,
+        projectStatus: sourceProject.status,
+        status: statusByDocumentAndLanguage.get(`${documentId}:${languageId}`) ?? null,
+      });
+    }
+
+    rows.set(languageId, forLanguage);
+  }
+
+  return rows;
 }

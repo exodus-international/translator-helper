@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, TriangleAlert } from 'lucide-react';
+import { ChevronRight, TriangleAlert } from 'lucide-react';
 
 import { PageHeader } from '@/components/page-header';
 import { LanguageTabs } from '@/components/language-tabs';
@@ -138,10 +138,11 @@ export default function LanguageOverviewClient({
           <StatRow progress={progress} lastDeployAt={lastDeployAt} />
 
           <div className="overflow-hidden rounded-xl border">
-            <div className="bg-muted/50 text-muted-foreground grid grid-cols-[minmax(0,1fr)_5.5rem] gap-4 px-4 py-2.5 text-[11px] font-semibold tracking-wide uppercase sm:grid-cols-[minmax(0,1fr)_8rem_5.5rem]">
+            <div className="bg-muted/50 text-muted-foreground grid grid-cols-[minmax(0,1fr)_5.5rem] gap-4 px-4 py-2.5 text-[11px] font-semibold tracking-wide uppercase sm:grid-cols-[minmax(0,1fr)_8rem_5.5rem] lg:grid-cols-[minmax(0,1fr)_8rem_5.5rem_1.25rem]">
               <span>Project</span>
               <span className="hidden sm:block">Progress</span>
               <span className="text-right">Deployed</span>
+              <span className="hidden lg:block" />
             </div>
 
             {progress.projects.length === 0 ? (
@@ -264,7 +265,7 @@ function ProjectRow({ project }: { project: LanguageProjectProgress }) {
   return (
     <Link
       href={`/projects/${project.id}`}
-      className="hover:bg-muted/40 grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-4 border-t px-4 py-3 transition-colors sm:grid-cols-[minmax(0,1fr)_8rem_5.5rem]"
+      className="hover:bg-muted/40 grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-4 border-t px-4 py-3 transition-colors sm:grid-cols-[minmax(0,1fr)_8rem_5.5rem] lg:grid-cols-[minmax(0,1fr)_8rem_5.5rem_1.25rem]"
     >
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">{project.name}</p>
@@ -281,9 +282,7 @@ function ProjectRow({ project }: { project: LanguageProjectProgress }) {
           {project.deployed}/{project.documents}
         </span>
       </p>
-      <span className="sr-only">
-        <ArrowUpRight />
-      </span>
+      <ChevronRight className="text-muted-foreground hidden size-4 lg:block" aria-hidden />
     </Link>
   );
 }

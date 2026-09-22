@@ -1,7 +1,12 @@
 import prisma from '@/lib/db';
-import { AudioProvider, DocumentStatus, ProjectRole, SourceProjectStatus } from '@/generated/prisma/enums';
+import { AudioProvider, ProjectRole, SourceProjectStatus } from '@/generated/prisma/enums';
 import type { LanguageDependents } from './language-delete';
-import { rollUpLanguageProgress, percentage, type LanguageDocumentRow, type LanguageProgress } from './language-progress';
+import {
+  buildLanguageDocumentRows,
+  rollUpLanguageProgress,
+  type LanguageDocumentRow,
+  type LanguageProgress,
+} from './language-progress';
 
 /** Everything a document can be translated *into*, which is every language but the source. */
 export async function listTargetLanguages() {
@@ -88,7 +93,7 @@ export interface LanguageListRow {
  * further along than it was.
  */
 export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
-  const [languages, managers, documentTotals, deployedCounts] = await Promise.all([
+  const [languages, managers, translationProjects, documents, versions] = await Promise.all([
     prisma.language.findMany({
       // Targets first, the source language last: it is context, not work.
       orderBy: [{ isSource: 'asc' }, { name: 'asc' }],
@@ -99,18 +104,22 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
       select: { languageId: true, user: { select: { name: true } } },
       orderBy: { user: { name: 'asc' } },
     }),
-    // Every document in an active project the language is translated in.
+    // Which languages are translated in which project, and the documents and
+    // versions to match them up. Three narrow reads rather than two aggregates:
+    // the aggregates had to restate the roll-up's definition, and restating it
+    // is how the index came to disagree with the overview about the same
+    // language -- a project with no documents counted here and not there.
     prisma.translationProject.findMany({
       where: { sourceProject: { status: SourceProjectStatus.ACTIVE } },
-      select: { languageId: true, sourceProject: { select: { _count: { select: { documents: true } } } } },
+      select: { languageId: true, sourceProject: { select: { id: true, name: true, status: true } } },
     }),
-    prisma.documentVersion.groupBy({
-      by: ['languageId'],
-      where: {
-        status: DocumentStatus.DEPLOYED,
-        document: { sourceProject: { status: SourceProjectStatus.ACTIVE } },
-      },
-      _count: { _all: true },
+    prisma.document.findMany({
+      where: { sourceProject: { status: SourceProjectStatus.ACTIVE } },
+      select: { id: true, sourceProjectId: true },
+    }),
+    prisma.documentVersion.findMany({
+      where: { document: { sourceProject: { status: SourceProjectStatus.ACTIVE } } },
+      select: { documentId: true, languageId: true, status: true },
     }),
   ]);
 
@@ -119,31 +128,30 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
     managerNames.set(manager.languageId, [...(managerNames.get(manager.languageId) ?? []), manager.user.name]);
   }
 
-  const documents = new Map<string, number>();
-  const activeProjects = new Map<string, number>();
-  for (const translationProject of documentTotals) {
-    const current = documents.get(translationProject.languageId) ?? 0;
-    documents.set(translationProject.languageId, current + translationProject.sourceProject._count.documents);
-    activeProjects.set(translationProject.languageId, (activeProjects.get(translationProject.languageId) ?? 0) + 1);
-  }
+  const rowsByLanguage = buildLanguageDocumentRows({ translationProjects, documents, versions });
 
-  const deployed = new Map(deployedCounts.map((group) => [group.languageId, group._count._all]));
+  return languages.map((language) => {
+    const progress = rollUpLanguageProgress(rowsByLanguage.get(language.id) ?? []);
 
-  return languages.map((language) => ({
-    id: language.id,
-    code: language.code,
-    name: language.name,
-    isSource: language.isSource,
-    branchName: language.branchName,
-    audioVoice: language.audioVoice,
-    translationInstructions: language.translationInstructions,
-    memberCount: language._count.users,
-    projectCount: activeProjects.get(language.id) ?? 0,
-    managerNames: managerNames.get(language.id) ?? [],
-    deployedCount: deployed.get(language.id) ?? 0,
-    documentCount: documents.get(language.id) ?? 0,
-    percent: percentage(deployed.get(language.id) ?? 0, documents.get(language.id) ?? 0),
-  }));
+    return {
+      id: language.id,
+      code: language.code,
+      name: language.name,
+      isSource: language.isSource,
+      branchName: language.branchName,
+      audioVoice: language.audioVoice,
+      translationInstructions: language.translationInstructions,
+      memberCount: language._count.users,
+      // Counted from the translation projects rather than from the roll-up: a
+      // project a language has joined but nobody has filled with documents yet
+      // is still a project it is in.
+      projectCount: translationProjects.filter((tp) => tp.languageId === language.id).length,
+      managerNames: managerNames.get(language.id) ?? [],
+      deployedCount: progress.deployed,
+      documentCount: progress.documents,
+      percent: progress.percent,
+    };
+  });
 }
 
 /**
