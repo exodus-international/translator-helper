@@ -219,6 +219,11 @@ export function StatusDropdown({
   const triggerButton = (
     <Button
       variant="outline"
+      // The visible text is the status itself, which changes as the document
+      // moves and is repeated by the stepper. Naming the control by what it
+      // does, and carrying the status inside that name, gives screen readers
+      // "Document status: Texts in Review" instead of a bare badge.
+      aria-label={`Document status: ${currentStatusConfig.name}`}
       disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
       className={cn(
         'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
