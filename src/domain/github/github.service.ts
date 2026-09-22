@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { App } from 'octokit';
 import { resolveFilePath } from './github.paths';
 import { createGitHubCommit } from './github.repository';
+import { DeploySkippedError } from './github.errors';
 
 const LOG_PREFIX = '[GitHub]';
 
@@ -185,7 +186,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
   console.log(`${LOG_PREFIX} Original filename: ${document.originalFilename || 'NOT SET'}`);
   console.log(`${LOG_PREFIX} Branch name: ${language.branchName || 'NOT SET'}`);
   console.log(`${LOG_PREFIX} Source project: ${document.sourceProject?.name || 'NOT SET'}`);
-  console.log(`${LOG_PREFIX} Source project identifier: ${document.sourceProject?.identifier || 'NOT SET'}`);
+  console.log(`${LOG_PREFIX} Repository directory: ${document.sourceProject?.repositoryDirectory || 'NOT SET'}`);
 
   // Validate required fields
   if (!language.branchName) {
@@ -196,8 +197,10 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     throw new Error(`Document "${document.title}" is not associated with a source project`);
   }
 
-  if (!document.sourceProject.identifier) {
-    throw new Error(`Source project "${document.sourceProject.name}" does not have an identifier configured`);
+  if (!document.sourceProject.repositoryDirectory) {
+    throw new DeploySkippedError(
+      `Source project "${document.sourceProject.name}" has no repository directory, so it is not deployed to GitHub`,
+    );
   }
 
   if (!document.type) {
@@ -214,7 +217,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
   const filePath = resolveFilePath({
     documentType: document.type,
     languageCode: language.code,
-    identifier: document.sourceProject.identifier,
+    repositoryDirectory: document.sourceProject.repositoryDirectory,
     originalFilename: document.originalFilename,
     slug: document.slug,
   });
@@ -241,7 +244,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     `- **File**: \`${filePath}\``,
     `- **Source Project**: ${document.sourceProject.name}`,
     `- **Translator**: ${version.user?.name ?? 'Unassigned'}`,
-    `- **Link to document**: ${process.env.NEXT_PUBLIC_APP_URL}${buildDocumentPath({ projectIdentifier: document.sourceProject?.identifier, slug: document.slug, languageCode: version.language.code, documentId: document.id })}`,
+    `- **Link to document**: ${process.env.NEXT_PUBLIC_APP_URL}${buildDocumentPath({ projectSlug: document.sourceProject?.slug, slug: document.slug, languageCode: version.language.code, documentId: document.id })}`,
     ...(audio.state === 'ready' && audio.url ? [`- **Audio**: ${audio.url}`] : []),
   ].join('\n');
 

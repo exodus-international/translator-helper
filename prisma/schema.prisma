@@ -5,10 +5,10 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  runtime      = "nodejs"
-  moduleFormat = "esm"
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "esm"
   generatedFileExtension = "ts"
 }
 
@@ -97,16 +97,38 @@ enum AnnouncementType {
   MODAL
 }
 
+enum NotificationType {
+  ASSIGNED_TRANSLATOR
+  ASSIGNED_REVIEWER
+  UNASSIGNED
+  REVIEW_REQUESTED
+  DEADLINE_CHANGED
+  DEADLINE_APPROACHING
+  DEADLINE_PASSED
+  DEADLINE_ESCALATION
+  CHANGES_REQUESTED
+  TRANSLATION_APPROVED
+  SUGGESTION_ADDED
+  SUGGESTION_REPLY
+}
+
+enum NotificationEmailStatus {
+  PENDING // waiting for the sweep to put it in the next digest
+  SENT
+  SKIPPED // email off for this type, not configured, or already read in the app
+  FAILED
+}
+
 model User {
-  id                     String                  @id @default(uuid())
-  email                  String                  @unique
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
+  id                     String                   @id @default(uuid())
+  email                  String                   @unique
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
   name                   String
-  emailVerified          Boolean                 @default(false)
+  emailVerified          Boolean                  @default(false)
   image                  String?
-  role                   Role                    @default(USER)
-  banned                 Boolean                 @default(false)
+  role                   Role                     @default(USER)
+  banned                 Boolean                  @default(false)
   banReason              String?
   banExpires             DateTime?
   streetAddress          String?
@@ -116,20 +138,23 @@ model User {
   country                String?
   tShirtSize             TShirtSize?
   exodus90AppId          String?
-  onboarded              Boolean                 @default(false)
+  onboarded              Boolean                  @default(false)
   sessions               Session[]
   accounts               Account[]
   documentVersions       DocumentVersion[]
-  reviewedVersions       DocumentVersion[]       @relation("ReviewedBy")
+  reviewedVersions       DocumentVersion[]        @relation("ReviewedBy")
   comments               Comment[]
   activityLogs           ActivityLog[]
-  assignedVersions       DocumentVersion[]       @relation("AssignedBy")
+  assignedVersions       DocumentVersion[]        @relation("AssignedBy")
   languages              UserLanguage[]
   suggestions            Suggestion[]
   triggeredAudioFiles    AudioFile[]
   suggestionReplies      SuggestionReply[]
-  invitationsCreated     Invitation[]            @relation("InvitationsCreated")
+  invitationsCreated     Invitation[]             @relation("InvitationsCreated")
   announcementDismissals AnnouncementDismissal[]
+  notifications          Notification[]
+  notificationsCaused    Notification[]           @relation("NotificationActor")
+  notificationPrefs      NotificationPreference[]
 
   @@map("user")
 }
@@ -219,7 +244,8 @@ model SourceProject {
   id                  String               @id @default(uuid())
   name                String               @unique
   description         String?              @db.Text
-  identifier          String               @unique // URL segment: /documents/{identifier}/...
+  slug                String               @unique // URL segment: /projects/{slug}, /documents/{slug}/...
+  repositoryDirectory String?              @unique // Folder in the content repository; null means this project is not deployed to GitHub
   acronym             String? // Short prefix for auto-named DAY titles, e.g. "SML" in "SML - DAY 03 - ..."
   status              SourceProjectStatus  @default(ACTIVE)
   audioDocumentTypes  DocumentType[]       @default([DAY, DAILY_CONTENT])
@@ -271,39 +297,43 @@ model Document {
 }
 
 model DocumentVersion {
-  id            String         @id @default(uuid())
-  documentId    String
-  document      Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  languageId    String
-  language      Language       @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  content       String         @db.Text // Markdown content
-  status        DocumentStatus @default(PENDING_TRANSLATION)
-  version       Int            @default(1)
-  userId        String?
-  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  reviewerId    String?
-  reviewer      User?          @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
+  id             String         @id @default(uuid())
+  documentId     String
+  document       Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  languageId     String
+  language       Language       @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  content        String         @db.Text // Markdown content
+  status         DocumentStatus @default(PENDING_TRANSLATION)
+  version        Int            @default(1)
+  userId         String?
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reviewerId     String?
+  reviewer       User?          @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
   // Assignment lives here rather than in a separate record, so a document's
   // translator, reviewer, deadline and status can never drift apart.
-  deadline      DateTime?
-  assignedById  String?
-  assignedBy    User?          @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
-  assignedAt    DateTime?
+  deadline       DateTime?
+  // The reviewer's own due date. Null falls back to `deadline` while the
+  // version waits for review.
+  reviewDeadline DateTime?
+  assignedById   String?
+  assignedBy     User?          @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedAt     DateTime?
   // Hand-edited SSML for the speech provider, sent verbatim in place of the
   // script derived from `content`. Null means "derive it", which is what every
   // version does until someone edits the Audio text tab.
-  audioSsml     String?        @db.Text
+  audioSsml      String?        @db.Text
   // Fingerprint of the SSML that would have been derived when `audioSsml` was
   // saved. Comparing it against a fresh derivation is how an edited transcript
   // learns that the words moved on without it.
-  audioSsmlBase String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  comments      Comment[]
-  activityLogs  ActivityLog[]
-  suggestions   Suggestion[]
-  githubCommits GitHubCommit[]
-  audioFiles    AudioFile[]
+  audioSsmlBase  String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  comments       Comment[]
+  activityLogs   ActivityLog[]
+  suggestions    Suggestion[]
+  githubCommits  GitHubCommit[]
+  audioFiles     AudioFile[]
+  notifications  Notification[]
 
   @@unique([documentId, languageId])
   // The dashboard's "My Work" filters on OR(userId, reviewerId); the
@@ -511,4 +541,53 @@ model InvitationLanguage {
 
   @@unique([invitationId, languageId])
   @@map("invitation_language")
+}
+
+/// One message to one person. The row is the in-app inbox entry and, while
+/// `emailStatus` is PENDING, also the queue the sweep builds email digests from.
+/// Title and body are rendered when the event happens, so the inbox keeps
+/// saying what was true then even after the document is renamed.
+model Notification {
+  id                String                  @id @default(uuid())
+  userId            String
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              NotificationType
+  documentVersionId String?
+  documentVersion   DocumentVersion?        @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  actorId           String?
+  actor             User?                   @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  title             String
+  body              String?                 @db.Text
+  url               String?
+  // Set for the reminders the sweep creates, so running it again (or twice at
+  // once) cannot send the same reminder twice.
+  dedupeKey         String?                 @unique
+  readAt            DateTime?
+  emailStatus       NotificationEmailStatus @default(SKIPPED)
+  emailAttempts     Int                     @default(0)
+  emailSentAt       DateTime?
+  emailError        String?                 @db.Text
+  createdAt         DateTime                @default(now())
+
+  // The bell: newest first per user, and the unread count.
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  // The email sweep's queue.
+  @@index([emailStatus, createdAt])
+  @@map("notification")
+}
+
+/// A user's email choice for one notification type. No row means the type's
+/// default (see notification.catalog.ts). In-app delivery is always on.
+model NotificationPreference {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  email     Boolean
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId, type])
+  @@map("notification_preference")
 }

@@ -52,7 +52,7 @@ type VersionWithDetails = {
     sourceProject: {
       id: string;
       name: string;
-      identifier: string;
+      slug: string;
     } | null;
   };
   language: {
@@ -78,7 +78,7 @@ interface DashboardClientProps {
   user: SessionUser;
   projects: {
     id: string;
-    identifier: string;
+    slug: string;
     name: string;
     description: string | null;
     status: string;
@@ -115,7 +115,7 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 function getVersionUrl(version: VersionWithDetails): string {
   return buildDocumentPath({
-    projectIdentifier: version.document.sourceProject?.identifier,
+    projectSlug: version.document.sourceProject?.slug,
     slug: version.document.slug,
     languageCode: version.language.code,
     documentId: version.document.id,
