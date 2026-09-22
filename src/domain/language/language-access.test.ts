@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { ProjectRole } from '@/generated/prisma/enums';
 import {
   canAdministerLanguages,
+  canDeployLanguage,
   canViewLanguage,
   resolveLanguageViewer,
   visibleLanguages,
@@ -96,5 +97,20 @@ describe('canAdministerLanguages', () => {
     assert.equal(canAdministerLanguages({ kind: 'admin' }), true);
     assert.equal(canAdministerLanguages(manager(HR.id)), false);
     assert.equal(canAdministerLanguages({ kind: 'none' }), false);
+  });
+});
+
+describe('canDeployLanguage', () => {
+  it('lets a manager publish their own language', () => {
+    assert.equal(canDeployLanguage(manager(HR.id), HR.id), true);
+  });
+
+  it('does not let them publish another language', () => {
+    assert.equal(canDeployLanguage(manager(HR.id), CS.id), false);
+  });
+
+  it('lets an admin publish any language, and everyone else none', () => {
+    assert.equal(canDeployLanguage({ kind: 'admin' }, CS.id), true);
+    assert.equal(canDeployLanguage({ kind: 'none' }, CS.id), false);
   });
 });

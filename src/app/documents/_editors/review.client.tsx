@@ -27,6 +27,8 @@ interface ReviewClientProps {
   targetLanguage?: { code: string; name: string } | null;
   translationProjectId?: string | null;
   user: SessionUser;
+  /** Resolved on the server against this version's language. */
+  canDeploy: boolean;
   /** Set when this document gets audio; enables the Audio text tab. */
   audioTextVersionId?: string | null;
   initialSuggestions?: any[];
@@ -45,6 +47,7 @@ export default function ReviewClient({
   targetLanguage,
   translationProjectId = null,
   user,
+  canDeploy,
   audioTextVersionId = null,
   initialSuggestions = [],
 }: ReviewClientProps) {
@@ -60,6 +63,7 @@ export default function ReviewClient({
       translationProjectId={translationProjectId}
       targetLanguageId={initialTargetVersion.languageId ?? ''}
       user={user}
+      canDeploy={canDeploy}
       audioTextVersionId={audioTextVersionId}
       variant="review"
       targetLanguageName={targetLanguage?.name ?? null}

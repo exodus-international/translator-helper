@@ -480,8 +480,10 @@ export default function DashboardClient({
             )}
           </section>
 
-          {/* Waiting for Deploy section - deployers only */}
-          {isAdminClient(user) && approvedVersions.length > 0 && (
+          {/* Waiting for Deploy — the server returns only what this person can
+              publish, so an empty list is the gate: all languages for an
+              administrator, their own for a language manager, none otherwise. */}
+          {approvedVersions.length > 0 && (
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">

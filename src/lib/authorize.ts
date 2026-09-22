@@ -8,7 +8,6 @@ type ProjectPermissionRole = 'manager' | 'reviewer' | 'editor' | 'translator' | 
 type Permission =
   | 'authenticated'
   | 'admin'
-  | 'can:deploy'
   | 'can:manage-folders'
   | 'can:manage-languages'
   | { project: string; role: ProjectPermissionRole }
@@ -64,7 +63,7 @@ export function createAuthorize(deps: AuthorizeDeps = defaultDeps) {
 
       const isAdmin = user.role === Role.ADMIN;
 
-      if (permission === 'admin' || permission === 'can:deploy' || permission === 'can:manage-folders' || permission === 'can:manage-languages') {
+      if (permission === 'admin' || permission === 'can:manage-folders' || permission === 'can:manage-languages') {
         if (!isAdmin) {
           throw new Error(`Forbidden: requires '${permission}' permission`);
         }

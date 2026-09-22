@@ -36,7 +36,8 @@ import { assertCanEditDocumentVersion } from './document-version.permissions';
 import { validateTransition } from './document-version.transitions';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
-import { getUserRoleForLanguage } from '../user-language/user-language.repository';
+import { getUserLanguages, getUserRoleForLanguage } from '../user-language/user-language.repository';
+import { resolveLanguageViewer } from '../language/language-access';
 import { getSourceProjectById } from '../source-project/source-project.repository';
 import {
   createTranslationProject,
@@ -244,15 +245,17 @@ export async function updateDocumentVersionStatusAction(
 }> {
   const { user } = await authorize('authenticated');
 
-  // Check permission for DEPLOYED status
-  if (status === DocumentStatus.DEPLOYED && user.role !== Role.ADMIN) {
-    throw new Error('Forbidden: Only deployers can deploy documents');
-  }
-
   // Get existing version to validate transition
   const existingVersion = await getDocumentVersionById(versionId);
   if (!existingVersion) {
     throw new Error('Document version not found');
+  }
+
+  // Deploying publishes this language's work to the content repository, so it
+  // belongs to the people answerable for that language -- its manager and any
+  // administrator. Leaving DEPLOYED is the same decision in reverse.
+  if (status === DocumentStatus.DEPLOYED || existingVersion.status === DocumentStatus.DEPLOYED) {
+    await authorize({ language: existingVersion.languageId, role: 'manager' });
   }
 
   if (status === DocumentStatus.APPROVED || status === DocumentStatus.DEPLOYED) {
@@ -457,16 +460,30 @@ export async function assignDocumentVersionAction(input: unknown) {
   return version;
 }
 
+/**
+ * The deploy queue: approved work waiting to be published, for the people who
+ * can publish it. An administrator sees every language; a manager sees the
+ * ones they manage, and nobody else has a queue at all.
+ */
 export async function getApprovedVersionsAction() {
   const { user } = await authorize('authenticated');
-  if (user.role !== Role.ADMIN) {
+
+  const viewer = resolveLanguageViewer({
+    isAdmin: user.role === Role.ADMIN,
+    memberships: user.role === Role.ADMIN ? [] : await getUserLanguages(user.id),
+  });
+
+  if (viewer.kind === 'none') {
     return [];
   }
 
   return prisma.documentVersion.findMany({
     where: {
       status: DocumentStatus.APPROVED,
-      language: { code: { not: 'en' } },
+      language: {
+        isSource: false,
+        ...(viewer.kind === 'manager' ? { id: { in: viewer.languageIds } } : {}),
+      },
     },
     select: assignmentSelect,
     orderBy: {

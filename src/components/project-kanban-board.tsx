@@ -169,6 +169,13 @@ const activeColumnIds = new Set(columns.map((column) => column.id));
 interface ProjectKanbanBoardProps {
   user: SessionUser;
   languages: Language[];
+  /**
+   * Language ids this person may deploy, resolved on the server: every language
+   * for an administrator, the managed ones for a language manager. The Deployed
+   * column is shown to everyone -- seeing what has shipped is not a privilege --
+   * but moving work into or out of it is not.
+   */
+  deployableLanguageIds: string[];
   selectedLanguage: string;
   sourceProjectId?: string;
   translationProjectId?: string | null;
@@ -177,6 +184,7 @@ interface ProjectKanbanBoardProps {
 export default function ProjectKanbanBoard({
   user,
   languages,
+  deployableLanguageIds,
   selectedLanguage,
   sourceProjectId,
   translationProjectId,
@@ -200,6 +208,7 @@ export default function ProjectKanbanBoard({
   >([]);
 
   const isAdmin = isAdminClient(user);
+  const canDeploy = deployableLanguageIds.includes(selectedLanguage);
 
   // Register the active language as a PostHog super property (selectedLanguage prop is a language id)
   const selectedLang = languages.find((lang) => lang.id === selectedLanguage);
@@ -421,6 +430,15 @@ export default function ProjectKanbanBoard({
         const versionId = hasVersion ? doc.versions[0].id : null;
 
         if (newStatus && versionId) {
+          // Refused here rather than by the server after the drop: the card
+          // would otherwise land in the column, fail, and spring back.
+          const leavingDeployed = getStatusForColumn(oldCard.column) === DocumentStatus.DEPLOYED;
+          if ((newStatus === DocumentStatus.DEPLOYED || leavingDeployed) && !canDeploy) {
+            toast.warning('Only this language\u2019s manager or an administrator can deploy');
+            await loadDocuments();
+            continue;
+          }
+
           if (newStatus === DocumentStatus.DEPLOYED && !(await confirmDeploy(versionId))) {
             await loadDocuments();
             continue;

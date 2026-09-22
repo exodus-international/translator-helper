@@ -3,6 +3,7 @@
 import { listTranslationProjectsAction } from '@/domain/translation-project/translation-project.actions';
 import { listTargetLanguages } from '@/domain/language/language.repository';
 import { resolveInitialLanguage } from '@/domain/language/resolve-initial-language';
+import { canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { canAccessSourceProject } from '@/lib/permissions';
 import { getCurrentUser } from '@/lib/session';
@@ -25,6 +26,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const translationProjects = await listTranslationProjectsAction({ sourceProjectId: sourceProject.id });
   const userLanguages = await getUserLanguages(user.id);
 
+  // Deploying publishes a language's work, so who may do it is decided per
+  // language: every one for an administrator, the managed ones for a manager.
+  const viewer = resolveLanguageViewer({
+    isAdmin: user.role === 'ADMIN',
+    memberships: user.role === 'ADMIN' ? [] : userLanguages,
+  });
+  const deployableLanguageIds = languages
+    .filter((language) => canDeployLanguage(viewer, language.id))
+    .map((language) => language.id);
+
   const initialLanguageId = resolveInitialLanguage({
     userLanguageIds: userLanguages.map((userLanguage) => userLanguage.languageId),
     projectLanguages: translationProjects.map((translationProject) => translationProject.language),
@@ -37,6 +48,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       languages={languages}
       translationProjects={translationProjects}
       initialLanguageId={initialLanguageId}
+      deployableLanguageIds={deployableLanguageIds}
     />
   );
 }

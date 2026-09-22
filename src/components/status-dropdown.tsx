@@ -7,7 +7,6 @@ import { useDeployConfirm } from '@/components/deploy-confirm';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { capture } from '@/lib/analytics';
-import { canDeployClient } from '@/lib/permissions-client';
 import { useStatusTransitionPending, useStatusTransitionStore } from '@/lib/stores/status-transition';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -18,10 +17,19 @@ import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { toast } from 'sonner';
 
+/** Shown wherever deploying is refused, so the reason is the same everywhere. */
+const DEPLOY_DENIED = 'Only this language\u2019s manager or an administrator can deploy';
+
 interface StatusDropdownProps {
   currentStatus: DocumentStatus | null;
   versionId: string;
   user: SessionUser;
+  /**
+   * Resolved on the server against this version's language: an administrator,
+   * or that language's manager. The client cannot answer it from the session
+   * alone, which is why it arrives as a prop.
+   */
+  canDeploy: boolean;
   documentId?: string; // For navigation after status change
   onStatusChange?: (newStatus: DocumentStatus) => void;
   onReviewRequested?: () => void; // Called instead of direct transition when moving to PENDING_REVIEW
@@ -34,6 +42,7 @@ export function StatusDropdown({
   currentStatus,
   versionId,
   user,
+  canDeploy,
   documentId,
   onStatusChange,
   onReviewRequested,
@@ -74,7 +83,7 @@ export function StatusDropdown({
     }
 
     // Filter out DEPLOYED if user doesn't have permission
-    if (!canDeployClient(user)) {
+    if (!canDeploy) {
       statuses = statuses.filter((status) => status !== DocumentStatus.DEPLOYED);
     }
 
@@ -85,7 +94,7 @@ export function StatusDropdown({
     }
 
     return statuses;
-  }, [allowedStatuses, user, currentStatus]);
+  }, [allowedStatuses, canDeploy, currentStatus]);
 
   const forwardLabels: Partial<Record<DocumentStatus, string>> = {
     [DocumentStatus.IN_PROGRESS]: 'Start translation',
@@ -116,13 +125,13 @@ export function StatusDropdown({
     if (newStatus === displayedStatus || loading) return;
 
     // Check permission for DEPLOYED
-    if (newStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
-      toast.warning('Only deployers can deploy documents');
+    if (newStatus === DocumentStatus.DEPLOYED && !canDeploy) {
+      toast.warning(DEPLOY_DENIED);
       return;
     }
 
-    if (displayedStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
-      toast.warning('Only deployers can change the status of a deployed document');
+    if (displayedStatus === DocumentStatus.DEPLOYED && !canDeploy) {
+      toast.warning('Deployed work can only be moved back by this language\u2019s manager or an administrator');
       return;
     }
 

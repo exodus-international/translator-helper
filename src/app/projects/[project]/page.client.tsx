@@ -59,6 +59,8 @@ interface ProjectDetailClientProps {
   }[];
   /** Resolved server-side from the user's assigned languages and this project's translation projects. */
   initialLanguageId: string;
+  /** Language ids this person may deploy: all of them for an admin, their own for a manager. */
+  deployableLanguageIds: string[];
 }
 
 export default function ProjectDetailClient({
@@ -67,6 +69,7 @@ export default function ProjectDetailClient({
   languages,
   translationProjects,
   initialLanguageId,
+  deployableLanguageIds,
 }: ProjectDetailClientProps) {
   const router = useRouter();
   useAnalyticsProjectGroup(sourceProject.id, sourceProject.name);
@@ -211,6 +214,7 @@ export default function ProjectDetailClient({
             <ProjectKanbanBoard
               user={user}
               languages={languages}
+              deployableLanguageIds={deployableLanguageIds}
               selectedLanguage={selectedLanguage}
               sourceProjectId={sourceProject.id}
               translationProjectId={selectedTranslationProject?.id}

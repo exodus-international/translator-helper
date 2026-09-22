@@ -52,6 +52,8 @@ interface ViewerConfig {
   viewerRef?: Ref<SourceTranslationViewerHandle>;
   sourceVersion: any;
   user: SessionUser;
+  /** Resolved on the server against this version's language. */
+  canDeploy: boolean;
   canEditSource: CapFn;
   canCreateSuggestions?: CapFn;
   disableReopen?: CapFn;
@@ -102,6 +104,7 @@ function EditorViewer({
   viewerRef,
   sourceVersion,
   user,
+  canDeploy,
   canEditSource,
   canCreateSuggestions,
   disableReopen,
@@ -262,6 +265,7 @@ function EditorViewer({
                 currentStatus={targetVersion.status}
                 versionId={targetVersion.id}
                 user={user}
+                canDeploy={canDeploy}
                 documentId={documentId}
                 disabled={isAnyLoading}
                 onStatusChange={handleStatusChange}
@@ -391,6 +395,8 @@ interface DocumentEditorProps {
 
   // User
   user: SessionUser;
+  /** Resolved on the server against this version's language. */
+  canDeploy: boolean;
 
   // Header — page-supplied, and now only for chrome a view adds to itself:
   // zen mode's own bar. The default layout has none.
@@ -450,6 +456,7 @@ export function DocumentEditor({
   translationProjectId,
   targetLanguageId,
   user,
+  canDeploy,
   header,
   fullscreen,
   outerClassName,
@@ -539,6 +546,7 @@ export function DocumentEditor({
               viewerRef={viewerRef}
               sourceVersion={sourceVersion}
               user={user}
+              canDeploy={canDeploy}
               canEditSource={canEditSource}
               canCreateSuggestions={canCreateSuggestions}
               disableReopen={disableReopen}
