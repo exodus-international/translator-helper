@@ -29,18 +29,30 @@ const MONO = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberat
  * deliberate — a document is mostly prose, and the marks on it should say
  * *what kind of thing* a token is at a glance, not decorate it:
  *
- *   foreground, heavier   headings, bold, HTML tag names
+ *   foreground, heavier   headings, bold
  *   info                  links and their URLs
- *   chart-2               HTML attributes, YAML keys
- *   chart-3               strings and attribute values
- *   chart-4               numbers and booleans
- *   muted-foreground      markers, list bullets, quotes, inline code
+ *   syntax-tag            HTML tag names, and the selectors of a stylesheet
+ *   syntax-attribute      HTML attributes, CSS properties, YAML keys
+ *   syntax-string         strings and attribute values
+ *   syntax-constant       numbers, units, colours, CSS keywords, entities
+ *   muted-foreground      markers, list bullets, quotes, inline code, and the
+ *                         punctuation of markup: `<` `>` `=` `:` `;` `{ }`
+ *
+ * This is the only style the editor has. CodeMirror's default is registered
+ * as a fallback, and a fallback is used only when no other style is -- so
+ * anything not named here is painted as plain text, not in some default. The
+ * CSS a `style` attribute or block carries arrives with tags of its own
+ * (colours, units, keywords, selectors), and it was one undifferentiated run
+ * until they were listed.
  */
-export const editorHighlightStyle = HighlightStyle.define([
+const editorHighlightStyle = HighlightStyle.define([
   { tag: tags.heading1, color: 'var(--foreground)', fontWeight: '700', fontSize: '1.35em' },
   { tag: tags.heading2, color: 'var(--foreground)', fontWeight: '700', fontSize: '1.2em' },
   { tag: tags.heading3, color: 'var(--foreground)', fontWeight: '650', fontSize: '1.08em' },
   { tag: [tags.heading4, tags.heading5, tags.heading6], color: 'var(--foreground)', fontWeight: '650' },
+  // A table's header row: a heading of no level. Its pipes and the `---` row
+  // under it are markers, like the rest.
+  { tag: tags.heading, color: 'var(--foreground)', fontWeight: '650' },
   { tag: tags.strong, color: 'var(--foreground)', fontWeight: '700' },
   { tag: tags.emphasis, fontStyle: 'italic' },
   { tag: tags.strikethrough, textDecoration: 'line-through' },
@@ -53,12 +65,33 @@ export const editorHighlightStyle = HighlightStyle.define([
   // but not hidden: a translator is writing them, and needs to see where.
   { tag: tags.processingInstruction, color: 'var(--muted-foreground)', opacity: '0.55' },
   // HTML: the content library embeds it, so tags, attributes and the strings
-  // they carry all need to be told apart.
-  { tag: tags.tagName, color: 'var(--foreground)', fontWeight: '600' },
-  { tag: tags.attributeName, color: 'var(--chart-2)' },
-  { tag: [tags.attributeValue, tags.string], color: 'var(--chart-3)' },
-  { tag: [tags.number, tags.bool, tags.null], color: 'var(--chart-4)' },
-  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: 'var(--chart-2)' },
+  // they carry all need to be told apart -- and told apart from the prose
+  // around them, which is the part a translator changes. A tag name in the
+  // foreground at a heavier weight read as bold text; in its own colour, with
+  // the brackets around it quiet, it reads as markup.
+  { tag: tags.tagName, color: 'var(--syntax-tag)' },
+  { tag: tags.className, color: 'var(--syntax-tag)' },
+  { tag: tags.attributeName, color: 'var(--syntax-attribute)' },
+  { tag: [tags.attributeValue, tags.string], color: 'var(--syntax-string)' },
+  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: 'var(--syntax-attribute)' },
+  // `#CC0000`, `15px`, `auto`, `&nbsp;` -- the values a stylesheet or an entity
+  // spells out, as opposed to the names they are given to.
+  {
+    tag: [tags.number, tags.bool, tags.null, tags.atom, tags.color, tags.unit, tags.character],
+    color: 'var(--syntax-constant)',
+  },
+  {
+    tag: [
+      tags.angleBracket,
+      tags.definitionOperator,
+      tags.punctuation,
+      tags.separator,
+      tags.brace,
+      tags.paren,
+      tags.squareBracket,
+    ],
+    color: 'var(--muted-foreground)',
+  },
   { tag: [tags.comment, tags.meta], color: 'var(--muted-foreground)', fontStyle: 'italic' },
 ]);
 
@@ -129,7 +162,7 @@ export const editorTheme = EditorView.theme({
   // The key's own contents are wrapped in a token span, so the tint has to
   // reach through it -- the parser still thinks this is prose.
   '.cm-frontmatter .cm-frontmatter-key, .cm-frontmatter .cm-frontmatter-key span': {
-    color: 'var(--chart-2)',
+    color: 'var(--syntax-attribute)',
   },
   '.cm-suggestion-gutter': {
     width: '18px',

@@ -9,7 +9,7 @@ import { buildProjectPath } from '@/domain/source-project/source-project-url';
 interface ProjectCardProps {
   project: {
     id: string;
-    identifier: string;
+    slug: string;
     name: string;
     description: string | null;
     status: string;
@@ -37,7 +37,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   const totalMembers = uniqueUserIds.size;
 
   return (
-    <Link href={buildProjectPath(project.identifier)}>
+    <Link href={buildProjectPath(project.slug)}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">

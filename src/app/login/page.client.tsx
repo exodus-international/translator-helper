@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-export default function LoginClient() {
+export default function LoginClient({ next = '/dashboard' }: { next?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -28,7 +28,7 @@ export default function LoginClient() {
       });
       if (result.data) {
         capture('user_signed_in', { method: 'email' });
-        router.push('/dashboard');
+        router.push(next);
         // Re-render the root layout with the new session so PostHogProvider
         // receives the user and calls identify() without a full page load.
         router.refresh();

@@ -275,6 +275,7 @@ function EditorViewer({
           reviewer={targetVersion?.reviewer}
           language={targetVersion?.language?.name}
           deadline={targetVersion?.deadline}
+          reviewDeadline={targetVersion?.reviewDeadline}
           onAssignTranslator={
             isAdminClient(user) && translationProjectId && targetVersion ? openAssignTranslatorDialog : undefined
           }
@@ -503,7 +504,12 @@ export function DocumentEditor({
       publishTrail([
         { label: 'Documents', href: '/documents' },
         ...(document.sourceProject
-          ? [{ label: document.sourceProject.name, href: buildProjectPath(document.sourceProject.identifier) }]
+          ? [
+              {
+                label: document.sourceProject.name,
+                href: buildProjectPath(document.sourceProject.slug),
+              },
+            ]
           : []),
         { label: document.title },
         ...(languageName ? [{ label: languageName }] : []),

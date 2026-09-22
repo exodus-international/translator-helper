@@ -12,6 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { updateSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import { buildProjectPath } from '@/domain/source-project/source-project-url';
+import { DeployOffWarning } from '@/components/project-form';
 import { capture } from '@/lib/analytics';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
@@ -29,7 +31,8 @@ interface ProjectDetailClientProps {
     id: string;
     name: string;
     description: string | null;
-    identifier: string | null;
+    slug: string;
+    repositoryDirectory: string | null;
     acronym: string | null;
     status: string;
     documents: any[];
@@ -75,7 +78,11 @@ export default function ProjectDetailClient({
   // Settings form state
   const [settingsName, setSettingsName] = useState(sourceProject.name);
   const [settingsDescription, setSettingsDescription] = useState(sourceProject.description || '');
-  const [settingsIdentifier, setSettingsIdentifier] = useState(sourceProject.identifier || '');
+  const [settingsSlug, setSettingsSlug] = useState(sourceProject.slug);
+  const [settingsRepositoryDirectory, setSettingsRepositoryDirectory] = useState(
+    sourceProject.repositoryDirectory || '',
+  );
+  const [settingsDeployToGithub, setSettingsDeployToGithub] = useState(Boolean(sourceProject.repositoryDirectory));
   const [settingsAcronym, setSettingsAcronym] = useState(sourceProject.acronym || '');
   const [settingsSaving, setSettingsSaving] = useState(false);
 
@@ -114,24 +121,37 @@ export default function ProjectDetailClient({
   const selectedTranslationProject = translationProjects.find((tp) => tp.languageId === selectedLanguage);
 
   const handleSaveSettings = async () => {
-    // The identifier is a URL segment and the content repo folder name, so it
-    // cannot be cleared. Caught here to say so, rather than letting the action
-    // reject a null with a type error.
-    if (!settingsIdentifier.trim()) {
-      toast.warning('Identifier is required');
+    // The slug is this project's URL, and the repository directory is where it
+    // deploys. Both are caught here so the admin is told which one is missing,
+    // rather than the action rejecting it with a validation error.
+    if (!settingsSlug.trim()) {
+      toast.warning('URL slug is required');
       return;
     }
+    if (settingsDeployToGithub && !settingsRepositoryDirectory.trim()) {
+      toast.warning('Repository directory is required to deploy to GitHub');
+      return;
+    }
+
+    const slugChanged = settingsSlug.trim() !== sourceProject.slug;
 
     setSettingsSaving(true);
     try {
       await updateSourceProjectAction(sourceProject.id, {
         name: settingsName,
         description: settingsDescription || null,
-        identifier: settingsIdentifier.trim(),
+        slug: settingsSlug.trim(),
+        repositoryDirectory: settingsDeployToGithub ? settingsRepositoryDirectory.trim() : null,
         acronym: settingsAcronym.trim() || null,
       });
       capture('project_settings_saved');
       toast.success('Project settings saved');
+      // The slug is in the URL of the page being looked at, so a rename has to
+      // move the browser rather than just refresh what is under the old one.
+      if (slugChanged) {
+        router.replace(buildProjectPath(settingsSlug.trim()));
+        return;
+      }
       router.refresh();
     } catch (error: any) {
       console.error('Error saving settings:', error);
@@ -264,18 +284,47 @@ export default function ProjectDetailClient({
                       />
                     </div>
                     <div>
-                      <Label htmlFor="settings-identifier">Repository Identifier</Label>
+                      <Label htmlFor="settings-slug">URL Slug *</Label>
                       <Input
-                        id="settings-identifier"
-                        value={settingsIdentifier}
-                        onChange={(e) => setSettingsIdentifier(e.target.value)}
-                        placeholder="e.g., exodus90, lent2026"
+                        id="settings-slug"
+                        value={settingsSlug}
+                        onChange={(e) => setSettingsSlug(e.target.value)}
+                        placeholder="e.g., exodus90, lent2026, october_2026"
                         className="mt-1"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
-                        GITHUB: Folder name in the content repository
+                        Where the project lives: /projects/{settingsSlug || 'exodus90'}. Changing it breaks links
+                        already shared.
                       </p>
                     </div>
+                    <div>
+                      <label htmlFor="settings-deploy-to-github" className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          id="settings-deploy-to-github"
+                          type="checkbox"
+                          checked={settingsDeployToGithub}
+                          onChange={(e) => setSettingsDeployToGithub(e.target.checked)}
+                        />
+                        Deploy to GitHub
+                      </label>
+                    </div>
+                    {settingsDeployToGithub ? (
+                      <div>
+                        <Label htmlFor="settings-repository-directory">Repository Directory *</Label>
+                        <Input
+                          id="settings-repository-directory"
+                          value={settingsRepositoryDirectory}
+                          onChange={(e) => setSettingsRepositoryDirectory(e.target.value)}
+                          placeholder="e.g., exodus90, lent2026"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Folder name in the content repository.
+                        </p>
+                      </div>
+                    ) : (
+                      <DeployOffWarning />
+                    )}
                     <div>
                       <Label htmlFor="settings-acronym">Acronym</Label>
                       <Input
