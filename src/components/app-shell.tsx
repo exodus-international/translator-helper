@@ -79,6 +79,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   translations: 'Translations',
   releases: 'Releases',
   admin: 'Admin',
+  languages: 'Languages',
   settings: 'Settings',
   profile: 'Profile',
   notifications: 'Notifications',
@@ -169,10 +170,13 @@ const ROOT_NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', ico
 // root group instead named the section it answers to nowhere in the UI.
 //
 // Announcements is deliberately absent: it authors what What's New shows, so it
-// lives next to it in the footer rather than a section away.
+// lives next to it in the footer rather than a section away. Languages is
+// admin-only like the rest of this group but sits at /languages rather than
+// under /admin: the page is a place of its own, and its URL is what stops the
+// language-wide effect of a change from needing a caption.
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/admin/languages', label: 'Languages', icon: Languages },
+  { href: '/languages', label: 'Languages', icon: Languages },
   { href: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { href: '/admin/users', label: 'Users', icon: Users },
 ];
