@@ -165,6 +165,15 @@ export async function isUserMemberOfSourceProject(userId: string, sourceProjectI
 }
 
 /**
+ * How many target languages a user is on. The root layout asks this on every
+ * request to decide whether one sidebar link renders, so it counts rather than
+ * loading each language row to look at a flag.
+ */
+export async function countUserTargetLanguages(userId: string): Promise<number> {
+  return prisma.userLanguage.count({ where: { userId, language: { isSource: false } } });
+}
+
+/**
  * A language's roster. The language-scoped read the team page needs: the
  * project-scoped `listTranslationProjectMembers` answers the same question
  * through a project, which is the indirection the team page exists to drop.

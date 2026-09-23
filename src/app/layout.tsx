@@ -3,6 +3,7 @@ import { Alegreya, Geist, Geist_Mono } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { getCurrentUser } from '@/lib/session';
+import { countUserTargetLanguages } from '@/domain/user-language/user-language.repository';
 import { SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { AppShell } from '@/components/app-shell';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -69,6 +70,11 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
+  // The AI instructions entry is for people with a language to instruct, which
+  // is every admin and anyone assigned to one. This runs on every request for
+  // every signed-in user, so it asks for a number rather than the rows.
+  const canReadInstructions =
+    !!user && (user.role === 'ADMIN' || (await countUserTargetLanguages(user.id)) > 0);
   // First paint already has the width the user last chose.
   const sidebarOpen = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value !== 'false';
 
@@ -78,7 +84,7 @@ export default async function RootLayout({
         <ThemeProvider>
           <PostHogProvider user={user}>
             <NuqsAdapter>
-              <AppShell user={user} defaultOpen={sidebarOpen}>
+              <AppShell user={user} canReadInstructions={canReadInstructions} defaultOpen={sidebarOpen}>
                 {children}
               </AppShell>
               {/* Signed-in users get these two links in the sidebar footer instead. */}

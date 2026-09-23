@@ -59,8 +59,14 @@ export async function updateLanguageSettingsAction(id: string, input: unknown) {
   return await updateLanguageSettings(id, validated);
 }
 
+/**
+ * Instructions are editorial rather than administrative: the people who know
+ * how Croatian scripture quotations should read are the Croatian team, not
+ * whoever happens to hold the admin flag. A language's Project Manager writes
+ * them; admins still can, through the same gate.
+ */
 export async function updateLanguageInstructionsAction(id: string, input: unknown) {
-  await authorize('can:manage-languages');
+  await authorize({ language: id, role: 'manager' });
 
   const validated = parseInput(updateLanguageInstructionsSchema, input);
   return await updateLanguageInstructions(id, validated.translationInstructions ?? null);

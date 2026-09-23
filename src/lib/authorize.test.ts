@@ -24,6 +24,7 @@ function createDeps(overrides: Partial<AuthorizeDeps> = {}): AuthorizeDeps {
   return {
     requireUser: async () => regularUser,
     getUserRolesInProject: async () => [],
+    getUserRoleForLanguage: async () => null,
     ...overrides,
   };
 }
@@ -219,5 +220,102 @@ describe('authorize', () => {
       await assert.rejects(() => authorize({ project: 'proj-1', role: 'editor' }));
       await assert.rejects(() => authorize({ project: 'proj-1', role: 'manager' }));
     });
+  });
+});
+
+// ─── Language-scoped ─────────────────────────────────────────
+
+describe('authorize { language, role }', () => {
+  const CROATIAN = 'language-hr';
+
+  it('lets a project manager of the language through a manager check', async () => {
+    const authorize = createAuthorize(
+      createDeps({ getUserRoleForLanguage: async () => ProjectRole.PROJECT_MANAGER }),
+    );
+
+    const result = await authorize({ language: CROATIAN, role: 'manager' });
+
+    assert.deepStrictEqual(result.projectRoles, [ProjectRole.PROJECT_MANAGER]);
+  });
+
+  it('refuses a translator a manager check, naming the language scope', async () => {
+    const authorize = createAuthorize(createDeps({ getUserRoleForLanguage: async () => ProjectRole.TRANSLATOR }));
+
+    await assert.rejects(() => authorize({ language: CROATIAN, role: 'manager' }), {
+      message: "Forbidden: requires 'manager' permission in language",
+    });
+  });
+
+  it('maps every role onto the language hierarchy the same way as a project', async () => {
+    // Instruction writing rests on this mapping: a reviewer or editor may read
+    // a language's page, and only a manager may save it. The project-scoped
+    // branch has its own tests; this is the language-scoped one.
+    const cases: [ProjectRole, { manager: boolean; editor: boolean; reviewer: boolean; translator: boolean }][] = [
+      [ProjectRole.PROJECT_MANAGER, { manager: true, editor: true, reviewer: true, translator: true }],
+      [ProjectRole.EDITOR, { manager: false, editor: true, reviewer: true, translator: true }],
+      [ProjectRole.REVIEWER, { manager: false, editor: false, reviewer: true, translator: true }],
+      [ProjectRole.TRANSLATOR, { manager: false, editor: false, reviewer: false, translator: true }],
+    ];
+
+    for (const [held, expected] of cases) {
+      const authorize = createAuthorize(createDeps({ getUserRoleForLanguage: async () => held }));
+
+      for (const [required, allowed] of Object.entries(expected)) {
+        const attempt = authorize({ language: CROATIAN, role: required as 'manager' });
+
+        if (allowed) {
+          await attempt;
+        } else {
+          await assert.rejects(() => attempt, new RegExp(`requires '${required}' permission in language`));
+        }
+      }
+    }
+  });
+
+  it('lets any role on the language pass a member check', async () => {
+    for (const role of [ProjectRole.TRANSLATOR, ProjectRole.REVIEWER, ProjectRole.EDITOR, ProjectRole.PROJECT_MANAGER]) {
+      const authorize = createAuthorize(createDeps({ getUserRoleForLanguage: async () => role }));
+      const result = await authorize({ language: CROATIAN, role: 'member' });
+      assert.deepStrictEqual(result.projectRoles, [role]);
+    }
+  });
+
+  it('refuses someone who is not on the language at all', async () => {
+    const authorize = createAuthorize(createDeps({ getUserRoleForLanguage: async () => null }));
+
+    await assert.rejects(() => authorize({ language: CROATIAN, role: 'member' }));
+  });
+
+  it('lets an admin through without asking the database', async () => {
+    let asked = false;
+    const authorize = createAuthorize(
+      createDeps({
+        requireUser: async () => adminUser,
+        getUserRoleForLanguage: async () => {
+          asked = true;
+          return null;
+        },
+      }),
+    );
+
+    await authorize({ language: CROATIAN, role: 'manager' });
+
+    assert.equal(asked, false);
+  });
+
+  it('asks about the language it was given, not a project', async () => {
+    const seen: string[] = [];
+    const authorize = createAuthorize(
+      createDeps({
+        getUserRoleForLanguage: async (_userId, languageId) => {
+          seen.push(languageId);
+          return ProjectRole.PROJECT_MANAGER;
+        },
+      }),
+    );
+
+    await authorize({ language: CROATIAN, role: 'manager' });
+
+    assert.deepStrictEqual(seen, [CROATIAN]);
   });
 });

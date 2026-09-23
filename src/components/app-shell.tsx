@@ -79,6 +79,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   translations: 'Translations',
   releases: 'Releases',
   admin: 'Admin',
+  instructions: 'AI instructions',
   languages: 'Languages',
   settings: 'Settings',
   profile: 'Profile',
@@ -95,7 +96,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 // Segments that exist only to namespace their children: none of these have a
 // page of their own, so linking them 404s. They still belong in the trail as
 // labels — shadcn's Breadcrumb renders a non-navigable crumb as plain text.
-const NAMESPACE_ONLY = new Set(['/admin', '/settings', '/onboarding', '/projects']);
+const NAMESPACE_ONLY = new Set(['/admin', '/onboarding', '/projects']);
 
 function isNavigable(href: string) {
   // /documents is a flat list across projects, so neither the project slug nor
@@ -164,6 +165,11 @@ interface NavItem {
 // in the topbar names the section the sidebar highlights.
 const ROOT_NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
 
+// Editorial rather than administrative: a language's Project Manager writes the
+// guidance and everyone on the language can read it, so it sits with the work
+// rather than in the Admin group.
+const INSTRUCTIONS_NAV_ITEM: NavItem = { href: '/instructions', label: 'AI instructions', icon: ScrollText };
+
 // Documents keeps a root-level href while sitting in this group: what puts an
 // item here is who it is for, not the namespace it sits under. Managing source
 // documents is admin-only, so the group is where it belongs -- hiding it in the
@@ -179,10 +185,6 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/languages', label: 'Languages', icon: Languages },
   { href: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { href: '/admin/users', label: 'Users', icon: Users },
-];
-
-const SETTINGS_NAV_ITEMS: NavItem[] = [
-  { href: '/settings/language-instructions', label: 'Language Instructions', icon: ScrollText },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -356,8 +358,8 @@ function UserIdentity({ user }: { user: SessionUser }) {
   );
 }
 
-function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: SessionUser }) {
-  const { user, ...sidebarProps } = props;
+function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: SessionUser; canReadInstructions: boolean }) {
+  const { user, canReadInstructions, ...sidebarProps } = props;
   const isAdmin = isAdminClient(user);
 
   return (
@@ -375,13 +377,8 @@ function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: Sessio
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarNavGroup items={ROOT_NAV_ITEMS} />
-        {isAdmin && (
-          <>
-            <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />
-            <SidebarNavGroup items={SETTINGS_NAV_ITEMS} label="Settings" />
-          </>
-        )}
+        <SidebarNavGroup items={[...ROOT_NAV_ITEMS, ...(canReadInstructions ? [INSTRUCTIONS_NAV_ITEM] : [])]} />
+        {isAdmin && <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />}
       </SidebarContent>
       <SidebarFooter>
         <NavSecondary isAdmin={isAdmin} />
@@ -394,12 +391,14 @@ function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: Sessio
 
 interface AppShellProps {
   user: SessionUser | null;
+  /** Admins, and anyone assigned to at least one language. */
+  canReadInstructions?: boolean;
   /** Server-read sidebar state cookie, so the first paint already has the right width. */
   defaultOpen?: boolean;
   children: React.ReactNode;
 }
 
-export function AppShell({ user, defaultOpen = true, children }: AppShellProps) {
+export function AppShell({ user, canReadInstructions = false, defaultOpen = true, children }: AppShellProps) {
   if (!user) {
     return <>{children}</>;
   }
@@ -411,7 +410,7 @@ export function AppShell({ user, defaultOpen = true, children }: AppShellProps) 
         { '--sidebar-width': '16rem', '--header-height': 'calc(var(--spacing) * 12 + 1px)' } as React.CSSProperties
       }
     >
-      <AppSidebar user={user} />
+      <AppSidebar user={user} canReadInstructions={canReadInstructions} />
       <SidebarInset>
         <header className="bg-background sticky top-0 z-10 flex h-(--header-height) shrink-0 items-center gap-2 border-b">
           <div className="flex items-center gap-2 px-4">
