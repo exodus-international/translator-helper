@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
  * to /languages/hr/team.
  */
 const TABS = [
+  { segment: '', label: 'Overview' },
   { segment: 'team', label: 'Team' },
   { segment: 'settings', label: 'Settings' },
 ] as const;
@@ -29,13 +30,13 @@ export function LanguageTabs({
 
   return (
     <div className="mt-4 flex gap-5 overflow-x-auto">
-      {TABS.filter((tab) => includeTeam || tab.segment !== 'team').map((tab) => {
-        const href = `${base}/${tab.segment}`;
+      {TABS.filter((tab) => includeTeam || (tab.segment !== 'team' && tab.segment !== '')).map((tab) => {
+        const href = tab.segment ? `${base}/${tab.segment}` : base;
         const active = pathname === href;
 
         return (
           <Link
-            key={tab.segment}
+            key={tab.segment || "overview"}
             href={href}
             aria-current={active ? 'page' : undefined}
             className={cn(

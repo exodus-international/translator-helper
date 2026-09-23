@@ -164,7 +164,7 @@ export default function LanguagesIndexClient({ languages }: { languages: Languag
                 <p className="text-muted-foreground mt-0.5 text-xs">
                   {language.isSource
                     ? 'Documents originate here'
-                    : `${language.memberCount === 0 ? 'No members' : `${language.memberCount} ${language.memberCount === 1 ? 'member' : 'members'}`} · ${language.projectCount} ${language.projectCount === 1 ? 'project' : 'projects'}`}
+                    : `${language.memberCount === 0 ? 'No members' : `${language.memberCount} ${language.memberCount === 1 ? 'member' : 'members'}`} · ${language.projectCount} active ${language.projectCount === 1 ? 'project' : 'projects'}`}
                 </p>
               </div>
 
@@ -183,16 +183,13 @@ export default function LanguagesIndexClient({ languages }: { languages: Languag
                 ) : (
                   <>
                     <div className="mb-1.5 flex justify-between text-xs">
-                      <span className="font-semibold">{percent(language.deployedCount, language.versionCount)}%</span>
+                      <span className="font-semibold">{language.percent}%</span>
                       <span className="text-muted-foreground">
-                        {language.deployedCount} / {language.versionCount}
+                        {language.deployedCount} / {language.documentCount}
                       </span>
                     </div>
                     <div className="bg-muted h-1.5 overflow-hidden rounded-full">
-                      <div
-                        className="bg-foreground h-full"
-                        style={{ width: `${percent(language.deployedCount, language.versionCount)}%` }}
-                      />
+                      <div className="bg-foreground h-full" style={{ width: `${language.percent}%` }} />
                     </div>
                   </>
                 )}
@@ -204,14 +201,10 @@ export default function LanguagesIndexClient({ languages }: { languages: Languag
         </div>
 
         <p className="text-muted-foreground text-xs">
-          Deployed counts translations at status DEPLOYED across every project the language appears in — the same
-          definition the project Statistics tab calls progress.
+          Deployed counts documents at status DEPLOYED over every document in the language&apos;s active projects — the
+          same definition the project Statistics tab uses. Completed projects are left out.
         </p>
       </div>
     </>
   );
-}
-
-function percent(part: number, total: number): number {
-  return total > 0 ? Math.round((part / total) * 100) : 0;
 }

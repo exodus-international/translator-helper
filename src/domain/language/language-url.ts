@@ -7,6 +7,9 @@
  * entry point that disagreed with the rest.
  */
 export function languageHomePath(language: { code: string; isSource: boolean }): string {
-  // Nothing is translated into the source language, so it has no team tab.
-  return `/languages/${encodeURIComponent(language.code)}/${language.isSource ? 'settings' : 'team'}`;
+  const base = `/languages/${encodeURIComponent(language.code)}`;
+
+  // Nothing is translated into the source language, so it has no overview to
+  // show and no team: its settings are the whole of it.
+  return language.isSource ? `${base}/settings` : base;
 }

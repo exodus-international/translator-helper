@@ -1,13 +1,27 @@
 import { notFound, redirect } from 'next/navigation';
-import { getLanguageByCode } from '@/domain/language/language.repository';
-import { languageHomePath } from '@/domain/language/language-url';
+import { getCurrentUser } from '@/lib/session';
+import { getLanguageByCode, getLanguageProgress } from '@/domain/language/language.repository';
+import { ProjectRole } from '@/generated/prisma/enums';
+import { languageHealth } from '@/domain/language/language-health';
+import { listLanguageMembers } from '@/domain/user-language/user-language.repository';
+import LanguageOverviewClient from './page.client';
 
 /**
- * Team is where a language is usually opened for, so the root lands there --
- * the same tab `languageHomePath` sends every other entry point to. Overview
- * takes this route over in phase 4, at which point both follow it.
+ * The overview: how far this language has got across every project it appears
+ * in, which no screen answered before — progress was only ever shown for one
+ * project and one language at a time.
  */
-export default async function LanguagePage({ params }: { params: Promise<{ lang: string }> }) {
+export default async function LanguageOverviewPage({ params }: { params: Promise<{ lang: string }> }) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  if (user.role !== 'ADMIN') {
+    redirect('/dashboard');
+  }
+
   const { lang } = await params;
   const language = await getLanguageByCode(lang);
 
@@ -15,5 +29,34 @@ export default async function LanguagePage({ params }: { params: Promise<{ lang:
     notFound();
   }
 
-  redirect(languageHomePath(language));
+  // Nothing is translated into the source language, so there is no progress to
+  // roll up and no team to show.
+  if (language.isSource) {
+    redirect(`/languages/${encodeURIComponent(language.code)}/settings`);
+  }
+
+  // The roster carries each member's role and name, which is everything the
+  // health pills need to know about managers -- no second read of the same rows.
+  const [progress, roster] = await Promise.all([getLanguageProgress(language.id), listLanguageMembers(language.id)]);
+
+  return (
+    <LanguageOverviewClient
+      language={{ code: language.code, name: language.name }}
+      progress={progress}
+      lastDeployAt={progress.lastDeployAt?.toISOString() ?? null}
+      pills={languageHealth({
+        ...language,
+        memberCount: roster.length,
+        managerNames: roster
+          .filter((member) => member.role === ProjectRole.PROJECT_MANAGER)
+          .map((member) => member.user.name),
+      })}
+      memberCount={roster.length}
+      roster={roster.slice(0, 5).map((member) => ({
+        id: member.id,
+        role: member.role,
+        user: member.user,
+      }))}
+    />
+  );
 }
