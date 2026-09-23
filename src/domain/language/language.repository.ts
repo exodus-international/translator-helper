@@ -111,7 +111,7 @@ export async function listLanguagesForIndex(): Promise<LanguageListRow[]> {
     // language -- a project with no documents counted here and not there.
     prisma.translationProject.findMany({
       where: { sourceProject: { status: SourceProjectStatus.ACTIVE } },
-      select: { languageId: true, sourceProject: { select: { id: true, name: true, status: true } } },
+      select: { languageId: true, sourceProject: { select: { id: true, name: true, slug: true, status: true } } },
     }),
     prisma.document.findMany({
       where: { sourceProject: { status: SourceProjectStatus.ACTIVE } },
@@ -166,7 +166,7 @@ export async function getLanguageProgress(
     prisma.document.findMany({
       where: { sourceProject: { translationProjects: { some: { languageId } } } },
       select: {
-        sourceProject: { select: { id: true, name: true, status: true } },
+        sourceProject: { select: { id: true, name: true, slug: true, status: true } },
         versions: { where: { languageId }, select: { status: true }, take: 1 },
       },
     }),
@@ -185,6 +185,7 @@ export async function getLanguageProgress(
           {
             projectId: document.sourceProject.id,
             projectName: document.sourceProject.name,
+            projectSlug: document.sourceProject.slug,
             projectStatus: document.sourceProject.status,
             status: document.versions[0]?.status ?? null,
           },

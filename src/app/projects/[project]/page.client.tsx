@@ -64,6 +64,8 @@ interface ProjectDetailClientProps {
   initialLanguageId: string;
   /** Language ids this person may deploy: all of them for an admin, their own for a manager. */
   deployableLanguageIds: string[];
+  /** True when the URL named the language, which then outranks the stored choice. */
+  languageFromUrl: boolean;
 }
 
 export default function ProjectDetailClient({
@@ -73,6 +75,7 @@ export default function ProjectDetailClient({
   translationProjects,
   initialLanguageId,
   deployableLanguageIds,
+  languageFromUrl,
 }: ProjectDetailClientProps) {
   const router = useRouter();
   useAnalyticsProjectGroup(sourceProject.id, sourceProject.name);
@@ -103,14 +106,16 @@ export default function ProjectDetailClient({
     }
   };
 
-  // Load persisted language selection
+  // Load persisted language selection -- unless the URL asked for one, in which
+  // case following a link would otherwise land on whatever language this
+  // browser happened to look at last.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || languageFromUrl) return;
     const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (stored && languages.some((lang) => lang.id === stored)) {
       setSelectedLanguage(stored);
     }
-  }, [languages, LANGUAGE_STORAGE_KEY]);
+  }, [languages, LANGUAGE_STORAGE_KEY, languageFromUrl]);
 
   // Persist language selection
   useEffect(() => {
