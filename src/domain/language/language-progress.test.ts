@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { DocumentStatus, SourceProjectStatus } from '@/generated/prisma/enums';
 import { buildLanguageDocumentRows, rollUpLanguageProgress, type LanguageDocumentRow } from './language-progress';
 
-const EXODUS = { projectId: 'p1', projectName: 'Exodus90 2026', projectStatus: SourceProjectStatus.ACTIVE };
-const ADVENT = { projectId: 'p2', projectName: 'Advent 2025', projectStatus: SourceProjectStatus.ACTIVE };
-const SUMMER = { projectId: 'p3', projectName: 'Summer Retreat 2025', projectStatus: SourceProjectStatus.COMPLETE };
+const EXODUS = { projectId: 'p1', projectName: 'Exodus90 2026', projectSlug: 'exodus90', projectStatus: SourceProjectStatus.ACTIVE };
+const ADVENT = { projectId: 'p2', projectName: 'Advent 2025', projectSlug: 'advent2025', projectStatus: SourceProjectStatus.ACTIVE };
+const SUMMER = { projectId: 'p3', projectName: 'Summer Retreat 2025', projectSlug: 'summer2025', projectStatus: SourceProjectStatus.COMPLETE };
 
 const doc = (project: Omit<LanguageDocumentRow, 'status'>, status: DocumentStatus | null): LanguageDocumentRow => ({
   ...project,
@@ -123,8 +123,8 @@ describe('rollUpLanguageProgress', () => {
     ]);
 
     assert.deepEqual(progress.projects, [
-      { id: 'p2', name: 'Advent 2025', documents: 1, deployed: 0, percent: 0 },
-      { id: 'p1', name: 'Exodus90 2026', documents: 3, deployed: 2, percent: 67 },
+      { id: 'p2', name: 'Advent 2025', slug: 'advent2025', documents: 1, deployed: 0, percent: 0 },
+      { id: 'p1', name: 'Exodus90 2026', slug: 'exodus90', documents: 3, deployed: 2, percent: 67 },
     ]);
   });
 
@@ -175,6 +175,7 @@ describe('buildLanguageDocumentRows', () => {
   const project = (id: string, name: string, status: SourceProjectStatus = SourceProjectStatus.ACTIVE) => ({
     id,
     name,
+    slug: name.toLowerCase().replace(/\s+/g, ''),
     status,
   });
 

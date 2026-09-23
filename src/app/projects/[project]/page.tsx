@@ -10,7 +10,13 @@ import { redirect } from 'next/navigation';
 import ProjectDetailClient from './page.client';
 import { resolveProject } from './resolve-project';
 
-export default async function ProjectDetailPage({ params }: { params: Promise<{ project: string }> }) {
+export default async function ProjectDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ project: string }>;
+  searchParams: Promise<{ lang?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
 
@@ -25,10 +31,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const translationProjects = await listTranslationProjectsAction({ sourceProjectId: sourceProject.id });
   const userLanguages = await getUserLanguages(user.id);
 
-  const initialLanguageId = resolveInitialLanguage({
-    userLanguageIds: userLanguages.map((userLanguage) => userLanguage.languageId),
-    projectLanguages: translationProjects.map((translationProject) => translationProject.language),
-  });
+  // A link can name the language it is about -- the language overview's project
+  // rows do. It only counts when the project is actually translated into it;
+  // anything else falls back to the usual choice.
+  const { lang } = await searchParams;
+  const requested = lang
+    ? translationProjects.find((translationProject) => translationProject.language.code === lang)
+    : undefined;
+
+  const initialLanguageId =
+    requested?.languageId ??
+    resolveInitialLanguage({
+      userLanguageIds: userLanguages.map((userLanguage) => userLanguage.languageId),
+      projectLanguages: translationProjects.map((translationProject) => translationProject.language),
+    });
 
   return (
     <ProjectDetailClient
@@ -37,6 +53,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       languages={languages}
       translationProjects={translationProjects}
       initialLanguageId={initialLanguageId}
+      languageFromUrl={!!requested}
     />
   );
 }

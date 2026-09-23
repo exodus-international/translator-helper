@@ -25,6 +25,7 @@ import { DocumentStatus, SourceProjectStatus } from '@/generated/prisma/enums';
 export interface LanguageDocumentRow {
   projectId: string;
   projectName: string;
+  projectSlug: string;
   projectStatus: SourceProjectStatus;
   /** Null when no version exists in this language yet. */
   status: DocumentStatus | null;
@@ -33,6 +34,7 @@ export interface LanguageDocumentRow {
 export interface LanguageProjectProgress {
   id: string;
   name: string;
+  slug: string;
   documents: number;
   deployed: number;
   percent: number;
@@ -96,6 +98,7 @@ export function rollUpLanguageProgress(rows: LanguageDocumentRow[]): LanguagePro
     const project = projects.get(row.projectId) ?? {
       id: row.projectId,
       name: row.projectName,
+      slug: row.projectSlug,
       status: row.projectStatus,
       documents: 0,
       deployed: 0,
@@ -155,6 +158,7 @@ function sortByName(projects: (LanguageProjectProgress & { status: SourceProject
     .map((project) => ({
       id: project.id,
       name: project.name,
+      slug: project.slug,
       documents: project.documents,
       deployed: project.deployed,
       percent: project.percent,
@@ -165,7 +169,10 @@ function sortByName(projects: (LanguageProjectProgress & { status: SourceProject
 
 export interface LanguageRowInputs {
   /** Which language is translated in which project. */
-  translationProjects: { languageId: string; sourceProject: { id: string; name: string; status: SourceProjectStatus } }[];
+  translationProjects: {
+    languageId: string;
+    sourceProject: { id: string; name: string; slug: string; status: SourceProjectStatus };
+  }[];
   documents: { id: string; sourceProjectId: string | null }[];
   versions: { documentId: string; languageId: string; status: DocumentStatus }[];
 }
@@ -209,6 +216,7 @@ export function buildLanguageDocumentRows({
       forLanguage.push({
         projectId: sourceProject.id,
         projectName: sourceProject.name,
+        projectSlug: sourceProject.slug,
         projectStatus: sourceProject.status,
         status: statusByDocumentAndLanguage.get(`${documentId}:${languageId}`) ?? null,
       });
