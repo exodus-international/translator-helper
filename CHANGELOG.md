@@ -1,4 +1,4 @@
-# [1.4.0](https://github.com/exodus-international/translator-helper/compare/v1.3.1...v1.4.0) (2026-09-23)
+# [1.4.0](https://github.com/exodus-international/translator-helper/compare/v1.3.0...v1.4.0) (2026-09-23)
 
 
 ### Bug Fixes
@@ -14,6 +14,7 @@
 * **lint:** read nested frontmatter blocks as one key ([#216](https://github.com/exodus-international/translator-helper/issues/216)) ([5969379](https://github.com/exodus-international/translator-helper/commit/596937924a3c132128123b07848b9159b7671208))
 * **lint:** stop rewriting localised scripture citations ([#217](https://github.com/exodus-international/translator-helper/issues/217)) ([7141911](https://github.com/exodus-international/translator-helper/commit/7141911410341f9257d5e7fa624011f106f21b5b))
 * preserve existing deadline when reopening assign translator modal ([#191](https://github.com/exodus-international/translator-helper/issues/191)) ([0008023](https://github.com/exodus-international/translator-helper/commit/0008023e06ff8196fadadd696ddfeb0f6402eeb0))
+* **projects:** allow underscores in project identifiers ([#223](https://github.com/exodus-international/translator-helper/issues/223)) ([d780d84](https://github.com/exodus-international/translator-helper/commit/d780d84f3158f4896307a0fd7d356922e3377882))
 * **sentry:** stop reporting from local dev, gate on NEXT_PUBLIC_SENTRY_DSN ([#207](https://github.com/exodus-international/translator-helper/issues/207)) ([d48f3fe](https://github.com/exodus-international/translator-helper/commit/d48f3fe97e977bf7aac0ff639080c436fe98138c))
 * **ui:** keep select popups above the dialog that owns their trigger ([#214](https://github.com/exodus-international/translator-helper/issues/214)) ([eaa3a7a](https://github.com/exodus-international/translator-helper/commit/eaa3a7a5b2b231b3cc524306db74a6f8ea48fa21))
 
