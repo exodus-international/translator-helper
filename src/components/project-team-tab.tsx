@@ -1,41 +1,31 @@
 'use client';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ArrowUpRight, Users } from 'lucide-react';
+
 import { UserAvatar } from '@/components/user-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  listTranslationProjectMembersAction,
-  removeLanguageMemberAction,
-  setLanguageMemberRoleAction,
-} from '@/domain/user-language/user-language.actions';
-import { listUsersAction } from '@/domain/user/user.actions';
-import { SessionUser } from '@/lib/session';
+import { PROJECT_ROLE_LABELS } from '@/constants/project-role';
+import { listTranslationProjectMembersAction } from '@/domain/user-language/user-language.actions';
 import { ProjectRole } from '@/generated/prisma/enums';
-import { Pencil, Plus, Trash2, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
+/**
+ * A roster, not an editor. Membership is language-scoped, so this table used to
+ * be editable here, on the translation-project page and on the Users page -- and
+ * each of them had to explain in small grey text that a change applied to
+ * projects you were not looking at. The writes live at /languages/[code]/team
+ * now, where the URL says the scope. A PM triaging a board still sees who is on
+ * the language without leaving it.
+ */
 interface ProjectTeamTabProps {
   translationProjectId: string | null;
-  user: SessionUser;
   canManage: boolean;
   selectedLanguageName: string;
+  selectedLanguageCode: string;
 }
 
 type Member = {
@@ -45,138 +35,46 @@ type Member = {
   user: { id: string; name: string; email: string; image: string | null };
 };
 
-const ALL_ROLES = [
-  ProjectRole.PROJECT_MANAGER,
-  ProjectRole.REVIEWER,
-  ProjectRole.EDITOR,
-  ProjectRole.TRANSLATOR,
-] as const;
-
-const ROLE_LABELS: Record<ProjectRole, string> = {
-  PROJECT_MANAGER: 'Project Manager',
-  REVIEWER: 'Reviewer',
-  EDITOR: 'Editor',
-  TRANSLATOR: 'Translator',
-};
-
-function RoleSelect({ value, onChange }: { value: ProjectRole; onChange: (role: ProjectRole) => void }) {
-  return (
-    <Select value={value} onValueChange={(v) => onChange((v ?? value) as ProjectRole)} items={ROLE_LABELS}>
-      <SelectTrigger>
-        <SelectValue placeholder="Select role" />
-      </SelectTrigger>
-      <SelectContent>
-        {ALL_ROLES.map((role) => (
-          <SelectItem key={role} value={role}>
-            {ROLE_LABELS[role]}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-export default function ProjectTeamTab({ translationProjectId, canManage, selectedLanguageName }: ProjectTeamTabProps) {
+export default function ProjectTeamTab({
+  translationProjectId,
+  canManage,
+  selectedLanguageName,
+  selectedLanguageCode,
+}: ProjectTeamTabProps) {
   const [members, setMembers] = useState<Member[]>([]);
-  const [allUsers, setAllUsers] = useState<{ id: string; name: string; email: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [newMemberUserId, setNewMemberUserId] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState<ProjectRole>(ProjectRole.TRANSLATOR);
-  const [adding, setAdding] = useState(false);
-  const [editingMember, setEditingMember] = useState<{ userId: string; name: string } | null>(null);
-  const [editRole, setEditRole] = useState<ProjectRole>(ProjectRole.TRANSLATOR);
-  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
-    loadMembers();
+    let cancelled = false;
+
+    async function load() {
+      if (!translationProjectId) {
+        setMembers([]);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const data = await listTranslationProjectMembersAction(translationProjectId);
+        if (!cancelled) setMembers(data);
+      } catch (error) {
+        console.error('Error loading team members:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [translationProjectId]);
-
-  async function loadMembers() {
-    if (!translationProjectId) {
-      setMembers([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const [membersData, usersData] = await Promise.all([
-        listTranslationProjectMembersAction(translationProjectId),
-        canManage ? listUsersAction() : Promise.resolve([]),
-      ]);
-      setMembers(membersData);
-      setAllUsers(usersData);
-    } catch (error) {
-      console.error('Error loading team members:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleAddMember() {
-    if (!translationProjectId || !newMemberUserId) return;
-
-    setAdding(true);
-    try {
-      await setLanguageMemberRoleAction({
-        translationProjectId,
-        userId: newMemberUserId,
-        role: newMemberRole,
-      });
-      toast.success(`Member added to the ${selectedLanguageName} team`);
-      setAddDialogOpen(false);
-      setNewMemberUserId('');
-      setNewMemberRole(ProjectRole.TRANSLATOR);
-      await loadMembers();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to add member');
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  function openEditDialog(userId: string, name: string, role: ProjectRole) {
-    setEditingMember({ userId, name });
-    setEditRole(role);
-  }
-
-  async function handleSaveEdit() {
-    if (!editingMember || !translationProjectId) return;
-
-    setEditSaving(true);
-    try {
-      await setLanguageMemberRoleAction({
-        translationProjectId,
-        userId: editingMember.userId,
-        role: editRole,
-      });
-      toast.success('Role updated successfully');
-      setEditingMember(null);
-      await loadMembers();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update role');
-    } finally {
-      setEditSaving(false);
-    }
-  }
-
-  async function handleRemoveMember(userId: string, userName: string) {
-    if (!translationProjectId) return;
-
-    try {
-      await removeLanguageMemberAction(userId, translationProjectId);
-      toast.success(`${userName} removed from the ${selectedLanguageName} team`);
-      await loadMembers();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to remove member');
-    }
-  }
 
   if (!translationProjectId) {
     return (
-      <div className="text-center py-12">
-        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+      <div className="py-12 text-center">
+        <Users className="text-muted-foreground mx-auto mb-2 h-8 w-8" />
         <p className="text-muted-foreground">No translation project exists for {selectedLanguageName}</p>
       </div>
     );
@@ -184,79 +82,38 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Loading team members...</p>
+      <div className="py-12 text-center">
+        <p className="text-muted-foreground">Loading team members…</p>
       </div>
     );
   }
 
-  const availableUsers = allUsers.filter((u) => !members.some((m) => m.user.id === u.id));
-
   return (
     <div>
-      <div className="flex items-start justify-between mb-4 gap-4">
+      <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-lg font-semibold">
-            {selectedLanguageName} Team ({members.length})
+            {selectedLanguageName} team ({members.length})
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Members work on every {selectedLanguageName} project, not just this one.
           </p>
         </div>
         {canManage && (
-          <Dialog modal={false} open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger render={<Button />}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Member
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add {selectedLanguageName} Team Member</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label>User</Label>
-                  <Select
-                    value={newMemberUserId || null}
-                    onValueChange={(v) => setNewMemberUserId(v ?? '')}
-                    items={Object.fromEntries(availableUsers.map((u) => [u.id, `${u.name} (${u.email})`]))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select user" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableUsers.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name} ({u.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Role</Label>
-                  <RoleSelect value={newMemberRole} onChange={setNewMemberRole} />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Grants this role on all {selectedLanguageName} translation projects.
-                  </p>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddMember} disabled={!newMemberUserId || adding}>
-                  {adding ? 'Adding...' : 'Add Member'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button
+            variant="outline"
+            nativeButton={false}
+            render={<Link href={`/languages/${encodeURIComponent(selectedLanguageCode)}/team`} />}
+          >
+            Manage team
+            <ArrowUpRight />
+          </Button>
         )}
       </div>
 
       {members.length === 0 ? (
-        <div className="text-center py-12">
-          <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+        <div className="py-12 text-center">
+          <Users className="text-muted-foreground mx-auto mb-2 h-8 w-8" />
           <p className="text-muted-foreground">No team members yet</p>
         </div>
       ) : (
@@ -266,7 +123,6 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
               <TableRow>
                 <TableHead>Member</TableHead>
                 <TableHead>Role</TableHead>
-                {canManage && <TableHead className="w-[100px]" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -274,89 +130,22 @@ export default function ProjectTeamTab({ translationProjectId, canManage, select
                 <TableRow key={member.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <UserAvatar
-                        name={member.user.name}
-                        image={member.user.image}
-                        email={member.user.email}
-                      />
+                      <UserAvatar name={member.user.name} image={member.user.image} email={member.user.email} />
                       <div>
-                        <p className="font-medium text-sm">{member.user.name}</p>
-                        <p className="text-xs text-muted-foreground">{member.user.email}</p>
+                        <p className="text-sm font-medium">{member.user.name}</p>
+                        <p className="text-muted-foreground text-xs">{member.user.email}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">
-                      {ROLE_LABELS[member.role]}
-                    </Badge>
+                    <Badge variant="secondary">{PROJECT_ROLE_LABELS[member.role]}</Badge>
                   </TableCell>
-                  {canManage && (
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openEditDialog(member.user.id, member.user.name, member.role)}
-                        >
-                          <Pencil className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remove team member</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to remove {member.user.name} from the {selectedLanguageName} team?
-                                This removes their access to every {selectedLanguageName} translation project.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleRemoveMember(member.user.id, member.user.name)}>
-                                Remove
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  )}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </Card>
       )}
-
-      {/* Edit member role dialog */}
-      <Dialog
-        modal={false}
-        open={!!editingMember}
-        onOpenChange={(open) => {
-          if (!open) setEditingMember(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Role — {editingMember?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="mt-4">
-            <Label>Role</Label>
-            <RoleSelect value={editRole} onChange={setEditRole} />
-            <p className="text-xs text-muted-foreground mt-1">Applies to all {selectedLanguageName} translation projects.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingMember(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveEdit} disabled={editSaving}>
-              {editSaving ? 'Saving...' : 'Save'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

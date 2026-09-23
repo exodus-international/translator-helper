@@ -1,61 +1,32 @@
 'use server';
 
-import { userExistsById } from '@/domain/user/user.repository';
 import { authorize } from '@/lib/authorize';
-import {
-  getLanguageIdForTranslationProject,
-  getProjectReviewers,
-  listTranslationProjectMembers,
-  removeUserFromLanguage,
-  setUserLanguageRole,
-  setUserLanguages,
-} from './user-language.repository';
-import { setLanguageMemberRoleSchema } from './user-language.types';
-
-export async function adminSetUserLanguagesAction(userId: string, languageIds: string[]) {
-  await authorize('admin');
-  return await setUserLanguages(userId, languageIds);
-}
+import { languageTeam } from './language-team';
+import { getProjectReviewers, listTranslationProjectMembers } from './user-language.repository';
 
 /**
- * Team membership is language-scoped: these actions are entered from a
- * translation project, but the role they grant applies to every project in
- * that project's language.
+ * Team membership is language-scoped: a UserLanguage row grants its role on
+ * every project in that language. These actions are keyed by language to say
+ * so; the reads below are still entered from a project, because a project board
+ * wants to show who is on the language it belongs to.
  */
+
 export async function listTranslationProjectMembersAction(translationProjectId: string) {
   await authorize('authenticated');
   return await listTranslationProjectMembers(translationProjectId);
 }
 
-export async function setLanguageMemberRoleAction(input: unknown) {
-  const validated = setLanguageMemberRoleSchema.parse(input);
-
-  await authorize({ project: validated.translationProjectId, role: 'manager' });
-
-  if (!(await userExistsById(validated.userId))) {
-    throw new Error('User not found in database');
-  }
-
-  const languageId = await getLanguageIdForTranslationProject(validated.translationProjectId);
-  if (!languageId) {
-    throw new Error('Translation project not found');
-  }
-
-  return await setUserLanguageRole(validated.userId, languageId, validated.role);
-}
-
-export async function removeLanguageMemberAction(userId: string, translationProjectId: string) {
-  await authorize({ project: translationProjectId, role: 'manager' });
-
-  const languageId = await getLanguageIdForTranslationProject(translationProjectId);
-  if (!languageId) {
-    throw new Error('Translation project not found');
-  }
-
-  return await removeUserFromLanguage(userId, languageId);
-}
-
 export async function getProjectReviewersAction(translationProjectId: string) {
   await authorize('authenticated');
   return await getProjectReviewers(translationProjectId);
+}
+
+export async function setLanguageMemberRoleAction(input: unknown) {
+  await authorize('can:manage-languages');
+  return await languageTeam.setMemberRole(input);
+}
+
+export async function removeLanguageMemberAction(input: unknown) {
+  await authorize('can:manage-languages');
+  return await languageTeam.removeMember(input);
 }

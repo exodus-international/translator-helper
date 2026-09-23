@@ -257,6 +257,47 @@ export async function getWorkVersionsForUser(userId: string): Promise<VersionAss
   });
 }
 
+/**
+ * How much unfinished work each member of a language is carrying, keyed by user
+ * id. Removing someone with work in flight is the one destructive action on the
+ * team page, so the number has to be beside them before they are removed.
+ *
+ * "Open" is the same rule `getWorkVersionsForUser` uses for My Work -- the
+ * member is translator or reviewer, and the status is neither APPROVED nor
+ * DEPLOYED -- so a member's count here and their dashboard cannot disagree. A
+ * version whose translator is also its reviewer counts once per role, for the
+ * same reason My Work lists it twice: it is two things to do.
+ */
+export async function countOpenWorkByMember(languageId: string): Promise<Map<string, number>> {
+  const where = {
+    languageId,
+    status: { notIn: [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED] },
+  };
+
+  const [asTranslator, asReviewer] = await Promise.all([
+    prisma.documentVersion.groupBy({
+      by: ['userId'],
+      where: { ...where, userId: { not: null } },
+      _count: { _all: true },
+    }),
+    prisma.documentVersion.groupBy({
+      by: ['reviewerId'],
+      where: { ...where, reviewerId: { not: null } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const counts = new Map<string, number>();
+  for (const group of asTranslator) {
+    if (group.userId) counts.set(group.userId, (counts.get(group.userId) ?? 0) + group._count._all);
+  }
+  for (const group of asReviewer) {
+    if (group.reviewerId) counts.set(group.reviewerId, (counts.get(group.reviewerId) ?? 0) + group._count._all);
+  }
+
+  return counts;
+}
+
 /** The versions belonging to a translation project — its language, its documents. */
 export async function listVersionsForTranslationProject(
   sourceProjectId: string,
