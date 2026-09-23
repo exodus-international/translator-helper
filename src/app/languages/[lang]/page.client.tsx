@@ -15,6 +15,7 @@ import { PROJECT_ROLE_LABELS } from '@/constants/project-role';
 import { ProjectRole } from '@/generated/prisma/enums';
 import { countHealthProblems, type LanguageHealthPill } from '@/domain/language/language-health';
 import type { LanguageProgress, LanguageProjectProgress } from '@/domain/language/language-progress';
+import { buildProjectPath } from '@/domain/source-project/source-project-url';
 import { formatLastActive } from '@/lib/format';
 import { capture } from '@/lib/analytics';
 import { useTrailStore } from '@/lib/page-trail';
@@ -153,7 +154,9 @@ export default function LanguageOverviewClient({
                 {language.name} is not in any active project.
               </p>
             ) : (
-              progress.projects.map((project) => <ProjectRow key={project.id} project={project} />)
+              progress.projects.map((project) => (
+                <ProjectRow key={project.id} project={project} languageCode={language.code} />
+              ))
             )}
 
           </div>
@@ -269,10 +272,14 @@ function StatRow({ progress, lastDeployAt }: { progress: LanguageProgress; lastD
   );
 }
 
-function ProjectRow({ project }: { project: LanguageProjectProgress }) {
+function ProjectRow({ project, languageCode }: { project: LanguageProjectProgress; languageCode: string }) {
   return (
     <Link
-      href={`/projects/${project.id}`}
+      // The row is a language's line in a project, so the link carries the
+      // language with it. Without it the project board opens on whatever
+      // language that browser last looked at, and a click from Croatian lands
+      // on someone else's Czech.
+      href={`${buildProjectPath(project.slug)}?lang=${encodeURIComponent(languageCode)}`}
       className="hover:bg-muted/40 grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-4 border-t px-4 py-3 transition-colors sm:grid-cols-[minmax(0,1fr)_8rem_5.5rem] lg:grid-cols-[minmax(0,1fr)_8rem_5.5rem_1.25rem]"
     >
       <div className="min-w-0">
