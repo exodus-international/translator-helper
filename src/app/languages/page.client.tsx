@@ -25,7 +25,14 @@ import { capture } from '@/lib/analytics';
  * language is listed with the four checks that decide whether it can produce
  * anything, and how much of its work has shipped.
  */
-export default function LanguagesIndexClient({ languages }: { languages: LanguageListRow[] }) {
+export default function LanguagesIndexClient({
+  languages,
+  canAdminister,
+}: {
+  languages: LanguageListRow[];
+  /** Creating a language is administration; a manager only sees their own. */
+  canAdminister: boolean;
+}) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [code, setCode] = useState('');
@@ -64,8 +71,13 @@ export default function LanguagesIndexClient({ languages }: { languages: Languag
     <>
       <PageHeader
         title="Languages"
-        description="Every language, its team and whether it is configured to produce anything."
+        description={
+          canAdminister
+            ? 'Every language, its team and whether it is configured to produce anything.'
+            : 'The languages you manage, and whether they are configured to produce anything.'
+        }
         actions={
+          canAdminister ? (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger render={<Button />}>
               <Plus />
@@ -124,6 +136,7 @@ export default function LanguagesIndexClient({ languages }: { languages: Languag
               </form>
             </DialogContent>
           </Dialog>
+          ) : null
         }
       />
 
@@ -135,7 +148,7 @@ export default function LanguagesIndexClient({ languages }: { languages: Languag
               <span className="font-semibold">
                 {unhealthy.length} {unhealthy.length === 1 ? 'language is' : 'languages are'} not fully configured.
               </span>{' '}
-              A missing branch fails at deploy, a missing voice generates no audio, and a language with no project
+              A missing branch fails at deploy, a missing voice generates no audio, and a language with no language
               manager cannot be managed by anyone.
             </p>
           </div>

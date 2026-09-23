@@ -1,7 +1,9 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
+import { parseInput } from '@/lib/validation';
 import { languageTeam } from './language-team';
+import { languageScopeSchema } from './user-language.types';
 import { getProjectReviewers, listTranslationProjectMembers } from './user-language.repository';
 
 /**
@@ -21,12 +23,22 @@ export async function getProjectReviewersAction(translationProjectId: string) {
   return await getProjectReviewers(translationProjectId);
 }
 
+/**
+ * A language's manager staffs it, as they could from the project board before
+ * the pages were consolidated -- `authorize` asks the question one step earlier
+ * now, against the language the row actually grants a role on. Administrators
+ * pass the same check.
+ */
 export async function setLanguageMemberRoleAction(input: unknown) {
-  await authorize('can:manage-languages');
+  const { languageId } = parseInput(languageScopeSchema, input);
+  await authorize({ language: languageId, role: 'manager' });
+
   return await languageTeam.setMemberRole(input);
 }
 
 export async function removeLanguageMemberAction(input: unknown) {
-  await authorize('can:manage-languages');
+  const { languageId } = parseInput(languageScopeSchema, input);
+  await authorize({ language: languageId, role: 'manager' });
+
   return await languageTeam.removeMember(input);
 }

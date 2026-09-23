@@ -20,3 +20,12 @@ export const removeLanguageMemberSchema = z.object({
   languageId: z.uuid(),
   userId: z.string(),
 });
+
+/**
+ * The language a write is about, read before the write's own schema so the
+ * permission check can name a scope. Deliberately loose about everything else:
+ * `languageTeam` validates the rest.
+ */
+export const languageScopeSchema = z.object({
+  languageId: z.uuid(),
+});

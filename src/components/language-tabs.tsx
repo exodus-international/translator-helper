@@ -19,18 +19,25 @@ export function LanguageTabs({
   code,
   memberCount,
   includeTeam = true,
+  includeSettings = true,
 }: {
   code: string;
   memberCount?: number;
   /** The source language has no team: nothing is translated into it. */
   includeTeam?: boolean;
+  /** Branch, voice, code and deletion are an administrator's to change. */
+  includeSettings?: boolean;
 }) {
   const pathname = usePathname();
   const base = `/languages/${encodeURIComponent(code)}`;
 
   return (
     <div className="mt-4 flex gap-5 overflow-x-auto">
-      {TABS.filter((tab) => includeTeam || (tab.segment !== 'team' && tab.segment !== '')).map((tab) => {
+      {TABS.filter(
+        (tab) =>
+          (includeTeam || (tab.segment !== 'team' && tab.segment !== '')) &&
+          (includeSettings || tab.segment !== 'settings'),
+      ).map((tab) => {
         const href = tab.segment ? `${base}/${tab.segment}` : base;
         const active = pathname === href;
 

@@ -170,19 +170,23 @@ const ROOT_NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', ico
 // rather than in the Admin group.
 const INSTRUCTIONS_NAV_ITEM: NavItem = { href: '/instructions', label: 'AI instructions', icon: ScrollText };
 
+// Languages sits at /languages rather than under /admin: the page is a place of
+// its own, and its URL is what stops the language-wide effect of a change from
+// needing a caption. Defined once and used twice -- it is in the Admin group for
+// an administrator, and in the root group for a manager, where an "Admin"
+// heading over a single entry would misname what they have.
+const LANGUAGES_NAV_ITEM: NavItem = { href: '/languages', label: 'Languages', icon: Languages };
+
 // Documents keeps a root-level href while sitting in this group: what puts an
 // item here is who it is for, not the namespace it sits under. Managing source
 // documents is admin-only, so the group is where it belongs -- hiding it in the
 // root group instead named the section it answers to nowhere in the UI.
 //
 // Announcements is deliberately absent: it authors what What's New shows, so it
-// lives next to it in the footer rather than a section away. Languages is
-// admin-only like the rest of this group but sits at /languages rather than
-// under /admin: the page is a place of its own, and its URL is what stops the
-// language-wide effect of a change from needing a caption.
+// lives next to it in the footer rather than a section away.
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/languages', label: 'Languages', icon: Languages },
+  LANGUAGES_NAV_ITEM,
   { href: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { href: '/admin/users', label: 'Users', icon: Users },
 ];
@@ -358,8 +362,14 @@ function UserIdentity({ user }: { user: SessionUser }) {
   );
 }
 
-function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: SessionUser; canReadInstructions: boolean }) {
-  const { user, canReadInstructions, ...sidebarProps } = props;
+function AppSidebar(
+  props: React.ComponentProps<typeof Sidebar> & {
+    user: SessionUser;
+    canReadInstructions: boolean;
+    canSeeLanguages: boolean;
+  },
+) {
+  const { user, canReadInstructions, canSeeLanguages, ...sidebarProps } = props;
   const isAdmin = isAdminClient(user);
 
   return (
@@ -377,7 +387,14 @@ function AppSidebar(props: React.ComponentProps<typeof Sidebar> & { user: Sessio
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarNavGroup items={[...ROOT_NAV_ITEMS, ...(canReadInstructions ? [INSTRUCTIONS_NAV_ITEM] : [])]} />
+        <SidebarNavGroup
+          items={[
+            ...ROOT_NAV_ITEMS,
+            // An admin gets Languages in the Admin group below instead.
+            ...(canSeeLanguages && !isAdmin ? [LANGUAGES_NAV_ITEM] : []),
+            ...(canReadInstructions ? [INSTRUCTIONS_NAV_ITEM] : []),
+          ]}
+        />
         {isAdmin && <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />}
       </SidebarContent>
       <SidebarFooter>
@@ -393,12 +410,20 @@ interface AppShellProps {
   user: SessionUser | null;
   /** Admins, and anyone assigned to at least one language. */
   canReadInstructions?: boolean;
+  /** Admins, and anyone who manages at least one language. */
+  canSeeLanguages?: boolean;
   /** Server-read sidebar state cookie, so the first paint already has the right width. */
   defaultOpen?: boolean;
   children: React.ReactNode;
 }
 
-export function AppShell({ user, canReadInstructions = false, defaultOpen = true, children }: AppShellProps) {
+export function AppShell({
+  user,
+  canReadInstructions = false,
+  canSeeLanguages = false,
+  defaultOpen = true,
+  children,
+}: AppShellProps) {
   if (!user) {
     return <>{children}</>;
   }
@@ -410,7 +435,7 @@ export function AppShell({ user, canReadInstructions = false, defaultOpen = true
         { '--sidebar-width': '16rem', '--header-height': 'calc(var(--spacing) * 12 + 1px)' } as React.CSSProperties
       }
     >
-      <AppSidebar user={user} canReadInstructions={canReadInstructions} />
+      <AppSidebar user={user} canReadInstructions={canReadInstructions} canSeeLanguages={canSeeLanguages} />
       <SidebarInset>
         <header className="bg-background sticky top-0 z-10 flex h-(--header-height) shrink-0 items-center gap-2 border-b">
           <div className="flex items-center gap-2 px-4">

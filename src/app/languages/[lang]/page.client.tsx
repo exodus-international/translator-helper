@@ -22,6 +22,8 @@ import { useTrailStore } from '@/lib/page-trail';
 
 interface LanguageOverviewClientProps {
   language: { code: string; name: string };
+  /** Settings are administration; a manager sees the verdict, not the controls. */
+  canAdminister: boolean;
   progress: LanguageProgress;
   lastDeployAt: string | null;
   pills: LanguageHealthPill[];
@@ -31,6 +33,7 @@ interface LanguageOverviewClientProps {
 
 export default function LanguageOverviewClient({
   language,
+  canAdminister,
   progress,
   lastDeployAt,
   pills,
@@ -61,7 +64,7 @@ export default function LanguageOverviewClient({
         }
         description={`Everything scoped to ${language.name} lives here.`}
       >
-        <LanguageTabs code={language.code} memberCount={memberCount} />
+        <LanguageTabs code={language.code} memberCount={memberCount} includeSettings={canAdminister} />
       </PageHeader>
 
       <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-start">
@@ -171,8 +174,13 @@ export default function LanguageOverviewClient({
                 <span className="text-muted-foreground text-[11px]">All set</span>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2.5">
               <LanguageHealthPills pills={pills} className="flex-col items-start" />
+              {!canAdminister && problems > 0 && (
+                <p className="text-muted-foreground text-xs">
+                  A branch, a voice and the language code are set by an administrator.
+                </p>
+              )}
             </CardContent>
           </Card>
 

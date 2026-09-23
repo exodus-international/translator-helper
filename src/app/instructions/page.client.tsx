@@ -171,7 +171,7 @@ export default function InstructionsClient({
             <div className="bg-muted/40 flex items-start gap-2 rounded-lg border px-3 py-2.5">
               <Lock className="text-muted-foreground mt-0.5 size-3.5 shrink-0" aria-hidden />
               <p className="text-muted-foreground text-xs">
-                Read-only. The {language.name} Project Manager and administrators can edit these instructions.
+                Read-only. The {language.name} Language Manager and administrators can edit these instructions.
               </p>
             </div>
           )}
