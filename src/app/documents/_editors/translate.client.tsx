@@ -40,6 +40,8 @@ interface TranslateClientProps {
   targetLanguage?: { code: string; name: string } | null;
   translationProject?: any | null;
   user: SessionUser;
+  /** Resolved on the server against this version's language. */
+  canDeploy: boolean;
   initialSuggestions?: any[];
 }
 
@@ -51,6 +53,7 @@ export default function TranslateClient({
   targetLanguage,
   translationProject,
   user,
+  canDeploy,
   initialSuggestions = [],
 }: TranslateClientProps) {
   const [zenMode, setZenMode] = useState(false);
@@ -86,6 +89,7 @@ export default function TranslateClient({
       translationProjectId={translationProject?.id ?? null}
       targetLanguageId={targetLanguageId}
       user={user}
+      canDeploy={canDeploy}
       variant="translate"
       layout={zenMode ? 'zen' : 'default'}
       fullscreen={zenMode}

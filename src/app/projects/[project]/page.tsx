@@ -3,6 +3,7 @@
 import { listTranslationProjectsAction } from '@/domain/translation-project/translation-project.actions';
 import { listTargetLanguages } from '@/domain/language/language.repository';
 import { resolveInitialLanguage } from '@/domain/language/resolve-initial-language';
+import { canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { canAccessSourceProject } from '@/lib/permissions';
 import { getCurrentUser } from '@/lib/session';
@@ -31,6 +32,16 @@ export default async function ProjectDetailPage({
   const translationProjects = await listTranslationProjectsAction({ sourceProjectId: sourceProject.id });
   const userLanguages = await getUserLanguages(user.id);
 
+  // Deploying publishes a language's work, so who may do it is decided per
+  // language: every one for an administrator, the managed ones for a manager.
+  const viewer = resolveLanguageViewer({
+    isAdmin: user.role === 'ADMIN',
+    memberships: user.role === 'ADMIN' ? [] : userLanguages,
+  });
+  const deployableLanguageIds = languages
+    .filter((language) => canDeployLanguage(viewer, language.id))
+    .map((language) => language.id);
+
   // A link can name the language it is about -- the language overview's project
   // rows do. It only counts when the project is actually translated into it;
   // anything else falls back to the usual choice.
@@ -53,6 +64,7 @@ export default async function ProjectDetailPage({
       languages={languages}
       translationProjects={translationProjects}
       initialLanguageId={initialLanguageId}
+      deployableLanguageIds={deployableLanguageIds}
       languageFromUrl={!!requested}
     />
   );

@@ -61,7 +61,7 @@ describe('authorize', () => {
   });
 
   describe('capability checks', () => {
-    for (const cap of ['can:deploy', 'can:manage-folders', 'can:manage-languages'] as const) {
+    for (const cap of ['can:manage-folders', 'can:manage-languages'] as const) {
       it(`admin passes ${cap}`, async () => {
         const authorize = createAuthorize(createDeps({ requireUser: async () => adminUser }));
         const result = await authorize(cap);

@@ -63,3 +63,16 @@ export function canViewLanguage(viewer: LanguageViewer, languageId: string): boo
 export function canAdministerLanguages(viewer: LanguageViewer): boolean {
   return viewer.kind === 'admin';
 }
+
+/**
+ * Deploying publishes a language's approved work to the content repository.
+ *
+ * It is the same set of people as `canViewLanguage` and for a related reason:
+ * the manager answers for that language's work, and deploying is the act of
+ * finishing it rather than a change to how the app treats the language. The
+ * settings that decide *where* it lands stay with administrators -- a manager
+ * publishes through configuration they cannot alter.
+ */
+export function canDeployLanguage(viewer: LanguageViewer, languageId: string): boolean {
+  return canViewLanguage(viewer, languageId);
+}
