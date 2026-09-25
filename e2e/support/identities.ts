@@ -7,9 +7,9 @@ import path from 'node:path';
  * (`@translator`), never by email, so a scenario reads as "a translator does
  * X" rather than naming a fixture row.
  *
- * `translator2` is deliberately absent: it is the one seeded user the suite
- * never signs in as during setup, which keeps it un-onboarded and therefore
- * available as the subject of the onboarding scenario.
+ * `translator2` is absent because nothing needs it. Onboarding is covered by
+ * the registration scenarios instead: the seed marks every seeded person as
+ * onboarded, so only a freshly registered account still meets that form.
  */
 export const IDENTITIES = {
   admin: 'admin@example.org',

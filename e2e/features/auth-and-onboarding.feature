@@ -10,14 +10,6 @@ Feature: Authentication and onboarding
     When I sign in as "translator@example.org"
     Then I should be on the dashboard
 
-  @high-usage @business-critical
-  Scenario: A new user completes onboarding before reaching the dashboard
-    Given I am signed out
-    When I sign in as "translator2@example.org"
-    Then I should be asked to complete my profile
-    When I continue to the dashboard
-    Then I should be on the dashboard
-
   @high-usage
   Scenario: Signing in with the wrong password is refused
     Given I am signed out

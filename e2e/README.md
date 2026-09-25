@@ -75,15 +75,16 @@ scenario picks who it runs as with a tag:
 | `@reviewer` | `reviewer@example.org`, reviewer hr and sk |
 | *(untagged)* | signed out |
 
-`translator2@example.org` is deliberately never signed in during setup, which keeps it un-onboarded
-and available as the subject of the onboarding scenario.
+Onboarding is covered by the registration scenarios: the seed marks every seeded person as
+onboarded, so only a freshly registered account still meets that form.
 
 **A shared session is shared.** A scenario that signs out revokes the session behind its tag, and
 every later scenario with that tag then fails with a redirect loop. The sign-out scenario must sign
 in fresh and stay untagged.
 
-**Seeded accounts all use the password `Hello123456`** and start with `onboarded = false`, so a first
-sign-in lands on the profile form rather than the dashboard. `support/sign-in.ts` clears that gate.
+**Seeded accounts all use the password `Hello123456`** and are already onboarded. A newly registered
+account is not, so it meets the profile form first; `support/sign-in.ts` clears that gate either
+way.
 
 **Status display names** are `Not Started`, `In Progress`, `In Review`, `Approved`, `Deployed`. Do
 not hardcode them; `support/status.ts` reads them from the app.
