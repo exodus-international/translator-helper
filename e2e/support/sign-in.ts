@@ -9,10 +9,28 @@ import { SEED_PASSWORD } from './identities';
  * the most durable handle available.
  */
 export async function signIn(page: Page, email: string, password: string = SEED_PASSWORD) {
+  await submitLogin(page, email, password);
+
+  // better-auth allows three sign-in attempts per ten seconds and enables that
+  // limit in production only, so a suite that signs several people in quickly
+  // is invisible against a dev server and refused against a real build. Only a
+  // refusal waits, and only for the rate limit: a wrong password still fails
+  // immediately, which is what its own scenario asserts.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const refused = page.getByText(/too many requests|rate limit/i);
+    if ((await refused.count()) === 0) return;
+    await page.waitForTimeout(11_000);
+    await submitLogin(page, email, password);
+  }
+}
+
+async function submitLogin(page: Page, email: string, password: string) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Login' }).click();
+  // Give the response time to land before looking for a refusal.
+  await page.waitForTimeout(500);
 }
 
 /**

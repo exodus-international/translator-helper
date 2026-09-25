@@ -53,9 +53,16 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-    // Bypasses the repo's own `dev` script on purpose: that script sources
-    // `.env`, which carries the development database URL.
-    command: `pnpm exec next dev --port ${PORT}`,
+    // CI serves a production build, which is what actually ships: dev and
+    // production differ in caching, error handling and route behaviour, and a
+    // suite that only ever saw dev would miss that. Locally it stays on dev,
+    // where a rebuild between runs would cost more than it finds.
+    //
+    // Either way this bypasses the repo's own `dev` script on purpose: that
+    // script sources `.env`, which carries the development database URL.
+    command: process.env.CI
+      ? `pnpm exec next start --port ${PORT}`
+      : `pnpm exec next dev --port ${PORT}`,
     url: baseURL,
     timeout: 180_000,
     reuseExistingServer: !process.env.CI,

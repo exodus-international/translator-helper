@@ -98,6 +98,14 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      # The suite serves this build rather than a dev server. Migrations are
+      # applied first because the build renders pages that read the database;
+      # the global setup resets and reseeds it again before the tests run.
+      - name: Build
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec next build
+
       - name: End-to-end tests
         run: pnpm test:e2e
 

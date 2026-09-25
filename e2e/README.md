@@ -23,6 +23,10 @@ pnpm test:e2e --grep @business-critical
 pnpm test:e2e --grep @high-usage
 ```
 
+CI serves a production build rather than a dev server, because the two differ in ways the suite
+should see. Locally it stays on `next dev`, where rebuilding between runs would cost more than it
+finds. Set `CI=1` to exercise the CI path locally.
+
 It also runs in CI, as its own `End-to-end` job in `.github/workflows/test.yml`, on pull requests
 and pushes to `develop` and `production`. That job supplies the same variables `.env.test` holds
 locally, against a Postgres service container, and uploads the Playwright report as an artifact when
@@ -138,6 +142,12 @@ could drift. That matters: the status names were renamed at some point from "Tex
 driving the same document would each inherit the other's status changes. Every scenario works on
 its own document, listed in `support/documents.ts`. When adding one, pick a document whose language
 the acting identity actually holds: the translator has sk and cs, the reviewer has sk and hr.
+
+**Sign-in is rate limited in production only.** better-auth allows three attempts per ten seconds
+and enables the limit when `NODE_ENV` is production, so signing several people in quickly passes
+against a dev server and is refused against a real build. `support/sign-in.ts` waits the window out
+and retries, but only on a rate-limit refusal: a wrong password still fails at once, which is what
+its own scenario asserts.
 
 **The status control is a plain button until React hydrates.** Only then does it own a menu. A click
 landing before that does nothing, silently and with no error, which reads as an inexplicable

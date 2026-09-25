@@ -41,6 +41,9 @@ When(
     await chooseProject(page, project);
     await page.getByLabel(/^Content/).fill(`# ${title}\n\nEnglish source written by the suite.`);
     await page.getByRole('button', { name: 'Create Document' }).click();
+    // Creating navigates away. Waiting for that is what stops the search below
+    // running against a document that is still being written.
+    await expect(page).not.toHaveURL(/\/documents\/new$/);
   },
 );
 
