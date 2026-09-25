@@ -166,6 +166,20 @@ const columns: KanbanColumn[] = COLUMN_IDS.map(({ id, status }) => ({
 
 const activeColumnIds = new Set(columns.map((column) => column.id));
 
+/**
+ * What the board reads when it mounts, injectable so a component test can render
+ * it without a database. Writes still go straight to their server actions.
+ */
+export interface ProjectKanbanBoardLoaders {
+  documents: typeof getDashboardDocumentsAction;
+  members: typeof listTranslationProjectMembersAction;
+}
+
+const serverLoaders: ProjectKanbanBoardLoaders = {
+  documents: getDashboardDocumentsAction,
+  members: listTranslationProjectMembersAction,
+};
+
 interface ProjectKanbanBoardProps {
   user: SessionUser;
   languages: Language[];
@@ -179,6 +193,7 @@ interface ProjectKanbanBoardProps {
   selectedLanguage: string;
   sourceProjectId?: string;
   translationProjectId?: string | null;
+  loaders?: ProjectKanbanBoardLoaders;
 }
 
 export default function ProjectKanbanBoard({
@@ -188,6 +203,7 @@ export default function ProjectKanbanBoard({
   selectedLanguage,
   sourceProjectId,
   translationProjectId,
+  loaders = serverLoaders,
 }: ProjectKanbanBoardProps) {
   const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,7 +249,7 @@ export default function ProjectKanbanBoard({
   async function loadDocuments() {
     setLoading(true);
     try {
-      const docs = await getDashboardDocumentsAction(selectedLanguage, sourceProjectId);
+      const docs = await loaders.documents(selectedLanguage, sourceProjectId);
       setDocuments(docs);
     } catch (error) {
       console.error('Error loading documents:', error);
@@ -244,9 +260,9 @@ export default function ProjectKanbanBoard({
 
   useEffect(() => {
     if (translationProjectId && isAdmin) {
-      listTranslationProjectMembersAction(translationProjectId).then(setProjectMembers).catch(console.error);
+      loaders.members(translationProjectId).then(setProjectMembers).catch(console.error);
     }
-  }, [translationProjectId, isAdmin]);
+  }, [translationProjectId, isAdmin, loaders]);
 
   function openAssignDialog(params: {
     docId: string;
