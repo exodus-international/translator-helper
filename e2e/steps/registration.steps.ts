@@ -1,9 +1,9 @@
 import { expect } from '@playwright/test';
 import { When, Then } from './fixtures';
-import { INVITE_TOKEN, SEED_PASSWORD } from '../support/identities';
+import { INVITE_TOKENS, SEED_PASSWORD } from '../support/identities';
 
 When('I open the seeded invitation', async ({ page }) => {
-  await page.goto(`/register/${INVITE_TOKEN}`);
+  await page.goto(`/register/${INVITE_TOKENS.valid}`);
 });
 
 When(

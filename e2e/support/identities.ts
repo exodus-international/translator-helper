@@ -40,7 +40,7 @@ export function identityFromTags(tags: string[]): IdentityName | undefined {
 /**
  * Token of the open invitation the seed creates.
  *
- * Kept in step with `INVITE_TOKEN` in `prisma/seed-data/datasets.ts`. It is
+ * Kept in step with `INVITE_TOKENS` in `prisma/seed-data/datasets.ts`. It is
  * repeated rather than imported because pulling the seed module into the test
  * process drags the Prisma client in with it. A mismatch is not subtle: the
  * registration page 404s immediately.
@@ -52,5 +52,3 @@ export const INVITE_TOKENS = {
   exhausted: 'seed-invite-exhausted',
   unknown: 'seed-invite-does-not-exist',
 } as const;
-
-export const INVITE_TOKEN = INVITE_TOKENS.valid;

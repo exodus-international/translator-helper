@@ -491,12 +491,6 @@ export const COMMENTS: { versionKey: string; userKey: string; content: string }[
 ];
 
 /**
- * Token for the seeded open invitation. Fixed so the registration flow can be
- * driven without an admin creating one first.
- */
-export const INVITE_TOKEN = 'seed-invite-open-sk';
-
-/**
  * Every way an invitation can fail, one token each.
  *
  * `validateInvitationToken` has four refusals and they read alike from the
@@ -505,7 +499,7 @@ export const INVITE_TOKEN = 'seed-invite-open-sk';
  */
 export const INVITE_TOKENS = {
   /** Unlimited uses, far future. Registering with it must always work. */
-  valid: INVITE_TOKEN,
+  valid: 'seed-invite-open-sk',
   revoked: 'seed-invite-revoked',
   expired: 'seed-invite-expired',
   /** maxUses reached, so it is spent without being revoked or expired. */
