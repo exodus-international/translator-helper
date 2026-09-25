@@ -1,7 +1,14 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { auth } from '@/lib/auth';
-import { AudioProvider, DocumentStatus, GitHubPRStatus, PrismaClient, ProjectRole } from '../src/generated/prisma/client';
+import {
+  AudioProvider,
+  DocumentStatus,
+  GitHubPRStatus,
+  InvitationStatus,
+  PrismaClient,
+  ProjectRole,
+} from '../src/generated/prisma/client';
 
 import { CONTENT_BY_LANGUAGE, ENGLISH_CONTENT } from './seed-data/content';
 import {
@@ -14,7 +21,7 @@ import {
   SUGGESTIONS,
   TARGET_VERSIONS,
   USERS,
-  INVITE_TOKEN,
+  INVITE_TOKENS,
   daysAgo,
   daysFromNow,
 } from './seed-data/datasets';
@@ -571,18 +578,46 @@ async function seedLanguageScenarios(langs: Record<string, string>, users: Recor
  * an admin first creating one by hand. The token is fixed rather than random
  * for the same reason the passwords are: a fixture you can type.
  */
-async function seedInvitation(users: Record<string, string>, langs: Record<string, string>) {
-  const invitation = await prisma.invitation.create({
+async function seedInvitations(users: Record<string, string>, langs: Record<string, string>) {
+  console.log('\n--- Invitations ---');
+
+  const base = { createdById: users.admin1, languages: { create: [{ languageId: langs.sk }] } };
+
+  // The one that works. Unlimited, because a test run that consumed it would
+  // leave the next run without a way in.
+  await prisma.invitation.create({
+    data: { ...base, token: INVITE_TOKENS.valid, maxUses: null, expiresAt: daysFromNow(365) },
+  });
+
+  // Revoked while still in date and with uses left, so only the status can be
+  // what refuses it.
+  await prisma.invitation.create({
     data: {
-      token: INVITE_TOKEN,
-      maxUses: null, // unlimited: re-running a test must not exhaust it
+      ...base,
+      token: INVITE_TOKENS.revoked,
+      maxUses: null,
       expiresAt: daysFromNow(365),
-      createdById: users.admin1,
-      languages: { create: [{ languageId: langs.sk }] },
+      status: InvitationStatus.REVOKED,
     },
   });
-  console.log(`Invitation ${invitation.token} (Slovak, unlimited)`);
-  return invitation;
+
+  // Out of date, still ACTIVE and unused, so only the date can refuse it.
+  await prisma.invitation.create({
+    data: { ...base, token: INVITE_TOKENS.expired, maxUses: null, expiresAt: daysAgo(1) },
+  });
+
+  // Spent: one use allowed and one taken, still ACTIVE and in date.
+  await prisma.invitation.create({
+    data: {
+      ...base,
+      token: INVITE_TOKENS.exhausted,
+      maxUses: 1,
+      usedCount: 1,
+      expiresAt: daysFromNow(365),
+    },
+  });
+
+  console.log(`Invitations: valid, revoked, expired, exhausted (Slovak)`);
 }
 
 async function main() {
@@ -601,7 +636,7 @@ async function main() {
   await seedActivityLogs(versions, users);
   await seedComments(versions, users);
   await seedLanguageScenarios(langs, users);
-  await seedInvitation(users, langs);
+  await seedInvitations(users, langs);
 
   console.log('\n=== Database seeding completed! ===\n');
   console.log('Login credentials:');
@@ -611,7 +646,7 @@ async function main() {
   console.log('  Translator 2: translator2@example.org / Hello123456');
   console.log('  Reviewer:     reviewer@example.org / Hello123456');
   console.log('  Banned:       banned@example.org / Hello123456');
-  console.log(`\nOpen invitation: /register/${INVITE_TOKEN}`);
+  console.log(`\nOpen invitation: /register/${INVITE_TOKENS.valid}`);
 }
 
 main()

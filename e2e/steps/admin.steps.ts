@@ -94,3 +94,16 @@ Then('I should be given an invitation link', async ({ page, world }) => {
   world.inviteUrl = await dialog.getByRole('textbox').first().inputValue();
   expect(world.inviteUrl).toContain('/register/');
 });
+
+Then('the page should not be an error', async ({ page }) => {
+  // An empty fixture is exactly what tends to throw, so the first thing worth
+  // asserting is that the page rendered at all.
+  await expect(page.getByText(/Application error|something went wrong/i)).toHaveCount(0);
+  await expect(page.getByRole('heading').first()).toBeVisible();
+});
+
+Then('I should see an empty state', async ({ page }) => {
+  await expect(
+    page.getByText(/no documents|no translations|nothing here|no members|no team|empty/i).first(),
+  ).toBeVisible();
+});

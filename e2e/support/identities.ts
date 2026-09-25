@@ -45,4 +45,12 @@ export function identityFromTags(tags: string[]): IdentityName | undefined {
  * process drags the Prisma client in with it. A mismatch is not subtle: the
  * registration page 404s immediately.
  */
-export const INVITE_TOKEN = 'seed-invite-open-sk';
+export const INVITE_TOKENS = {
+  valid: 'seed-invite-open-sk',
+  revoked: 'seed-invite-revoked',
+  expired: 'seed-invite-expired',
+  exhausted: 'seed-invite-exhausted',
+  unknown: 'seed-invite-does-not-exist',
+} as const;
+
+export const INVITE_TOKEN = INVITE_TOKENS.valid;

@@ -11,3 +11,16 @@ Feature: Registration by invitation
     Then I should be asked to complete my profile
     When I continue to the dashboard
     Then I should be on the dashboard
+
+  @business-critical
+  Scenario Outline: An invitation that is no longer good is refused
+    Given I am signed out
+    When I open the invitation "<token>"
+    Then I should not be able to register
+
+    Examples:
+      | token                       |
+      | seed-invite-revoked         |
+      | seed-invite-expired         |
+      | seed-invite-exhausted       |
+      | seed-invite-does-not-exist  |
