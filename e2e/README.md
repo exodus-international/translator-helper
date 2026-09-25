@@ -23,7 +23,10 @@ pnpm test:e2e --grep @business-critical
 pnpm test:e2e --grep @high-usage
 ```
 
-The suite currently runs locally only. It is not wired into CI until it has proven it is not flaky.
+It also runs in CI, as its own `End-to-end` job in `.github/workflows/test.yml`, on pull requests
+and pushes to `develop` and `production`. That job supplies the same variables `.env.test` holds
+locally, against a Postgres service container, and uploads the Playwright report as an artifact when
+something fails.
 
 ## Requirements
 

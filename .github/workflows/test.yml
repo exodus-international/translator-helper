@@ -46,3 +46,67 @@ jobs:
       - name: Dead code
         if: github.event_name == 'pull_request'
         run: pnpm exec fallow dead-code --changed-since "origin/${{ github.base_ref }}"
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    # Playwright drives a real browser against a real database, so it is slower
+    # than the checks above and runs beside them rather than after.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: translation_helper_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # The suite refuses to run unless this names its own database, which is
+      # what stops it ever resetting something else.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/translation_helper_test?schema=public
+      BETTER_AUTH_SECRET: end-to-end-secret-not-used-anywhere-else
+      NEXT_PUBLIC_APP_URL: http://localhost:3100
+      PORT: '3100'
+      # Never reached: the model call is answered by a local stub.
+      CHATGPT_API: sk-test-not-used
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # Only Chromium: the suite targets one browser on purpose, and the other
+      # two would triple the download for nothing.
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: pnpm test:e2e
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
