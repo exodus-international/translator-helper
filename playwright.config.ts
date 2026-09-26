@@ -2,6 +2,7 @@ import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { defineBddConfig } from 'playwright-bdd';
 import dotenv from 'dotenv';
+import { GITHUB_STUB, githubStubEnv } from './e2e/support/github-stub';
 
 // The isolated end-to-end environment: its own database and its own port, so a
 // test run can never reach development data or collide with `pnpm dev`.
@@ -53,6 +54,15 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
+      // Stands in for the GitHub API, for the same reason: deploying runs in
+      // a server action. Nothing leaves the machine and no pull request is
+      // opened.
+      command: 'node e2e/support/github-mock.mjs',
+      url: `http://localhost:${GITHUB_STUB.port}`,
+      timeout: 30_000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
     // CI serves a production build, which is what actually ships: dev and
     // production differ in caching, error handling and route behaviour, and a
     // suite that only ever saw dev would miss that. Locally it stays on dev,
@@ -77,6 +87,10 @@ export default defineConfig({
       NEXT_PUBLIC_APP_URL: baseURL,
       CHATGPT_API: process.env.CHATGPT_API || 'sk-test-not-used',
       CHATGPT_API_BASE_URL: `http://localhost:${OPENAI_MOCK_PORT}`,
+      // Points the app at the GitHub stand-in, with a key made for this run.
+      // Set here rather than in .env.test or CI so a real GITHUB_* value in
+      // .env.local can never reach a test run.
+      ...githubStubEnv(),
       PORT,
     },
     },

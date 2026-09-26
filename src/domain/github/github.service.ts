@@ -2,7 +2,7 @@ import { buildDocumentPath } from '@/domain/document/document-url';
 import prisma from '@/lib/db';
 import { getGitHubConfig } from '@/lib/github-config';
 import { GitHubPRStatus } from '@/generated/prisma/enums';
-import { App } from 'octokit';
+import { App, Octokit } from 'octokit';
 import { resolveFilePath } from './github.paths';
 import { createGitHubCommit } from './github.repository';
 import { DeploySkippedError } from './github.errors';
@@ -18,6 +18,9 @@ function getApp(): App {
   appInstance = new App({
     appId: config.appId,
     privateKey: config.privateKey,
+    // Every client the app hands out, including the installation one that
+    // fetches its own token, inherits this base URL.
+    ...(config.apiBaseUrl && { Octokit: Octokit.defaults({ baseUrl: config.apiBaseUrl }) }),
   });
   return appInstance;
 }
