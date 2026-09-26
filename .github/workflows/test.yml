@@ -3,8 +3,10 @@ name: Test
 on:
   push:
     branches: [develop, production]
+  # Every pull request, whatever it targets: a branch stacked on another
+  # branch is still a change that has to pass, and with the base filter it
+  # ran nothing at all.
   pull_request:
-    branches: [develop, production]
 
 jobs:
   test:
