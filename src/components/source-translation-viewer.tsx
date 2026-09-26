@@ -4,17 +4,9 @@ import { PaneTabs } from '@/components/editor/pane-tabs';
 import type { CodeEditorHandle } from '@/components/editor/code-editor';
 import { useCursorSync } from '@/components/editor/use-cursor-sync';
 import { useSourceEditing } from '@/components/editor/use-source-editing';
-import { selectionBox, useFollowSelection, type SelectionBox } from '@/components/editor/toolbar-placement';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { useFollowSelection } from '@/components/editor/toolbar-placement';
+import { DiscardDialog } from '@/components/editor/discard-dialog';
+import { useSuggestionAuthoring } from '@/components/editor/use-suggestion-authoring';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -37,7 +29,7 @@ import {
   Save,
   X,
 } from 'lucide-react';
-import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ReaderPreview } from '@/components/reader-preview';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import type { LintDiagnostic } from '@/lib/lint';
@@ -306,23 +298,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       }
     }, [requestedView, audioTabVersionId, onRequestedViewShown]);
     const [isReviewEditing, setIsReviewEditing] = useState(reviewConfig?.editingDefault ?? false);
-    const [showSuggestionForm, setShowSuggestionForm] = useState(false);
-    const [suggestionFormType, setSuggestionFormType] = useState<SuggestionType>(SuggestionType.COMMENT);
-    const [selectedRange, setSelectedRange] = useState<{
-      startLine: number;
-      startColumn: number;
-      endLine: number;
-      endColumn: number;
-    } | null>(null);
-    const [selectedText, setSelectedText] = useState<string>(''); // Store selected text for pre-filling
-    const suggestionFormDirtyRef = useRef(false);
-    // The Audio text tab is unmounted the moment another tab is chosen, taking
-    // an unsaved draft with it. Same guard the suggestion form gets.
-    const audioDraftDirtyRef = useRef(false);
-    const [showDiscardDialog, setShowDiscardDialog] = useState(false);
-    const [discardKind, setDiscardKind] = useState<'suggestion' | 'audioText'>('suggestion');
-    const pendingDiscardActionRef = useRef<(() => void) | null>(null);
-    const [toolbarPosition, setToolbarPosition] = useState<SelectionBox | null>(null);
     const translationEditorRef = useRef<CodeEditorHandle | null>(null);
     const [translationDiagnostics, setTranslationDiagnostics] = useState<LintDiagnostic[]>([]);
     const sourceEditorRef = useRef<CodeEditorHandle | null>(null);
@@ -387,6 +362,41 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       inPreview: !isYaml && sourceViewMode === 'formatted',
       onEnter: () => setSourceViewMode('raw'),
     });
+
+    // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
+    const showSuggestionDecorations = suggestions.length > 0;
+    const showSelectionToolbar = canCreateSuggestions && (isReviewMode || showSuggestionDecorations);
+    // Formatting is offered wherever the translation pane is the thing being
+    // typed into. Where the suggestion toolbar owns the selection (review, or a
+    // document with feedback), that toolbar keeps the spot.
+    const formattingEnabled = variant === 'translate' && translateTab === 'edit' && !showSelectionToolbar;
+
+    const authoring = useSuggestionAuthoring({
+      translationContent,
+      editorRef: translationEditorRef,
+      externalEditorRef,
+      showSelectionToolbar,
+      formattingEnabled,
+      documentVersion,
+      onCreateSuggestion,
+      viewKey: `${reviewViewMode}:${translateTab}:${isReviewEditing}`,
+    });
+    const {
+      showSuggestionForm,
+      suggestionFormType,
+      selectedRange,
+      selectedText,
+      toolbarPosition,
+      setToolbarPosition,
+      suggestionFormDirtyRef,
+      audioDraftDirtyRef,
+      requestLeaveAudioText,
+      requestCloseSuggestionForm,
+      handleSelectionChange,
+      openSuggestionForm: handleCreateSuggestion,
+      submitSuggestionForm: handleSuggestionFormSubmit,
+    } = authoring;
+
     // The suggestion toolbar is placed where the selection is on screen, so it
     // moves with the selection as the pane scrolls.
     useFollowSelection(toolbarPosition !== null, translationContainerRef, translationEditorRef, setToolbarPosition);
@@ -453,20 +463,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       clearTranslationSync();
     };
 
-    /** Leaving the Audio text tab, once whoever is in it has agreed to lose the draft. */
-    const requestLeaveAudioText = useCallback((proceed: () => void) => {
-      if (!audioDraftDirtyRef.current) {
-        proceed();
-        return;
-      }
-      pendingDiscardActionRef.current = () => {
-        audioDraftDirtyRef.current = false;
-        proceed();
-      };
-      setDiscardKind('audioText');
-      setShowDiscardDialog(true);
-    }, []);
-
     const enterReviewEditMode = () => {
       if (!reviewConfig?.canEdit) return;
       // Editing the translation replaces the Audio text pane with the editor,
@@ -502,136 +498,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       }),
       [variant, enterReviewEditMode, exitReviewEditMode],
     );
-
-    const doCloseSuggestionForm = useCallback(() => {
-      setShowSuggestionForm(false);
-      setSelectedRange(null);
-      setSelectedText('');
-      suggestionFormDirtyRef.current = false;
-    }, []);
-
-    // Everything below is read off a selection, and the editor that reported it
-    // is unmounted when the view changes. A freshly mounted one says nothing
-    // until someone moves the cursor, so this state used to outlive the pane it
-    // came from: the suggestion toolbar reappeared at its old coordinates with
-    // nothing highlighted, and Comment or Suggest edit filed against a range
-    // out of a tab the reviewer had already left. The form goes too -- it
-    // remounts empty while its dirty flag stayed set, so cancelling a form
-    // nobody had touched asked whether to discard the work in it.
-    useEffect(() => {
-      setToolbarPosition(null);
-      doCloseSuggestionForm();
-    }, [reviewViewMode, translateTab, isReviewEditing, doCloseSuggestionForm]);
-
-    const requestCloseSuggestionForm = useCallback(
-      (onConfirmed?: () => void) => {
-        if (!suggestionFormDirtyRef.current) {
-          doCloseSuggestionForm();
-          onConfirmed?.();
-          return;
-        }
-        pendingDiscardActionRef.current = onConfirmed ?? null;
-        setDiscardKind('suggestion');
-        setShowDiscardDialog(true);
-      },
-      [doCloseSuggestionForm],
-    );
-
-    const handleDiscardConfirm = useCallback(() => {
-      if (discardKind === 'suggestion') doCloseSuggestionForm();
-      setShowDiscardDialog(false);
-      pendingDiscardActionRef.current?.();
-      pendingDiscardActionRef.current = null;
-    }, [doCloseSuggestionForm, discardKind]);
-
-    const handleDiscardCancel = useCallback(() => {
-      setShowDiscardDialog(false);
-      pendingDiscardActionRef.current = null;
-    }, []);
-
-    const handleSelectionChange = (
-      range: {
-        startLine: number;
-        startColumn: number;
-        endLine: number;
-        endColumn: number;
-      } | null,
-    ) => {
-      // Close suggestion form if open when selection changes
-      if (showSuggestionForm) {
-        requestCloseSuggestionForm();
-        return;
-      }
-
-      setSelectedRange(range);
-      // Get selected text from editor
-      if (range) {
-        const editor = (translationEditorRef.current || externalEditorRef?.current)?.editor;
-
-        if (editor) {
-          try {
-            setSelectedText(editor.getTextInRange(range));
-          } catch (error) {
-            console.error('Error getting selected text from the editor:', error);
-            // Fallback to content extraction
-            extractTextFromContent(range);
-          }
-        } else {
-          // Fallback: extract text from content
-          extractTextFromContent(range);
-        }
-      } else {
-        setSelectedText('');
-      }
-
-      function extractTextFromContent(range: {
-        startLine: number;
-        startColumn: number;
-        endLine: number;
-        endColumn: number;
-      }) {
-        const lines = translationContent.split('\n');
-        if (range.startLine === range.endLine) {
-          const line = lines[range.startLine - 1] || '';
-          const text = line.substring(range.startColumn - 1, range.endColumn - 1);
-          setSelectedText(text);
-        } else {
-          // Multi-line selection
-          const firstLine = lines[range.startLine - 1] || '';
-          const lastLine = lines[range.endLine - 1] || '';
-          const firstPart = firstLine.substring(range.startColumn - 1);
-          const lastPart = lastLine.substring(0, range.endColumn - 1);
-          const middleLines = lines.slice(range.startLine, range.endLine - 1);
-          setSelectedText([firstPart, ...middleLines, lastPart].join('\n'));
-        }
-      }
-
-      const showToolbar =
-        !!range && ((canCreateSuggestions && (isReviewMode || suggestions.length > 0)) || formattingEnabled);
-      const view = showToolbar ? (translationEditorRef.current || externalEditorRef?.current)?.view : null;
-      setToolbarPosition(view ? selectionBox(view) : null);
-    };
-
-    const handleCreateSuggestion = (type: SuggestionType) => {
-      if (!selectedRange) return;
-      setSuggestionFormType(type);
-      setShowSuggestionForm(true);
-      setToolbarPosition(null);
-    };
-
-    const handleSuggestionFormSubmit = (data: { comment: string; proposedText?: string }) => {
-      if (!selectedRange || !onCreateSuggestion) return;
-      onCreateSuggestion({
-        ...data,
-        type: suggestionFormType,
-        range: selectedRange,
-        version: documentVersion,
-      });
-      suggestionFormDirtyRef.current = false;
-      setShowSuggestionForm(false);
-      setSelectedRange(null);
-      setSelectedText('');
-    };
 
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
 
@@ -678,13 +544,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       variant === 'review' && !isReviewEditing && !!audioTabVersionId && reviewViewMode === 'audio';
     const showTranslationCopy = (variant === 'review' || translationStarted) && !showingAudioText;
 
-    // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
-    const showSuggestionDecorations = suggestions.length > 0;
-    const showSelectionToolbar = canCreateSuggestions && (isReviewMode || showSuggestionDecorations);
-    // Formatting is offered wherever the translation pane is the thing being
-    // typed into. Where the suggestion toolbar owns the selection (review, or a
-    // document with feedback), that toolbar keeps the spot.
-    const formattingEnabled = variant === 'translate' && translateTab === 'edit' && !showSelectionToolbar;
     // The same toolbar for both panes: one hook each, pointed at the editor of
     // the pane and the box it floats over.
     const sourceFormatting = useFormattingToolbar({
@@ -1112,29 +971,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             </div>
           </Card>
 
-          <AlertDialog
-            open={showDiscardDialog}
-            onOpenChange={(open) => {
-              if (!open) handleDiscardCancel();
-            }}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {discardKind === 'audioText' ? 'Discard unsaved audio text?' : 'Discard unsaved suggestion?'}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {discardKind === 'audioText'
-                    ? 'The audio text has changes that have not been saved. Leaving this tab loses them.'
-                    : 'You have unsaved changes in your suggestion. Are you sure you want to discard them?'}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={handleDiscardCancel}>Keep editing</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDiscardConfirm}>Discard</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <DiscardDialog prompt={authoring.discard} />
         </div>
 
         {/* Zen mode is the writing surface, so it carries neither sidebar: the
