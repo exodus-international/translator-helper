@@ -1,6 +1,6 @@
 import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
-import { Prisma } from '@/generated/prisma/client';
+import { Prisma, type Document } from '@/generated/prisma/client';
 import { DocumentType, SuggestionStatus } from '@/generated/prisma/enums';
 
 const userWithLanguages = {
@@ -168,7 +168,7 @@ export async function updateDocument(
   });
 }
 
-export async function deleteDocument(id: string): Promise<Prisma.DocumentGetPayload<{}>> {
+export async function deleteDocument(id: string): Promise<Document> {
   return prisma.document.delete({
     where: { id },
   });

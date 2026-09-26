@@ -37,6 +37,11 @@ jobs:
       - name: Typecheck
         run: pnpm exec tsc --noEmit
 
+      # Warnings are debt being paid down and do not fail the job; an error
+      # does. --max-warnings is deliberately not set.
+      - name: Lint
+        run: pnpm lint
+
       - name: Test
         run: pnpm test
 

@@ -563,6 +563,20 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       setSyncedTranslationLine(undefined);
     };
 
+    /** Leaving the Audio text tab, once whoever is in it has agreed to lose the draft. */
+    const requestLeaveAudioText = useCallback((proceed: () => void) => {
+      if (!audioDraftDirtyRef.current) {
+        proceed();
+        return;
+      }
+      pendingDiscardActionRef.current = () => {
+        audioDraftDirtyRef.current = false;
+        proceed();
+      };
+      setDiscardKind('audioText');
+      setShowDiscardDialog(true);
+    }, []);
+
     const enterReviewEditMode = () => {
       if (!reviewConfig?.canEdit) return;
       // Editing the translation replaces the Audio text pane with the editor,
@@ -632,20 +646,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       },
       [doCloseSuggestionForm],
     );
-
-    /** Leaving the Audio text tab, once whoever is in it has agreed to lose the draft. */
-    const requestLeaveAudioText = useCallback((proceed: () => void) => {
-      if (!audioDraftDirtyRef.current) {
-        proceed();
-        return;
-      }
-      pendingDiscardActionRef.current = () => {
-        audioDraftDirtyRef.current = false;
-        proceed();
-      };
-      setDiscardKind('audioText');
-      setShowDiscardDialog(true);
-    }, []);
 
     const handleDiscardConfirm = useCallback(() => {
       if (discardKind === 'suggestion') doCloseSuggestionForm();
