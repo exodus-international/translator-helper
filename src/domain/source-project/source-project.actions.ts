@@ -66,7 +66,9 @@ export async function getSourceProjectBySlugAction(slug: string) {
 }
 
 export async function createSourceProjectAction(input: unknown) {
-  await authorize('authenticated');
+  // Creating a source project fans out a translation project into every
+  // language, so it is the same decision as deleting one: an administrator's.
+  await authorize('can:manage-folders');
 
   const validated = createSourceProjectSchema.parse(input);
   const sourceProject = await createSourceProject({

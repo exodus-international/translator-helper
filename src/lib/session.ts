@@ -1,5 +1,6 @@
 import { Role } from '@/generated/prisma/enums';
 import { headers } from 'next/headers';
+import { unstable_rethrow } from 'next/navigation';
 import { cache } from 'react';
 import { auth } from './auth';
 
@@ -37,6 +38,10 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
       image: session.user.image,
     };
   } catch (error) {
+    // Next signals "this route cannot be prerendered" by throwing from
+    // headers(), and expects to see that error itself. Swallowing it here is
+    // what made every build log a "Dynamic server usage" error per page.
+    unstable_rethrow(error);
     console.error('Error getting current user:', error);
     return null;
   }

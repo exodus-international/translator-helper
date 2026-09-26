@@ -2,8 +2,7 @@ import { buildDocumentPath } from '@/domain/document/document-url';
 import prisma from '@/lib/db';
 import { getGitHubConfig } from '@/lib/github-config';
 import { GitHubPRStatus } from '@/generated/prisma/enums';
-import crypto from 'crypto';
-import { App } from 'octokit';
+import { App, Octokit } from 'octokit';
 import { resolveFilePath } from './github.paths';
 import { createGitHubCommit } from './github.repository';
 import { DeploySkippedError } from './github.errors';
@@ -19,6 +18,9 @@ function getApp(): App {
   appInstance = new App({
     appId: config.appId,
     privateKey: config.privateKey,
+    // Every client the app hands out, including the installation one that
+    // fetches its own token, inherits this base URL.
+    ...(config.apiBaseUrl && { Octokit: Octokit.defaults({ baseUrl: config.apiBaseUrl }) }),
   });
   return appInstance;
 }
@@ -147,15 +149,6 @@ async function findOrCreatePullRequest(
 
   console.log(`${LOG_PREFIX} PR created: #${data.number} — ${data.html_url}`);
   return { number: data.number, url: data.html_url };
-}
-
-export function verifyWebhookSignature(payload: string, signature: string): boolean {
-  const config = getGitHubConfig();
-  const expected = 'sha256=' + crypto.createHmac('sha256', config.webhookSecret).update(payload).digest('hex');
-
-  const valid = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  console.log(`${LOG_PREFIX} Webhook signature verification: ${valid ? 'VALID' : 'INVALID'}`);
-  return valid;
 }
 
 export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl: string }> {

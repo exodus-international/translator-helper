@@ -1,13 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
-import { Role } from '@/generated/prisma/enums';
-
-// Coerce any unrecognized role value to USER before it reaches the DB
-function ensureValidRole(args: { data?: { role?: unknown } }) {
-  if (args.data?.role && !Object.values(Role).includes(args.data.role as Role)) {
-    args.data.role = Role.USER;
-  }
-}
+import { ensureValidRole } from './valid-role';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 

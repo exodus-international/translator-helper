@@ -338,6 +338,16 @@ export default function DashboardClient({
     return 'all';
   });
 
+  const deployLanguages = useMemo(() => {
+    const langMap = new Map<string, { name: string; code: string }>();
+    for (const v of approvedVersions) {
+      langMap.set(v.language.id, { name: v.language.name, code: v.language.code });
+    }
+    return Array.from(langMap.entries())
+      .map(([id, { name, code }]) => ({ id, name, code }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [approvedVersions]);
+
   const handleDeployLanguageFilterChange = (value: string) => {
     setDeployLanguageFilter(value);
     localStorage.setItem('dashboard:deployLanguageFilter', value);
@@ -351,16 +361,6 @@ export default function DashboardClient({
   const workItems = useMemo(() => buildWorkItems(workVersions, user.id), [workVersions, user.id]);
   const needsYouItems = useMemo(() => workItems.filter((item) => item.isMyTurn), [workItems]);
   const waitingItems = useMemo(() => workItems.filter((item) => !item.isMyTurn), [workItems]);
-
-  const deployLanguages = useMemo(() => {
-    const langMap = new Map<string, { name: string; code: string }>();
-    for (const v of approvedVersions) {
-      langMap.set(v.language.id, { name: v.language.name, code: v.language.code });
-    }
-    return Array.from(langMap.entries())
-      .map(([id, { name, code }]) => ({ id, name, code }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [approvedVersions]);
 
   // Register the active deploy-filter language as a PostHog super property (value is a language id)
   const selectedDeployLanguage =
