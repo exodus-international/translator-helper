@@ -4,9 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import { useDeployConfirm } from '@/components/deploy-confirm';
+import { withStatusChangeFeedback } from '@/components/status-change-feedback';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
-import { capture } from '@/lib/analytics';
 import { useStatusTransitionPending, useStatusTransitionStore } from '@/lib/stores/status-transition';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -155,44 +155,11 @@ export function StatusDropdown({
     // either re-renders.
     if (!beginTransition(versionId)) return;
 
-    // Show a loading toast for deploy (GitHub takes a few seconds)
-    let deployToastId: string | number | undefined;
-    if (newStatus === DocumentStatus.DEPLOYED) {
-      deployToastId = toast.loading('Deploying to GitHub...');
-    }
-
     try {
-      const result = await changeStatus(versionId, newStatus);
-
-      // Show GitHub deploy feedback
-      if (result.github) {
-        if (deployToastId) toast.dismiss(deployToastId);
-        if (result.github.status === 'success') {
-          toast.success(result.github.prUrl ? `GitHub PR created successfully` : 'Deployed to GitHub successfully', {
-            action: result.github.prUrl
-              ? { label: 'Open PR', onClick: () => window.open(result.github!.prUrl, '_blank') }
-              : undefined,
-            duration: 8000,
-          });
-        } else if (result.github.status === 'failed') {
-          toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
-        }
-      } else if (deployToastId) {
-        toast.dismiss(deployToastId);
-      }
-
-      if (result.audio?.status === 'success') {
-        capture('audio_generation_triggered', { documentVersionId: versionId });
-      } else if (result.audio?.status === 'failed') {
-        capture('audio_generation_failed', { documentVersionId: versionId, kind: 'unknown' });
-        toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
-      }
-
-      const ids = { documentId: documentId ?? null, documentVersionId: versionId };
-      capture('document_status_changed', { from: displayedStatus, to: newStatus, via: 'dropdown', ...ids });
-      if (newStatus === DocumentStatus.DEPLOYED) {
-        capture('document_deployed', { via: 'dropdown', ...ids });
-      }
+      await withStatusChangeFeedback(
+        { from: displayedStatus, to: newStatus, via: 'dropdown', documentId: documentId ?? null, versionId },
+        () => changeStatus(versionId, newStatus),
+      );
 
       // Update displayed status immediately for optimistic UI update
       setDisplayedStatus(newStatus);
@@ -208,7 +175,6 @@ export function StatusDropdown({
         window.location.reload();
       }
     } catch (error: any) {
-      if (deployToastId) toast.dismiss(deployToastId);
       console.error('Error updating status:', error);
       toast.error(error.message || 'Failed to update status');
     } finally {
