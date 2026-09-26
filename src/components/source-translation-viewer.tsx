@@ -2,7 +2,8 @@ import { RawEditorPane } from '@/components/raw-editor-panel';
 import { DocumentPanel } from '@/components/editor/document-panel';
 import { PaneTabs } from '@/components/editor/pane-tabs';
 import type { CodeEditorHandle } from '@/components/editor/code-editor';
-import { alignLines } from '@/components/editor/align-lines';
+import { useCursorSync } from '@/components/editor/use-cursor-sync';
+import { useSourceEditing } from '@/components/editor/use-source-editing';
 import { selectionBox, useFollowSelection, type SelectionBox } from '@/components/editor/toolbar-placement';
 import {
   AlertDialog,
@@ -39,7 +40,7 @@ import {
 import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ReaderPreview } from '@/components/reader-preview';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
-import { lintDocument, type LintDiagnostic } from '@/lib/lint';
+import type { LintDiagnostic } from '@/lib/lint';
 import { LintStatusBar } from '@/components/editor/lint-status-bar';
 import { MarkdownGuideDialog } from '@/components/markdown-guide';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
@@ -175,10 +176,6 @@ interface SourceTranslationViewerProps {
   /** Passed through to the Audio text tab so the sidebar card's badge follows what happens in it. */
   onAudioTranscriptStateChange?: (state: AudioTranscriptState) => void;
 }
-
-const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
-  return Math.min(Math.max(_lineNumber, 1), Math.max(toTotal, 1));
-};
 
 /**
  * Where the cursor sits in this pane and where its counterpart sits in the
@@ -328,18 +325,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [toolbarPosition, setToolbarPosition] = useState<SelectionBox | null>(null);
     const translationEditorRef = useRef<CodeEditorHandle | null>(null);
     const [translationDiagnostics, setTranslationDiagnostics] = useState<LintDiagnostic[]>([]);
-    const [sourceDiagnostics, setSourceDiagnostics] = useState<LintDiagnostic[]>([]);
     const sourceEditorRef = useRef<CodeEditorHandle | null>(null);
     const sourceContainerRef = useRef<HTMLDivElement>(null);
     const translationContainerRef = useRef<HTMLDivElement>(null);
     const [selectedUserId] = useState<string | null>(null); // Filter by user for diff view
-    const [isSourceEditing, setIsSourceEditing] = useState(false);
-    const [sourceEditValue, setSourceEditValue] = useState(sourceEditContent ?? sourceContent);
-    const [sourceSaving, setSourceSaving] = useState(false);
-    const [sourceLine, setSourceLine] = useState(1);
-    const [translationLine, setTranslationLine] = useState(1);
-    const [syncedSourceLine, setSyncedSourceLine] = useState<number | undefined>(undefined);
-    const [syncedTranslationLine, setSyncedTranslationLine] = useState<number | undefined>(undefined);
 
     useEffect(() => {
       setMounted(true);
@@ -350,9 +339,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       return suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length;
     }, [suggestions]);
 
-    const sourceLineCount = useMemo(() => sourceContent.split('\n').length, [sourceContent]);
-    const translationLineCount = useMemo(() => translationContent.split('\n').length, [translationContent]);
-
     const translationPreview = translationFormattedContent ?? translationContent;
     const translationRawVisible =
       variant === 'translate' ? translateTab === 'edit' : isReviewEditing || reviewViewMode === 'review';
@@ -362,98 +348,48 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // also when a line moved to in one comes level in the other -- side by
     // side, not a tab apart.
     const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
-    const alignPanes = (pane: 'source' | 'translation') => {
-      if (!showCursorSync || isMobile) return;
-      const source = sourceEditorRef.current?.view;
-      const translation = translationEditorRef.current?.view;
-      if (!source || !translation) return;
-      if (pane === 'source') alignLines(source, translation);
-      else alignLines(translation, source);
-    };
+    const {
+      sourceLine,
+      translationLine,
+      syncedSourceLine,
+      syncedTranslationLine,
+      handleSourceCursorChange,
+      handleTranslationCursorChange,
+      jumpToTranslationLine,
+      clearTranslationSync,
+    } = useCursorSync({
+      sourceContent,
+      translationContent,
+      sourceEditorRef,
+      translationEditorRef,
+      active: showCursorSync && !isMobile,
+      translationRawVisible,
+      sourceRawVisible: sourceViewMode === 'raw',
+    });
+    const {
+      isSourceEditing,
+      sourceEditValue,
+      sourceSaving,
+      sourcePaneDiagnostics,
+      setSourceDiagnostics,
+      handleSourceEditChange,
+      handleSourceSave,
+      handleSourceCancel,
+      enterSourceEditMode,
+    } = useSourceEditing({
+      canEditSource,
+      sourceContent,
+      sourceEditContent,
+      onSourceChange,
+      onSourceSave,
+      // `!isYaml` for the same reason the editor gates itself on the language:
+      // these are Markdown rules.
+      inPreview: !isYaml && sourceViewMode === 'formatted',
+      onEnter: () => setSourceViewMode('raw'),
+    });
     // The suggestion toolbar is placed where the selection is on screen, so it
     // moves with the selection as the pane scrolls.
     useFollowSelection(toolbarPosition !== null, translationContainerRef, translationEditorRef, setToolbarPosition);
-
-    // Update source edit value when sourceEditContent prop changes
-    useEffect(() => {
-      if (sourceEditContent !== undefined) {
-        setSourceEditValue(sourceEditContent);
-      }
-    }, [sourceEditContent]);
-
-    const handleSourceEditChange = (value: string) => {
-      setSourceEditValue(value);
-      onSourceChange?.(value);
-    };
-
-    const handleSourceSave = async () => {
-      if (!onSourceSave) return;
-      setSourceSaving(true);
-      try {
-        await onSourceSave();
-        setIsSourceEditing(false);
-      } catch (error) {
-        console.error('Error saving source:', error);
-      } finally {
-        setSourceSaving(false);
-      }
-    };
-
-    const handleSourceCancel = () => {
-      setSourceEditValue(sourceEditContent ?? sourceContent);
-      setIsSourceEditing(false);
-    };
-
-    const enterSourceEditMode = () => {
-      if (!canEditSource) return;
-      setSourceEditValue(sourceEditContent ?? sourceContent);
-      setIsSourceEditing(true);
-      setSourceViewMode('raw');
-    };
-
-    const handleSourceCursorChange = (lineNumber: number, toLine: boolean) => {
-      setSourceLine(lineNumber);
-      // Clear stale decoration on the source pane (user is now active here)
-      setSyncedSourceLine(undefined);
-      if (!translationRawVisible) {
-        setSyncedTranslationLine(undefined);
-        return;
-      }
-
-      // A key moving the cursor along its line, or typing, is not a move to
-      // another line: the other pane stays where it was scrolled to, and keeps
-      // the line it marks. A click on the line is one, and brings it back.
-      if (!toLine) return;
-
-      const sourceTotalLines = sourceLineCount;
-      const translationTotalLines = translationLineCount;
-      const translationTargetLine = mapLineNumber(lineNumber, sourceTotalLines, translationTotalLines);
-      setSyncedTranslationLine(translationTargetLine);
-      // Update the translation pane's displayed line to match the synced target
-      setTranslationLine(translationTargetLine);
-      alignPanes('source');
-    };
-
-    const handleTranslationCursorChange = (lineNumber: number, toLine: boolean) => {
-      setTranslationLine(lineNumber);
-      // Clear stale decoration on the translation pane (user is now active here)
-      setSyncedTranslationLine(undefined);
-      if (sourceViewMode !== 'raw') {
-        setSyncedSourceLine(undefined);
-        return;
-      }
-
-      // Along the line: as in handleSourceCursorChange, the source stays put.
-      if (!toLine) return;
-
-      const sourceTotalLines = sourceLineCount;
-      const translationTotalLines = translationLineCount;
-      const sourceTargetLine = mapLineNumber(lineNumber, translationTotalLines, sourceTotalLines);
-      setSyncedSourceLine(sourceTargetLine);
-      // Update the source pane's displayed line to match the synced target
-      setSourceLine(sourceTargetLine);
-      alignPanes('translation');
-    };
 
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
       setActiveThreadId(suggestion.id);
@@ -483,19 +419,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             editor.setSelection(range);
           }
 
-          // Always sync both panes for context
-          setTranslationLine(suggestion.startLine);
-          setSyncedTranslationLine(suggestion.startLine);
-
-          // Sync source pane — switch to raw view if needed so the line highlight is visible
-          const sourceTotalLines = sourceContent.split('\n').length;
-          const translationTotalLines = translationContent.split('\n').length;
-          const sourceTargetLine = mapLineNumber(suggestion.startLine, translationTotalLines, sourceTotalLines);
-
+          // Both panes mark the lines for context; the source shows its
+          // editor if it was on the preview, so the mark is visible.
+          jumpToTranslationLine(suggestion.startLine);
           if (sourceViewMode !== 'raw') {
             setSourceViewMode('raw');
           }
-          setSyncedSourceLine(sourceTargetLine);
         }
       } catch (error) {
         console.error('Error selecting suggestion in editor:', error);
@@ -516,34 +445,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // Report only once there is text to report on. A version that has just
     // been started is empty, and checking it against the source calls every
     // heading, key and link missing — an error the translator has not made.
-    // (The rules themselves already stay quiet on an empty document; this keeps
-    // the bar from saying anything at all until there is work to judge.)
     const translationHasContent = translationContent.trim().length > 0;
-    // The source pane is linted like the translation, as the source: the style
-    // rules adopt whatever it already does, and the rules that compare a
-    // translation with its source stay out of it. In Preview there is no editor
-    // to report them, so they are computed from the text.
-    // `!isYaml` for the same reason the editor gates itself on the language:
-    // these are Markdown rules, and the Preview branch below is not the only
-    // reader of this flag.
-    const inSourcePreview = !isYaml && !isSourceEditing && sourceViewMode === 'formatted';
-    const sourcePreviewDiagnostics = useMemo(
-      () => (inSourcePreview ? lintDocument({ text: sourceContent, isSource: true }) : []),
-      [inSourcePreview, sourceContent],
-    );
-    // Whichever view is up owns the bar. Falling back to the editor's last
-    // report whenever Preview came back empty could not tell "Preview found
-    // nothing" from "Preview has not run" -- and since this is computed
-    // synchronously those were never two states. What it did instead was carry
-    // a finding from the editor into Preview, where the text it was about is
-    // no longer on screen and there is no Fix all to clear it with. Nothing
-    // clears `sourceDiagnostics` on the way out, so it sat there.
-    const sourcePaneDiagnostics = inSourcePreview ? sourcePreviewDiagnostics : sourceDiagnostics;
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
       setReviewViewMode('review');
-      setSyncedTranslationLine(undefined);
+      clearTranslationSync();
     };
 
     /** Leaving the Audio text tab, once whoever is in it has agreed to lose the draft. */
