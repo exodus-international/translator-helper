@@ -18,7 +18,7 @@ import { validateTransition } from './document-version.transitions';
  * built.
  */
 
-export interface StatusChangeVersion {
+interface StatusChangeVersion {
   id: string;
   status: DocumentStatus;
 }
