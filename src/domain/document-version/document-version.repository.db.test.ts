@@ -9,6 +9,7 @@ import { DocumentStatus } from '@/generated/prisma/enums';
 import prisma from '@/lib/db';
 import { SEEDED_USERS, seededDocument, seededLanguage, seededUser, seededVersion } from '../../../tests/seeded';
 import {
+  claimDocumentVersion,
   createDocumentVersion,
   getDocumentVersionByDocumentAndLanguage,
   getDocumentVersionById,
@@ -111,5 +112,26 @@ describe('getDocumentVersionById', () => {
 
   it('is null for an id nothing has', async () => {
     assert.equal(await getDocumentVersionById('00000000-0000-4000-8000-000000000000'), null);
+  });
+});
+
+describe('claimDocumentVersion', () => {
+  it('hands a waiting version to the translator and moves it to IN_PROGRESS', async () => {
+    const day14 = await seededVersion('ex90-day-14', 'sk');
+    const translator = await seededUser(SEEDED_USERS.translator);
+    assert.equal(day14.status, DocumentStatus.PENDING_TRANSLATION);
+    try {
+      const claimed = await claimDocumentVersion(day14.id, translator.id);
+      assert.equal(claimed.status, DocumentStatus.IN_PROGRESS);
+      assert.equal(claimed.user?.id, translator.id);
+      assert.equal(claimed.language.code, 'sk');
+      // The counter is not a content write, so it does not move.
+      assert.equal(claimed.version, day14.version);
+    } finally {
+      await prisma.documentVersion.update({
+        where: { id: day14.id },
+        data: { userId: day14.userId, status: day14.status },
+      });
+    }
   });
 });
