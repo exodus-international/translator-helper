@@ -35,6 +35,7 @@ import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { DocumentTypeFilter } from '@/components/document-type-filter';
 import { useActiveLanguage } from '@/components/analytics-project-group';
 import { useDeployConfirm } from '@/components/deploy-confirm';
+import { withStatusChangeFeedback } from '@/components/status-change-feedback';
 import { capture } from '@/lib/analytics';
 import { buildDocumentPath } from '@/domain/document/document-url';
 import { isAdminClient } from '@/lib/permissions-client';
@@ -173,11 +174,13 @@ const activeColumnIds = new Set(columns.map((column) => column.id));
 export interface ProjectKanbanBoardLoaders {
   documents: typeof getDashboardDocumentsAction;
   members: typeof listTranslationProjectMembersAction;
+  changeStatus: typeof updateDocumentVersionStatusAction;
 }
 
 const serverLoaders: ProjectKanbanBoardLoaders = {
   documents: getDashboardDocumentsAction,
   members: listTranslationProjectMembersAction,
+  changeStatus: updateDocumentVersionStatusAction,
 };
 
 interface ProjectKanbanBoardProps {
@@ -460,33 +463,10 @@ export default function ProjectKanbanBoard({
             continue;
           }
           try {
-            const result = await updateDocumentVersionStatusAction(versionId, newStatus);
-            if (result.github?.status === 'success') {
-              toast.success(
-                result.github.prUrl ? 'GitHub PR created successfully' : 'Deployed to GitHub successfully',
-                {
-                  action: result.github.prUrl
-                    ? { label: 'Open PR', onClick: () => window.open(result.github!.prUrl, '_blank') }
-                    : undefined,
-                  duration: 8000,
-                },
-              );
-            } else if (result.github?.status === 'failed') {
-              toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
-            }
-            if (result.audio?.status === 'failed') {
-              toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
-            }
-            capture('document_status_changed', {
-              from: getStatusForColumn(oldCard.column),
-              to: newStatus,
-              via: 'kanban_dnd',
-              documentId: doc.id,
-              documentVersionId: versionId,
-            });
-            if (newStatus === DocumentStatus.DEPLOYED) {
-              capture('document_deployed', { documentId: doc.id, documentVersionId: versionId, via: 'kanban_dnd' });
-            }
+            await withStatusChangeFeedback(
+              { from: getStatusForColumn(oldCard.column), to: newStatus, via: 'kanban_dnd', documentId: doc.id, versionId },
+              () => loaders.changeStatus(versionId, newStatus),
+            );
             await loadDocuments();
           } catch (error) {
             console.error('Error updating document status:', error);

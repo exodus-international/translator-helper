@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils';
 import { forwardRef, type ReactNode } from 'react';
-import { CodeEditor, type CodeEditorHandle } from './editor/code-editor';
+import type { CodeEditorHandle } from './editor/code-editor';
+import { useEditorImplementation } from './editor/editor-implementation';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import type { LintDiagnostic } from '@/lib/lint';
 
@@ -62,6 +63,7 @@ export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(fu
   },
   ref,
 ) {
+  const CodeEditor = useEditorImplementation();
   return (
     <div className={cn('flex h-full flex-col', className)}>
       {/*

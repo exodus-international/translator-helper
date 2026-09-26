@@ -5,7 +5,7 @@ import { AlertCircle, CheckCircle2, Circle, Clock3, PenLine, Rocket } from 'luci
 // fallow-ignore-next-line unused-type
 export type DocumentStatusKey = DocumentStatus | 'NO_STATUS';
 
-interface DocumentStatusConfig {
+export interface DocumentStatusConfig {
   status: DocumentStatusKey;
   name: string;
   icon: LucideIcon;
