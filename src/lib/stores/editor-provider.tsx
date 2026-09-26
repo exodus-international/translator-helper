@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 import { createEditorStore, type EditorStore, type EditorStoreApi, type EditorStoreConfig } from './editor-store';
+import { editorStoreDeps } from './editor-store.deps';
 
 const EditorStoreContext = createContext<EditorStoreApi | null>(null);
 
@@ -13,7 +14,7 @@ interface EditorProviderProps extends EditorStoreConfig {
 export function EditorProvider({ children, ...config }: EditorProviderProps) {
   // One store per mount, created once: the initialiser runs on the first
   // render only, and later renders reuse the instance.
-  const [store] = useState(() => createEditorStore(config));
+  const [store] = useState(() => createEditorStore(config, editorStoreDeps));
   return <EditorStoreContext.Provider value={store}>{children}</EditorStoreContext.Provider>;
 }
 

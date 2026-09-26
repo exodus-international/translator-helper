@@ -1,9 +1,13 @@
 import { createStore } from 'zustand';
-import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
-import { assignDocumentVersionAction } from '@/domain/document-version/document-version.actions';
-import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
-import { submitForReviewAction } from '@/domain/document-version/document-version.actions';
-import {
+import type { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
+import type {
+  assignDocumentVersionAction,
+  assignReviewerToVersionAction,
+  assignTranslatorToVersionAction,
+  submitForReviewAction,
+  updateDocumentVersionAction,
+} from '@/domain/document-version/document-version.actions';
+import type {
   applySuggestionAction,
   createSuggestionAction,
   createSuggestionReplyAction,
@@ -11,22 +15,16 @@ import {
   getSuggestionsByDocumentVersionAction,
   reopenSuggestionAction,
 } from '@/domain/suggestion/suggestion.actions';
-
-import {
-  assignReviewerToVersionAction,
-  assignTranslatorToVersionAction,
-} from '@/domain/document-version/document-version.actions';
-import {
+import type {
   getProjectReviewersAction,
   listTranslationProjectMembersAction,
 } from '@/domain/user-language/user-language.actions';
-import { deleteDocumentAction } from '@/domain/document/document.actions';
-import { translateDocumentAction } from '@/domain/translation/translation.actions';
-import { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions';
+import type { deleteDocumentAction } from '@/domain/document/document.actions';
+import type { translateDocumentAction } from '@/domain/translation/translation.actions';
+import type { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions';
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
-import { toast } from 'sonner';
-import { capture, type AnalyticsEvent, type AnalyticsProperties } from '@/lib/analytics';
+import type { AnalyticsEvent, AnalyticsProperties } from '@/lib/analytics';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -72,6 +70,40 @@ export interface EditorStoreConfig {
   translationProjectId: string | null;
   /** Version id when the Audio text tab is reachable here, null when it is not. */
   audioTextVersionId: string | null;
+}
+
+/**
+ * Everything the store reaches outside itself: the server actions it calls,
+ * the toasts it shows and the analytics it sends.
+ *
+ * The store never imports these at runtime. `editor-store.deps.ts` binds the
+ * real ones for the app, and a test hands in fakes, so the store's own
+ * behaviour -- what is dirty, what is queued, what a race keeps -- runs in
+ * milliseconds with no server, no Prisma and no DOM.
+ */
+export interface EditorStoreDeps {
+  assignDocumentVersion: typeof assignDocumentVersionAction;
+  updateDocumentVersion: typeof updateDocumentVersionAction;
+  submitForReview: typeof submitForReviewAction;
+  assignReviewerToVersion: typeof assignReviewerToVersionAction;
+  assignTranslatorToVersion: typeof assignTranslatorToVersionAction;
+  applySuggestion: typeof applySuggestionAction;
+  createSuggestion: typeof createSuggestionAction;
+  createSuggestionReply: typeof createSuggestionReplyAction;
+  dismissSuggestion: typeof dismissSuggestionAction;
+  getSuggestionsByDocumentVersion: typeof getSuggestionsByDocumentVersionAction;
+  reopenSuggestion: typeof reopenSuggestionAction;
+  getProjectReviewers: typeof getProjectReviewersAction;
+  listTranslationProjectMembers: typeof listTranslationProjectMembersAction;
+  deleteDocument: typeof deleteDocumentAction;
+  translateDocument: typeof translateDocumentAction;
+  getAudioTranscriptState: typeof getAudioTranscriptStateAction;
+  notify: {
+    success: (message: string) => void;
+    error: (message: string) => void;
+    warning: (message: string) => void;
+  };
+  capture: (event: AnalyticsEvent, properties?: AnalyticsProperties) => void;
 }
 
 // ─── State ───────────────────────────────────────────────────
@@ -234,7 +266,7 @@ async function flushPendingEdits(get: () => EditorStore): Promise<boolean> {
 
 // ─── Store factory ───────────────────────────────────────────
 
-export function createEditorStore(config: EditorStoreConfig) {
+export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDeps) {
   const initialContent = config.targetVersion?.content || '';
   // Both audio cards (the sidebar summary and the details panel) mount at once
   // and both want this. Fetch it for whoever asks first and hand the same
@@ -246,7 +278,7 @@ export function createEditorStore(config: EditorStoreConfig) {
   // Every editor event names the document and version it is about, so PostHog
   // can follow one document from translation through review to deploy.
   const track = (event: AnalyticsEvent, properties?: AnalyticsProperties) =>
-    capture(event, {
+    deps.capture(event, {
       documentId: config.documentId,
       documentVersionId: store.getState().targetVersion?.id ?? null,
       ...properties,
@@ -281,7 +313,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     startTranslation: async () => {
       const { documentId, targetLanguageId } = get();
       if (!targetLanguageId) {
-        toast.warning('Please select a target language first');
+        deps.notify.warning('Please select a target language first');
         return;
       }
       // Two controls offer this, and a disabled attribute only takes effect on
@@ -292,7 +324,7 @@ export function createEditorStore(config: EditorStoreConfig) {
 
       set(addLoading(get(), 'startTranslation'));
       try {
-        const version = await assignDocumentVersionAction({
+        const version = await deps.assignDocumentVersion({
           documentId,
           languageId: targetLanguageId,
           content: '',
@@ -307,14 +339,14 @@ export function createEditorStore(config: EditorStoreConfig) {
         track('translation_started');
       } catch (error: any) {
         set(removeLoading(get(), 'startTranslation'));
-        toast.error(error.message || 'Failed to start translation');
+        deps.notify.error(error.message || 'Failed to start translation');
       }
     },
 
     translateWithAi: async () => {
       const { targetLanguageId } = get();
       if (!targetLanguageId) {
-        toast.warning('Select a target language before requesting an AI translation.');
+        deps.notify.warning('Select a target language before requesting an AI translation.');
         return;
       }
       // As in `startTranslation`: a disabled attribute only takes effect on the
@@ -332,7 +364,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       const before = get().content;
       set(addLoading(get(), 'aiTranslate'));
       try {
-        const result = await translateDocumentAction({
+        const result = await deps.translateDocument({
           documentTitle: config.documentTitle,
           sourceLanguageName: config.sourceLanguageName,
           targetLanguageId,
@@ -348,15 +380,15 @@ export function createEditorStore(config: EditorStoreConfig) {
         // be asked for again; those lines cannot.
         if (get().content !== before) {
           set(removeLoading(get(), 'aiTranslate'));
-          toast.warning('Your edits were kept -- the AI draft would have replaced them. Ask for it again to use it.');
+          deps.notify.warning('Your edits were kept -- the AI draft would have replaced them. Ask for it again to use it.');
           return;
         }
         set({ content: result.translatedContent, ...removeLoading(get(), 'aiTranslate') });
         track('ai_translate_triggered', { overwrite: before.trim().length > 0 });
-        toast.success('AI translation generated successfully!');
+        deps.notify.success('AI translation generated successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'aiTranslate'));
-        toast.error(error.message || 'Failed to generate AI translation');
+        deps.notify.error(error.message || 'Failed to generate AI translation');
       }
     },
 
@@ -381,7 +413,7 @@ export function createEditorStore(config: EditorStoreConfig) {
 
         set(addLoading(get(), 'save'));
         try {
-          const updated = await updateDocumentVersionAction(targetVersion.id, { content });
+          const updated = await deps.updateDocumentVersion(targetVersion.id, { content });
           set({
             targetVersion: updated,
             savedContent: content,
@@ -393,10 +425,10 @@ export function createEditorStore(config: EditorStoreConfig) {
           if (trigger === 'manual') {
             track('translation_saved', { documentVersionId: targetVersion.id });
           }
-          toast.success('Translation saved successfully!');
+          deps.notify.success('Translation saved successfully!');
         } catch (error: any) {
           set(removeLoading(get(), 'save'));
-          toast.error(error.message || 'Failed to save translation');
+          deps.notify.error(error.message || 'Failed to save translation');
           throw error;
         }
       };
@@ -421,13 +453,13 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { sourceEditContent } = get();
       set(addLoading(get(), 'sourceSave'));
       try {
-        await updateDocumentVersionAction(sourceVersionId, { content: sourceEditContent });
+        await deps.updateDocumentVersion(sourceVersionId, { content: sourceEditContent });
         set(removeLoading(get(), 'sourceSave'));
         track('source_saved', { documentVersionId: sourceVersionId });
-        toast.success('Source document saved successfully!');
+        deps.notify.success('Source document saved successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'sourceSave'));
-        toast.error(error.message || 'Failed to save source document');
+        deps.notify.error(error.message || 'Failed to save source document');
       }
     },
 
@@ -435,13 +467,13 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { documentId } = get();
       set(addLoading(get(), 'deleteSource'));
       try {
-        await deleteDocumentAction(documentId);
+        await deps.deleteDocument(documentId);
         set(removeLoading(get(), 'deleteSource'));
         track('document_deleted', { location: 'editor' });
-        toast.success('Document deleted successfully!');
+        deps.notify.success('Document deleted successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'deleteSource'));
-        toast.error(error.message || 'Failed to delete document');
+        deps.notify.error(error.message || 'Failed to delete document');
       }
     },
 
@@ -450,7 +482,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { targetVersion } = get();
       if (!targetVersion) return;
       try {
-        const updated = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+        const updated = await deps.getSuggestionsByDocumentVersion(targetVersion.id);
         set({ suggestions: normalizeSuggestions(updated) });
       } catch (error) {
         console.error('Error loading suggestions:', error);
@@ -470,7 +502,7 @@ export function createEditorStore(config: EditorStoreConfig) {
 
       set(addLoading(get(), 'applySuggestion'));
       try {
-        const updatedVersion = await applySuggestionAction({ suggestionId });
+        const updatedVersion = await deps.applySuggestion({ suggestionId });
         set({
           targetVersion: updatedVersion,
           content: updatedVersion.content,
@@ -478,25 +510,25 @@ export function createEditorStore(config: EditorStoreConfig) {
           ...removeLoading(get(), 'applySuggestion'),
         });
         track('suggestion_applied', { suggestionId });
-        toast.success('Suggestion applied!');
+        deps.notify.success('Suggestion applied!');
         await get().reloadSuggestions();
       } catch (error: any) {
         set(removeLoading(get(), 'applySuggestion'));
-        toast.error(error.message || 'Failed to apply suggestion');
+        deps.notify.error(error.message || 'Failed to apply suggestion');
       }
     },
 
     dismissSuggestion: async (suggestionId, reason?) => {
       set(addLoading(get(), 'dismissSuggestion'));
       try {
-        await dismissSuggestionAction({ suggestionId, dismissedReason: reason });
+        await deps.dismissSuggestion({ suggestionId, dismissedReason: reason });
         set(removeLoading(get(), 'dismissSuggestion'));
         track('suggestion_dismissed', { suggestionId });
-        toast.success('Suggestion dismissed!');
+        deps.notify.success('Suggestion dismissed!');
         await get().reloadSuggestions();
       } catch (error: any) {
         set(removeLoading(get(), 'dismissSuggestion'));
-        toast.error(error.message || 'Failed to dismiss suggestion');
+        deps.notify.error(error.message || 'Failed to dismiss suggestion');
       }
     },
 
@@ -505,7 +537,7 @@ export function createEditorStore(config: EditorStoreConfig) {
 
       set(addLoading(get(), 'reopenSuggestion'));
       try {
-        const result = await reopenSuggestionAction({ suggestionId });
+        const result = await deps.reopenSuggestion({ suggestionId });
         if (result.updatedVersion) {
           set({
             targetVersion: result.updatedVersion,
@@ -515,11 +547,11 @@ export function createEditorStore(config: EditorStoreConfig) {
         }
         set(removeLoading(get(), 'reopenSuggestion'));
         track('suggestion_reopened', { suggestionId });
-        toast.success('Suggestion reopened!');
+        deps.notify.success('Suggestion reopened!');
         await get().reloadSuggestions();
       } catch (error: any) {
         set(removeLoading(get(), 'reopenSuggestion'));
-        toast.error(error.message || 'Failed to reopen suggestion');
+        deps.notify.error(error.message || 'Failed to reopen suggestion');
       }
     },
 
@@ -527,7 +559,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { targetVersion } = get();
       if (!targetVersion) return;
       try {
-        await createSuggestionAction({
+        await deps.createSuggestion({
           documentVersionId: targetVersion.id,
           startLine: data.range.startLine,
           startColumn: data.range.startColumn,
@@ -539,10 +571,10 @@ export function createEditorStore(config: EditorStoreConfig) {
           version: data.version,
         });
         track('suggestion_created', { type: data.type });
-        toast.success('Suggestion created!');
+        deps.notify.success('Suggestion created!');
         await get().reloadSuggestions();
       } catch (error: any) {
-        toast.error(error.message || 'Failed to create suggestion');
+        deps.notify.error(error.message || 'Failed to create suggestion');
       }
     },
 
@@ -550,7 +582,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { targetVersion } = get();
       if (!targetVersion) return;
       try {
-        await createSuggestionAction({
+        await deps.createSuggestion({
           documentVersionId: targetVersion.id,
           startLine: null,
           startColumn: null,
@@ -561,20 +593,20 @@ export function createEditorStore(config: EditorStoreConfig) {
           version: targetVersion.version ?? 1,
         });
         track('general_thread_created');
-        toast.success('Comment added!');
+        deps.notify.success('Comment added!');
         await get().reloadSuggestions();
       } catch (error: any) {
-        toast.error(error.message || 'Failed to create comment');
+        deps.notify.error(error.message || 'Failed to create comment');
       }
     },
 
     replySuggestion: async (suggestionId, content) => {
       try {
-        await createSuggestionReplyAction({ suggestionId, content });
+        await deps.createSuggestionReply({ suggestionId, content });
         track('suggestion_replied', { suggestionId });
         await get().reloadSuggestions();
       } catch (error: any) {
-        toast.error(error.message || 'Failed to post reply');
+        deps.notify.error(error.message || 'Failed to post reply');
       }
     },
 
@@ -582,7 +614,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     setAudioTranscriptState: (audioTranscriptState) => set({ audioTranscriptState }),
 
     loadAudioTranscriptState: (documentVersionId) => {
-      transcriptStateRequest ??= getAudioTranscriptStateAction(documentVersionId)
+      transcriptStateRequest ??= deps.getAudioTranscriptState(documentVersionId)
         .then((state) => set({ audioTranscriptState: state }))
         // Nothing here is worth interrupting someone over: the badge just does
         // not appear, and the transcript itself is unaffected.
@@ -599,11 +631,11 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { translationProjectId } = get();
       if (!translationProjectId) return;
       try {
-        const members = await getProjectReviewersAction(translationProjectId);
+        const members = await deps.getProjectReviewers(translationProjectId);
         set({ dialog: { type: 'submitReview', reviewers: members } });
         track('dialog_opened', { dialog: 'submit_review' });
       } catch (error) {
-        toast.error('Failed to load reviewers');
+        deps.notify.error('Failed to load reviewers');
       }
     },
 
@@ -613,7 +645,7 @@ export function createEditorStore(config: EditorStoreConfig) {
 
       set(addLoading(get(), 'submitForReview'));
       try {
-        await submitForReviewAction({
+        await deps.submitForReview({
           versionId: targetVersion.id,
           ...(reviewerId ? { reviewerId } : {}),
         });
@@ -623,10 +655,10 @@ export function createEditorStore(config: EditorStoreConfig) {
           ...removeLoading(get(), 'submitForReview'),
         });
         track('submitted_for_review', { has_reviewer: Boolean(reviewerId) });
-        toast.success('Submitted for review!');
+        deps.notify.success('Submitted for review!');
       } catch (error: any) {
         set(removeLoading(get(), 'submitForReview'));
-        toast.error(error.message || 'Failed to submit for review');
+        deps.notify.error(error.message || 'Failed to submit for review');
       }
     },
 
@@ -634,11 +666,11 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { translationProjectId } = get();
       if (!translationProjectId) return;
       try {
-        const members = await listTranslationProjectMembersAction(translationProjectId);
+        const members = await deps.listTranslationProjectMembers(translationProjectId);
         set({ dialog: { type: 'assignTranslator', members } });
         track('dialog_opened', { dialog: 'assign_translator' });
       } catch (error) {
-        toast.error('Failed to load team members');
+        deps.notify.error('Failed to load team members');
       }
     },
 
@@ -648,7 +680,7 @@ export function createEditorStore(config: EditorStoreConfig) {
 
       set(addLoading(get(), 'assignTranslator'));
       try {
-        await assignTranslatorToVersionAction({
+        await deps.assignTranslatorToVersion({
           documentId,
           translationProjectId,
           userId,
@@ -670,10 +702,10 @@ export function createEditorStore(config: EditorStoreConfig) {
 
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignTranslator') });
         track('translator_assigned');
-        toast.success('Translator assigned!');
+        deps.notify.success('Translator assigned!');
       } catch (error: any) {
         set(removeLoading(get(), 'assignTranslator'));
-        toast.error(error.message || 'Failed to assign translator');
+        deps.notify.error(error.message || 'Failed to assign translator');
       }
     },
 
@@ -681,14 +713,14 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { documentId, translationProjectId, targetVersion } = get();
       if (!translationProjectId) return;
       try {
-        await assignTranslatorToVersionAction({ documentId, translationProjectId, userId: null });
+        await deps.assignTranslatorToVersion({ documentId, translationProjectId, userId: null });
         if (targetVersion) {
           set({ targetVersion: { ...targetVersion, user: null } });
         }
         track('translator_unassigned');
-        toast.success('Translator unassigned');
+        deps.notify.success('Translator unassigned');
       } catch (error: any) {
-        toast.error(error.message || 'Failed to unassign translator');
+        deps.notify.error(error.message || 'Failed to unassign translator');
       }
     },
 
@@ -696,11 +728,11 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { translationProjectId } = get();
       if (!translationProjectId) return;
       try {
-        const members = await getProjectReviewersAction(translationProjectId);
+        const members = await deps.getProjectReviewers(translationProjectId);
         set({ dialog: { type: 'assignReviewer', candidates: members } });
         track('dialog_opened', { dialog: 'assign_reviewer' });
       } catch (error) {
-        toast.error('Failed to load reviewers');
+        deps.notify.error('Failed to load reviewers');
       }
     },
 
@@ -711,7 +743,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       set(addLoading(get(), 'assignReviewer'));
       try {
         const due = reviewDeadline ? new Date(reviewDeadline) : null;
-        await assignReviewerToVersionAction(targetVersion.id, userId, due);
+        await deps.assignReviewerToVersion(targetVersion.id, userId, due);
         if (dialog.type === 'assignReviewer') {
           const assignedReviewer = dialog.candidates.find((m) => m.user.id === userId)?.user ?? null;
           set({
@@ -724,10 +756,10 @@ export function createEditorStore(config: EditorStoreConfig) {
         }
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignReviewer') });
         track('reviewer_assigned');
-        toast.success('Reviewer assigned!');
+        deps.notify.success('Reviewer assigned!');
       } catch (error: any) {
         set(removeLoading(get(), 'assignReviewer'));
-        toast.error(error.message || 'Failed to assign reviewer');
+        deps.notify.error(error.message || 'Failed to assign reviewer');
       }
     },
 
@@ -735,12 +767,12 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { targetVersion } = get();
       if (!targetVersion) return;
       try {
-        await assignReviewerToVersionAction(targetVersion.id, null);
+        await deps.assignReviewerToVersion(targetVersion.id, null);
         set({ targetVersion: { ...targetVersion, reviewer: null } });
         track('reviewer_unassigned');
-        toast.success('Reviewer unassigned');
+        deps.notify.success('Reviewer unassigned');
       } catch (error: any) {
-        toast.error(error.message || 'Failed to unassign reviewer');
+        deps.notify.error(error.message || 'Failed to unassign reviewer');
       }
     },
 
@@ -759,7 +791,7 @@ export function createEditorStore(config: EditorStoreConfig) {
         // The deadline travels with the assignment, the way the translations
         // page sets it: same action, same permission, same activity entry --
         // only the translator stays whoever it already was.
-        const updated = await assignTranslatorToVersionAction({
+        const updated = await deps.assignTranslatorToVersion({
           documentId,
           translationProjectId,
           userId: targetVersion.user?.id ?? null,
@@ -771,10 +803,10 @@ export function createEditorStore(config: EditorStoreConfig) {
           ...removeLoading(get(), 'setDeadline'),
         });
         track('dialog_opened', { dialog: 'deadline_set' });
-        toast.success(deadline ? 'Deadline set' : 'Deadline cleared');
+        deps.notify.success(deadline ? 'Deadline set' : 'Deadline cleared');
       } catch (error: any) {
         set(removeLoading(get(), 'setDeadline'));
-        toast.error(error.message || 'Failed to set the deadline');
+        deps.notify.error(error.message || 'Failed to set the deadline');
       }
     },
 
