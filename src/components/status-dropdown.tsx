@@ -36,6 +36,8 @@ interface StatusDropdownProps {
   allowedStatuses?: DocumentStatus[]; // For future permission filtering
   disabled?: boolean;
   openSuggestionsCount?: number;
+  /** The server action behind a move; a test hands in a fake. */
+  changeStatus?: typeof updateDocumentVersionStatusAction;
 }
 
 export function StatusDropdown({
@@ -49,6 +51,7 @@ export function StatusDropdown({
   allowedStatuses,
   disabled = false,
   openSuggestionsCount = 0,
+  changeStatus = updateDocumentVersionStatusAction,
 }: StatusDropdownProps) {
   const router = useRouter();
   const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
@@ -159,7 +162,7 @@ export function StatusDropdown({
     }
 
     try {
-      const result = await updateDocumentVersionStatusAction(versionId, newStatus);
+      const result = await changeStatus(versionId, newStatus);
 
       // Show GitHub deploy feedback
       if (result.github) {
