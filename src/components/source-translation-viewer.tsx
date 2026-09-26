@@ -1,4 +1,6 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
+import { DocumentPanel } from '@/components/editor/document-panel';
+import { PaneTabs } from '@/components/editor/pane-tabs';
 import type { CodeEditorHandle } from '@/components/editor/code-editor';
 import { alignLines } from '@/components/editor/align-lines';
 import { selectionBox, useFollowSelection, type SelectionBox } from '@/components/editor/toolbar-placement';
@@ -15,19 +17,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarRail,
-  useSidebar,
-} from '@/components/ui/sidebar';
+import { SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -35,18 +26,11 @@ import { getDocumentStatusConfig } from '@/constants/document-status';
 import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
 import { DocumentStatus, SuggestionStatus } from '@/generated/prisma/enums';
 import {
-  AlertCircle,
-  BookOpen,
-  ChevronDown,
   Edit,
   Eye,
   FileCode,
   FileEdit,
   Loader2,
-  Maximize2,
-  MessageSquare,
-  Minimize2,
-  PanelRightClose,
   PanelRightOpen,
   Plus,
   Save,
@@ -64,7 +48,6 @@ import { CopyAllButton } from './editor/copy-all-button';
 import { FormattingToolbar } from './editor/formatting-toolbar';
 import { useFormattingToolbar } from './editor/use-formatting-toolbar';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
-import { ThreadSidebar } from './thread-sidebar';
 import { AudioTextPanel } from '@/components/audio-text-panel';
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 // SuggestionType enum values
@@ -844,50 +827,17 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {!isSourceEditing &&
-                  !isYaml &&
-                  (mounted ? (
-                    <Tabs
-                      value={sourceViewMode}
-                      onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}
-                    >
-                      <TabsList className="h-8">
-                        <TabsTrigger value="raw">
-                          <FileCode />
-                          Markdown
-                        </TabsTrigger>
-                        <TabsTrigger value="formatted">
-                          <Eye />
-                          Preview
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  ) : (
-                    <div className="inline-flex h-8 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          sourceViewMode === 'raw' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        <FileCode />
-                        Markdown
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          sourceViewMode === 'formatted' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        <Eye />
-                        Preview
-                      </button>
-                    </div>
-                  ))}
+                {!isSourceEditing && !isYaml && (
+                  <PaneTabs
+                    mounted={mounted}
+                    value={sourceViewMode}
+                    onValueChange={setSourceViewMode}
+                    tabs={[
+                      { value: 'raw', label: 'Markdown', icon: <FileCode /> },
+                      { value: 'formatted', label: 'Preview', icon: <Eye /> },
+                    ]}
+                  />
+                )}
                 {canEditSource && !isSourceEditing && (
                   <>
                     <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
@@ -1013,100 +963,46 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {variant === 'translate' ? (
-                  isYaml ? null : mounted ? (
-                    <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
-                      <TabsList className="h-8">
-                        <TabsTrigger value="edit">
-                          <FileEdit />
-                          Edit
-                        </TabsTrigger>
-                        <TabsTrigger value="preview">
-                          <Eye />
-                          Preview
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  ) : (
-                    <div className="inline-flex h-8 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          translateTab === 'edit' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        <FileEdit />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          translateTab === 'preview' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        <Eye />
-                        Preview
-                      </button>
-                    </div>
+                  isYaml ? null : (
+                    <PaneTabs
+                      mounted={mounted}
+                      value={translateTab}
+                      onValueChange={setTranslateTab}
+                      tabs={[
+                        { value: 'edit', label: 'Edit', icon: <FileEdit /> },
+                        { value: 'preview', label: 'Preview', icon: <Eye /> },
+                      ]}
+                    />
                   )
                 ) : !isReviewEditing && !isYaml ? (
-                  mounted ? (
-                    <Tabs
-                      value={reviewViewMode}
-                      onValueChange={(value) => {
-                        const next = value as TranslationViewMode;
-                        if (reviewViewMode === 'audio' && next !== 'audio') {
-                          requestLeaveAudioText(() => setReviewViewMode(next));
-                          return;
-                        }
-                        setReviewViewMode(next);
-                      }}
-                    >
-                      <TabsList className="h-8">
-                        <TabsTrigger value="formatted">Live</TabsTrigger>
-                        <TabsTrigger value="review">
-                          Review
-                          {openSuggestionsCount > 0 && (
-                            <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
-                              {openSuggestionsCount}
-                            </Badge>
-                          )}
-                        </TabsTrigger>
-                        {audioTabVersionId && <TabsTrigger value="audio">Audio text</TabsTrigger>}
-                      </TabsList>
-                    </Tabs>
-                  ) : (
-                    <div className="inline-flex h-8 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          reviewViewMode === 'formatted' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        Live
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          reviewViewMode === 'review' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        Review
-                        {openSuggestionsCount > 0 && (
-                          <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
-                            {openSuggestionsCount}
-                          </Badge>
-                        )}
-                      </button>
-                    </div>
-                  )
+                  <PaneTabs
+                    mounted={mounted}
+                    value={reviewViewMode}
+                    onValueChange={(next) => {
+                      if (reviewViewMode === 'audio' && next !== 'audio') {
+                        requestLeaveAudioText(() => setReviewViewMode(next));
+                        return;
+                      }
+                      setReviewViewMode(next);
+                    }}
+                    tabs={[
+                      { value: 'formatted', label: 'Live' },
+                      {
+                        value: 'review',
+                        label: (
+                          <>
+                            Review
+                            {openSuggestionsCount > 0 && (
+                              <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
+                                {openSuggestionsCount}
+                              </Badge>
+                            )}
+                          </>
+                        ),
+                      },
+                      ...(audioTabVersionId ? [{ value: 'audio' as const, label: 'Audio text' }] : []),
+                    ]}
+                  />
                 ) : null}
                 {showTranslationCopy && <CopyAllButton pane="translation" text={translationContent} />}
                 {translationHeaderExtra}
@@ -1339,177 +1235,37 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             not rendered. Its header row goes with it, which is why zen mode's
             bar shows the save state. */}
         {hasPanel && !isZen && (
-          <Sidebar
-            side="right"
-            variant="floating"
-            collapsible="icon"
-            // The panel is a sidebar painted with the editor's own tokens, so
-            // the third column reads as another sheet on the workspace rather
-            // than a second kind of surface. Collapsed it keeps a rail — the
-            // document's state at a glance, and the way back in — which is what
-            // replaces the "Show panel" button the pane header used to carry.
-            style={{ '--sidebar': 'var(--editor)', '--sidebar-border': 'var(--border)' } as React.CSSProperties}
-          >
-            {/* Folded: the rail. Same affordance as the app nav's, so folding
-                this panel and folding the shell's behave the same way. */}
-            <SidebarContent className="hidden gap-1 p-2 group-data-[collapsible=icon]:flex">
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Open document panel" onClick={toggleSidebar}>
-                    <PanelRightOpen />
-                    <span>Open</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                {targetLanguageMissing && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      tooltip="Select a target language from the documents page to start translating"
-                      onClick={toggleSidebar}
-                    >
-                      <AlertCircle className="text-muted-foreground" />
-                      <span>No language</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                {panelStatus && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton tooltip={`Status: ${panelStatus.name}`} onClick={toggleSidebar}>
-                      <span
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: panelStatus.color.hex }}
-                      />
-                      <span>{panelStatus.name}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    tooltip={`${openSuggestionsCount} open ${openSuggestionsCount === 1 ? 'comment' : 'comments'}`}
-                    onClick={() => {
-                      setSidebarView('threads');
-                      toggleSidebar();
-                    }}
-                  >
-                    <MessageSquare />
-                    <span>Comments</span>
-                    {openSuggestionsCount > 0 && (
-                      <span className="absolute top-0 right-0 rounded-full bg-primary px-1 text-[10px] leading-4 tabular-nums text-primary-foreground">
-                        {openSuggestionsCount}
-                      </span>
-                    )}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Markdown guide" onClick={onOpenGuide}>
-                    <BookOpen />
-                    <span>Guide</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                {onToggleZen && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton tooltip={isZen ? 'Exit zen mode' : 'Zen mode'} onClick={onToggleZen}>
-                      {isZen ? <Minimize2 /> : <Maximize2 />}
-                      <span>{isZen ? 'Exit zen' : 'Zen mode'}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-              </SidebarMenu>
-            </SidebarContent>
-
-            {/* The panel's own header, the height of the panes': one control,
-                so folding is a button as well as the seam between columns. */}
-            <SidebarHeader className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
-              <div className="flex h-11 shrink-0 items-center justify-end gap-1 border-b px-2">
-                {panelActions && <div className="mr-auto flex items-center gap-1">{panelActions}</div>}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={toggleSidebar}
-                  aria-label="Fold document panel"
-                  title="Fold document panel"
-                >
-                  <PanelRightClose />
-                </Button>
-              </div>
-            </SidebarHeader>
-
-            {/* Unfolded: the facts, the actions and the status rows scroll
-                together, so a tall panel never clips the button someone came to
-                press. */}
-            <SidebarContent className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
-              <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-                {sidebarHeader}
-                {sidebarActions}
-                {sidebarSummary && (
-                  <div className="flex flex-col divide-y overflow-hidden rounded-lg border bg-card [&>*]:px-3 [&>*]:py-2.5">
-                    {sidebarSummary}
-                  </div>
-                )}
-                {/* The details are their own card: as a row inside the card
-                    above they read as one more button, and open they read as a
-                    second, unstyled list bolted onto the panel.
-
-                    The header is the trigger, which is why the label is a span
-                    rather than CardTitle: a control that is a whole row cannot
-                    hold a div, and the alternative -- a title nobody can click
-                    plus a chevron to hit -- splits one target into two. The
-                    chevron turns off the trigger's own state, so the motion is
-                    CSS and the row says expanded to a screen reader either way. */}
-                {sidebarDetails && (
-                  <Card className="gap-0 overflow-hidden rounded-lg py-0 shadow-none">
-                    <Collapsible
-                      open={sidebarView === 'details'}
-                      onOpenChange={(open) => setSidebarView(open ? 'details' : 'threads')}
-                    >
-                      <CollapsibleTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            // ring-inset: the card clips what it contains, and a
-                            // focus ring on the header's edge would be half cut.
-                            className="group h-auto w-full justify-between rounded-none bg-muted/60 px-3 py-2 transition-colors focus-visible:ring-inset"
-                          />
-                        }
-                      >
-                        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                          Details
-                        </span>
-                        <ChevronDown className="size-3.5 text-muted-foreground transition-transform duration-200 group-aria-expanded:rotate-180" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="border-t [&>section:last-child]:border-b-0">
-                        {sidebarDetails}
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </Card>
-                )}
-
-                {hasSidebar && (
-                  <div className="flex min-h-[16rem] flex-1 flex-col">
-                    <ThreadSidebar
-                      suggestions={suggestions}
-                      currentUserId={currentUserId || ''}
-                      translationContent={translationContent}
-                      canCreateSuggestions={canCreateSuggestions}
-                      onReply={onReply}
-                      onApply={onApplySuggestion}
-                      onDismiss={(id) => onDismissSuggestion?.(id)}
-                      onReopen={(id) => onReopenSuggestion?.(id)}
-                      onEdit={onEditSuggestion}
-                      onSuggestionClick={handleSuggestionClickInternal}
-                      onCreateGeneralThread={onCreateGeneralThread}
-                      activeThreadId={activeThreadId}
-                      disableReopen={disableReopen}
-                    />
-                  </div>
-                )}
-              </div>
-            </SidebarContent>
-
-            {/* Folding happens at the panel's own edge, the way the app nav's
-                does. The rail is only reachable on desktop, where the collapsed
-                panel is still on screen. */}
-            <SidebarRail />
-          </Sidebar>
+          <DocumentPanel
+            isZen={isZen}
+            targetLanguageMissing={targetLanguageMissing}
+            status={panelStatus}
+            openSuggestionsCount={openSuggestionsCount}
+            onOpenGuide={onOpenGuide}
+            onToggleZen={onToggleZen}
+            panelActions={panelActions}
+            header={sidebarHeader}
+            actions={sidebarActions}
+            summary={sidebarSummary}
+            details={sidebarDetails}
+            view={sidebarView}
+            onViewChange={setSidebarView}
+            threads={{
+              show: hasSidebar,
+              suggestions,
+              currentUserId: currentUserId || '',
+              translationContent,
+              canCreateSuggestions,
+              activeThreadId,
+              disableReopen,
+              onReply,
+              onApply: onApplySuggestion,
+              onDismiss: (id) => onDismissSuggestion?.(id),
+              onReopen: (id) => onReopenSuggestion?.(id),
+              onEdit: onEditSuggestion,
+              onSuggestionClick: handleSuggestionClickInternal,
+              onCreateGeneralThread,
+            }}
+          />
         )}
 
         {/* Mounted once for the whole editor: the lint cards and the panel
