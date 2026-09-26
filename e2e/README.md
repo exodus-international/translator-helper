@@ -96,6 +96,22 @@ way.
 **Status display names** are `Not Started`, `In Progress`, `In Review`, `Approved`, `Deployed`. Do
 not hardcode them; `support/status.ts` reads them from the app.
 
+## Database-backed tests
+
+The same database serves a second, faster layer: `pnpm test:db` runs every `*.db.test.ts` file
+under `src/` against it with `node:test`, after reseeding it through the same `pnpm db:seed`. A
+repository or a service is called directly, with only the session stood in for, so a query that
+answers wrongly for a seeded person fails in seconds rather than as a browser timeout. Files run one
+at a time, because they share the seeded rows.
+
+It needs the same `.env.test` and the same Postgres, and refuses any database not named
+`translation_helper_test` through the guard in `tests/test-database.ts`. `SKIP_DB_SEED=1` skips the
+ten-second reseed while iterating on one file. In CI it runs in the `End-to-end` job, before the
+browser suite, which reseeds again for itself.
+
+`pnpm test` does not include it, so a checkout without Postgres still runs the unit and component
+tests.
+
 ## Priority tags
 
 A scenario says why it earns its place, and the two reasons are independent:

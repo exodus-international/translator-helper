@@ -111,6 +111,12 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec next build
 
+      # Repositories and services against the real schema, seeded the same
+      # way the browser suite is. Runs here because this is the job with a
+      # database; the end-to-end setup reseeds again before its own run.
+      - name: Database tests
+        run: pnpm test:db
+
       - name: End-to-end tests
         run: pnpm test:e2e
 
