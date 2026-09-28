@@ -946,6 +946,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
               )}
               {isSourceEditing ? (
                 <RawEditorPane
+                  ariaLabel="Source text"
                   ref={sourceEditorRef}
                   value={sourceEditValue}
                   onChange={handleSourceEditChange}
@@ -974,6 +975,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 </div>
               ) : (
                 <RawEditorPane
+                  ariaLabel="Source text"
                   ref={sourceEditorRef}
                   value={sourceContent}
                   readOnly
@@ -1150,6 +1152,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 ) : isYaml || translateTab === 'edit' ? (
                   <div ref={translationContainerRef} className="relative h-full">
                     <RawEditorPane
+                      ariaLabel="Translation"
                       ref={translationEditorRef}
                       value={translationContent}
                       onChange={onTranslationChange}
@@ -1224,6 +1227,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       is the one the source lines up with (align-lines). */}
                   <RawEditorPane
                     ref={translationEditorRef}
+                    ariaLabel="Translation"
                     value={translationContent}
                     onChange={onTranslationChange}
                     onCursorChange={handleTranslationCursorChange}
@@ -1261,6 +1265,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     // Show normal editor with suggestions
                     <>
                       <RawEditorPane
+                        ariaLabel="Translation"
                         ref={translationEditorRef}
                         value={translationContent}
                         readOnly

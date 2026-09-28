@@ -88,7 +88,16 @@ export function ThreadSidebar({
   };
 
   const renderCard = (suggestion: SuggestionWithUser) => (
-    <div key={suggestion.id} ref={activeThreadId === suggestion.id ? activeCardRef : undefined}>
+    // An article, not a bare div: a feedback thread is a self-contained piece
+    // of authored content, which is what lets a screen reader move between
+    // threads instead of through one undifferentiated run of text. A list
+    // would be the other option, but this container also holds the empty
+    // state and the resolved toggle, which are not list items.
+    <article
+      key={suggestion.id}
+      aria-label={`Feedback from ${suggestion.user?.name ?? 'a reviewer'}`}
+      ref={activeThreadId === suggestion.id ? activeCardRef : undefined}
+    >
       <ThreadCard
         suggestion={suggestion}
         currentUserId={currentUserId}
@@ -102,11 +111,15 @@ export function ThreadSidebar({
         onClick={() => onSuggestionClick?.(suggestion)}
         disableReopen={disableReopen}
       />
-    </div>
+    </article>
   );
 
   return (
-    <Card className="flex h-full flex-col gap-0 overflow-hidden rounded-lg py-0 shadow-none">
+    <Card
+      role="region"
+      aria-label="Feedback"
+      className="flex h-full flex-col gap-0 overflow-hidden rounded-lg py-0 shadow-none"
+    >
       {/* Header: the panel's banded label row, the same one the details card
           and every section in it wear, so feedback reads as one more card in
           the stack rather than a region bolted to the panel's edge. */}

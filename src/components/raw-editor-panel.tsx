@@ -32,6 +32,8 @@ interface RawEditorPaneProps {
   onOpenGuide?: () => void;
   /** Rendered under the editor, inside the pane — the lint status bar goes here. */
   footer?: ReactNode;
+  /** Accessible name for the editing surface — see CodeEditor. */
+  ariaLabel?: string;
 }
 
 export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(function RawEditorPane(
@@ -56,6 +58,7 @@ export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(fu
     lint,
     onOpenGuide,
     footer,
+    ariaLabel,
   },
   ref,
 ) {
@@ -86,6 +89,7 @@ export const RawEditorPane = forwardRef<CodeEditorHandle, RawEditorPaneProps>(fu
           onDiagnosticsChange={onDiagnosticsChange}
           lint={lint}
           onOpenGuide={onOpenGuide}
+          ariaLabel={ariaLabel}
         />
       </div>
       {footer}

@@ -171,6 +171,16 @@ export const SOURCE_PROJECTS = [
     status: SourceProjectStatus.ACTIVE,
   },
   {
+    // No documents, on purpose: the empty state of a project page, and the one
+    // project a delete guard should let through.
+    key: 'empty',
+    name: 'Fallow Project 2027',
+    description: 'Set up but not yet filled. Exists so the empty project page has something to show.',
+    slug: 'fallow2027',
+    repositoryDirectory: 'fallow2027',
+    status: SourceProjectStatus.ACTIVE,
+  },
+  {
     key: 'retreat',
     name: 'Summer Retreat 2025',
     description: 'Weekend retreat materials including talks and small group guides.',
@@ -479,3 +489,21 @@ export const COMMENTS: { versionKey: string; userKey: string; content: string }[
   { versionKey: 'le-d20:cs', userKey: 'translator1', content: 'I have some questions about the liturgical terminology — see the suggestion thread.' },
   { versionKey: 'ex-d1:sk', userKey: 'reviewer1', content: 'Good work on the Slovak translation. One term updated.' },
 ];
+
+/**
+ * Every way an invitation can fail, one token each.
+ *
+ * `validateInvitationToken` has four refusals and they read alike from the
+ * outside, so each needs its own fixture to tell them apart: a revoked one, an
+ * expired one, one whose uses are spent, and a token that was never issued.
+ */
+export const INVITE_TOKENS = {
+  /** Unlimited uses, far future. Registering with it must always work. */
+  valid: 'seed-invite-open-sk',
+  revoked: 'seed-invite-revoked',
+  expired: 'seed-invite-expired',
+  /** maxUses reached, so it is spent without being revoked or expired. */
+  exhausted: 'seed-invite-exhausted',
+  /** Never issued. The "not found" branch. */
+  unknown: 'seed-invite-does-not-exist',
+} as const;

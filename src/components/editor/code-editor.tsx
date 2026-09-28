@@ -132,6 +132,15 @@ interface CodeEditorProps {
   lint?: boolean;
   /** Opens the Markdown guide from a lint finding, when the host offers one. */
   onOpenGuide?: () => void;
+  /**
+   * Accessible name for the editing surface.
+   *
+   * CodeMirror's content element is a textbox, and without a name a screen
+   * reader announces only "edit text". These panes come in pairs -- the
+   * English source beside the translation -- so an unnamed box also leaves
+   * the two indistinguishable to anything that cannot see the layout.
+   */
+  ariaLabel?: string;
 }
 
 export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function CodeEditor(
@@ -154,6 +163,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     disabledRules,
     lint = true,
     onOpenGuide,
+    ariaLabel,
   },
   forwardedRef,
 ) {
@@ -273,6 +283,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       editorTheme,
       updateListener,
       clickListener,
+      ariaLabel ? EditorView.contentAttributes.of({ 'aria-label': ariaLabel }) : [],
     ];
 
     const view = new EditorView({

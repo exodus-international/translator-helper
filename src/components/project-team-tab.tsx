@@ -26,6 +26,8 @@ interface ProjectTeamTabProps {
   canManage: boolean;
   selectedLanguageName: string;
   selectedLanguageCode: string;
+  /** Reads the roster. Injectable so a component test can render it without a database. */
+  loadMembers?: (translationProjectId: string) => Promise<Member[]>;
 }
 
 type Member = {
@@ -40,6 +42,7 @@ export default function ProjectTeamTab({
   canManage,
   selectedLanguageName,
   selectedLanguageCode,
+  loadMembers = listTranslationProjectMembersAction,
 }: ProjectTeamTabProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +59,7 @@ export default function ProjectTeamTab({
 
       setLoading(true);
       try {
-        const data = await listTranslationProjectMembersAction(translationProjectId);
+        const data = await loadMembers(translationProjectId);
         if (!cancelled) setMembers(data);
       } catch (error) {
         console.error('Error loading team members:', error);
@@ -69,7 +72,7 @@ export default function ProjectTeamTab({
     return () => {
       cancelled = true;
     };
-  }, [translationProjectId]);
+  }, [translationProjectId, loadMembers]);
 
   if (!translationProjectId) {
     return (
