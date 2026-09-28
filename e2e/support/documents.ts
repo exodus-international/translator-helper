@@ -22,6 +22,10 @@ const SEEDED = [
   { title: 'Day 2 - Discipline of Prayer', projectSlug: 'exodus90', slug: 'ex90-day-2', languageCode: 'sk' },
   { title: 'Day 1 - The Call', projectSlug: 'exodus90', slug: 'ex90-day-1', languageCode: 'hr' },
   { title: 'Day 3 - Fasting and Freedom', projectSlug: 'exodus90', slug: 'ex90-day-3', languageCode: 'cs' },
+  // Approved in the seed, so deploy is the next step. Czech is deployed by
+  // the admin; Slovak only shows a translator what is not offered.
+  { title: 'Day 2 - Discipline of Prayer', projectSlug: 'exodus90', slug: 'ex90-day-2', languageCode: 'cs' },
+  { title: 'Day 1 - The Call', projectSlug: 'exodus90', slug: 'ex90-day-1', languageCode: 'sk' },
 ] as const;
 
 const LANGUAGE_CODES: Record<string, string> = {

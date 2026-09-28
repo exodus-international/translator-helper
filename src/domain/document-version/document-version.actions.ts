@@ -6,8 +6,8 @@ import { authorize } from '@/lib/authorize';
 import { type SessionUser } from '@/lib/session';
 import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
-import type { AudioGenerationOutcome } from '../audio/audio.types';
-import { DeploySkippedError } from '../github/github.errors';
+import { isGitHubConfigured } from '@/lib/github-config';
+import { createStatusChange, involvesDeployed, type StatusChangeResult } from './document-version.status-change';
 import {
   notifyReviewerAssignment,
   notifyStatusChange,
@@ -258,17 +258,36 @@ export async function deleteDocumentVersionAction(id: string) {
   return await deleteDocumentVersion(id);
 }
 
+/**
+ * The status change as the app wires it: real repositories, the GitHub and
+ * audio services loaded on demand so a page that never deploys never loads
+ * octokit, and the document page revalidated when something it shows moved.
+ */
+const changeStatus = createStatusChange({
+  countOpenSuggestions,
+  updateStatus: updateDocumentVersionStatus,
+  log: createActivityLog,
+  notify: notifyStatusChange,
+  github: {
+    isConfigured: () => isGitHubConfigured(),
+    deploy: async (versionId) => {
+      const { deployToGitHub } = await import('../github/github.service');
+      return deployToGitHub(versionId);
+    },
+  },
+  startAudio: async (versionId, userId) => {
+    const { startGeneration } = await import('../audio/audio.service');
+    return startGeneration(versionId, userId);
+  },
+  revalidateDocumentPage: () => revalidatePath('/documents/[project]/[slug]/[lang]', 'page'),
+});
+
 export async function updateDocumentVersionStatusAction(
   versionId: string,
   status: DocumentStatus,
-): Promise<{
-  version: Awaited<ReturnType<typeof updateDocumentVersionStatus>>;
-  github?: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string };
-  audio?: AudioGenerationOutcome;
-}> {
+): Promise<StatusChangeResult<Awaited<ReturnType<typeof updateDocumentVersionStatus>>>> {
   const { user } = await authorize('authenticated');
 
-  // Get existing version to validate transition
   const existingVersion = await getDocumentVersionById(versionId);
   if (!existingVersion) {
     throw new Error('Document version not found');
@@ -277,87 +296,11 @@ export async function updateDocumentVersionStatusAction(
   // Deploying publishes this language's work to the content repository, so it
   // belongs to the people answerable for that language -- its manager and any
   // administrator. Leaving DEPLOYED is the same decision in reverse.
-  if (status === DocumentStatus.DEPLOYED || existingVersion.status === DocumentStatus.DEPLOYED) {
+  if (involvesDeployed(existingVersion.status, status)) {
     await authorize({ language: existingVersion.languageId, role: 'manager' });
   }
 
-  if (status === DocumentStatus.APPROVED || status === DocumentStatus.DEPLOYED) {
-    const openCount = await countOpenSuggestions(versionId);
-    validateTransition(existingVersion.status, status, { openSuggestionsCount: openCount });
-  } else {
-    validateTransition(existingVersion.status, status);
-  }
-
-  const version = await updateDocumentVersionStatus(versionId, status);
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'status_updated',
-    details: { status: status },
-  });
-
-  await notifyStatusChange({ versionId: version.id, actorId: user.id, from: existingVersion.status, to: status });
-
-  // If transitioning to DEPLOYED, attempt GitHub deploy
-  let github: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string } | undefined;
-  if (status === DocumentStatus.DEPLOYED) {
-    try {
-      console.log('[GitHub] Checking if GitHub is configured...');
-      const { isGitHubConfigured } = await import('@/lib/github-config');
-      if (isGitHubConfigured()) {
-        console.log('[GitHub] GitHub is configured, starting deploy for version:', versionId);
-        const { deployToGitHub } = await import('../github/github.service');
-        const result = await deployToGitHub(versionId);
-
-        console.log('[GitHub] Deploy succeeded, logging activity');
-        await createActivityLog({
-          documentVersionId: version.id,
-          userId: user.id,
-          action: 'github_deployed',
-          details: {},
-        });
-        revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
-        github = { status: 'success', prUrl: result?.prUrl };
-      } else {
-        console.log('[GitHub] GitHub is not configured, skipping deploy');
-        github = { status: 'skipped' };
-      }
-    } catch (error: any) {
-      if (error instanceof DeploySkippedError) {
-        console.log('[GitHub] Deploy skipped:', error.message);
-        github = { status: 'skipped' };
-      } else {
-        console.error('[GitHub] Deploy failed:', error.message);
-        console.error('[GitHub] Full error:', error);
-        await createActivityLog({
-          documentVersionId: version.id,
-          userId: user.id,
-          action: 'github_deploy_failed',
-          details: { error: error.message },
-        });
-        revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
-        github = { status: 'failed', error: error.message };
-      }
-    }
-  }
-
-  // If transitioning to APPROVED, start audio generation. Same shape as the
-  // GitHub deploy above: never throws, the outcome is reported to the caller.
-  let audio: AudioGenerationOutcome | undefined;
-  if (status === DocumentStatus.APPROVED) {
-    try {
-      const { startGeneration } = await import('../audio/audio.service');
-      audio = await startGeneration(version.id, user.id);
-      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
-    } catch (error: unknown) {
-      console.error('[Audio] Generation failed:', error);
-      audio = { status: 'failed', error: error instanceof Error ? error.message : String(error) };
-    }
-  }
-
-  return { version, github, audio };
+  return changeStatus({ version: existingVersion, to: status, actorId: user.id });
 }
 
 export async function assignDocumentVersionAction(input: unknown) {

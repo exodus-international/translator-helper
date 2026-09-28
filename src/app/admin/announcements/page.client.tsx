@@ -138,8 +138,11 @@ export default function AnnouncementsClient({ announcements: initialAnnouncement
     }
   };
 
+  // Read once when the page mounts: an announcement that expires while the
+  // page is open is shown as it was when the list loaded.
+  const [now] = useState(() => Date.now());
   const isExpired = (announcement: AnnouncementWithCount) =>
-    announcement.expiresAt !== null && new Date(announcement.expiresAt).getTime() <= Date.now();
+    announcement.expiresAt !== null && new Date(announcement.expiresAt).getTime() <= now;
 
   const dialogTitle = editing
     ? `Edit ${type === 'BANNER' ? 'Banner' : 'Modal'}`

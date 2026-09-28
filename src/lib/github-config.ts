@@ -7,6 +7,11 @@ const githubConfigSchema = z.object({
   repoOwner: z.string().min(1, 'GITHUB_REPO_OWNER is required'),
   repoName: z.string().min(1, 'GITHUB_REPO_NAME is required'),
   installationId: z.coerce.number().int().positive('GITHUB_INSTALLATION_ID must be a positive integer'),
+  /**
+   * Where the GitHub API is. Unset means github.com; a GitHub Enterprise
+   * host or a local stand-in sets it.
+   */
+  apiBaseUrl: z.string().url().optional(),
 });
 
 type GitHubConfig = z.infer<typeof githubConfigSchema>;
@@ -37,6 +42,7 @@ export function getGitHubConfig(): GitHubConfig {
     repoOwner: process.env.GITHUB_REPO_OWNER,
     repoName: process.env.GITHUB_REPO_NAME,
     installationId: process.env.GITHUB_INSTALLATION_ID,
+    apiBaseUrl: process.env.GITHUB_API_BASE_URL || undefined,
   });
 
   if (!result.success) {

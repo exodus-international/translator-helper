@@ -96,6 +96,22 @@ way.
 **Status display names** are `Not Started`, `In Progress`, `In Review`, `Approved`, `Deployed`. Do
 not hardcode them; `support/status.ts` reads them from the app.
 
+## Database-backed tests
+
+The same database serves a second, faster layer: `pnpm test:db` runs every `*.db.test.ts` file
+under `src/` against it with `node:test`, after reseeding it through the same `pnpm db:seed`. A
+repository or a service is called directly, with only the session stood in for, so a query that
+answers wrongly for a seeded person fails in seconds rather than as a browser timeout. Files run one
+at a time, because they share the seeded rows.
+
+It needs the same `.env.test` and the same Postgres, and refuses any database not named
+`translation_helper_test` through the guard in `tests/test-database.ts`. `SKIP_DB_SEED=1` skips the
+ten-second reseed while iterating on one file. In CI it runs in the `End-to-end` job, before the
+browser suite, which reseeds again for itself.
+
+`pnpm test` does not include it, so a checkout without Postgres still runs the unit and component
+tests.
+
 ## Priority tags
 
 A scenario says why it earns its place, and the two reasons are independent:
@@ -113,8 +129,7 @@ Chosen from production usage: these sit outside the measured top fifth, and test
 more than it returns.
 
 Translator and reviewer assignment, audio generation and transcripts, administrative user, project,
-language and announcement management, invitations, avatars, profile editing, releases, document
-upload and creation.
+language and announcement management, avatars, profile editing and releases.
 
 Also out of scope: visual regression, accessibility as a gate, performance and load testing,
 cross-browser and mobile viewports. The suite targets Desktop Chrome.
@@ -130,6 +145,26 @@ Only these know about the DOM. Steps call them; scenarios never touch a selector
 | `support/editor.ts` | the editor library, entirely |
 | `support/status.ts` | the status control, its menu and its labels |
 | `support/threads.ts` | the feedback panel and thread cards |
+
+## Stubs
+
+Two calls leave the Next process from inside a server action, so `page.route` cannot see them. Each
+is answered by a small HTTP server that Playwright starts with the suite, and the app is pointed at
+it through the base URL it already reads from the environment. No test-only branch exists in
+application code.
+
+| Module | Stands in for | Pointed at by |
+|---|---|---|
+| `support/openai-mock.mjs` | the chat completions endpoint | `CHATGPT_API_BASE_URL` |
+| `support/github-mock.mjs` | the GitHub REST API, enough of it for one deploy | `GITHUB_API_BASE_URL` |
+
+The GitHub stub answers the six calls a deploy makes: installation token, branch check, file
+lookup, commit, open pull request lookup, and pull request creation. It always reports pull request
+42. The app also needs the rest of a GitHub configuration to believe it is configured, and
+`support/github-stub.ts` supplies it, including an RSA key generated for the run: the app signs a
+token request with it, and the signing needs a key that parses even though nobody checks the
+signature. `playwright.config.ts` passes all of it to the Next server explicitly, so a real
+`GITHUB_*` value in `.env.local` can never reach a test run, and CI needs no extra secrets.
 
 `documents.ts` builds paths with the application's own `buildDocumentPath`, and `status.ts` reads
 display names from the application's own `DOCUMENT_STATUS_CONFIGS`. Neither copies a value that
@@ -179,14 +214,20 @@ the status control is named `Document status: <status>`, the editor panes are te
 
 ## Coverage today
 
-16 checks: 4 sign-ins during setup, then
+36 checks: 4 sign-ins during setup, then
 
-- **Authentication and onboarding** — sign in, first-run onboarding, wrong password, and three
-  protected routes redirecting a signed-out visitor
+- **Authentication and onboarding** — sign in, wrong password, and three protected routes
+  redirecting a signed-out visitor
+- **Access and guards** — a banned person refused, four admin screens turning an ordinary user
+  away, signing out ending the session
+- **Registration** — an invited person registering, and four invitations that are no longer good
 - **Translation lifecycle** — starting a translation, a save surviving a reload, submitting for review
+- **AI translation** — a stubbed model filling an empty translation
 - **Review and suggestions** — approval refused while feedback is open, applying a suggestion,
-  approval succeeding once nothing is open
+  approval succeeding once nothing is open, dismissing and reopening a comment
+- **Deploy** — an approved translation deployed against the stubbed GitHub API and linked to its
+  pull request, and a translator not offered deploy at all
+- **Administration happy paths** — creating a document by typing and by upload, creating a source
+  project, creating an invitation, and the empty states of a new project and a new language
 
-Still to come: deploy with a stubbed GitHub call, language switching, suggestion dismiss and reopen,
-AI translate with a stubbed response, label toggle, download, and the guards for banned and
-non-admin users.
+Still to come from the measured top fifth: language switching, label toggle, and download.

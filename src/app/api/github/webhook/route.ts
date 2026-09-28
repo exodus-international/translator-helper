@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GitHubPRStatus } from '@/generated/prisma/enums';
-import { verifyWebhookSignature } from '@/domain/github/github.service';
+import { verifyWebhookSignature } from '@/domain/github/github.webhook';
+import { getGitHubConfig } from '@/lib/github-config';
 import { getGitHubCommitsByPRNumber, updateGitHubCommitPRStatus } from '@/domain/github/github.repository';
 import { pullRequestWebhookSchema } from '@/domain/github/github.types';
 
@@ -18,8 +19,10 @@ export async function POST(request: NextRequest) {
   const body = await request.text();
   console.log(`${LOG_PREFIX} Payload size: ${body.length} bytes`);
 
+  // getGitHubConfig throws when the app is not configured for GitHub at all,
+  // which is answered the same way as a bad signature: not authenticated.
   try {
-    const isValid = verifyWebhookSignature(body, signature);
+    const isValid = verifyWebhookSignature(body, signature, getGitHubConfig().webhookSecret);
     if (!isValid) {
       console.log(`${LOG_PREFIX} Invalid signature`);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });

@@ -26,20 +26,24 @@ export default function ProjectStatisticsTab({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDocuments();
-  }, [sourceProjectId, selectedLanguage]);
-
-  async function loadDocuments() {
+    // A response for an earlier project or language must not land after a
+    // later one: only the newest request may set state.
+    let current = true;
     setLoading(true);
-    try {
-      const docs = await getDashboardDocumentsAction(selectedLanguage, sourceProjectId);
-      setDocuments(docs);
-    } catch (error) {
-      console.error('Error loading statistics:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+    getDashboardDocumentsAction(selectedLanguage, sourceProjectId)
+      .then((docs) => {
+        if (current) setDocuments(docs);
+      })
+      .catch((error) => {
+        console.error('Error loading statistics:', error);
+      })
+      .finally(() => {
+        if (current) setLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [sourceProjectId, selectedLanguage]);
 
   if (loading) {
     return (

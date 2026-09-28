@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 import { createEditorStore, type EditorStore, type EditorStoreApi, type EditorStoreConfig } from './editor-store';
+import { editorStoreDeps } from './editor-store.deps';
 
 const EditorStoreContext = createContext<EditorStoreApi | null>(null);
 
@@ -11,11 +12,10 @@ interface EditorProviderProps extends EditorStoreConfig {
 }
 
 export function EditorProvider({ children, ...config }: EditorProviderProps) {
-  const storeRef = useRef<EditorStoreApi>(null);
-  if (!storeRef.current) {
-    storeRef.current = createEditorStore(config);
-  }
-  return <EditorStoreContext.Provider value={storeRef.current}>{children}</EditorStoreContext.Provider>;
+  // One store per mount, created once: the initialiser runs on the first
+  // render only, and later renders reuse the instance.
+  const [store] = useState(() => createEditorStore(config, editorStoreDeps));
+  return <EditorStoreContext.Provider value={store}>{children}</EditorStoreContext.Provider>;
 }
 
 export function useEditorStore<T>(selector: (state: EditorStore) => T): T {

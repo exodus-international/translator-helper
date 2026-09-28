@@ -57,6 +57,57 @@ export function selectionBox(view: EditorView): SelectionBox {
 const GAP = 6;
 const INSET = 8;
 
+export interface ToolbarPlacement {
+  left: number;
+  top: number;
+  /** True when the toolbar sits under the selection rather than over it. */
+  below: boolean;
+}
+
+/** The edges of a box on screen, as `getBoundingClientRect` reports them. */
+interface Edges {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * Where a toolbar of `size` goes for `position`, in viewport pixels, or null
+ * while the selection is scrolled out of sight.
+ *
+ * Above the selection, clear of its first line. Without the room for that --
+ * a selection on the pane's first lines -- below its last line instead, and
+ * only onto the selection when it fills the pane and there is nowhere else to
+ * go. Sideways it stays inside the pane, and inside the window when there is
+ * no pane to stay inside.
+ */
+export function placeToolbar(
+  position: SelectionBox,
+  size: { width: number; height: number },
+  pane: Edges | undefined,
+  window: { width: number; height: number },
+): ToolbarPlacement | null {
+  const visibleTop = Math.max(pane?.top ?? 0, position.viewTop, 0);
+  const visibleBottom = Math.min(pane?.bottom ?? Infinity, position.viewBottom, window.height);
+  // Scrolled out of sight: there is nothing on screen to act on.
+  if (position.bottom <= visibleTop || position.top >= visibleBottom) return null;
+
+  const bounds = {
+    left: Math.max(pane?.left ?? 0, 0) + INSET,
+    top: visibleTop + INSET,
+    right: Math.min(pane?.right ?? Infinity, window.width) - INSET,
+    bottom: visibleBottom - INSET,
+  };
+
+  const above = position.top - GAP - size.height;
+  const below = above < bounds.top;
+  const top = below ? Math.max(bounds.top, Math.min(position.bottom + GAP, bounds.bottom - size.height)) : above;
+  const left = Math.max(bounds.left, Math.min(position.left, bounds.right - size.width));
+
+  return { left, top, below };
+}
+
 /**
  * Where the toolbar goes, in viewport pixels, and whether that is below the
  * selection; null while the selection is scrolled out of sight.
@@ -71,39 +122,23 @@ export function useToolbarPlacement(
   position: SelectionBox,
   containerRef?: RefObject<HTMLElement | null>,
 ) {
-  const [coords, setCoords] = useState<{ left: number; top: number; below: boolean } | null>(null);
+  const [coords, setCoords] = useState<ToolbarPlacement | null>(null);
+  // Re-placed when a number in the box changes, not when the box object does:
+  // the same selection measured again is the same place.
+  const { left, top, bottom, viewTop, viewBottom } = position;
 
   useLayoutEffect(() => {
     const toolbar = toolbarRef.current;
     if (!toolbar) return;
-    const pane = containerRef?.current?.getBoundingClientRect();
-    const visibleTop = Math.max(pane?.top ?? 0, position.viewTop, 0);
-    const visibleBottom = Math.min(pane?.bottom ?? Infinity, position.viewBottom, window.innerHeight);
-    // Scrolled out of sight: there is nothing on screen to act on.
-    if (position.bottom <= visibleTop || position.top >= visibleBottom) {
-      setCoords(null);
-      return;
-    }
-    const bounds = {
-      left: Math.max(pane?.left ?? 0, 0) + INSET,
-      top: visibleTop + INSET,
-      right: Math.min(pane?.right ?? Infinity, window.innerWidth) - INSET,
-      bottom: visibleBottom - INSET,
-    };
-    const width = toolbar.offsetWidth;
-    const height = toolbar.offsetHeight;
-
-    // Above the selection, clear of its first line. Without the room for that
-    // -- a selection on the pane's first lines -- below its last line instead,
-    // and only onto the selection when it fills the pane and there is nowhere
-    // else to go.
-    const above = position.top - GAP - height;
-    const below = above < bounds.top;
-    const top = below ? Math.max(bounds.top, Math.min(position.bottom + GAP, bounds.bottom - height)) : above;
-    const left = Math.max(bounds.left, Math.min(position.left, bounds.right - width));
-
-    setCoords({ left, top, below });
-  }, [toolbarRef, position.left, position.top, position.bottom, position.viewTop, position.viewBottom, containerRef]);
+    setCoords(
+      placeToolbar(
+        { left, top, bottom, viewTop, viewBottom },
+        { width: toolbar.offsetWidth, height: toolbar.offsetHeight },
+        containerRef?.current?.getBoundingClientRect(),
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
+    );
+  }, [toolbarRef, left, top, bottom, viewTop, viewBottom, containerRef]);
 
   return coords;
 }

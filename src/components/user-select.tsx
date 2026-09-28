@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UserAvatar } from '@/components/user-avatar';
 import { cn } from '@/lib/utils';
 
-export interface SelectableUser {
+interface SelectableUser {
   id: string;
   name: string | null;
   email: string;

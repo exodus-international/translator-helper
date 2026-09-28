@@ -1,47 +1,10 @@
 import { execSync } from 'node:child_process';
-import path from 'node:path';
-import dotenv from 'dotenv';
-
-/**
- * The name the test database must have.
- *
- * This is checked rather than assumed because `prisma.config.ts` calls
- * `import 'dotenv/config'`, which reads `.env` -- and `.env` holds the
- * development `DATABASE_URL`. A Prisma command spawned without an explicit
- * override would therefore reset the real development database. The guard
- * below is the thing standing between a mistyped env file and a day of lost
- * work, so it compares the database name exactly instead of loosely matching
- * a substring.
- */
-const REQUIRED_DATABASE = 'translation_helper_test';
-
-function assertTestDatabase(databaseUrl: string | undefined): string {
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL is not set. Create .env.test -- see e2e/README.md.');
-  }
-
-  let name: string;
-  try {
-    name = new URL(databaseUrl).pathname.replace(/^\//, '');
-  } catch {
-    throw new Error('DATABASE_URL is not a valid URL.');
-  }
-
-  if (name !== REQUIRED_DATABASE) {
-    throw new Error(
-      `Refusing to run: DATABASE_URL points at "${name}", not "${REQUIRED_DATABASE}". ` +
-        'The end-to-end suite resets the database it is given, so it only ever runs against ' +
-        'its own. Check .env.test.',
-    );
-  }
-
-  return databaseUrl;
-}
+import { loadTestDatabaseUrl } from '../tests/test-database';
 
 async function globalSetup() {
-  dotenv.config({ path: path.resolve(__dirname, '..', '.env.test'), override: true });
-
-  const databaseUrl = assertTestDatabase(process.env.DATABASE_URL);
+  // Refuses anything but the suite's own database; see tests/test-database.ts
+  // for why that guard is exact.
+  const databaseUrl = loadTestDatabaseUrl();
 
   const env = { ...process.env, DATABASE_URL: databaseUrl };
 

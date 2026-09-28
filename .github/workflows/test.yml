@@ -3,8 +3,10 @@ name: Test
 on:
   push:
     branches: [develop, production]
+  # Every pull request, whatever it targets: a branch stacked on another
+  # branch is still a change that has to pass, and with the base filter it
+  # ran nothing at all.
   pull_request:
-    branches: [develop, production]
 
 jobs:
   test:
@@ -36,6 +38,11 @@ jobs:
 
       - name: Typecheck
         run: pnpm exec tsc --noEmit
+
+      # Warnings are debt being paid down and do not fail the job; an error
+      # does. --max-warnings is deliberately not set.
+      - name: Lint
+        run: pnpm lint
 
       - name: Test
         run: pnpm test
@@ -105,6 +112,12 @@ jobs:
         run: |
           pnpm exec prisma migrate deploy
           pnpm exec next build
+
+      # Repositories and services against the real schema, seeded the same
+      # way the browser suite is. Runs here because this is the job with a
+      # database; the end-to-end setup reseeds again before its own run.
+      - name: Database tests
+        run: pnpm test:db
 
       - name: End-to-end tests
         run: pnpm test:e2e

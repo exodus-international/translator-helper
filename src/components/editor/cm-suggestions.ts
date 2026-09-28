@@ -15,7 +15,7 @@ import { positionToOffset } from './editor-api';
 
 export const setSuggestions = StateEffect.define<SuggestionWithUser[]>();
 
-export const suggestionsField = StateField.define<SuggestionWithUser[]>({
+const suggestionsField = StateField.define<SuggestionWithUser[]>({
   create: () => [],
   update(value, transaction) {
     for (const effect of transaction.effects) {

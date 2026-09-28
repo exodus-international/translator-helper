@@ -162,10 +162,14 @@ function EditorViewer({
   const unassignTranslator = useEditorStore((s) => s.unassignTranslator);
   const unassignReviewer = useEditorStore((s) => s.unassignReviewer);
 
-  const sourceFormattedContent = useMemo(
-    () => getContentWithoutFrontmatter(sourceVersion.content),
-    [sourceVersion.content],
-  );
+  // What a saved source edit produced, shown until the router refresh that
+  // follows the save delivers the same text as a prop. Keyed on the prop it
+  // replaced, so a later prop change wins over it.
+  const [savedSource, setSavedSource] = useState<{ replaced: string; content: string } | null>(null);
+  const sourceContent: string =
+    savedSource && savedSource.replaced === sourceVersion.content ? savedSource.content : sourceVersion.content;
+
+  const sourceFormattedContent = useMemo(() => getContentWithoutFrontmatter(sourceContent), [sourceContent]);
   const translationFormattedContent = useMemo(() => {
     if (!content) return translationPreviewEmptyText ?? '';
     return getContentWithoutFrontmatter(content);
@@ -181,7 +185,7 @@ function EditorViewer({
 
   const handleSourceSave = async () => {
     await saveSource(sourceVersion.id);
-    sourceVersion.content = sourceEditContent;
+    setSavedSource({ replaced: sourceVersion.content, content: sourceEditContent });
     router.refresh();
   };
 
@@ -197,7 +201,7 @@ function EditorViewer({
       layout={layout}
       className="h-full"
       contentLanguage={contentLanguage}
-      sourceContent={sourceVersion.content}
+      sourceContent={sourceContent}
       sourceFormattedContent={sourceFormattedContent}
       translationContent={content}
       translationFormattedContent={translationFormattedContent}
