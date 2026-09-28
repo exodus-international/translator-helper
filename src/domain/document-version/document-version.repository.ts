@@ -185,6 +185,23 @@ export async function updateDocumentVersionStatus(id: string, status: DocumentSt
   });
 }
 
+/**
+ * Gives the version to `userId` and moves it to IN_PROGRESS, whatever its
+ * status was. Only starting a translation does this; every other status move
+ * goes through the workflow's transition rules.
+ */
+export async function claimDocumentVersion(id: string, userId: string) {
+  return prisma.documentVersion.update({
+    where: { id },
+    data: { userId, status: DocumentStatus.IN_PROGRESS },
+    include: {
+      document: true,
+      language: true,
+      user: userBrief,
+    },
+  });
+}
+
 export async function deleteDocumentVersion(id: string) {
   return prisma.documentVersion.delete({
     where: { id },

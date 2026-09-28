@@ -31,6 +31,9 @@ const croatian: Language = {
 const emptyProject: ProjectKanbanBoardLoaders = {
   documents: async () => [],
   members: async () => [],
+  changeStatus: async () => {
+    throw new Error('nothing to move on an empty board');
+  },
 };
 
 test('a project with no documents shows an empty board with no filter to clear', async () => {

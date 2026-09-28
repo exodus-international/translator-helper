@@ -36,3 +36,14 @@ export async function seededTranslationProject(projectSlug: string, languageCode
     where: { sourceProject: { slug: projectSlug }, language: { code: languageCode } },
   });
 }
+
+export async function seededDocument(slug: string) {
+  return prisma.document.findFirstOrThrow({ where: { slug } });
+}
+
+/** The version of one document in one language, as the seed left it. */
+export async function seededVersion(documentSlug: string, languageCode: string) {
+  return prisma.documentVersion.findFirstOrThrow({
+    where: { document: { slug: documentSlug }, language: { code: languageCode } },
+  });
+}

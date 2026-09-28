@@ -1,12 +1,12 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
-import { applyTextEditAtRange, extractTextAtRange, isRangeWithinBounds } from '@/lib/text-range';
 import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
 import { resolveTranslationProject } from '../document-version/resolve-translation-project';
+import { createApplySuggestion } from './suggestion.apply';
 import { notifySuggestionAdded, notifySuggestionReply } from '../notification/notification.service';
 import {
   applySuggestionSchema,
@@ -93,35 +93,21 @@ export async function createSuggestionAction(input: unknown) {
   return suggestion;
 }
 
+/** Applying a suggestion as the app wires it: the real repository writes. */
+const applySuggestion = createApplySuggestion({
+  updateVersion: updateDocumentVersion,
+  markApplied: (suggestionId, originalText) => updateSuggestionStatus(suggestionId, SuggestionStatus.APPLIED, null, originalText),
+  log: createActivityLog,
+  revalidateDocumentPage: () => revalidatePath('/documents/[project]/[slug]/[lang]', 'page'),
+});
+
 export async function applySuggestionAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = applySuggestionSchema.parse(input);
 
-  // Get suggestion
   const suggestion = await getSuggestionById(validated.suggestionId);
   if (!suggestion) {
     throw new Error('Suggestion not found');
-  }
-
-  if (suggestion.status !== SuggestionStatus.OPEN) {
-    throw new Error('Only open suggestions can be applied');
-  }
-
-  if (suggestion.type !== SuggestionType.CHANGE) {
-    throw new Error('Only CHANGE type suggestions can be applied');
-  }
-
-  if (!suggestion.proposedText) {
-    throw new Error('Suggestion does not have proposed text');
-  }
-
-  if (
-    suggestion.startLine == null ||
-    suggestion.endLine == null ||
-    suggestion.startColumn == null ||
-    suggestion.endColumn == null
-  ) {
-    throw new Error('Cannot apply a suggestion without a text range');
   }
 
   const { version: documentVersion, translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
@@ -132,47 +118,12 @@ export async function applySuggestionAction(input: unknown) {
     await authorize('admin');
   }
 
-  // Apply the suggestion by replacing the text at the range
-  const range = {
-    startLine: suggestion.startLine,
-    startColumn: suggestion.startColumn,
-    endLine: suggestion.endLine,
-    endColumn: suggestion.endColumn,
-  };
-
-  if (!isRangeWithinBounds(range, documentVersion.content.split('\n').length)) {
-    throw new Error('Suggestion range is out of bounds');
-  }
-
-  const originalText = extractTextAtRange(documentVersion.content, range);
-  const newContent = applyTextEditAtRange(documentVersion.content, range, suggestion.proposedText);
-
-  // Update document version
-  const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, newContent, user.id);
-
-  // Update suggestion status and store original text for potential revert
-  await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.APPLIED, null, originalText);
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: suggestion.documentVersionId,
-    userId: user.id,
-    action: 'applied_suggestion',
-    details: {
-      suggestionId: suggestion.id,
-      type: suggestion.type,
-      range: {
-        startLine: suggestion.startLine,
-        startColumn: suggestion.startColumn,
-        endLine: suggestion.endLine,
-        endColumn: suggestion.endColumn,
-      },
-    },
+  return applySuggestion({
+    suggestion,
+    versionId: suggestion.documentVersionId,
+    content: documentVersion.content,
+    actorId: user.id,
   });
-
-  revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
-
-  return updatedVersion;
 }
 
 export async function dismissSuggestionAction(input: unknown) {

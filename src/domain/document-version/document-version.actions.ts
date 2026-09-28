@@ -8,6 +8,7 @@ import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { isGitHubConfigured } from '@/lib/github-config';
 import { createStatusChange, involvesDeployed, type StatusChangeResult } from './document-version.status-change';
+import { createStartTranslation } from './document-version.start-translation';
 import {
   notifyReviewerAssignment,
   notifyStatusChange,
@@ -52,6 +53,7 @@ import {
 import {
   assignDocumentVersion,
   assignmentSelect,
+  claimDocumentVersion,
   createDocumentVersion,
   deleteDocumentVersion,
   getWorkVersionsForUser,
@@ -303,6 +305,14 @@ export async function updateDocumentVersionStatusAction(
   return changeStatus({ version: existingVersion, to: status, actorId: user.id });
 }
 
+/** Starting a translation as the app wires it: the real repository writes. */
+const startTranslation = createStartTranslation({
+  findVersion: getDocumentVersionByDocumentAndLanguage,
+  claimVersion: claimDocumentVersion,
+  createVersion: createDocumentVersion,
+  log: createActivityLog,
+});
+
 export async function assignDocumentVersionAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = createDocumentVersionSchema.parse(input);
@@ -366,71 +376,12 @@ export async function assignDocumentVersionAction(input: unknown) {
 
   await authorize({ project: translationProject.id, role: 'translator' });
 
-  // Check if version already exists
-  const existingVersion = await getDocumentVersionByDocumentAndLanguage(validated.documentId, validated.languageId);
-
-  if (existingVersion) {
-    // The version carries the assignment now: a translator set on it reserves the
-    // document, an empty one leaves it open to the whole language team.
-    if (existingVersion.userId && existingVersion.userId !== user.id) {
-      throw new Error('This document is assigned to another user');
-    }
-
-    if (existingVersion.status === DocumentStatus.IN_PROGRESS) {
-      // Already claimed by this user — hand back the same version.
-      if (existingVersion.userId === user.id) {
-        return existingVersion;
-      }
-      throw new Error('This translation is already assigned to another user');
-    }
-
-    // Assign to current user and set to IN_PROGRESS (bypasses validateTransition
-    // intentionally — this is the "Start Translation" flow which can re-claim
-    // a version from PENDING_TRANSLATION or reassign from other statuses)
-    const version = await prisma.documentVersion.update({
-      where: { id: existingVersion.id },
-      data: {
-        userId: user.id,
-        status: DocumentStatus.IN_PROGRESS,
-      },
-      include: {
-        document: true,
-        language: true,
-        user: {
-          ...userBrief,
-        },
-      },
-    });
-
-    // Log the activity
-    await createActivityLog({
-      documentVersionId: version.id,
-      userId: user.id,
-      action: 'started_translation',
-      details: { language: version.language.name, progress: `${existingVersion.status} -> IN_PROGRESS` },
-    });
-
-    return version;
-  }
-
-  // Create new version with IN_PROGRESS status and assign to user
-  const version = await createDocumentVersion({
+  return startTranslation({
     documentId: validated.documentId,
     languageId: validated.languageId,
     content: validated.content || '',
-    status: DocumentStatus.IN_PROGRESS,
-    userId: user.id,
+    actorId: user.id,
   });
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'assigned_translation',
-    details: { language: version.language.name },
-  });
-
-  return version;
 }
 
 /**
