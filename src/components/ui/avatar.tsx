@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Avatar as AvatarPrimitive } from 'radix-ui';
+import { Avatar as AvatarPrimitive } from '@base-ui/react/avatar';
 import * as React from 'react';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';

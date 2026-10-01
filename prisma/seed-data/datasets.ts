@@ -6,7 +6,7 @@ import {
   SourceProjectStatus,
   SuggestionStatus,
   SuggestionType,
-} from '@prisma/client';
+} from '../../src/generated/prisma/client';
 
 // ---------------------------------------------------------------------------
 // Helpers used by both datasets and seed.ts
@@ -29,7 +29,10 @@ export function daysFromNow(n: number): Date {
 // ---------------------------------------------------------------------------
 
 export const LANGUAGES = [
-  { code: 'en', name: 'English' },
+  // Documents are authored in English and translated out of it. Without the
+  // flag a fresh database has no source language at all, so every query that
+  // asks for target languages offers English a page it can never use.
+  { code: 'en', name: 'English', isSource: true },
   {
     code: 'cs',
     name: 'Czech',
@@ -147,28 +150,42 @@ export const SOURCE_PROJECTS = [
     key: 'exodus',
     name: 'Exodus90 2026',
     description: '90-day spiritual exercise program for men. Daily reflections, prayers, and ascetic practices.',
-    identifier: 'exodus90',
+    slug: 'exodus90',
+    repositoryDirectory: 'exodus90',
     status: SourceProjectStatus.ACTIVE,
   },
   {
     key: 'lent',
     name: 'Lent 2026',
     description: 'Lenten devotional series with daily Scripture readings and meditations for the liturgical season.',
-    identifier: 'lent2026',
+    slug: 'lent2026',
+    repositoryDirectory: 'lent2026',
     status: SourceProjectStatus.ACTIVE,
   },
   {
     key: 'advent',
     name: 'Advent 2025',
     description: 'Advent preparation program with weekly themes and daily content leading to Christmas.',
-    identifier: 'advent2025',
+    slug: 'advent2025',
+    repositoryDirectory: 'advent2025',
+    status: SourceProjectStatus.ACTIVE,
+  },
+  {
+    // No documents, on purpose: the empty state of a project page, and the one
+    // project a delete guard should let through.
+    key: 'empty',
+    name: 'Fallow Project 2027',
+    description: 'Set up but not yet filled. Exists so the empty project page has something to show.',
+    slug: 'fallow2027',
+    repositoryDirectory: 'fallow2027',
     status: SourceProjectStatus.ACTIVE,
   },
   {
     key: 'retreat',
     name: 'Summer Retreat 2025',
     description: 'Weekend retreat materials including talks and small group guides.',
-    identifier: 'summer2025',
+    slug: 'summer2025',
+    repositoryDirectory: null,
     status: SourceProjectStatus.COMPLETE,
   },
 ];
@@ -199,6 +216,7 @@ export const DOCUMENTS: {
   { key: 'ex-disc', slug: 'ex90-disciplines', title: 'Disciplines', type: DocumentType.ROOT_FILE, labels: ['root', 'yaml'], originalFilename: 'disciplines.yml', project: 'exodus' },
   { key: 'ex-m1', slug: 'ex90-meeting-1-6', title: 'Fraternity Meeting (Days 1-6)', type: DocumentType.MEETING, labels: ['meeting'], originalFilename: '1-6.md', project: 'exodus' },
   { key: 'ex-m2', slug: 'ex90-meeting-7-13', title: 'Fraternity Meeting (Days 7-13)', type: DocumentType.MEETING, labels: ['meeting'], originalFilename: '7-13.md', project: 'exodus' },
+  { key: 'ex-md', slug: 'ex90-markdown-reference', title: 'Markdown Reference', type: DocumentType.DAILY_CONTENT, labels: ['reference', 'markdown'], originalFilename: 'markdown-reference.md', project: 'exodus' },
   // Lent
   { key: 'le-aw', slug: 'lent-ash-wednesday', title: 'Ash Wednesday Reflection', type: DocumentType.DAY, labels: ['week-1', 'special'], deadline: daysFromNow(10), project: 'lent' },
   { key: 'le-d5', slug: 'lent-day-5', title: 'Friday of the First Week', type: DocumentType.DAY, labels: ['week-1'], deadline: daysFromNow(15), originalFilename: '5.md', project: 'lent' },
@@ -235,6 +253,9 @@ export const TARGET_VERSIONS: VersionDef[] = [
   { docKey: 'ex-d45', langCode: 'cs', status: DocumentStatus.PENDING_TRANSLATION, userKey: 'admin1', versionNum: 1 },
   { docKey: 'ex-fg', langCode: 'cs', status: DocumentStatus.DEPLOYED, userKey: 'translator1', reviewerKey: 'admin1', versionNum: 5 },
   { docKey: 'ex-dc', langCode: 'cs', status: DocumentStatus.APPROVED, userKey: 'translator1', reviewerKey: 'admin1', versionNum: 4 },
+  // Left in progress on purpose: the markdown reference is where the content
+  // lint and its "Fix all" are demonstrated, and both need an editable pane.
+  { docKey: 'ex-md', langCode: 'cs', status: DocumentStatus.IN_PROGRESS, userKey: 'translator1', versionNum: 2 },
 
   // Exodus90 — Slovak
   { docKey: 'ex-d1', langCode: 'sk', status: DocumentStatus.APPROVED, userKey: 'translator1', reviewerKey: 'reviewer1', versionNum: 4 },
@@ -468,3 +489,21 @@ export const COMMENTS: { versionKey: string; userKey: string; content: string }[
   { versionKey: 'le-d20:cs', userKey: 'translator1', content: 'I have some questions about the liturgical terminology — see the suggestion thread.' },
   { versionKey: 'ex-d1:sk', userKey: 'reviewer1', content: 'Good work on the Slovak translation. One term updated.' },
 ];
+
+/**
+ * Every way an invitation can fail, one token each.
+ *
+ * `validateInvitationToken` has four refusals and they read alike from the
+ * outside, so each needs its own fixture to tell them apart: a revoked one, an
+ * expired one, one whose uses are spent, and a token that was never issued.
+ */
+export const INVITE_TOKENS = {
+  /** Unlimited uses, far future. Registering with it must always work. */
+  valid: 'seed-invite-open-sk',
+  revoked: 'seed-invite-revoked',
+  expired: 'seed-invite-expired',
+  /** maxUses reached, so it is spent without being revoked or expired. */
+  exhausted: 'seed-invite-exhausted',
+  /** Never issued. The "not found" branch. */
+  unknown: 'seed-invite-does-not-exist',
+} as const;

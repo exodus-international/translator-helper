@@ -9,7 +9,7 @@ import { buildProjectPath } from '@/domain/source-project/source-project-url';
 interface ProjectCardProps {
   project: {
     id: string;
-    identifier: string;
+    slug: string;
     name: string;
     description: string | null;
     status: string;
@@ -37,21 +37,21 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   const totalMembers = uniqueUserIds.size;
 
   return (
-    <Link href={buildProjectPath(project.identifier)}>
+    <Link href={buildProjectPath(project.slug)}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
             <CardTitle className="text-lg">{project.name}</CardTitle>
             {project.status === 'COMPLETE' && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="secondary">
                 Complete
               </Badge>
             )}
           </div>
-          {project.description && <p className="text-sm text-gray-500 line-clamp-2">{project.description}</p>}
+          {project.description && <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>}
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <FileText className="h-4 w-4" />
               <span>{project._count.documents} documents</span>
@@ -72,7 +72,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
               {project.translationProjects.map((tp) => {
                 const uniqueMembers = tp.language.users.length;
                 return (
-                  <Badge key={tp.id} variant="secondary" size="xs" className="gap-1">
+                  <Badge key={tp.id} variant="secondary" className="gap-1">
                     {tp.language.name}
                     {uniqueMembers > 0 && (
                       <span className="text-muted-foreground">

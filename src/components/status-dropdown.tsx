@@ -4,46 +4,62 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import { useDeployConfirm } from '@/components/deploy-confirm';
+import { withStatusChangeFeedback } from '@/components/status-change-feedback';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
-import { capture } from '@/lib/analytics';
-import { canDeployClient } from '@/lib/permissions-client';
+import { useStatusTransitionPending, useStatusTransitionStore } from '@/lib/stores/status-transition';
 import { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { DocumentStatus } from '@prisma/client';
-import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+import { DocumentStatus } from '@/generated/prisma/enums';
+import { Menu as DropdownMenuPrimitive } from '@base-ui/react/menu';
 import { AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
-import { useState } from 'react';
 import { toast } from 'sonner';
+
+/** Shown wherever deploying is refused, so the reason is the same everywhere. */
+const DEPLOY_DENIED = 'Only this language\u2019s manager or an administrator can deploy';
 
 interface StatusDropdownProps {
   currentStatus: DocumentStatus | null;
   versionId: string;
   user: SessionUser;
+  /**
+   * Resolved on the server against this version's language: an administrator,
+   * or that language's manager. The client cannot answer it from the session
+   * alone, which is why it arrives as a prop.
+   */
+  canDeploy: boolean;
   documentId?: string; // For navigation after status change
   onStatusChange?: (newStatus: DocumentStatus) => void;
   onReviewRequested?: () => void; // Called instead of direct transition when moving to PENDING_REVIEW
   allowedStatuses?: DocumentStatus[]; // For future permission filtering
   disabled?: boolean;
   openSuggestionsCount?: number;
+  /** The server action behind a move; a test hands in a fake. */
+  changeStatus?: typeof updateDocumentVersionStatusAction;
 }
 
 export function StatusDropdown({
   currentStatus,
   versionId,
   user,
+  canDeploy,
   documentId,
   onStatusChange,
   onReviewRequested,
   allowedStatuses,
   disabled = false,
   openSuggestionsCount = 0,
+  changeStatus = updateDocumentVersionStatusAction,
 }: StatusDropdownProps) {
   const router = useRouter();
   const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
-  const [loading, setLoading] = useState(false);
+  // Shared with every other mount for this version, so whichever control is
+  // clicked disables all of them rather than only itself.
+  const loading = useStatusTransitionPending(versionId);
+  const beginTransition = useStatusTransitionStore((state) => state.begin);
+  const releaseTransition = useStatusTransitionStore((state) => state.release);
   const [open, setOpen] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
   const [displayedStatus, setDisplayedStatus] = React.useState<DocumentStatus | null>(currentStatus);
@@ -70,7 +86,7 @@ export function StatusDropdown({
     }
 
     // Filter out DEPLOYED if user doesn't have permission
-    if (!canDeployClient(user)) {
+    if (!canDeploy) {
       statuses = statuses.filter((status) => status !== DocumentStatus.DEPLOYED);
     }
 
@@ -81,7 +97,7 @@ export function StatusDropdown({
     }
 
     return statuses;
-  }, [allowedStatuses, user, currentStatus]);
+  }, [allowedStatuses, canDeploy, currentStatus]);
 
   const forwardLabels: Partial<Record<DocumentStatus, string>> = {
     [DocumentStatus.IN_PROGRESS]: 'Start translation',
@@ -112,13 +128,13 @@ export function StatusDropdown({
     if (newStatus === displayedStatus || loading) return;
 
     // Check permission for DEPLOYED
-    if (newStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
-      toast.warning('Only deployers can deploy documents');
+    if (newStatus === DocumentStatus.DEPLOYED && !canDeploy) {
+      toast.warning(DEPLOY_DENIED);
       return;
     }
 
-    if (displayedStatus === DocumentStatus.DEPLOYED && !canDeployClient(user)) {
-      toast.warning('Only deployers can change the status of a deployed document');
+    if (displayedStatus === DocumentStatus.DEPLOYED && !canDeploy) {
+      toast.warning('Deployed work can only be moved back by this language\u2019s manager or an administrator');
       return;
     }
 
@@ -134,45 +150,16 @@ export function StatusDropdown({
       return;
     }
 
-    setLoading(true);
-
-    // Show a loading toast for deploy (GitHub takes a few seconds)
-    let deployToastId: string | number | undefined;
-    if (newStatus === DocumentStatus.DEPLOYED) {
-      deployToastId = toast.loading('Deploying to GitHub...');
-    }
+    // Claiming the version is what actually prevents the race: `disabled` only
+    // takes effect on the next render, so two mounts can both be clicked before
+    // either re-renders.
+    if (!beginTransition(versionId)) return;
 
     try {
-      const result = await updateDocumentVersionStatusAction(versionId, newStatus);
-
-      // Show GitHub deploy feedback
-      if (result.github) {
-        if (deployToastId) toast.dismiss(deployToastId);
-        if (result.github.status === 'success') {
-          toast.success(result.github.prUrl ? `GitHub PR created successfully` : 'Deployed to GitHub successfully', {
-            action: result.github.prUrl
-              ? { label: 'Open PR', onClick: () => window.open(result.github!.prUrl, '_blank') }
-              : undefined,
-            duration: 8000,
-          });
-        } else if (result.github.status === 'failed') {
-          toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
-        }
-      } else if (deployToastId) {
-        toast.dismiss(deployToastId);
-      }
-
-      if (result.audio?.status === 'success') {
-        capture('audio_generation_triggered', { documentVersionId: versionId });
-      } else if (result.audio?.status === 'failed') {
-        capture('audio_generation_failed', { documentVersionId: versionId, kind: 'unknown' });
-        toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
-      }
-
-      capture('document_status_changed', { from: displayedStatus, to: newStatus, via: 'dropdown' });
-      if (newStatus === DocumentStatus.DEPLOYED) {
-        capture('document_deployed');
-      }
+      await withStatusChangeFeedback(
+        { from: displayedStatus, to: newStatus, via: 'dropdown', documentId: documentId ?? null, versionId },
+        () => changeStatus(versionId, newStatus),
+      );
 
       // Update displayed status immediately for optimistic UI update
       setDisplayedStatus(newStatus);
@@ -188,11 +175,10 @@ export function StatusDropdown({
         window.location.reload();
       }
     } catch (error: any) {
-      if (deployToastId) toast.dismiss(deployToastId);
       console.error('Error updating status:', error);
       toast.error(error.message || 'Failed to update status');
     } finally {
-      setLoading(false);
+      releaseTransition(versionId);
     }
   };
 
@@ -202,6 +188,11 @@ export function StatusDropdown({
   const triggerButton = (
     <Button
       variant="outline"
+      // The visible text is the status itself, which changes as the document
+      // moves and is repeated by the stepper. Naming the control by what it
+      // does, and carrying the status inside that name, gives screen readers
+      // "Document status: Texts in Review" instead of a bare badge.
+      aria-label={`Document status: ${currentStatusConfig.name}`}
       disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
       className={cn(
         'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
@@ -228,15 +219,16 @@ export function StatusDropdown({
     <>
       {deployDialog}
       <DropdownMenuPrimitive.Root open={open} onOpenChange={setOpen}>
-      <DropdownMenuPrimitive.Trigger asChild>
-        {triggerButton}
-      </DropdownMenuPrimitive.Trigger>
+      <DropdownMenuPrimitive.Trigger render={triggerButton} />
 
       <DropdownMenuPrimitive.Portal>
-        <DropdownMenuPrimitive.Content
-          className="min-w-[200px] bg-white rounded-md border shadow-md p-1 z-50"
+        <DropdownMenuPrimitive.Positioner
+          className="isolate z-50 outline-none"
           align="start"
           sideOffset={4}
+        >
+        <DropdownMenuPrimitive.Popup
+          className="min-w-[200px] bg-popover text-popover-foreground rounded-md border shadow-md p-1 z-50"
         >
           {availableStatuses.map((status) => {
             const statusConfig = getDocumentStatusConfig(status);
@@ -258,11 +250,11 @@ export function StatusDropdown({
                 disabled={isDisabled}
                 className={cn(
                   'relative flex items-center gap-2 px-2 py-2 text-sm rounded-sm outline-none',
-                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100 focus:bg-gray-100',
-                  isCurrentStatus && 'bg-blue-50 opacity-60',
+                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-accent focus:bg-accent',
+                  isCurrentStatus && 'bg-info/10 opacity-60',
                 )}
-                onSelect={(e) => {
-                  e.preventDefault();
+                closeOnClick={false}
+                onClick={() => {
                   if (isBlockedByOpenSuggestions) {
                     toast.warning(`Resolve all open comments before approving (${openSuggestionsCount} remaining)`);
                     return;
@@ -272,21 +264,21 @@ export function StatusDropdown({
                   }
                 }}
               >
-                {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-r" />}
+                {isCurrentStatus && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-info rounded-r" />}
                 <div className="flex w-full justify-between items-center gap-2">
                   <div className="flex flex-col">
-                    <span className={cn(isDisabled ? 'text-gray-400' : 'text-gray-900 font-medium')}>
+                    <span className={cn(isDisabled ? 'text-muted-foreground' : 'text-foreground font-medium')}>
                       {getTransitionLabel(displayedStatus, status)}
                     </span>
                     {isBlockedByOpenSuggestions && (
-                      <div className="text-[12px] text-red-600 flex items-center">
+                      <div className="text-[12px] text-destructive flex items-center">
                         <AlertCircle className="h-3.5 w-3.5 mr-1" /> {openSuggestionsCount} open comment
                         {openSuggestionsCount !== 1 ? 's' : ''} remaining
                       </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <ArrowRight className={cn('h-3.5 w-3.5', isDisabled ? 'text-gray-300' : 'text-gray-400')} />
+                    <ArrowRight className={cn('h-3.5 w-3.5', isDisabled ? 'text-muted-foreground/60' : 'text-muted-foreground')} />
                     <Badge variant="secondary" className={cn('gap-1', statusConfig.color.badgeClass, 'justify-start')}>
                       <StatusIcon className={cn('h-3.5 w-3.5', statusConfig.color.textClass)} />
                       <span className={cn('font-medium', statusConfig.color.textClass)}>{statusConfig.name}</span>
@@ -296,7 +288,8 @@ export function StatusDropdown({
               </DropdownMenuPrimitive.Item>
             );
           })}
-        </DropdownMenuPrimitive.Content>
+        </DropdownMenuPrimitive.Popup>
+        </DropdownMenuPrimitive.Positioner>
       </DropdownMenuPrimitive.Portal>
     </DropdownMenuPrimitive.Root>
     </>

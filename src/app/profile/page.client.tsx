@@ -14,9 +14,10 @@ import { updateUserProfileAction } from '@/domain/user/user.actions';
 import { capture } from '@/lib/analytics';
 import { authClient } from '@/lib/auth-client';
 import { formatUnambiguousDate } from '@/lib/format';
-import { TShirtSize } from '@prisma/client';
+import { TShirtSize } from '@/generated/prisma/enums';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { NotificationPreferences } from './notification-preferences';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
 const NONE_VALUE = '__none__';
@@ -44,24 +45,26 @@ interface UserProfile {
 interface ProfileClientProps {
   profile: UserProfile;
   avatarUploadEnabled: boolean;
+  notificationPreferences: React.ComponentProps<typeof NotificationPreferences>;
 }
 
-export default function ProfileClient({ profile, avatarUploadEnabled }: ProfileClientProps) {
+export default function ProfileClient({ profile, avatarUploadEnabled, notificationPreferences }: ProfileClientProps) {
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader title="Profile" description="Your picture, contact details and password." />
+    <>
+      <PageHeader title="Profile" description="Your picture, contact details, notifications and password." />
 
-      <div className="container mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <IdentityCard profile={profile} avatarUploadEnabled={avatarUploadEnabled} />
         <ProfileDetailsForm profile={profile} />
+        <NotificationPreferences {...notificationPreferences} />
         <ChangePasswordSection />
       </div>
-    </div>
+    </>
   );
 }
 
 /** Who you are: picture, and the things only an administrator can change. */
-function IdentityCard({ profile, avatarUploadEnabled }: ProfileClientProps) {
+function IdentityCard({ profile, avatarUploadEnabled }: Pick<ProfileClientProps, 'profile' | 'avatarUploadEnabled'>) {
   return (
     <Card>
       <CardContent className="space-y-5 py-3">
@@ -74,15 +77,13 @@ function IdentityCard({ profile, avatarUploadEnabled }: ProfileClientProps) {
             <span className="break-all">{profile.email}</span>
           </Detail>
           <Detail label="Role">
-            <Badge variant={profile.role === 'ADMIN' ? 'primary' : 'secondary'} size="sm">
-              {profile.role}
-            </Badge>
+            <Badge variant={profile.role === 'ADMIN' ? 'default' : 'secondary'}>{profile.role}</Badge>
           </Detail>
           <Detail label="Languages">
             {profile.languages.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {profile.languages.map((ul) => (
-                  <Badge key={ul.language.id} variant="outline" size="sm">
+                  <Badge key={ul.language.id} variant="outline">
                     {ul.language.name}
                   </Badge>
                 ))}
@@ -270,7 +271,8 @@ function ProfileDetailsForm({ profile }: { profile: UserProfile }) {
               <FieldLabel htmlFor="profile-tshirt">T-shirt size</FieldLabel>
               <Select
                 value={form.tShirtSize || NONE_VALUE}
-                onValueChange={(v) => set('tShirtSize')(v === NONE_VALUE ? '' : v)}
+                onValueChange={(v) => set('tShirtSize')(!v || v === NONE_VALUE ? '' : v)}
+                items={{ [NONE_VALUE]: 'Not set', ...Object.fromEntries(T_SHIRT_SIZES.map((size) => [size, size])) }}
               >
                 <SelectTrigger id="profile-tshirt" className="w-full sm:w-48">
                   <SelectValue placeholder="Select size" />

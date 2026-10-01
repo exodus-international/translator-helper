@@ -48,11 +48,20 @@ next-env.d.ts
 .env.sentry-build-plugin
 .fallow/
 
-# Monaco is vendored into public/ by scripts/copy-monaco.mjs on postinstall
-/public/monaco/
-
 # Playwright MCP session artifacts
 .playwright-mcp/
 
 # Staging area for uploaded brand artwork; derived files are committed instead
 generated-images/
+.react-email
+
+# end-to-end tests
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/.auth/
+/.features-gen/
+
+# Raw demo recordings (demos/README.md)
+/demos/output/

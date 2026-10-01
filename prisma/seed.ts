@@ -1,5 +1,14 @@
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { auth } from '@/lib/auth';
-import { DocumentStatus, PrismaClient } from '@prisma/client';
+import {
+  AudioProvider,
+  DocumentStatus,
+  GitHubPRStatus,
+  InvitationStatus,
+  PrismaClient,
+  ProjectRole,
+} from '../src/generated/prisma/client';
 
 import { CONTENT_BY_LANGUAGE, ENGLISH_CONTENT } from './seed-data/content';
 import {
@@ -12,11 +21,14 @@ import {
   SUGGESTIONS,
   TARGET_VERSIONS,
   USERS,
+  INVITE_TOKENS,
   daysAgo,
   daysFromNow,
 } from './seed-data/datasets';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 // ---------------------------------------------------------------------------
 // 1. Cleanup
@@ -38,6 +50,8 @@ async function cleanup() {
     prisma.folder.deleteMany(),
     prisma.session.deleteMany(),
     prisma.account.deleteMany(),
+    prisma.invitationLanguage.deleteMany(),
+    prisma.invitation.deleteMany(),
     prisma.verification.deleteMany(),
     prisma.user.deleteMany(),
   ]);
@@ -55,7 +69,12 @@ async function seedLanguages() {
   for (const lang of LANGUAGES) {
     const result = await prisma.language.upsert({
       where: { code: lang.code },
-      update: { name: lang.name, branchName: lang.branchName ?? null, translationInstructions: lang.translationInstructions ?? null },
+      update: {
+        name: lang.name,
+        branchName: lang.branchName ?? null,
+        translationInstructions: lang.translationInstructions ?? null,
+        isSource: lang.isSource ?? false,
+      },
       create: lang,
     });
     langs[lang.code] = result.id;
@@ -90,6 +109,10 @@ async function seedUsers(langs: Record<string, string>) {
       body: { email: u.email, name: u.name, password: 'Hello123456', role: u.role },
     });
     users[u.key] = result.user.id;
+    // Seeded people already have the name the profile form asks for, so the
+    // onboarding gate would only stand between them and the app -- and the
+    // first thing it offers is an edit to the name they already have.
+    await prisma.user.update({ where: { id: result.user.id }, data: { onboarded: true } });
     console.log(`User ${u.name} (${u.email}) -> ${u.key}`);
 
     // UserLanguage records — the language assignment carries the project role
@@ -119,7 +142,13 @@ async function seedSourceProjects() {
   const projects: Record<string, string> = {};
   for (const p of SOURCE_PROJECTS) {
     const result = await prisma.sourceProject.create({
-      data: { name: p.name, description: p.description, identifier: p.identifier, status: p.status },
+      data: {
+        name: p.name,
+        description: p.description,
+        slug: p.slug,
+        repositoryDirectory: p.repositoryDirectory,
+        status: p.status,
+      },
     });
     projects[p.key] = result.id;
     console.log(`Project ${p.name} (${p.status})`);
@@ -204,7 +233,10 @@ function getTranslationContent(docKey: string, langCode: string, status: Documen
 
   const langContent = CONTENT_BY_LANGUAGE[langCode];
   if (langContent && langContent[docKey]) {
-    if (status === DocumentStatus.IN_PROGRESS) {
+    // The markdown reference carries its own half-finished translation, written
+    // with the lint violations it exists to demonstrate. Halving it would cut
+    // them out, so it is the one document that keeps what the dataset says.
+    if (status === DocumentStatus.IN_PROGRESS && docKey !== 'ex-md') {
       // Partial content: first half
       const lines = langContent[docKey].split('\n');
       return lines.slice(0, Math.ceil(lines.length / 2)).join('\n') + '\n\n<!-- TODO: finish translation -->';
@@ -448,9 +480,145 @@ async function seedComments(
   console.log(`Created ${COMMENTS.length} comments`);
 }
 
+
+// ---------------------------------------------------------------------------
+// Language configuration scenarios
+// ---------------------------------------------------------------------------
+
+/**
+ * Coverage for the language pages: each target language is deliberately broken
+ * in a different way, so the health checks, the delete guard and the overview
+ * all have something real to report.
+ *
+ *   cs  fully configured, deployed work, a PM
+ *   sk  no AI instructions
+ *   de  no voice
+ *   hr  no branch, no PM, no voice, no instructions -- every check failing
+ *   fr  configured but barely started
+ *   pt  no projects at all, so it is the one language that can be deleted
+ */
+async function seedLanguageScenarios(langs: Record<string, string>, users: Record<string, string>) {
+  console.log('\n--- Language scenarios ---');
+
+  const voices: Record<string, string> = { cs: 'cs-CZ-AntoninNeural', sk: 'sk-SK-LukasNeural', fr: 'fr-FR-HenriNeural' };
+  for (const [code, audioVoice] of Object.entries(voices)) {
+    await prisma.language.update({
+      where: { id: langs[code] },
+      data: { audioProvider: AudioProvider.AZURE_SPEECH, audioVoice },
+    });
+  }
+
+  // Slovak deploys and speaks, but nobody has written its AI instructions.
+  await prisma.language.update({ where: { id: langs.sk }, data: { translationInstructions: null } });
+
+  // A Project Manager who is not an administrator. Without one, the split the
+  // instructions page rests on -- a PM writes, members read, and neither can
+  // reach /languages -- cannot be exercised at all. German gets a second PM
+  // with it, so it is also the one language where demoting one is harmless.
+  await prisma.userLanguage.update({
+    where: { userId_languageId: { userId: users.translator2, languageId: langs.de } },
+    data: { role: ProjectRole.PROJECT_MANAGER },
+  });
+
+  // An empty language: a branch, no projects, no translations. The only one the
+  // delete guard should let through.
+  const portuguese = await prisma.language.upsert({
+    where: { code: 'pt' },
+    update: {},
+    create: { code: 'pt', name: 'Portuguese', branchName: 'translations/pt' },
+  });
+
+  // A pending invitation scoped to it, so the delete dialog has a row to name.
+  await prisma.invitation.create({
+    data: {
+      token: 'seed-invite-portuguese',
+      createdById: users.admin1,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      languages: { create: [{ languageId: portuguese.id }] },
+    },
+  });
+
+  // Deploy history: a commit per deployed version, so "last deploy" has a real
+  // timestamp rather than a status with no history behind it.
+  const deployed = await prisma.documentVersion.findMany({
+    where: { status: DocumentStatus.DEPLOYED },
+    select: { id: true, languageId: true, document: { select: { slug: true } } },
+  });
+  const branchByLanguage = new Map(
+    (await prisma.language.findMany({ select: { id: true, code: true, branchName: true } })).map((l) => [
+      l.id,
+      l.branchName ?? `translations/${l.code}`,
+    ]),
+  );
+  let day = 0;
+  for (const version of deployed) {
+    await prisma.gitHubCommit.create({
+      data: {
+        documentVersionId: version.id,
+        commitSha: `seed${version.id.slice(0, 7)}`,
+        branchName: branchByLanguage.get(version.languageId) ?? 'translations/unknown',
+        filePath: `translations/${version.document.slug}.md`,
+        prNumber: 100 + day,
+        prStatus: GitHubPRStatus.MERGED,
+        // Spread backwards so the newest is a few days old, not all identical.
+        createdAt: new Date(Date.now() - (day += 2) * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+
+  console.log(`Voices for ${Object.keys(voices).length} languages, Portuguese as an empty language, ${deployed.length} deploy commits`);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+
+/**
+ * A ready-made invitation, so the registration flow can be exercised without
+ * an admin first creating one by hand. The token is fixed rather than random
+ * for the same reason the passwords are: a fixture you can type.
+ */
+async function seedInvitations(users: Record<string, string>, langs: Record<string, string>) {
+  console.log('\n--- Invitations ---');
+
+  const base = { createdById: users.admin1, languages: { create: [{ languageId: langs.sk }] } };
+
+  // The one that works. Unlimited, because a test run that consumed it would
+  // leave the next run without a way in.
+  await prisma.invitation.create({
+    data: { ...base, token: INVITE_TOKENS.valid, maxUses: null, expiresAt: daysFromNow(365) },
+  });
+
+  // Revoked while still in date and with uses left, so only the status can be
+  // what refuses it.
+  await prisma.invitation.create({
+    data: {
+      ...base,
+      token: INVITE_TOKENS.revoked,
+      maxUses: null,
+      expiresAt: daysFromNow(365),
+      status: InvitationStatus.REVOKED,
+    },
+  });
+
+  // Out of date, still ACTIVE and unused, so only the date can refuse it.
+  await prisma.invitation.create({
+    data: { ...base, token: INVITE_TOKENS.expired, maxUses: null, expiresAt: daysAgo(1) },
+  });
+
+  // Spent: one use allowed and one taken, still ACTIVE and in date.
+  await prisma.invitation.create({
+    data: {
+      ...base,
+      token: INVITE_TOKENS.exhausted,
+      maxUses: 1,
+      usedCount: 1,
+      expiresAt: daysFromNow(365),
+    },
+  });
+
+  console.log(`Invitations: valid, revoked, expired, exhausted (Slovak)`);
+}
 
 async function main() {
   console.log('Starting comprehensive database seeding...\n');
@@ -467,6 +635,8 @@ async function main() {
   await seedSuggestions(versions, users);
   await seedActivityLogs(versions, users);
   await seedComments(versions, users);
+  await seedLanguageScenarios(langs, users);
+  await seedInvitations(users, langs);
 
   console.log('\n=== Database seeding completed! ===\n');
   console.log('Login credentials:');
@@ -476,6 +646,7 @@ async function main() {
   console.log('  Translator 2: translator2@example.org / Hello123456');
   console.log('  Reviewer:     reviewer@example.org / Hello123456');
   console.log('  Banned:       banned@example.org / Hello123456');
+  console.log(`\nOpen invitation: /register/${INVITE_TOKENS.valid}`);
 }
 
 main()

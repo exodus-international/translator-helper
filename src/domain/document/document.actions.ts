@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
-import { DocumentStatus, DocumentType } from '@prisma/client';
+import { DocumentStatus, DocumentType } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import {
@@ -34,7 +34,8 @@ export async function listDocumentsAction(filters?: {
 }
 
 export async function createDocumentAction(input: unknown) {
-  const { user } = await authorize('authenticated');
+  // Source documents are admin-managed, like updating and deleting them below.
+  const { user } = await authorize('admin');
   const validated = createDocumentSchema.parse(input);
 
   // Create the document
@@ -132,7 +133,9 @@ export async function listDocumentsOverviewAction(filters: {
   skip?: number;
   take?: number;
 }) {
-  await authorize('authenticated');
+  // Feeds the admin-only /documents overview; the per-language boards read
+  // through listDocumentsAction and getDashboardDocumentsAction instead.
+  await authorize('admin');
   const [documents, total] = await Promise.all([
     listDocumentsOverviewPaginated(filters),
     countDocumentsOverview(filters),

@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Alegreya, Geist, Geist_Mono } from 'next/font/google';
+import { cookies } from 'next/headers';
 import './globals.css';
 import { getCurrentUser } from '@/lib/session';
-import { Navigation } from '@/components/navigation';
+import { countManagedLanguages, countUserTargetLanguages } from '@/domain/user-language/user-language.repository';
+import { SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
+import { AppShell } from '@/components/app-shell';
+import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackButton } from '@/components/feedback-button';
 import { PostHogProvider } from '@/components/posthog-provider';
@@ -16,6 +20,18 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
+});
+
+// The serif the reading app sets its content in. Loaded here only so the
+// formatted preview can show a translator what a reader will actually see;
+// nothing in the tool's own chrome uses it. latin-ext covers the Czech and
+// Polish diacritics the translations carry.
+const alegreya = Alegreya({
+  variable: '--font-reader',
+  subsets: ['latin', 'latin-ext'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+  display: 'swap',
 });
 
 const APP_NAME = 'Translation Helper';
@@ -54,18 +70,40 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
+  // The AI instructions entry is for people with a language to instruct, which
+  // is every admin and anyone assigned to one. This runs on every request for
+  // every signed-in user, so it asks for a number rather than the rows.
+  const isAdmin = user?.role === 'ADMIN';
+  const [instructionLanguages, managedLanguages] = user
+    ? await Promise.all([countUserTargetLanguages(user.id), countManagedLanguages(user.id)])
+    : [0, 0];
+  const canReadInstructions = !!user && (isAdmin || instructionLanguages > 0);
+  // A manager reaches their languages from the same entry an admin does; the
+  // index shows them only what they manage.
+  const canSeeLanguages = !!user && (isAdmin || managedLanguages > 0);
+  // First paint already has the width the user last chose.
+  const sidebarOpen = (await cookies()).get(SIDEBAR_COOKIE_NAME)?.value !== 'false';
 
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <PostHogProvider user={user}>
-          <NuqsAdapter>
-            <Navigation user={user} />
-            {children}
-            <FeedbackButton />
-            <Toaster />
-          </NuqsAdapter>
-        </PostHogProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${alegreya.variable} antialiased`}>
+        <ThemeProvider>
+          <PostHogProvider user={user}>
+            <NuqsAdapter>
+              <AppShell
+                user={user}
+                canReadInstructions={canReadInstructions}
+                canSeeLanguages={canSeeLanguages}
+                defaultOpen={sidebarOpen}
+              >
+                {children}
+              </AppShell>
+              {/* Signed-in users get these two links in the sidebar footer instead. */}
+              {!user && <FeedbackButton />}
+              <Toaster />
+            </NuqsAdapter>
+          </PostHogProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
-import { DocumentStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client';
+import { DocumentStatus } from '@/generated/prisma/enums';
 
 /**
  * The shape the assignment lists render: who, which document, which language,
@@ -32,7 +33,7 @@ export const assignmentSelect = {
       type: true,
       labels: true,
       sourceProjectId: true,
-      sourceProject: { select: { id: true, name: true, identifier: true, acronym: true } },
+      sourceProject: { select: { id: true, name: true, slug: true, acronym: true } },
     },
   },
   language: { select: { id: true, name: true, code: true } },
@@ -184,6 +185,23 @@ export async function updateDocumentVersionStatus(id: string, status: DocumentSt
   });
 }
 
+/**
+ * Gives the version to `userId` and moves it to IN_PROGRESS, whatever its
+ * status was. Only starting a translation does this; every other status move
+ * goes through the workflow's transition rules.
+ */
+export async function claimDocumentVersion(id: string, userId: string) {
+  return prisma.documentVersion.update({
+    where: { id },
+    data: { userId, status: DocumentStatus.IN_PROGRESS },
+    include: {
+      document: true,
+      language: true,
+      user: userBrief,
+    },
+  });
+}
+
 export async function deleteDocumentVersion(id: string) {
   return prisma.documentVersion.delete({
     where: { id },
@@ -236,6 +254,11 @@ export async function assignDocumentVersion(data: {
   });
 }
 
+/** Just the language a version belongs to, for the checks that gate on it. */
+export async function getDocumentVersionLanguage(id: string): Promise<{ languageId: string } | null> {
+  return prisma.documentVersion.findUnique({ where: { id }, select: { languageId: true } });
+}
+
 /** Every version a user is assigned to translate, soonest deadline first. */
 /**
  * A user's active work: versions where they are the translator or the reviewer,
@@ -254,6 +277,47 @@ export async function getWorkVersionsForUser(userId: string): Promise<VersionAss
       deadline: { sort: 'asc', nulls: 'last' },
     },
   });
+}
+
+/**
+ * How much unfinished work each member of a language is carrying, keyed by user
+ * id. Removing someone with work in flight is the one destructive action on the
+ * team page, so the number has to be beside them before they are removed.
+ *
+ * "Open" is the same rule `getWorkVersionsForUser` uses for My Work -- the
+ * member is translator or reviewer, and the status is neither APPROVED nor
+ * DEPLOYED -- so a member's count here and their dashboard cannot disagree. A
+ * version whose translator is also its reviewer counts once per role, for the
+ * same reason My Work lists it twice: it is two things to do.
+ */
+export async function countOpenWorkByMember(languageId: string): Promise<Map<string, number>> {
+  const where = {
+    languageId,
+    status: { notIn: [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED] },
+  };
+
+  const [asTranslator, asReviewer] = await Promise.all([
+    prisma.documentVersion.groupBy({
+      by: ['userId'],
+      where: { ...where, userId: { not: null } },
+      _count: { _all: true },
+    }),
+    prisma.documentVersion.groupBy({
+      by: ['reviewerId'],
+      where: { ...where, reviewerId: { not: null } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const counts = new Map<string, number>();
+  for (const group of asTranslator) {
+    if (group.userId) counts.set(group.userId, (counts.get(group.userId) ?? 0) + group._count._all);
+  }
+  for (const group of asReviewer) {
+    if (group.reviewerId) counts.set(group.reviewerId, (counts.get(group.reviewerId) ?? 0) + group._count._all);
+  }
+
+  return counts;
 }
 
 /** The versions belonging to a translation project — its language, its documents. */

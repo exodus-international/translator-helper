@@ -16,7 +16,9 @@ export default async function EditDocumentPage({
   }
 
   if (user.role !== 'ADMIN') {
-    redirect('/documents');
+    // Not /documents: that is admin-only too, so bouncing there would just
+    // redirect a second time.
+    redirect('/dashboard');
   }
 
   const { project, slug } = await params;

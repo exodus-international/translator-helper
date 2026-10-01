@@ -21,7 +21,7 @@ describe('getContentFormat', () => {
 });
 
 describe('getEditorLanguage', () => {
-  it('maps YAML files to the monaco yaml language', () => {
+  it('maps YAML files to the yaml editor language', () => {
     assert.equal(getEditorLanguage('disciplines.yml'), 'yaml');
     assert.equal(getEditorLanguage('metadata.yaml'), 'yaml');
   });

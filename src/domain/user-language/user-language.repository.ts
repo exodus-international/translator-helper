@@ -1,6 +1,6 @@
 import { userBriefColumns } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
-import { ProjectRole } from '@prisma/client';
+import { ProjectRole } from '@/generated/prisma/enums';
 
 /**
  * Access control is language-based: a UserLanguage row grants its role on every
@@ -29,9 +29,15 @@ export async function getUserLanguages(userId: string) {
 }
 
 /**
- * Replaces the user's language assignments, preserving the role on languages the
- * user already had. Languages added here start at the lowest role (TRANSLATOR);
- * use `setUserLanguageRole` to promote.
+ * Replaces the user's language assignments, preserving the role on languages
+ * the user already had. Languages added here start at the lowest role
+ * (TRANSLATOR).
+ *
+ * Only registration calls this: a user accepting an invitation has no
+ * memberships yet, so replacing the whole set cannot take a role away. It was
+ * also the Users page's edit control, where it could and did -- unticking a
+ * language and re-ticking it demoted a Project Manager to Translator without
+ * saying so. That screen writes through `setUserLanguageRole` now.
  */
 export async function setUserLanguages(userId: string, languageIds: string[]) {
   await prisma.$transaction([
@@ -52,14 +58,6 @@ export async function setUserLanguages(userId: string, languageIds: string[]) {
   ]);
 
   return getUserLanguages(userId);
-}
-
-export async function getUserLanguagesCount(userId: string): Promise<number> {
-  return prisma.userLanguage.count({
-    where: {
-      userId,
-    },
-  });
 }
 
 // ─── Project access ──────────────────────────────────────────
@@ -105,19 +103,6 @@ export async function listTranslationProjectMembers(translationProjectId: string
         },
       },
     },
-    include: {
-      user: { select: memberUserSelect },
-    },
-    orderBy: {
-      user: { name: 'asc' },
-    },
-  });
-}
-
-/** Everyone assigned to a language, with their role. */
-export async function listLanguageMembers(languageId: string) {
-  return prisma.userLanguage.findMany({
-    where: { languageId },
     include: {
       user: { select: memberUserSelect },
     },
@@ -179,6 +164,37 @@ export async function isUserMemberOfSourceProject(userId: string, sourceProjectI
   return !!match;
 }
 
+/**
+ * How many target languages a user is on. The root layout asks this on every
+ * request to decide whether one sidebar link renders, so it counts rather than
+ * loading each language row to look at a flag.
+ */
+export async function countUserTargetLanguages(userId: string): Promise<number> {
+  return prisma.userLanguage.count({ where: { userId, language: { isSource: false } } });
+}
+
+/** Whether this person manages any language, for the sidebar's Languages entry. */
+export async function countManagedLanguages(userId: string): Promise<number> {
+  return prisma.userLanguage.count({ where: { userId, role: ProjectRole.PROJECT_MANAGER } });
+}
+
+/**
+ * A language's roster. The language-scoped read the team page needs: the
+ * project-scoped `listTranslationProjectMembers` answers the same question
+ * through a project, which is the indirection the team page exists to drop.
+ */
+export async function listLanguageMembers(languageId: string) {
+  return prisma.userLanguage.findMany({
+    where: { languageId },
+    include: {
+      user: { select: memberUserSelect },
+    },
+    orderBy: {
+      user: { name: 'asc' },
+    },
+  });
+}
+
 // ─── Membership CRUD ─────────────────────────────────────────
 
 /** Grants (or changes) a user's role for a language. */
@@ -199,13 +215,4 @@ export async function removeUserFromLanguage(userId: string, languageId: string)
   return prisma.userLanguage.deleteMany({
     where: { userId, languageId },
   });
-}
-
-export async function getLanguageIdForTranslationProject(translationProjectId: string): Promise<string | null> {
-  const translationProject = await prisma.translationProject.findUnique({
-    where: { id: translationProjectId },
-    select: { languageId: true },
-  });
-
-  return translationProject?.languageId ?? null;
 }

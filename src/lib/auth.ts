@@ -1,8 +1,9 @@
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { admin } from 'better-auth/plugins';
 import { createAccessControl } from 'better-auth/plugins/access';
+import { nextCookies } from 'better-auth/next-js';
 import prisma from './db';
 
 // Create access control with user management permissions (mirrored in src/lib/auth-client.ts by better-auth convention)
@@ -29,6 +30,10 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
   }),
+  // NOTE: neither `account.identityStrategy` nor an issuer field exists in
+  // 1.7.x — @better-auth/core 1.7.3 declares the account table without one, so
+  // nothing here can populate it. Migration 20260910140000 drops the column an
+  // earlier upgrade added on that assumption. Revisit when upgrading past 1.7.x.
   emailAndPassword: {
     enabled: true,
   },
@@ -59,6 +64,16 @@ export const auth = betterAuth({
         USER: userRole,
       },
     }),
+    // Must stay last. Calling `auth.api.*` from a server action returns the
+    // Set-Cookie header to the caller rather than to the browser, so a
+    // server-side sign-up created a session the client never received: the
+    // user was registered and still anonymous on the next navigation. This
+    // plugin forwards those cookies onto the outgoing response.
+    nextCookies(),
   ],
+  // Without an explicit base URL better-auth derives the origin from each
+  // incoming request, which breaks redirect/callback URLs behind proxies and
+  // logs a warning on every cold start.
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   trustedOrigins: ['http://localhost:3000', process.env.NEXT_PUBLIC_APP_URL || ''],
 });

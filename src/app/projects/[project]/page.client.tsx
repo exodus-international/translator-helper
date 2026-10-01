@@ -12,11 +12,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { updateSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import { buildProjectPath } from '@/domain/source-project/source-project-url';
+import { DeployOffWarning } from '@/components/project-form';
 import { capture } from '@/lib/analytics';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { Language } from '@prisma/client';
+import type { Language } from '@/generated/prisma/client';
 import { BarChart3, CheckCircle2, LayoutDashboard, Settings, Users } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { useRouter } from 'next/navigation';
@@ -29,7 +31,8 @@ interface ProjectDetailClientProps {
     id: string;
     name: string;
     description: string | null;
-    identifier: string | null;
+    slug: string;
+    repositoryDirectory: string | null;
     acronym: string | null;
     status: string;
     documents: any[];
@@ -59,6 +62,10 @@ interface ProjectDetailClientProps {
   }[];
   /** Resolved server-side from the user's assigned languages and this project's translation projects. */
   initialLanguageId: string;
+  /** Language ids this person may deploy: all of them for an admin, their own for a manager. */
+  deployableLanguageIds: string[];
+  /** True when the URL named the language, which then outranks the stored choice. */
+  languageFromUrl: boolean;
 }
 
 export default function ProjectDetailClient({
@@ -67,6 +74,8 @@ export default function ProjectDetailClient({
   languages,
   translationProjects,
   initialLanguageId,
+  deployableLanguageIds,
+  languageFromUrl,
 }: ProjectDetailClientProps) {
   const router = useRouter();
   useAnalyticsProjectGroup(sourceProject.id, sourceProject.name);
@@ -75,7 +84,11 @@ export default function ProjectDetailClient({
   // Settings form state
   const [settingsName, setSettingsName] = useState(sourceProject.name);
   const [settingsDescription, setSettingsDescription] = useState(sourceProject.description || '');
-  const [settingsIdentifier, setSettingsIdentifier] = useState(sourceProject.identifier || '');
+  const [settingsSlug, setSettingsSlug] = useState(sourceProject.slug);
+  const [settingsRepositoryDirectory, setSettingsRepositoryDirectory] = useState(
+    sourceProject.repositoryDirectory || '',
+  );
+  const [settingsDeployToGithub, setSettingsDeployToGithub] = useState(Boolean(sourceProject.repositoryDirectory));
   const [settingsAcronym, setSettingsAcronym] = useState(sourceProject.acronym || '');
   const [settingsSaving, setSettingsSaving] = useState(false);
 
@@ -93,14 +106,16 @@ export default function ProjectDetailClient({
     }
   };
 
-  // Load persisted language selection
+  // Load persisted language selection -- unless the URL asked for one, in which
+  // case following a link would otherwise land on whatever language this
+  // browser happened to look at last.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || languageFromUrl) return;
     const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (stored && languages.some((lang) => lang.id === stored)) {
       setSelectedLanguage(stored);
     }
-  }, [languages, LANGUAGE_STORAGE_KEY]);
+  }, [languages, LANGUAGE_STORAGE_KEY, languageFromUrl]);
 
   // Persist language selection
   useEffect(() => {
@@ -114,24 +129,37 @@ export default function ProjectDetailClient({
   const selectedTranslationProject = translationProjects.find((tp) => tp.languageId === selectedLanguage);
 
   const handleSaveSettings = async () => {
-    // The identifier is a URL segment and the content repo folder name, so it
-    // cannot be cleared. Caught here to say so, rather than letting the action
-    // reject a null with a type error.
-    if (!settingsIdentifier.trim()) {
-      toast.warning('Identifier is required');
+    // The slug is this project's URL, and the repository directory is where it
+    // deploys. Both are caught here so the admin is told which one is missing,
+    // rather than the action rejecting it with a validation error.
+    if (!settingsSlug.trim()) {
+      toast.warning('URL slug is required');
       return;
     }
+    if (settingsDeployToGithub && !settingsRepositoryDirectory.trim()) {
+      toast.warning('Repository directory is required to deploy to GitHub');
+      return;
+    }
+
+    const slugChanged = settingsSlug.trim() !== sourceProject.slug;
 
     setSettingsSaving(true);
     try {
       await updateSourceProjectAction(sourceProject.id, {
         name: settingsName,
         description: settingsDescription || null,
-        identifier: settingsIdentifier.trim(),
+        slug: settingsSlug.trim(),
+        repositoryDirectory: settingsDeployToGithub ? settingsRepositoryDirectory.trim() : null,
         acronym: settingsAcronym.trim() || null,
       });
       capture('project_settings_saved');
       toast.success('Project settings saved');
+      // The slug is in the URL of the page being looked at, so a rename has to
+      // move the browser rather than just refresh what is under the old one.
+      if (slugChanged) {
+        router.replace(buildProjectPath(settingsSlug.trim()));
+        return;
+      }
       router.refresh();
     } catch (error: any) {
       console.error('Error saving settings:', error);
@@ -155,13 +183,16 @@ export default function ProjectDetailClient({
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
-        back={{ href: '/dashboard', label: 'Dashboard' }}
         title={sourceProject.name}
         description={sourceProject.description ?? undefined}
         actions={
-          <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+          <Select
+            value={selectedLanguage}
+            onValueChange={(v) => handleLanguageChange(v ?? '')}
+            items={Object.fromEntries(languages.map((lang) => [lang.id, lang.name]))}
+          >
             <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select language" />
             </SelectTrigger>
@@ -176,7 +207,7 @@ export default function ProjectDetailClient({
         }
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <Tabs defaultValue="dashboard">
           <TabsList
             className={cn(
@@ -208,6 +239,7 @@ export default function ProjectDetailClient({
             <ProjectKanbanBoard
               user={user}
               languages={languages}
+              deployableLanguageIds={deployableLanguageIds}
               selectedLanguage={selectedLanguage}
               sourceProjectId={sourceProject.id}
               translationProjectId={selectedTranslationProject?.id}
@@ -217,9 +249,9 @@ export default function ProjectDetailClient({
           <TabsContent value="team" className="mt-4">
             <ProjectTeamTab
               translationProjectId={selectedTranslationProject?.id || null}
-              user={user}
               canManage={isAdminClient(user)}
               selectedLanguageName={languages.find((l) => l.id === selectedLanguage)?.name || ''}
+              selectedLanguageCode={languages.find((l) => l.id === selectedLanguage)?.code || ''}
             />
           </TabsContent>
 
@@ -261,18 +293,47 @@ export default function ProjectDetailClient({
                       />
                     </div>
                     <div>
-                      <Label htmlFor="settings-identifier">Repository Identifier</Label>
+                      <Label htmlFor="settings-slug">URL Slug *</Label>
                       <Input
-                        id="settings-identifier"
-                        value={settingsIdentifier}
-                        onChange={(e) => setSettingsIdentifier(e.target.value)}
-                        placeholder="e.g., exodus90, lent2026"
+                        id="settings-slug"
+                        value={settingsSlug}
+                        onChange={(e) => setSettingsSlug(e.target.value)}
+                        placeholder="e.g., exodus90, lent2026, october_2026"
                         className="mt-1"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
-                        GITHUB: Folder name in the content repository
+                        Where the project lives: /projects/{settingsSlug || 'exodus90'}. Changing it breaks links
+                        already shared.
                       </p>
                     </div>
+                    <div>
+                      <label htmlFor="settings-deploy-to-github" className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          id="settings-deploy-to-github"
+                          type="checkbox"
+                          checked={settingsDeployToGithub}
+                          onChange={(e) => setSettingsDeployToGithub(e.target.checked)}
+                        />
+                        Deploy to GitHub
+                      </label>
+                    </div>
+                    {settingsDeployToGithub ? (
+                      <div>
+                        <Label htmlFor="settings-repository-directory">Repository Directory *</Label>
+                        <Input
+                          id="settings-repository-directory"
+                          value={settingsRepositoryDirectory}
+                          onChange={(e) => setSettingsRepositoryDirectory(e.target.value)}
+                          placeholder="e.g., exodus90, lent2026"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Folder name in the content repository.
+                        </p>
+                      </div>
+                    ) : (
+                      <DeployOffWarning />
+                    )}
                     <div>
                       <Label htmlFor="settings-acronym">Acronym</Label>
                       <Input
@@ -323,6 +384,6 @@ export default function ProjectDetailClient({
           )}
         </Tabs>
       </div>
-    </div>
+    </>
   );
 }

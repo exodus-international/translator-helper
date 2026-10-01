@@ -19,6 +19,18 @@ How we track usage, and how to turn the raw events into insight in the PostHog U
 - **Config:** `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST`. These are
   build-time `NEXT_PUBLIC_*` vars — set them in Coolify for **staging and production**.
 
+### Sentry
+- **Init:** one options object in `src/lib/sentry-options.ts`, used by
+  `src/instrumentation-client.ts` (browser), `sentry.server.config.ts` (Node) and
+  `sentry.edge.config.ts` (edge).
+- **Config:** `NEXT_PUBLIC_SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_ENVIRONMENT`. Both are
+  build-time `NEXT_PUBLIC_*` vars — set them in Coolify for **staging and production**
+  only. With no DSN the SDK initialises disabled and sends nothing, which is the
+  local-dev and E2E default. Never hardcode the DSN in source; that is how dev
+  errors ended up in the production project.
+- **Filtering:** every event carries `environment`, so staging noise can be
+  excluded in the Sentry UI. Unset it and Sentry labels everything `production`.
+
 ### Adding a new event
 1. Add the name to the `AnalyticsEvent` union in `src/lib/analytics.ts`.
 2. Call `capture('event_name', { ...props })` from a **client** handler, on the
@@ -28,6 +40,13 @@ How we track usage, and how to turn the raw events into insight in the PostHog U
 `setProjectGroup` associates events with a project **until the next call or `reset()`**.
 Events fired outside a project (global dashboard, admin) carry whatever project was set
 last. Always **filter project-level insights by the `project` group** — there it's accurate.
+
+### Document IDs on workflow events
+Events fired from the editor store, the status dropdown and the kanban board carry
+`documentId` and `documentVersionId`. Use them to follow one document through
+translate → review → approve → deploy, or to count review rounds per document
+(`document_status_changed` with `from = PENDING_REVIEW`, `to = IN_PROGRESS`).
+Events before this change don't have them.
 
 ### Language as a team dimension (super property)
 Every event carries a `language` super property (the readable code, e.g. `es`) plus
@@ -44,10 +63,15 @@ groups: it reflects the user's most-recently-worked language until changed or lo
 1. **Set up the `project` group type:** Project → Settings → *Group Analytics* →
    ensure a group type named `project` exists (it's created automatically once events
    with `$groups.project` arrive).
-2. **Enable Session Replay** (optional, recommended): Project → Settings → *Replay*.
-   ⚠️ Before enabling, add masking for translation content (Monaco editor, rendered
-   markdown, suggestion text) so real user content isn't recorded. Ask before turning
-   this on.
+2. **Session Replay** is on for production only (`recording_domains`), sessions
+   shorter than 2s are dropped, and the replay spend limit is $0, so it stops at the
+   5,000 free recordings a month. Masking is set in the project, not in code:
+   `maskAllInputs` plus `maskTextSelector: ".monaco-editor, .cm-editor, .ph-mask"`.
+   `.cm-editor` is the CodeMirror root, so it covers the editors and the diff views
+   (`@codemirror/merge` renders its panes as `.cm-editor` too). `.monaco-editor` is
+   for production builds that still ship Monaco; drop it once no release uses it.
+   Add the `ph-mask` class to any other element that renders translation or
+   suggestion text (see `markdown-preview.tsx`, `thread-card.tsx`).
 3. **Enable Error Tracking:** Project → Settings → *Error Tracking* (the SDK already
    sends exceptions via `capture_exceptions`).
 

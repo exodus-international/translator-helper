@@ -1,7 +1,7 @@
 import { userBriefColumns } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { SuggestionFilters } from './suggestion.types';
-import { SuggestionStatus, SuggestionType } from '@prisma/client';
+import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 
 const userSelect = userBriefColumns;
 

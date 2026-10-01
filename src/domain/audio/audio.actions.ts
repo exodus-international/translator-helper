@@ -3,7 +3,8 @@
 import { authorize } from '@/lib/authorize';
 import prisma from '@/lib/db';
 import { type SessionUser } from '@/lib/session';
-import { Role, type AudioFile } from '@prisma/client';
+import type { AudioFile } from '@/generated/prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { assertCanEditDocumentVersion } from '../document-version/document-version.permissions';
 import { getUserRoleForLanguage } from '../user-language/user-language.repository';

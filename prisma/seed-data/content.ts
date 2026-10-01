@@ -415,6 +415,135 @@ Each Sunday, as you light a new candle, pray together:
 - Sing an Advent hymn like "O Come, O Come, Emmanuel"
 - Share one thing you are grateful for each evening`,
 
+  // Every Markdown and inline-HTML construct the published content library
+  // actually uses, in one document: the frontmatter keys, the `<style>` block
+  // and card/center-image wrappers, the coloured `<span>`s, the profile
+  // `<img>`s, the YouTube `<iframe>`, `<br>` line breaks, `*` bullets and
+  // numbered lists. Useful for checking the preview renderer and the content
+  // lint against real shapes without opening a production file.
+  'ex-md': `---
+title: Markdown Reference
+subtitle: Every construct the content library uses
+caption: Reference
+hero: markdown_reference-exodus_2026
+day: 0
+---
+
+<style>
+  .card {
+    border: 3px solid;
+    border-radius: 15px;
+    padding: 20px;
+    width: 100%;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .card img {
+    border-radius: 50%;
+    object-fit: cover;
+    width: 100px;
+    height: 100px;
+    margin-bottom: 5px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .center-image img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+  }
+</style>
+
+# Markdown Reference
+
+This document exists so translators and reviewers can see every construct the published content uses, rendered exactly as the app will render it. Nothing here is devotional text — it is a specimen sheet.
+
+## Headings
+
+Only \`#\` and \`##\` appear in the library. Deeper levels are not used, so the lint expects the translation to carry the same number of headings as the source.
+
+## Emphasis and line breaks
+
+Bold reads as **a discipline you commit to**, and italic as *the disposition you bring to it*. The two combine as ***both at once***, though that is rare.
+
+A single \`<br>\` ends a line without starting a paragraph:<br>
+like this — which is how the library formats signatures and address blocks.
+
+## Quotations
+
+> "Be still, and know that I am God." — Psalm 46:10
+
+Attributions are set as their own quoted lines, each ended with a break:
+
+> Fr. James Kubicki<br>
+> Chaplain, Exodus 90<br>
+
+## Lists
+
+Bulleted lists use \`*\`, matching every list in the library:
+
+* Prayer — twenty minutes of silence before the day begins
+* Asceticism — the fast you agreed to, kept without renegotiation
+* Fraternity — the brother you call when the first two get hard
+
+Numbered lists carry order that matters:
+
+1. Read the day's reflection before you check anything else.
+2. Sit with the Scripture passage for a few minutes.
+3. Write one sentence in your journal about what you noticed.
+
+## Links
+
+Inline Markdown links are the common form: read the [full Exodus 90 description](https://exodus90.com/about) before you begin.
+
+The library also uses raw anchors when a link needs a class:
+
+<a href="https://shop.exodus90.com/collections/new-for-2026" class="black-button">Shop the 2026 collection</a>
+
+## Images
+
+A Markdown image, with alt text that translators should translate:
+
+![The Judean wilderness at first light](https://d37rt9hzgo9s3k.cloudfront.net/example/desert-dawn.jpg)
+
+A centred image, wrapped so the stylesheet can position it:
+
+<div class="center-image">
+  <img src="https://d37rt9hzgo9s3k.cloudfront.net/example/wreath.jpg" alt="An Advent wreath with one candle lit">
+</div>
+
+## Cards
+
+Cards hold the profile blocks used in the Book of the Dead and the fraternity pages:
+
+<div class="card">
+  <img src="https://d37rt9hzgo9s3k.cloudfront.net/example/portrait.jpg" alt="Profile Picture">
+  <h2>William C. Roche</h2>
+  <p class="date">1948 — 2025</p>
+  <p class="link"><a href="https://example.org/obituaries/william-roche">Read his obituary</a></p>
+</div>
+
+## Coloured and marked spans
+
+Rubrics are set in red, the way a missal sets them:
+
+<span style="color:#CC0000;">All stand.</span>
+
+Some spans are blocks, and some carry state the app reads back:
+
+<span style="display:block;color:#CC0000;" data-read="false">The reading is marked unread until the app sets this attribute.</span>
+
+## Embedded video
+
+<iframe width="100%" height="315" src="https://www.youtube.com/embed/H8FST0PI1ys" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+---
+
+The rule above is a horizontal rule, which every file in the library uses at least once to separate the body from what follows it.
+
+*Deo gratias.*`,
+
   're-t1': `# Opening Talk: Finding Silence
 
 > "Be still, and know that I am God." — Psalm 46:10
@@ -665,6 +794,55 @@ Naše životy jsou prosyceny hlukem:
 - Vnitřní monolog úzkosti a sebekritiky
 
 **Ticho není nepřítomnost zvuku. Je to přítomnost pozornosti.**`,
+  // Deliberately messy: straight quotes, trailing spaces, a `-` bullet, a
+  // translated `hero:` key and a swapped link URL. Opening this document is the
+  // fastest way to see the content lint and its "Fix all" in the real editor.
+  'ex-md': `---
+title: Referenční příručka Markdownu
+subtitle: Každá konstrukce, kterou knihovna obsahu používá
+caption: Reference
+hrdina: markdown_reference-exodus_2026
+day: 0
+---
+
+# Referenční příručka Markdownu   
+
+Tento dokument existuje proto, aby překladatelé a recenzenti viděli každou konstrukci, kterou publikovaný obsah používá.
+
+## Nadpisy
+
+V knihovně se objevují pouze \`#\` a \`##\`.
+
+## Zvýraznění a zalomení řádků
+
+Tučně se čte jako **disciplína, ke které se zavazujete**, kurzívou jako *postoj, který k ní přinášíte*.
+
+Jediné \`<br>\` ukončí řádek, aniž by začalo nový odstavec:<br>
+takto — tak knihovna formátuje podpisy.
+
+## Citace
+
+> "Ztište se a vězte, že já jsem Bůh." — Žalm 46,10
+
+> P. James Kubicki<br>
+> Kaplan, Exodus 90<br>
+
+## Seznamy
+
+- Modlitba — dvacet minut ticha, než začne den
+- Askeze — půst, na kterém jste se dohodli
+- Bratrství — bratr, kterému zavoláte, když první dva začnou být těžké
+
+1. Přečtěte si denní zamyšlení dříve než cokoli jiného.
+2. Setrvejte několik minut u úryvku z Písma.
+3. Napište si do deníku jednu větu o tom, čeho jste si všimli.
+
+## Odkazy
+
+Přečtěte si [celý popis Exodu 90](https://exodus90.cz/o-programu), než začnete.
+
+<!-- TODO: dokončit překlad zbývajících sekcí -->`,
+
 };
 
 const SLOVAK_CONTENT: Record<string, string> = {

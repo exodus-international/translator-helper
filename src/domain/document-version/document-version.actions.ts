@@ -4,9 +4,16 @@ import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { type SessionUser } from '@/lib/session';
-import { DocumentStatus, Role } from '@prisma/client';
+import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
-import type { AudioGenerationOutcome } from '../audio/audio.types';
+import { isGitHubConfigured } from '@/lib/github-config';
+import { createStatusChange, involvesDeployed, type StatusChangeResult } from './document-version.status-change';
+import { createStartTranslation } from './document-version.start-translation';
+import {
+  notifyReviewerAssignment,
+  notifyStatusChange,
+  notifyTranslatorAssignment,
+} from '../notification/notification.service';
 
 /**
  * Load a version + its language and assert the caller may edit/delete a source
@@ -36,7 +43,8 @@ import { assertCanEditDocumentVersion } from './document-version.permissions';
 import { validateTransition } from './document-version.transitions';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
-import { getUserRoleForLanguage } from '../user-language/user-language.repository';
+import { getUserLanguages, getUserRoleForLanguage } from '../user-language/user-language.repository';
+import { resolveLanguageViewer } from '../language/language-access';
 import { getSourceProjectById } from '../source-project/source-project.repository';
 import {
   createTranslationProject,
@@ -45,6 +53,7 @@ import {
 import {
   assignDocumentVersion,
   assignmentSelect,
+  claimDocumentVersion,
   createDocumentVersion,
   deleteDocumentVersion,
   getWorkVersionsForUser,
@@ -61,18 +70,41 @@ import {
   updateDocumentVersionSchema,
 } from './document-version.types';
 
-export async function assignReviewerToVersionAction(versionId: string, reviewerId: string | null) {
-  await authorize('admin');
+/**
+ * Sets or clears a version's reviewer. `reviewDeadline` is left as it is when
+ * omitted; null clears it, and the review then answers to the version's own
+ * deadline. Clearing the reviewer always clears the review deadline.
+ */
+export async function assignReviewerToVersionAction(
+  versionId: string,
+  reviewerId: string | null,
+  reviewDeadline?: Date | null,
+) {
+  const { user } = await authorize('admin');
+
+  const previous = await prisma.documentVersion.findUnique({
+    where: { id: versionId },
+    select: { reviewerId: true, reviewDeadline: true },
+  });
 
   const version = await prisma.documentVersion.update({
     where: { id: versionId },
-    data: { reviewerId },
+    // A review deadline belongs to a review: removing the reviewer clears it, so
+    // the next one assigned doesn't silently inherit a stale date.
+    data: {
+      reviewerId,
+      ...(reviewerId === null ? { reviewDeadline: null } : reviewDeadline !== undefined ? { reviewDeadline } : {}),
+    },
     include: {
       language: true,
       user: userBrief,
       reviewer: userBrief,
     },
   });
+
+  if (previous) {
+    await notifyReviewerAssignment({ versionId, actorId: user.id, previous });
+  }
 
   revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
   return version;
@@ -96,6 +128,13 @@ export async function assignTranslatorToVersionAction(input: unknown) {
     throw new Error('Translation project not found');
   }
 
+  const previous = await prisma.documentVersion.findUnique({
+    where: {
+      documentId_languageId: { documentId: validated.documentId, languageId: translationProject.languageId },
+    },
+    select: { userId: true, deadline: true },
+  });
+
   const version = await assignDocumentVersion({
     documentId: validated.documentId,
     languageId: translationProject.languageId,
@@ -103,6 +142,8 @@ export async function assignTranslatorToVersionAction(input: unknown) {
     deadline: validated.deadline ?? null,
     assignedById: user.id,
   });
+
+  await notifyTranslatorAssignment({ versionId: version.id, actorId: user.id, previous });
 
   revalidatePath('/dashboard');
   revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
@@ -133,28 +174,6 @@ export async function listVersionsForTranslationProjectAction(translationProject
   }
 
   return await listVersionsForTranslationProject(translationProject.sourceProjectId, translationProject.languageId);
-}
-
-export async function createDocumentVersionAction(input: unknown) {
-  const { user } = await authorize('authenticated');
-  const validated = createDocumentVersionSchema.parse(input);
-
-  const version = await createDocumentVersion({
-    documentId: validated.documentId,
-    languageId: validated.languageId,
-    content: validated.content,
-    userId: user.id,
-  });
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'created_translation',
-    details: { language: version.language.name },
-  });
-
-  return version;
 }
 
 export async function updateDocumentVersionAction(id: string, input: unknown) {
@@ -224,6 +243,13 @@ export async function submitForReviewAction(input: unknown) {
     details: { reviewerId: validated.reviewerId },
   });
 
+  await notifyStatusChange({
+    versionId: version.id,
+    actorId: user.id,
+    from: existingVersion.status,
+    to: DocumentStatus.PENDING_REVIEW,
+  });
+
   return version;
 }
 
@@ -234,98 +260,58 @@ export async function deleteDocumentVersionAction(id: string) {
   return await deleteDocumentVersion(id);
 }
 
+/**
+ * The status change as the app wires it: real repositories, the GitHub and
+ * audio services loaded on demand so a page that never deploys never loads
+ * octokit, and the document page revalidated when something it shows moved.
+ */
+const changeStatus = createStatusChange({
+  countOpenSuggestions,
+  updateStatus: updateDocumentVersionStatus,
+  log: createActivityLog,
+  notify: notifyStatusChange,
+  github: {
+    isConfigured: () => isGitHubConfigured(),
+    deploy: async (versionId) => {
+      const { deployToGitHub } = await import('../github/github.service');
+      return deployToGitHub(versionId);
+    },
+  },
+  startAudio: async (versionId, userId) => {
+    const { startGeneration } = await import('../audio/audio.service');
+    return startGeneration(versionId, userId);
+  },
+  revalidateDocumentPage: () => revalidatePath('/documents/[project]/[slug]/[lang]', 'page'),
+});
+
 export async function updateDocumentVersionStatusAction(
   versionId: string,
   status: DocumentStatus,
-): Promise<{
-  version: Awaited<ReturnType<typeof updateDocumentVersionStatus>>;
-  github?: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string };
-  audio?: AudioGenerationOutcome;
-}> {
+): Promise<StatusChangeResult<Awaited<ReturnType<typeof updateDocumentVersionStatus>>>> {
   const { user } = await authorize('authenticated');
 
-  // Check permission for DEPLOYED status
-  if (status === DocumentStatus.DEPLOYED && user.role !== Role.ADMIN) {
-    throw new Error('Forbidden: Only deployers can deploy documents');
-  }
-
-  // Get existing version to validate transition
   const existingVersion = await getDocumentVersionById(versionId);
   if (!existingVersion) {
     throw new Error('Document version not found');
   }
 
-  if (status === DocumentStatus.APPROVED || status === DocumentStatus.DEPLOYED) {
-    const openCount = await countOpenSuggestions(versionId);
-    validateTransition(existingVersion.status, status, { openSuggestionsCount: openCount });
-  } else {
-    validateTransition(existingVersion.status, status);
+  // Deploying publishes this language's work to the content repository, so it
+  // belongs to the people answerable for that language -- its manager and any
+  // administrator. Leaving DEPLOYED is the same decision in reverse.
+  if (involvesDeployed(existingVersion.status, status)) {
+    await authorize({ language: existingVersion.languageId, role: 'manager' });
   }
 
-  const version = await updateDocumentVersionStatus(versionId, status);
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'status_updated',
-    details: { status: status },
-  });
-
-  // If transitioning to DEPLOYED, attempt GitHub deploy
-  let github: { status: 'success' | 'failed' | 'skipped'; error?: string; prUrl?: string } | undefined;
-  if (status === DocumentStatus.DEPLOYED) {
-    try {
-      console.log('[GitHub] Checking if GitHub is configured...');
-      const { isGitHubConfigured } = await import('@/lib/github-config');
-      if (isGitHubConfigured()) {
-        console.log('[GitHub] GitHub is configured, starting deploy for version:', versionId);
-        const { deployToGitHub } = await import('../github/github.service');
-        const result = await deployToGitHub(versionId);
-
-        console.log('[GitHub] Deploy succeeded, logging activity');
-        await createActivityLog({
-          documentVersionId: version.id,
-          userId: user.id,
-          action: 'github_deployed',
-          details: {},
-        });
-        revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
-        github = { status: 'success', prUrl: result?.prUrl };
-      } else {
-        console.log('[GitHub] GitHub is not configured, skipping deploy');
-        github = { status: 'skipped' };
-      }
-    } catch (error: any) {
-      console.error('[GitHub] Deploy failed:', error.message);
-      console.error('[GitHub] Full error:', error);
-      await createActivityLog({
-        documentVersionId: version.id,
-        userId: user.id,
-        action: 'github_deploy_failed',
-        details: { error: error.message },
-      });
-      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
-      github = { status: 'failed', error: error.message };
-    }
-  }
-
-  // If transitioning to APPROVED, start audio generation. Same shape as the
-  // GitHub deploy above: never throws, the outcome is reported to the caller.
-  let audio: AudioGenerationOutcome | undefined;
-  if (status === DocumentStatus.APPROVED) {
-    try {
-      const { startGeneration } = await import('../audio/audio.service');
-      audio = await startGeneration(version.id, user.id);
-      revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
-    } catch (error: unknown) {
-      console.error('[Audio] Generation failed:', error);
-      audio = { status: 'failed', error: error instanceof Error ? error.message : String(error) };
-    }
-  }
-
-  return { version, github, audio };
+  return changeStatus({ version: existingVersion, to: status, actorId: user.id });
 }
+
+/** Starting a translation as the app wires it: the real repository writes. */
+const startTranslation = createStartTranslation({
+  findVersion: getDocumentVersionByDocumentAndLanguage,
+  claimVersion: claimDocumentVersion,
+  createVersion: createDocumentVersion,
+  log: createActivityLog,
+});
 
 export async function assignDocumentVersionAction(input: unknown) {
   const { user } = await authorize('authenticated');
@@ -390,83 +376,38 @@ export async function assignDocumentVersionAction(input: unknown) {
 
   await authorize({ project: translationProject.id, role: 'translator' });
 
-  // Check if version already exists
-  const existingVersion = await getDocumentVersionByDocumentAndLanguage(validated.documentId, validated.languageId);
-
-  if (existingVersion) {
-    // The version carries the assignment now: a translator set on it reserves the
-    // document, an empty one leaves it open to the whole language team.
-    if (existingVersion.userId && existingVersion.userId !== user.id) {
-      throw new Error('This document is assigned to another user');
-    }
-
-    if (existingVersion.status === DocumentStatus.IN_PROGRESS) {
-      // Already claimed by this user — hand back the same version.
-      if (existingVersion.userId === user.id) {
-        return existingVersion;
-      }
-      throw new Error('This translation is already assigned to another user');
-    }
-
-    // Assign to current user and set to IN_PROGRESS (bypasses validateTransition
-    // intentionally — this is the "Start Translation" flow which can re-claim
-    // a version from PENDING_TRANSLATION or reassign from other statuses)
-    const version = await prisma.documentVersion.update({
-      where: { id: existingVersion.id },
-      data: {
-        userId: user.id,
-        status: DocumentStatus.IN_PROGRESS,
-      },
-      include: {
-        document: true,
-        language: true,
-        user: {
-          ...userBrief,
-        },
-      },
-    });
-
-    // Log the activity
-    await createActivityLog({
-      documentVersionId: version.id,
-      userId: user.id,
-      action: 'started_translation',
-      details: { language: version.language.name, progress: `${existingVersion.status} -> IN_PROGRESS` },
-    });
-
-    return version;
-  }
-
-  // Create new version with IN_PROGRESS status and assign to user
-  const version = await createDocumentVersion({
+  return startTranslation({
     documentId: validated.documentId,
     languageId: validated.languageId,
     content: validated.content || '',
-    status: DocumentStatus.IN_PROGRESS,
-    userId: user.id,
+    actorId: user.id,
   });
-
-  // Log the activity
-  await createActivityLog({
-    documentVersionId: version.id,
-    userId: user.id,
-    action: 'assigned_translation',
-    details: { language: version.language.name },
-  });
-
-  return version;
 }
 
+/**
+ * The deploy queue: approved work waiting to be published, for the people who
+ * can publish it. An administrator sees every language; a manager sees the
+ * ones they manage, and nobody else has a queue at all.
+ */
 export async function getApprovedVersionsAction() {
   const { user } = await authorize('authenticated');
-  if (user.role !== Role.ADMIN) {
+
+  const viewer = resolveLanguageViewer({
+    isAdmin: user.role === Role.ADMIN,
+    memberships: user.role === Role.ADMIN ? [] : await getUserLanguages(user.id),
+  });
+
+  if (viewer.kind === 'none') {
     return [];
   }
 
   return prisma.documentVersion.findMany({
     where: {
       status: DocumentStatus.APPROVED,
-      language: { code: { not: 'en' } },
+      language: {
+        isSource: false,
+        ...(viewer.kind === 'manager' ? { id: { in: viewer.languageIds } } : {}),
+      },
     },
     select: assignmentSelect,
     orderBy: {

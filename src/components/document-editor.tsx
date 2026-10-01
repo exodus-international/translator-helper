@@ -1,15 +1,15 @@
 'use client';
 
 import { ReactNode, Ref, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import matter from 'gray-matter';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { parseFrontmatter } from '@/lib/frontmatter';
 import { useState, useMemo } from 'react';
 import { ActivityLog } from '@/components/activity-log';
 import { DocumentInfoCard } from '@/components/document-info-card';
 import { getEditorLanguage } from '@/components/document-form/content-format';
 import { EditorDialogs } from '@/components/editor-dialogs';
+import { StatusDropdown } from '@/components/status-dropdown';
 import { SourceTranslationViewer, SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -22,62 +22,22 @@ import {
   StepperTrigger,
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
+import { SuggestionStatus } from '@/generated/prisma/enums';
 import { getStatusStep, isDraftPhase, isStepCompleted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
+import { useTrailStore } from '@/lib/page-trail';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import { useAutoSave } from '@/lib/stores/hooks';
 import { buildProjectPath } from '@/domain/source-project/source-project-url';
 
 function getContentWithoutFrontmatter(text: string) {
   try {
-    const { content } = matter(text);
+    const { content } = parseFrontmatter(text);
     return content;
   } catch {
     return text;
   }
-}
-
-// ──────────────────────────────────────────────────────────────
-// Header helper — shared breadcrumb + title + lang pair on the left,
-// caller-supplied actions on the right
-// ──────────────────────────────────────────────────────────────
-
-export function DocumentEditorHeader({
-  document,
-  sourceLanguageName,
-  targetLanguageName,
-  actions,
-}: {
-  document: any;
-  sourceLanguageName: string;
-  targetLanguageName: string;
-  actions: ReactNode;
-}) {
-  return (
-    <div className="border-b bg-background">
-      <div className="flex flex-col gap-2 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          {document.sourceProject && (
-            <>
-              <Link
-                href={buildProjectPath(document.sourceProject.identifier)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors truncate shrink-0"
-              >
-                {document.sourceProject.name}
-              </Link>
-              <span className="text-muted-foreground">/</span>
-            </>
-          )}
-          <h1 className="text-sm font-semibold truncate">{document.title}</h1>
-          <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-            {sourceLanguageName} → {targetLanguageName}
-          </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>
-      </div>
-    </div>
-  );
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -92,6 +52,8 @@ interface ViewerConfig {
   viewerRef?: Ref<SourceTranslationViewerHandle>;
   sourceVersion: any;
   user: SessionUser;
+  /** Resolved on the server against this version's language. */
+  canDeploy: boolean;
   canEditSource: CapFn;
   canCreateSuggestions?: CapFn;
   disableReopen?: CapFn;
@@ -104,10 +66,32 @@ interface ViewerConfig {
   /** Version id when this document is eligible for audio; enables the Audio text tab. */
   audioTextVersionId?: string | null;
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
+  /** The language this editor is open on, for the shell's trail. */
+  targetLanguageName?: string | null;
+  /** The editor's own controls, drawn in the document panel's header row. */
+  panelActions?: ReactNode;
+  /** Toggles zen mode; the panel's folded rail keeps a button for it. */
+  onToggleZen?: () => void;
+  /** Workflow buttons, shown above the summary rows in the panel. */
+  sidebarActions?: ReactNode;
   sidebarSummary?: ReactNode;
   sidebarDetails?: ReactNode;
   sidebarDetailsDefaultOpen?: boolean;
   contentLanguage?: 'markdown' | 'yaml';
+  /** No target language yet: the folded panel has to say so too. */
+  targetLanguageMissing?: boolean;
+}
+
+/** "Just now" / "5m ago" / "2d ago" — as much resolution as a tile can carry. */
+function shortAgo(value: unknown): string | null {
+  const then = value ? new Date(value as string).getTime() : NaN;
+  if (Number.isNaN(then)) return null;
+  const minutes = Math.max(0, Math.round((Date.now() - then) / 60000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)}h ago`;
+  if (minutes < 60 * 24 * 30) return `${Math.round(minutes / (60 * 24))}d ago`;
+  return new Date(then).toLocaleDateString();
 }
 
 function evalCap<T>(cap: T | ((tv: any) => T), tv: any): T {
@@ -120,6 +104,7 @@ function EditorViewer({
   viewerRef,
   sourceVersion,
   user,
+  canDeploy,
   canEditSource,
   canCreateSuggestions,
   disableReopen,
@@ -128,16 +113,26 @@ function EditorViewer({
   translationPreviewEmptyText,
   audioTextVersionId,
   onEditSuggestion,
+  sidebarActions,
   sidebarSummary,
   sidebarDetails,
   sidebarDetailsDefaultOpen,
   contentLanguage,
+  panelActions,
+  onToggleZen,
+  targetLanguageMissing,
 }: ViewerConfig) {
   const router = useRouter();
   const targetVersion = useEditorStore((s) => s.targetVersion);
   const content = useEditorStore((s) => s.content);
   const setContent = useEditorStore((s) => s.setContent);
   const suggestions = useEditorStore((s) => s.suggestions);
+  const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
+  const openSuggestionsCount = useMemo(
+    () => suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length,
+    [suggestions],
+  );
+  const wordCount = useMemo(() => (content.trim() ? content.trim().split(/\s+/).length : 0), [content]);
   const sourceEditContent = useEditorStore((s) => s.sourceEditContent);
   const setSourceEditContent = useEditorStore((s) => s.setSourceEditContent);
   const saveSource = useEditorStore((s) => s.saveSource);
@@ -151,27 +146,38 @@ function EditorViewer({
   const isApplyingSuggestion = useEditorStore((s) => s.loading.has('applySuggestion'));
   const isDismissingSuggestion = useEditorStore((s) => s.loading.has('dismissSuggestion'));
   const translationProjectId = useEditorStore((s) => s.translationProjectId);
+  const startTranslation = useEditorStore((s) => s.startTranslation);
+  const isStartingTranslation = useEditorStore((s) => s.isLoading('startTranslation'));
+  const setMarkdownGuideOpen = useEditorStore((s) => s.setMarkdownGuideOpen);
+  const handleStatusChange = useEditorStore((s) => s.handleStatusChange);
+  const openReviewDialog = useEditorStore((s) => s.openReviewDialog);
+  const documentId = useEditorStore((s) => s.documentId);
+
   const requestedTranslationView = useEditorStore((s) => s.requestedTranslationView);
   const requestTranslationView = useEditorStore((s) => s.requestTranslationView);
   const setAudioTranscriptState = useEditorStore((s) => s.setAudioTranscriptState);
   const openAssignTranslatorDialog = useEditorStore((s) => s.openAssignTranslatorDialog);
   const openAssignReviewerDialog = useEditorStore((s) => s.openAssignReviewerDialog);
+  const openDeadlineDialog = useEditorStore((s) => s.openDeadlineDialog);
   const unassignTranslator = useEditorStore((s) => s.unassignTranslator);
   const unassignReviewer = useEditorStore((s) => s.unassignReviewer);
 
-  const sourceFormattedContent = useMemo(
-    () => getContentWithoutFrontmatter(sourceVersion.content),
-    [sourceVersion.content],
-  );
+  // What a saved source edit produced, shown until the router refresh that
+  // follows the save delivers the same text as a prop. Keyed on the prop it
+  // replaced, so a later prop change wins over it.
+  const [savedSource, setSavedSource] = useState<{ replaced: string; content: string } | null>(null);
+  const sourceContent: string =
+    savedSource && savedSource.replaced === sourceVersion.content ? savedSource.content : sourceVersion.content;
+
+  const sourceFormattedContent = useMemo(() => getContentWithoutFrontmatter(sourceContent), [sourceContent]);
   const translationFormattedContent = useMemo(() => {
     if (!content) return translationPreviewEmptyText ?? '';
     return getContentWithoutFrontmatter(content);
   }, [content, translationPreviewEmptyText]);
 
   const resolvedCanEditSource = evalCap(canEditSource, targetVersion);
-  const resolvedCanCreateSuggestions = canCreateSuggestions !== undefined
-    ? evalCap(canCreateSuggestions, targetVersion)
-    : undefined;
+  const resolvedCanCreateSuggestions =
+    canCreateSuggestions !== undefined ? evalCap(canCreateSuggestions, targetVersion) : undefined;
   const resolvedDisableReopen = disableReopen !== undefined ? evalCap(disableReopen, targetVersion) : undefined;
   const resolvedReviewConfig = reviewConfig
     ? { canEdit: evalCap(reviewConfig.canEdit, targetVersion), renderEditActions: reviewConfig.renderEditActions }
@@ -179,7 +185,7 @@ function EditorViewer({
 
   const handleSourceSave = async () => {
     await saveSource(sourceVersion.id);
-    sourceVersion.content = sourceEditContent;
+    setSavedSource({ replaced: sourceVersion.content, content: sourceEditContent });
     router.refresh();
   };
 
@@ -195,7 +201,7 @@ function EditorViewer({
       layout={layout}
       className="h-full"
       contentLanguage={contentLanguage}
-      sourceContent={sourceVersion.content}
+      sourceContent={sourceContent}
       sourceFormattedContent={sourceFormattedContent}
       translationContent={content}
       translationFormattedContent={translationFormattedContent}
@@ -206,8 +212,13 @@ function EditorViewer({
       onRequestedViewShown={() => requestTranslationView(null)}
       onAudioTranscriptStateChange={setAudioTranscriptState}
       onTranslationChange={setContent}
-      sourceBadge={<Badge variant="secondary">{sourceVersion.language.name}</Badge>}
-      translationBadge={<Badge variant="secondary">{targetVersion?.language?.name || 'New Translation'}</Badge>}
+      sourceBadge={<Badge variant="outline">{sourceVersion.language.name}</Badge>}
+      translationBadge={<Badge variant="outline">{targetVersion?.language?.name || 'New Translation'}</Badge>}
+      translationStarted={!!targetVersion}
+      targetLanguageMissing={targetLanguageMissing}
+      onStartTranslation={startTranslation}
+      startingTranslation={isStartingTranslation}
+      onOpenGuide={() => setMarkdownGuideOpen(true)}
       canEditSource={resolvedCanEditSource}
       onSourceChange={setSourceEditContent}
       onSourceSave={handleSourceSave}
@@ -229,15 +240,50 @@ function EditorViewer({
       onReply={replySuggestion}
       onCreateGeneralThread={createGeneralThread}
       disableReopen={resolvedDisableReopen}
-      sidebarSummary={sidebarSummary}
+      sidebarSummary={
+        <>
+          {sidebarActions}
+          {sidebarSummary}
+        </>
+      }
       sidebarDetails={sidebarDetails}
       sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
+      status={targetVersion?.status}
+      panelActions={panelActions}
+      onToggleZen={onToggleZen}
       sidebarHeader={
         <DocumentInfoCard
+          meta={[
+            `v${targetVersion?.version ?? 1}`,
+            `${wordCount.toLocaleString()} ${wordCount === 1 ? 'word' : 'words'}`,
+            `${openSuggestionsCount} open ${openSuggestionsCount === 1 ? 'comment' : 'comments'}`,
+            targetVersion ? `updated ${shortAgo(targetVersion.updatedAt)}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+          statusControl={
+            targetVersion ? (
+              // The status is a field of the document, so it lives in the panel
+              // beside language, translator and reviewer — not in the toolbar.
+              <StatusDropdown
+                currentStatus={targetVersion.status}
+                versionId={targetVersion.id}
+                user={user}
+                canDeploy={canDeploy}
+                documentId={documentId}
+                disabled={isAnyLoading}
+                onStatusChange={handleStatusChange}
+                onReviewRequested={openReviewDialog}
+                openSuggestionsCount={openSuggestionsCount}
+              />
+            ) : undefined
+          }
           status={targetVersion?.status}
           translator={targetVersion?.user ?? null}
           reviewer={targetVersion?.reviewer}
           language={targetVersion?.language?.name}
+          deadline={targetVersion?.deadline}
+          reviewDeadline={targetVersion?.reviewDeadline}
           onAssignTranslator={
             isAdminClient(user) && translationProjectId && targetVersion ? openAssignTranslatorDialog : undefined
           }
@@ -246,6 +292,7 @@ function EditorViewer({
             isAdminClient(user) && translationProjectId && targetVersion ? openAssignReviewerDialog : undefined
           }
           onUnassignReviewer={isAdminClient(user) && targetVersion?.reviewer ? unassignReviewer : undefined}
+          onEditDeadline={isAdminClient(user) && translationProjectId && targetVersion ? openDeadlineDialog : undefined}
         />
       }
     />
@@ -348,12 +395,17 @@ interface DocumentEditorProps {
   targetVersion: any | null;
   initialSuggestions?: any[];
   translationProjectId: string | null;
+  /** The language this page translates into; used to create the first version. */
+  targetLanguageId: string;
 
   // User
   user: SessionUser;
+  /** Resolved on the server against this version's language. */
+  canDeploy: boolean;
 
-  // Header — page-supplied (built with <DocumentEditorHeader /> or fully custom)
-  header: ReactNode;
+  // Header — page-supplied, and now only for chrome a view adds to itself:
+  // zen mode's own bar. The default layout has none.
+  header?: ReactNode;
 
   // Outer container
   fullscreen?: boolean;
@@ -367,6 +419,12 @@ interface DocumentEditorProps {
   translationPreviewEmptyText?: string;
   /** Version id when this document is eligible for audio; enables the Audio text tab. */
   audioTextVersionId?: string | null;
+  /** The language this editor is open on, for the shell's trail. */
+  targetLanguageName?: string | null;
+  /** The editor's own controls, drawn in the document panel's header row. */
+  panelActions?: ReactNode;
+  /** Toggles zen mode; the panel's folded rail keeps a button for it. */
+  onToggleZen?: () => void;
 
   // Capabilities (value or function of live targetVersion from store)
   canEditSource: CapFn;
@@ -380,7 +438,8 @@ interface DocumentEditorProps {
   // Suggestion handler (review-only edit)
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
 
-  // Sidebar summary + details (audio, deploy)
+  // Sidebar summary + details (audio, deploy, workflow actions)
+  sidebarActions?: ReactNode;
   sidebarSummary?: ReactNode;
   sidebarDetails?: ReactNode;
   sidebarDetailsDefaultOpen?: boolean;
@@ -400,7 +459,9 @@ export function DocumentEditor({
   targetVersion,
   initialSuggestions = [],
   translationProjectId,
+  targetLanguageId,
   user,
+  canDeploy,
   header,
   fullscreen,
   outerClassName,
@@ -415,17 +476,28 @@ export function DocumentEditor({
   disableReopen,
   reviewConfig,
   onEditSuggestion,
+  sidebarActions,
   sidebarSummary,
   sidebarDetails,
   sidebarDetailsDefaultOpen,
+  targetLanguageName,
+  panelActions,
+  onToggleZen,
   extraDetails,
   activityLogs,
   hideDetails,
   autoSaveDelayMs,
 }: DocumentEditorProps) {
-  const outer = outerClassName ?? (fullscreen ? 'fixed inset-0 bg-white z-50' : 'bg-gray-50');
-  const viewerHeight = fullscreen ? 'h-full' : 'h-[calc(100vh-7.5rem)]';
-  const viewerWrapper = fullscreen ? 'h-[calc(100vh-3.5rem)] p-4' : 'border-0';
+  // The editor wants to be exactly one viewport tall: header row, then panes
+  // filling what is left. Subtracting the shell's own topbar (--header-height)
+  // from the viewport is the whole calculation, and it keeps the panes from
+  // leaving a dead strip at the bottom the way the hardcoded rem value did.
+  const outer =
+    outerClassName ??
+    (fullscreen
+      ? 'fixed inset-0 z-50 flex flex-col bg-workspace'
+      : 'flex h-[calc(100svh-var(--header-height,3rem))] min-h-0 flex-col bg-workspace');
+  const viewerWrapper = 'flex min-h-0 flex-1 flex-col';
   const contentLanguage = getEditorLanguage(document.originalFilename ?? '');
   // The Audio text tab lives in the tab strip a YAML document does not get, so
   // on one it would be a pane with no way back out. Deciding it once here keeps
@@ -433,9 +505,36 @@ export function DocumentEditor({
   // same question.
   const audioTextTarget = contentLanguage === 'yaml' ? null : (audioTextVersionId ?? null);
 
+  // The shell's breadcrumb shows what this page is, by name: the pathname only
+  // knows the slug and the language code, so the editor publishes the rest
+  // while it is mounted.
+  const publishTrail = useTrailStore((s) => s.publish);
+  const languageName = targetLanguageName ?? sourceVersion.language.name;
+  useEffect(
+    () =>
+      publishTrail([
+        { label: 'Documents', href: '/documents' },
+        ...(document.sourceProject
+          ? [
+              {
+                label: document.sourceProject.name,
+                href: buildProjectPath(document.sourceProject.slug),
+              },
+            ]
+          : []),
+        { label: document.title },
+        ...(languageName ? [{ label: languageName }] : []),
+      ]),
+    [publishTrail, document.title, document.sourceProject, languageName],
+  );
+
   return (
     <EditorProvider
       documentId={document.id}
+      documentTitle={document.title}
+      sourceLanguageName={sourceVersion.language.name}
+      originalFilename={document.originalFilename ?? null}
+      targetLanguageId={targetLanguageId}
       targetVersion={targetVersion}
       sourceContent={sourceVersion.content}
       initialSuggestions={initialSuggestions}
@@ -450,13 +549,14 @@ export function DocumentEditor({
         {header}
 
         <div className={viewerWrapper}>
-          <div className={viewerHeight}>
+          <div className="min-h-0 flex-1">
             <EditorViewer
               variant={variant}
               layout={layout}
               viewerRef={viewerRef}
               sourceVersion={sourceVersion}
               user={user}
+              canDeploy={canDeploy}
               canEditSource={canEditSource}
               canCreateSuggestions={canCreateSuggestions}
               disableReopen={disableReopen}
@@ -465,10 +565,14 @@ export function DocumentEditor({
               translationPreviewEmptyText={translationPreviewEmptyText}
               audioTextVersionId={audioTextTarget}
               onEditSuggestion={onEditSuggestion}
+              sidebarActions={sidebarActions}
               sidebarSummary={sidebarSummary}
               sidebarDetails={sidebarDetails}
               sidebarDetailsDefaultOpen={sidebarDetailsDefaultOpen}
               contentLanguage={contentLanguage}
+              panelActions={panelActions}
+              onToggleZen={onToggleZen}
+              targetLanguageMissing={!targetLanguageId}
             />
           </div>
 

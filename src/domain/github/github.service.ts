@@ -1,11 +1,11 @@
 import { buildDocumentPath } from '@/domain/document/document-url';
 import prisma from '@/lib/db';
 import { getGitHubConfig } from '@/lib/github-config';
-import { GitHubPRStatus } from '@prisma/client';
-import crypto from 'crypto';
-import { App } from 'octokit';
+import { GitHubPRStatus } from '@/generated/prisma/enums';
+import { App, Octokit } from 'octokit';
 import { resolveFilePath } from './github.paths';
 import { createGitHubCommit } from './github.repository';
+import { DeploySkippedError } from './github.errors';
 
 const LOG_PREFIX = '[GitHub]';
 
@@ -18,6 +18,9 @@ function getApp(): App {
   appInstance = new App({
     appId: config.appId,
     privateKey: config.privateKey,
+    // Every client the app hands out, including the installation one that
+    // fetches its own token, inherits this base URL.
+    ...(config.apiBaseUrl && { Octokit: Octokit.defaults({ baseUrl: config.apiBaseUrl }) }),
   });
   return appInstance;
 }
@@ -148,15 +151,6 @@ async function findOrCreatePullRequest(
   return { number: data.number, url: data.html_url };
 }
 
-export function verifyWebhookSignature(payload: string, signature: string): boolean {
-  const config = getGitHubConfig();
-  const expected = 'sha256=' + crypto.createHmac('sha256', config.webhookSecret).update(payload).digest('hex');
-
-  const valid = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  console.log(`${LOG_PREFIX} Webhook signature verification: ${valid ? 'VALID' : 'INVALID'}`);
-  return valid;
-}
-
 export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl: string }> {
   console.log(`${LOG_PREFIX} ========== Starting GitHub deploy ==========`);
   console.log(`${LOG_PREFIX} Document version ID: ${documentVersionId}`);
@@ -185,7 +179,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
   console.log(`${LOG_PREFIX} Original filename: ${document.originalFilename || 'NOT SET'}`);
   console.log(`${LOG_PREFIX} Branch name: ${language.branchName || 'NOT SET'}`);
   console.log(`${LOG_PREFIX} Source project: ${document.sourceProject?.name || 'NOT SET'}`);
-  console.log(`${LOG_PREFIX} Source project identifier: ${document.sourceProject?.identifier || 'NOT SET'}`);
+  console.log(`${LOG_PREFIX} Repository directory: ${document.sourceProject?.repositoryDirectory || 'NOT SET'}`);
 
   // Validate required fields
   if (!language.branchName) {
@@ -196,8 +190,10 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     throw new Error(`Document "${document.title}" is not associated with a source project`);
   }
 
-  if (!document.sourceProject.identifier) {
-    throw new Error(`Source project "${document.sourceProject.name}" does not have an identifier configured`);
+  if (!document.sourceProject.repositoryDirectory) {
+    throw new DeploySkippedError(
+      `Source project "${document.sourceProject.name}" has no repository directory, so it is not deployed to GitHub`,
+    );
   }
 
   if (!document.type) {
@@ -214,7 +210,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
   const filePath = resolveFilePath({
     documentType: document.type,
     languageCode: language.code,
-    identifier: document.sourceProject.identifier,
+    repositoryDirectory: document.sourceProject.repositoryDirectory,
     originalFilename: document.originalFilename,
     slug: document.slug,
   });
@@ -241,7 +237,7 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     `- **File**: \`${filePath}\``,
     `- **Source Project**: ${document.sourceProject.name}`,
     `- **Translator**: ${version.user?.name ?? 'Unassigned'}`,
-    `- **Link to document**: ${process.env.NEXT_PUBLIC_APP_URL}${buildDocumentPath({ projectIdentifier: document.sourceProject?.identifier, slug: document.slug, languageCode: version.language.code, documentId: document.id })}`,
+    `- **Link to document**: ${process.env.NEXT_PUBLIC_APP_URL}${buildDocumentPath({ projectSlug: document.sourceProject?.slug, slug: document.slug, languageCode: version.language.code, documentId: document.id })}`,
     ...(audio.state === 'ready' && audio.url ? [`- **Audio**: ${audio.url}`] : []),
   ].join('\n');
 

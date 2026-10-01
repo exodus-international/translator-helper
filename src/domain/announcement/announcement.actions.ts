@@ -7,7 +7,6 @@ import {
   deleteAnnouncement,
   dismissAnnouncement,
   listActiveAnnouncements,
-  listAnnouncementsWithDismissalCount,
   listDismissedAnnouncementIds,
   setAnnouncementActive,
   updateAnnouncement,
@@ -31,11 +30,6 @@ export async function dismissAnnouncementAction(announcementId: unknown) {
   const parsed = z.string().uuid().parse(announcementId);
   await dismissAnnouncement(user.id, parsed);
   return { success: true };
-}
-
-export async function listAnnouncementsAction() {
-  await authorize('admin');
-  return listAnnouncementsWithDismissalCount();
 }
 
 export async function createAnnouncementAction(input: unknown) {

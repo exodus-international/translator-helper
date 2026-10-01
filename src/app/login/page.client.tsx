@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-export default function LoginClient() {
+export default function LoginClient({ next = '/dashboard' }: { next?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -28,7 +28,7 @@ export default function LoginClient() {
       });
       if (result.data) {
         capture('user_signed_in', { method: 'email' });
-        router.push('/dashboard');
+        router.push(next);
         // Re-render the root layout with the new session so PostHogProvider
         // receives the user and calls identify() without a full page load.
         router.refresh();
@@ -45,12 +45,12 @@ export default function LoginClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-4">
         <div className="text-center mb-4">
           <Logo size={48} className="mx-auto mb-2 block" />
           <h1 className="text-2xl font-bold">Translation Helper</h1>
-          <p className="text-gray-600">Manage your translations efficiently</p>
+          <p className="text-muted-foreground">Manage your translations efficiently</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">

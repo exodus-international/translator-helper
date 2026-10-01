@@ -1,4 +1,4 @@
-import { AudioProvider } from '@prisma/client';
+import { AudioProvider } from '@/generated/prisma/enums';
 import { unzipSync } from 'fflate';
 import { getAzureSpeechConfig, isAzureSpeechConfigured } from '@/lib/azure-speech-config';
 import type { PollOutcome, SpeechProvider, SubmitOutcome, SynthesisRequest, SynthesisResult } from './speech-provider';

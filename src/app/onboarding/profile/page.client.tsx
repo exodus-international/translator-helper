@@ -9,7 +9,7 @@ import { completeOnboardingAction } from '@/domain/user/user.actions';
 import { capture } from '@/lib/analytics';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { TShirtSize } from '@prisma/client';
+import { TShirtSize } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
 
 const T_SHIRT_SIZES = Object.values(TShirtSize);
@@ -64,11 +64,11 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <Card className="w-full max-w-lg p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold mb-2">Complete Your Profile</h1>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Please fill in your details to get started. You can update these later from your profile page.
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="onboarding-name">
-              Full Name <span className="text-red-500">*</span>
+              Full Name <span className="text-destructive">*</span>
             </Label>
             <Input
               id="onboarding-name"
@@ -141,7 +141,11 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
 
           <div>
             <Label htmlFor="onboarding-tshirt">T-Shirt Size</Label>
-            <Select value={tShirtSize} onValueChange={setTShirtSize}>
+            <Select
+              value={tShirtSize || null}
+              onValueChange={(v) => setTShirtSize(v ?? '')}
+              items={Object.fromEntries(T_SHIRT_SIZES.map((size) => [size, size]))}
+            >
               <SelectTrigger id="onboarding-tshirt">
                 <SelectValue placeholder="Select size" />
               </SelectTrigger>
@@ -163,7 +167,7 @@ export default function OnboardingProfileClient({ userName }: OnboardingProfileC
               onChange={(e) => setExodus90AppId(e.target.value)}
               placeholder="Your Exodus90 app ID"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               You can find this in the My Account section of the Me page in the Exodus90 app.
             </p>
           </div>

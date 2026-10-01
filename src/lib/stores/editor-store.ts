@@ -1,8 +1,13 @@
 import { createStore } from 'zustand';
-import { SuggestionWithUser } from '@/components/monaco-suggestion-decorations';
-import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
-import { submitForReviewAction } from '@/domain/document-version/document-version.actions';
-import {
+import type { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
+import type {
+  assignDocumentVersionAction,
+  assignReviewerToVersionAction,
+  assignTranslatorToVersionAction,
+  submitForReviewAction,
+  updateDocumentVersionAction,
+} from '@/domain/document-version/document-version.actions';
+import type {
   applySuggestionAction,
   createSuggestionAction,
   createSuggestionReplyAction,
@@ -10,21 +15,16 @@ import {
   getSuggestionsByDocumentVersionAction,
   reopenSuggestionAction,
 } from '@/domain/suggestion/suggestion.actions';
-
-import {
-  assignReviewerToVersionAction,
-  assignTranslatorToVersionAction,
-} from '@/domain/document-version/document-version.actions';
-import {
+import type {
   getProjectReviewersAction,
   listTranslationProjectMembersAction,
 } from '@/domain/user-language/user-language.actions';
-import { deleteDocumentAction } from '@/domain/document/document.actions';
-import { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions';
+import type { deleteDocumentAction } from '@/domain/document/document.actions';
+import type { translateDocumentAction } from '@/domain/translation/translation.actions';
+import type { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions';
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
-import { DocumentStatus, SuggestionType } from '@prisma/client';
-import { toast } from 'sonner';
-import { capture } from '@/lib/analytics';
+import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
+import type { AnalyticsEvent, AnalyticsProperties } from '@/lib/analytics';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -37,11 +37,13 @@ export type LoadingKey =
   | 'submitForReview'
   | 'assignTranslator'
   | 'assignReviewer'
+  | 'setDeadline'
   | 'startTranslation'
+  | 'aiTranslate'
   | 'deleteTranslation'
   | 'deleteSource';
 
-interface MemberInfo {
+export interface MemberInfo {
   id: string;
   userId?: string;
   user: { id: string; name: string | null; email: string; image?: string | null };
@@ -51,16 +53,57 @@ type DialogState =
   | { type: 'closed' }
   | { type: 'submitReview'; reviewers: MemberInfo[] }
   | { type: 'assignTranslator'; members: MemberInfo[] }
-  | { type: 'assignReviewer'; candidates: MemberInfo[] };
+  | { type: 'assignReviewer'; candidates: MemberInfo[] }
+  | { type: 'deadline' };
 
 export interface EditorStoreConfig {
   documentId: string;
+  /** Title, source language and filename feed the AI translate prompt. */
+  documentTitle: string;
+  sourceLanguageName: string;
+  originalFilename: string | null;
+  /** The language this editor page translates into; the first version is created for it. */
+  targetLanguageId: string;
   targetVersion: any | null;
   sourceContent: string;
   initialSuggestions: any[];
   translationProjectId: string | null;
   /** Version id when the Audio text tab is reachable here, null when it is not. */
   audioTextVersionId: string | null;
+}
+
+/**
+ * Everything the store reaches outside itself: the server actions it calls,
+ * the toasts it shows and the analytics it sends.
+ *
+ * The store never imports these at runtime. `editor-store.deps.ts` binds the
+ * real ones for the app, and a test hands in fakes, so the store's own
+ * behaviour -- what is dirty, what is queued, what a race keeps -- runs in
+ * milliseconds with no server, no Prisma and no DOM.
+ */
+export interface EditorStoreDeps {
+  assignDocumentVersion: typeof assignDocumentVersionAction;
+  updateDocumentVersion: typeof updateDocumentVersionAction;
+  submitForReview: typeof submitForReviewAction;
+  assignReviewerToVersion: typeof assignReviewerToVersionAction;
+  assignTranslatorToVersion: typeof assignTranslatorToVersionAction;
+  applySuggestion: typeof applySuggestionAction;
+  createSuggestion: typeof createSuggestionAction;
+  createSuggestionReply: typeof createSuggestionReplyAction;
+  dismissSuggestion: typeof dismissSuggestionAction;
+  getSuggestionsByDocumentVersion: typeof getSuggestionsByDocumentVersionAction;
+  reopenSuggestion: typeof reopenSuggestionAction;
+  getProjectReviewers: typeof getProjectReviewersAction;
+  listTranslationProjectMembers: typeof listTranslationProjectMembersAction;
+  deleteDocument: typeof deleteDocumentAction;
+  translateDocument: typeof translateDocumentAction;
+  getAudioTranscriptState: typeof getAudioTranscriptStateAction;
+  notify: {
+    success: (message: string) => void;
+    error: (message: string) => void;
+    warning: (message: string) => void;
+  };
+  capture: (event: AnalyticsEvent, properties?: AnalyticsProperties) => void;
 }
 
 // ─── State ───────────────────────────────────────────────────
@@ -72,6 +115,8 @@ interface EditorState {
   savedContent: string;
   suggestions: SuggestionWithUser[];
   sourceEditContent: string;
+  /** When the last successful save landed, manual or auto. */
+  lastSavedAt: Date | null;
 
   // Loading & dialogs
   loading: Set<LoadingKey>;
@@ -93,8 +138,17 @@ interface EditorState {
    */
   audioTranscriptState: AudioTranscriptState | null;
 
+  /**
+   * The Markdown guide is opened from two places that cannot see each other:
+   * its button in the header, and the lint tooltip inside CodeMirror — which is
+   * plain DOM, not React. One flag in the store keeps them from growing a
+   * second way to open it.
+   */
+  markdownGuideOpen: boolean;
+
   // Config (set once at init)
   documentId: string;
+  targetLanguageId: string;
   translationProjectId: string | null;
   audioTextVersionId: string | null;
 }
@@ -103,6 +157,7 @@ interface EditorState {
 
 interface EditorActions {
   requestTranslationView: (view: 'audio' | null) => void;
+  setMarkdownGuideOpen: (open: boolean) => void;
 
   // Audio transcript
   setAudioTranscriptState: (state: AudioTranscriptState) => void;
@@ -114,6 +169,10 @@ interface EditorActions {
 
   // Version
   setTargetVersion: (version: any) => void;
+  /** Creates this language's first version and opens the editor on it. */
+  startTranslation: () => Promise<void>;
+  /** Drafts (or re-drafts) the translation with the model, into the editor. */
+  translateWithAi: () => Promise<void>;
   handleStatusChange: (status: DocumentStatus) => void;
 
   // Save
@@ -143,8 +202,12 @@ interface EditorActions {
   assignTranslator: (userId: string, deadline?: string) => Promise<void>;
   unassignTranslator: () => Promise<void>;
   openAssignReviewerDialog: () => Promise<void>;
-  assignReviewer: (userId: string) => Promise<void>;
+  /** `reviewDeadline` is a `yyyy-mm-dd` date; empty clears it. */
+  assignReviewer: (userId: string, reviewDeadline?: string) => Promise<void>;
   unassignReviewer: () => Promise<void>;
+  /** Opens the small modal that sets or clears this version's deadline. */
+  openDeadlineDialog: () => void;
+  setDeadline: (deadline: Date | null) => Promise<void>;
   closeDialog: () => void;
 
   // Loading helpers
@@ -183,36 +246,152 @@ function removeLoading(state: EditorState, key: LoadingKey): Partial<EditorState
   return { loading: next };
 }
 
+/**
+ * Writes anything typed but not yet saved, before an action that replaces the
+ * document with the server's copy. Returns false when the write failed, in
+ * which case the caller must not go on and overwrite the edits it has just
+ * failed to preserve.
+ */
+async function flushPendingEdits(get: () => EditorStore): Promise<boolean> {
+  const { content, savedContent } = get();
+  if (content === savedContent) return true;
+  try {
+    await get().saveContent('auto');
+    return true;
+  } catch {
+    // `saveContent` has already told the reader why.
+    return false;
+  }
+}
+
 // ─── Store factory ───────────────────────────────────────────
 
-export function createEditorStore(config: EditorStoreConfig) {
+export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDeps) {
   const initialContent = config.targetVersion?.content || '';
   // Both audio cards (the sidebar summary and the details panel) mount at once
   // and both want this. Fetch it for whoever asks first and hand the same
   // promise to the second.
   let transcriptStateRequest: Promise<void> | null = null;
+  /** The write currently in flight, so the next one can queue behind it. */
+  let pendingSave: Promise<void> | null = null;
 
-  return createStore<EditorStore>()((set, get) => ({
+  // Every editor event names the document and version it is about, so PostHog
+  // can follow one document from translation through review to deploy.
+  const track = (event: AnalyticsEvent, properties?: AnalyticsProperties) =>
+    deps.capture(event, {
+      documentId: config.documentId,
+      documentVersionId: store.getState().targetVersion?.id ?? null,
+      ...properties,
+    });
+
+  const store = createStore<EditorStore>()((set, get) => ({
     // ─── Initial state ─────────────────────────────────
     targetVersion: config.targetVersion,
     content: initialContent,
     savedContent: initialContent,
+    lastSavedAt: null,
     suggestions: normalizeSuggestions(config.initialSuggestions),
     sourceEditContent: config.sourceContent,
     loading: new Set<LoadingKey>(),
     dialog: { type: 'closed' },
     requestedTranslationView: null,
     audioTranscriptState: null,
+    markdownGuideOpen: false,
     documentId: config.documentId,
+    targetLanguageId: config.targetLanguageId,
     translationProjectId: config.translationProjectId,
     audioTextVersionId: config.audioTextVersionId,
 
     // ─── Content ───────────────────────────────────────
     setContent: (content) => set({ content }),
     setSourceEditContent: (sourceEditContent) => set({ sourceEditContent }),
+    setMarkdownGuideOpen: (markdownGuideOpen) => set({ markdownGuideOpen }),
 
     // ─── Version ───────────────────────────────────────
     setTargetVersion: (version) => set({ targetVersion: version }),
+
+    startTranslation: async () => {
+      const { documentId, targetLanguageId } = get();
+      if (!targetLanguageId) {
+        deps.notify.warning('Please select a target language first');
+        return;
+      }
+      // Two controls offer this, and a disabled attribute only takes effect on
+      // the next render: without this the second click of a double-click, or
+      // the panel's button racing the header's, sends a second assign for the
+      // same document and language.
+      if (get().isLoading('startTranslation')) return;
+
+      set(addLoading(get(), 'startTranslation'));
+      try {
+        const version = await deps.assignDocumentVersion({
+          documentId,
+          languageId: targetLanguageId,
+          content: '',
+        });
+        set({
+          targetVersion: version,
+          content: version.content ?? '',
+          savedContent: version.content ?? '',
+          lastSavedAt: null,
+          ...removeLoading(get(), 'startTranslation'),
+        });
+        track('translation_started');
+      } catch (error: any) {
+        set(removeLoading(get(), 'startTranslation'));
+        deps.notify.error(error.message || 'Failed to start translation');
+      }
+    },
+
+    translateWithAi: async () => {
+      const { targetLanguageId } = get();
+      if (!targetLanguageId) {
+        deps.notify.warning('Select a target language before requesting an AI translation.');
+        return;
+      }
+      // As in `startTranslation`: a disabled attribute only takes effect on the
+      // next render, so without this the second click of a double-click spends
+      // another model call on a draft that is thrown away.
+      if (get().isLoading('aiTranslate')) return;
+
+      // This replaces the whole document, so anything typed and not yet saved
+      // would be thrown away -- and `savedContent` would then be the text the
+      // draft replaced, leaving autosave to persist the draft over it with no
+      // dirty flag left pointing at the edits. Writing them first also means
+      // the model is asked to revise what the reader actually has.
+      if (!(await flushPendingEdits(get))) return;
+
+      const before = get().content;
+      set(addLoading(get(), 'aiTranslate'));
+      try {
+        const result = await deps.translateDocument({
+          documentTitle: config.documentTitle,
+          sourceLanguageName: config.sourceLanguageName,
+          targetLanguageId,
+          sourceContent: config.sourceContent,
+          currentTranslation: before || undefined,
+          originalFilename: config.originalFilename ?? undefined,
+        });
+        // A whole document takes the model tens of seconds and the pane stays
+        // editable the entire time. Whoever kept translating while they waited
+        // has the only copy of that work: a version is overwritten in place,
+        // so it is nowhere on the server, and the editor's undo history is the
+        // only way back -- which the next remount takes with it. A draft can
+        // be asked for again; those lines cannot.
+        if (get().content !== before) {
+          set(removeLoading(get(), 'aiTranslate'));
+          deps.notify.warning('Your edits were kept -- the AI draft would have replaced them. Ask for it again to use it.');
+          return;
+        }
+        set({ content: result.translatedContent, ...removeLoading(get(), 'aiTranslate') });
+        track('ai_translate_triggered', { overwrite: before.trim().length > 0 });
+        deps.notify.success('AI translation generated successfully!');
+      } catch (error: any) {
+        set(removeLoading(get(), 'aiTranslate'));
+        deps.notify.error(error.message || 'Failed to generate AI translation');
+      }
+    },
+
     handleStatusChange: (status) => {
       const { targetVersion } = get();
       if (targetVersion) {
@@ -221,42 +400,66 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     // ─── Save ──────────────────────────────────────────
-    saveContent: async (trigger = 'manual') => {
-      const { targetVersion, content } = get();
-      if (!targetVersion) return;
+    saveContent: (trigger = 'manual') => {
+      const write = async () => {
+        const { targetVersion, content, savedContent } = get();
+        if (!targetVersion) return;
+        // A save with nothing to write costs a request and a toast for no
+        // reason; the save control stays clickable when clean, so this is the
+        // guard that makes that honest. It is also what makes queueing cheap
+        // below: a write that waited for one which already persisted the same
+        // text stops here.
+        if (content === savedContent) return;
 
-      set(addLoading(get(), 'save'));
-      try {
-        const updated = await updateDocumentVersionAction(targetVersion.id, { content });
-        set({
-          targetVersion: updated,
-          savedContent: content,
-          ...removeLoading(get(), 'save'),
-        });
-        // Only track explicit user saves; the 3s-debounced auto-save would
-        // otherwise flood analytics with background events.
-        if (trigger === 'manual') {
-          capture('translation_saved', { documentVersionId: targetVersion.id });
+        set(addLoading(get(), 'save'));
+        try {
+          const updated = await deps.updateDocumentVersion(targetVersion.id, { content });
+          set({
+            targetVersion: updated,
+            savedContent: content,
+            lastSavedAt: new Date(),
+            ...removeLoading(get(), 'save'),
+          });
+          // Only track explicit user saves; the 3s-debounced auto-save would
+          // otherwise flood analytics with background events.
+          if (trigger === 'manual') {
+            track('translation_saved', { documentVersionId: targetVersion.id });
+          }
+          deps.notify.success('Translation saved successfully!');
+        } catch (error: any) {
+          set(removeLoading(get(), 'save'));
+          deps.notify.error(error.message || 'Failed to save translation');
+          throw error;
         }
-        toast.success('Translation saved successfully!');
-      } catch (error: any) {
-        set(removeLoading(get(), 'save'));
-        toast.error(error.message || 'Failed to save translation');
-        throw error;
-      }
+      };
+
+      // One write at a time. A version is updated in place -- the repository
+      // reads the row to bump `version`, then writes the content back over it,
+      // and keeps no history -- so two writes in flight at once lose the
+      // counter and leave the later reply setting `targetVersion` to whichever
+      // finished last. Clicking Save with the 3s autosave already armed did
+      // exactly that: the hook's guard only covers a timer firing while an
+      // earlier *autosave* runs, and nothing cancelled the timer when a manual
+      // save started, so the request in flight had not yet moved
+      // `savedContent` when the timer read it.
+      const queued = (pendingSave ?? Promise.resolve()).catch(() => {}).then(write);
+      // A failed write must not reject whatever queued behind it; its own
+      // caller still gets the rejection, which `flushPendingEdits` reads.
+      pendingSave = queued.catch(() => {});
+      return queued;
     },
 
     saveSource: async (sourceVersionId) => {
       const { sourceEditContent } = get();
       set(addLoading(get(), 'sourceSave'));
       try {
-        await updateDocumentVersionAction(sourceVersionId, { content: sourceEditContent });
+        await deps.updateDocumentVersion(sourceVersionId, { content: sourceEditContent });
         set(removeLoading(get(), 'sourceSave'));
-        capture('source_saved', { documentVersionId: sourceVersionId });
-        toast.success('Source document saved successfully!');
+        track('source_saved', { documentVersionId: sourceVersionId });
+        deps.notify.success('Source document saved successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'sourceSave'));
-        toast.error(error.message || 'Failed to save source document');
+        deps.notify.error(error.message || 'Failed to save source document');
       }
     },
 
@@ -264,13 +467,13 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { documentId } = get();
       set(addLoading(get(), 'deleteSource'));
       try {
-        await deleteDocumentAction(documentId);
+        await deps.deleteDocument(documentId);
         set(removeLoading(get(), 'deleteSource'));
-        capture('document_deleted', { location: 'editor' });
-        toast.success('Document deleted successfully!');
+        track('document_deleted', { location: 'editor' });
+        deps.notify.success('Document deleted successfully!');
       } catch (error: any) {
         set(removeLoading(get(), 'deleteSource'));
-        toast.error(error.message || 'Failed to delete document');
+        deps.notify.error(error.message || 'Failed to delete document');
       }
     },
 
@@ -279,7 +482,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { targetVersion } = get();
       if (!targetVersion) return;
       try {
-        const updated = await getSuggestionsByDocumentVersionAction(targetVersion.id);
+        const updated = await deps.getSuggestionsByDocumentVersion(targetVersion.id);
         set({ suggestions: normalizeSuggestions(updated) });
       } catch (error) {
         console.error('Error loading suggestions:', error);
@@ -287,42 +490,54 @@ export function createEditorStore(config: EditorStoreConfig) {
     },
 
     applySuggestion: async (suggestionId) => {
+      // This and `reopenSuggestion` replace the whole document with the
+      // server's copy, so anything typed and not yet saved would be thrown
+      // away -- and, because `savedContent` is replaced too, the UI would read
+      // "saved" over text it had just discarded, with no dirty flag left for
+      // autosave to recover from. Writing the edits first loses nothing and is
+      // what the reader meant anyway: the server applies the suggestion to the
+      // stored version, so unsaved edits would otherwise be overwritten by a
+      // suggestion applied to text that never included them.
+      if (!(await flushPendingEdits(get))) return;
+
       set(addLoading(get(), 'applySuggestion'));
       try {
-        const updatedVersion = await applySuggestionAction({ suggestionId });
+        const updatedVersion = await deps.applySuggestion({ suggestionId });
         set({
           targetVersion: updatedVersion,
           content: updatedVersion.content,
           savedContent: updatedVersion.content,
           ...removeLoading(get(), 'applySuggestion'),
         });
-        capture('suggestion_applied', { suggestionId });
-        toast.success('Suggestion applied!');
+        track('suggestion_applied', { suggestionId });
+        deps.notify.success('Suggestion applied!');
         await get().reloadSuggestions();
       } catch (error: any) {
         set(removeLoading(get(), 'applySuggestion'));
-        toast.error(error.message || 'Failed to apply suggestion');
+        deps.notify.error(error.message || 'Failed to apply suggestion');
       }
     },
 
     dismissSuggestion: async (suggestionId, reason?) => {
       set(addLoading(get(), 'dismissSuggestion'));
       try {
-        await dismissSuggestionAction({ suggestionId, dismissedReason: reason });
+        await deps.dismissSuggestion({ suggestionId, dismissedReason: reason });
         set(removeLoading(get(), 'dismissSuggestion'));
-        capture('suggestion_dismissed', { suggestionId });
-        toast.success('Suggestion dismissed!');
+        track('suggestion_dismissed', { suggestionId });
+        deps.notify.success('Suggestion dismissed!');
         await get().reloadSuggestions();
       } catch (error: any) {
         set(removeLoading(get(), 'dismissSuggestion'));
-        toast.error(error.message || 'Failed to dismiss suggestion');
+        deps.notify.error(error.message || 'Failed to dismiss suggestion');
       }
     },
 
     reopenSuggestion: async (suggestionId) => {
+      if (!(await flushPendingEdits(get))) return;
+
       set(addLoading(get(), 'reopenSuggestion'));
       try {
-        const result = await reopenSuggestionAction({ suggestionId });
+        const result = await deps.reopenSuggestion({ suggestionId });
         if (result.updatedVersion) {
           set({
             targetVersion: result.updatedVersion,
@@ -331,12 +546,12 @@ export function createEditorStore(config: EditorStoreConfig) {
           });
         }
         set(removeLoading(get(), 'reopenSuggestion'));
-        capture('suggestion_reopened', { suggestionId });
-        toast.success('Suggestion reopened!');
+        track('suggestion_reopened', { suggestionId });
+        deps.notify.success('Suggestion reopened!');
         await get().reloadSuggestions();
       } catch (error: any) {
         set(removeLoading(get(), 'reopenSuggestion'));
-        toast.error(error.message || 'Failed to reopen suggestion');
+        deps.notify.error(error.message || 'Failed to reopen suggestion');
       }
     },
 
@@ -344,7 +559,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { targetVersion } = get();
       if (!targetVersion) return;
       try {
-        await createSuggestionAction({
+        await deps.createSuggestion({
           documentVersionId: targetVersion.id,
           startLine: data.range.startLine,
           startColumn: data.range.startColumn,
@@ -355,11 +570,11 @@ export function createEditorStore(config: EditorStoreConfig) {
           proposedText: data.proposedText,
           version: data.version,
         });
-        capture('suggestion_created', { type: data.type });
-        toast.success('Suggestion created!');
+        track('suggestion_created', { type: data.type });
+        deps.notify.success('Suggestion created!');
         await get().reloadSuggestions();
       } catch (error: any) {
-        toast.error(error.message || 'Failed to create suggestion');
+        deps.notify.error(error.message || 'Failed to create suggestion');
       }
     },
 
@@ -367,7 +582,7 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { targetVersion } = get();
       if (!targetVersion) return;
       try {
-        await createSuggestionAction({
+        await deps.createSuggestion({
           documentVersionId: targetVersion.id,
           startLine: null,
           startColumn: null,
@@ -377,21 +592,21 @@ export function createEditorStore(config: EditorStoreConfig) {
           comment,
           version: targetVersion.version ?? 1,
         });
-        capture('general_thread_created');
-        toast.success('Comment added!');
+        track('general_thread_created');
+        deps.notify.success('Comment added!');
         await get().reloadSuggestions();
       } catch (error: any) {
-        toast.error(error.message || 'Failed to create comment');
+        deps.notify.error(error.message || 'Failed to create comment');
       }
     },
 
     replySuggestion: async (suggestionId, content) => {
       try {
-        await createSuggestionReplyAction({ suggestionId, content });
-        capture('suggestion_replied', { suggestionId });
+        await deps.createSuggestionReply({ suggestionId, content });
+        track('suggestion_replied', { suggestionId });
         await get().reloadSuggestions();
       } catch (error: any) {
-        toast.error(error.message || 'Failed to post reply');
+        deps.notify.error(error.message || 'Failed to post reply');
       }
     },
 
@@ -399,7 +614,7 @@ export function createEditorStore(config: EditorStoreConfig) {
     setAudioTranscriptState: (audioTranscriptState) => set({ audioTranscriptState }),
 
     loadAudioTranscriptState: (documentVersionId) => {
-      transcriptStateRequest ??= getAudioTranscriptStateAction(documentVersionId)
+      transcriptStateRequest ??= deps.getAudioTranscriptState(documentVersionId)
         .then((state) => set({ audioTranscriptState: state }))
         // Nothing here is worth interrupting someone over: the badge just does
         // not appear, and the transcript itself is unaffected.
@@ -416,11 +631,11 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { translationProjectId } = get();
       if (!translationProjectId) return;
       try {
-        const members = await getProjectReviewersAction(translationProjectId);
+        const members = await deps.getProjectReviewers(translationProjectId);
         set({ dialog: { type: 'submitReview', reviewers: members } });
-        capture('dialog_opened', { dialog: 'submit_review' });
+        track('dialog_opened', { dialog: 'submit_review' });
       } catch (error) {
-        toast.error('Failed to load reviewers');
+        deps.notify.error('Failed to load reviewers');
       }
     },
 
@@ -430,7 +645,7 @@ export function createEditorStore(config: EditorStoreConfig) {
 
       set(addLoading(get(), 'submitForReview'));
       try {
-        await submitForReviewAction({
+        await deps.submitForReview({
           versionId: targetVersion.id,
           ...(reviewerId ? { reviewerId } : {}),
         });
@@ -439,11 +654,11 @@ export function createEditorStore(config: EditorStoreConfig) {
           targetVersion: { ...targetVersion, status: DocumentStatus.PENDING_REVIEW },
           ...removeLoading(get(), 'submitForReview'),
         });
-        capture('submitted_for_review', { has_reviewer: Boolean(reviewerId) });
-        toast.success('Submitted for review!');
+        track('submitted_for_review', { has_reviewer: Boolean(reviewerId) });
+        deps.notify.success('Submitted for review!');
       } catch (error: any) {
         set(removeLoading(get(), 'submitForReview'));
-        toast.error(error.message || 'Failed to submit for review');
+        deps.notify.error(error.message || 'Failed to submit for review');
       }
     },
 
@@ -451,11 +666,11 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { translationProjectId } = get();
       if (!translationProjectId) return;
       try {
-        const members = await listTranslationProjectMembersAction(translationProjectId);
+        const members = await deps.listTranslationProjectMembers(translationProjectId);
         set({ dialog: { type: 'assignTranslator', members } });
-        capture('dialog_opened', { dialog: 'assign_translator' });
+        track('dialog_opened', { dialog: 'assign_translator' });
       } catch (error) {
-        toast.error('Failed to load team members');
+        deps.notify.error('Failed to load team members');
       }
     },
 
@@ -465,7 +680,7 @@ export function createEditorStore(config: EditorStoreConfig) {
 
       set(addLoading(get(), 'assignTranslator'));
       try {
-        await assignTranslatorToVersionAction({
+        await deps.assignTranslatorToVersion({
           documentId,
           translationProjectId,
           userId,
@@ -474,19 +689,23 @@ export function createEditorStore(config: EditorStoreConfig) {
 
         // Optimistic update: find the assigned user from dialog members
         const { dialog } = get();
-        if (dialog.type === 'assignTranslator') {
+        if (dialog.type === 'assignTranslator' && targetVersion) {
           const assignedUser = dialog.members.find((m) => m.user.id === userId)?.user ?? null;
-          if (assignedUser && targetVersion) {
-            set({ targetVersion: { ...targetVersion, user: assignedUser } });
-          }
+          set({
+            targetVersion: {
+              ...targetVersion,
+              ...(assignedUser ? { user: assignedUser } : {}),
+              deadline: deadline ? new Date(deadline) : null,
+            },
+          });
         }
 
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignTranslator') });
-        capture('translator_assigned');
-        toast.success('Translator assigned!');
+        track('translator_assigned');
+        deps.notify.success('Translator assigned!');
       } catch (error: any) {
         set(removeLoading(get(), 'assignTranslator'));
-        toast.error(error.message || 'Failed to assign translator');
+        deps.notify.error(error.message || 'Failed to assign translator');
       }
     },
 
@@ -494,14 +713,14 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { documentId, translationProjectId, targetVersion } = get();
       if (!translationProjectId) return;
       try {
-        await assignTranslatorToVersionAction({ documentId, translationProjectId, userId: null });
+        await deps.assignTranslatorToVersion({ documentId, translationProjectId, userId: null });
         if (targetVersion) {
           set({ targetVersion: { ...targetVersion, user: null } });
         }
-        capture('translator_unassigned');
-        toast.success('Translator unassigned');
+        track('translator_unassigned');
+        deps.notify.success('Translator unassigned');
       } catch (error: any) {
-        toast.error(error.message || 'Failed to unassign translator');
+        deps.notify.error(error.message || 'Failed to unassign translator');
       }
     },
 
@@ -509,33 +728,38 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { translationProjectId } = get();
       if (!translationProjectId) return;
       try {
-        const members = await getProjectReviewersAction(translationProjectId);
+        const members = await deps.getProjectReviewers(translationProjectId);
         set({ dialog: { type: 'assignReviewer', candidates: members } });
-        capture('dialog_opened', { dialog: 'assign_reviewer' });
+        track('dialog_opened', { dialog: 'assign_reviewer' });
       } catch (error) {
-        toast.error('Failed to load reviewers');
+        deps.notify.error('Failed to load reviewers');
       }
     },
 
-    assignReviewer: async (userId) => {
+    assignReviewer: async (userId, reviewDeadline?) => {
       const { targetVersion, dialog } = get();
       if (!targetVersion) return;
 
       set(addLoading(get(), 'assignReviewer'));
       try {
-        await assignReviewerToVersionAction(targetVersion.id, userId);
+        const due = reviewDeadline ? new Date(reviewDeadline) : null;
+        await deps.assignReviewerToVersion(targetVersion.id, userId, due);
         if (dialog.type === 'assignReviewer') {
           const assignedReviewer = dialog.candidates.find((m) => m.user.id === userId)?.user ?? null;
-          if (assignedReviewer) {
-            set({ targetVersion: { ...targetVersion, reviewer: assignedReviewer } });
-          }
+          set({
+            targetVersion: {
+              ...targetVersion,
+              ...(assignedReviewer ? { reviewer: assignedReviewer } : {}),
+              reviewDeadline: due,
+            },
+          });
         }
         set({ dialog: { type: 'closed' }, ...removeLoading(get(), 'assignReviewer') });
-        capture('reviewer_assigned');
-        toast.success('Reviewer assigned!');
+        track('reviewer_assigned');
+        deps.notify.success('Reviewer assigned!');
       } catch (error: any) {
         set(removeLoading(get(), 'assignReviewer'));
-        toast.error(error.message || 'Failed to assign reviewer');
+        deps.notify.error(error.message || 'Failed to assign reviewer');
       }
     },
 
@@ -543,12 +767,46 @@ export function createEditorStore(config: EditorStoreConfig) {
       const { targetVersion } = get();
       if (!targetVersion) return;
       try {
-        await assignReviewerToVersionAction(targetVersion.id, null);
+        await deps.assignReviewerToVersion(targetVersion.id, null);
         set({ targetVersion: { ...targetVersion, reviewer: null } });
-        capture('reviewer_unassigned');
-        toast.success('Reviewer unassigned');
+        track('reviewer_unassigned');
+        deps.notify.success('Reviewer unassigned');
       } catch (error: any) {
-        toast.error(error.message || 'Failed to unassign reviewer');
+        deps.notify.error(error.message || 'Failed to unassign reviewer');
+      }
+    },
+
+    // ─── Deadline ──────────────────────────────────────
+    openDeadlineDialog: () => {
+      set({ dialog: { type: 'deadline' } });
+      track('dialog_opened', { dialog: 'deadline' });
+    },
+
+    setDeadline: async (deadline) => {
+      const { documentId, translationProjectId, targetVersion } = get();
+      if (!translationProjectId || !targetVersion) return;
+
+      set(addLoading(get(), 'setDeadline'));
+      try {
+        // The deadline travels with the assignment, the way the translations
+        // page sets it: same action, same permission, same activity entry --
+        // only the translator stays whoever it already was.
+        const updated = await deps.assignTranslatorToVersion({
+          documentId,
+          translationProjectId,
+          userId: targetVersion.user?.id ?? null,
+          deadline,
+        });
+        set({
+          targetVersion: { ...targetVersion, deadline: updated?.deadline ?? deadline },
+          dialog: { type: 'closed' },
+          ...removeLoading(get(), 'setDeadline'),
+        });
+        track('dialog_opened', { dialog: 'deadline_set' });
+        deps.notify.success(deadline ? 'Deadline set' : 'Deadline cleared');
+      } catch (error: any) {
+        set(removeLoading(get(), 'setDeadline'));
+        deps.notify.error(error.message || 'Failed to set the deadline');
       }
     },
 
@@ -562,6 +820,8 @@ export function createEditorStore(config: EditorStoreConfig) {
       return 'saved';
     },
   }));
+
+  return store;
 }
 
 export type EditorStoreApi = ReturnType<typeof createEditorStore>;

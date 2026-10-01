@@ -2,7 +2,6 @@ import { listVersionsForTranslationProjectAction } from '@/domain/document-versi
 import { listDocumentsAction } from '@/domain/document/document.actions';
 import { listTranslationProjectMembersAction } from '@/domain/user-language/user-language.actions';
 import { getTranslationProjectAction } from '@/domain/translation-project/translation-project.actions';
-import { listUsersAction } from '@/domain/user/user.actions';
 import { authorize } from '@/lib/authorize';
 import { notFound, redirect } from 'next/navigation';
 import TranslationProjectClient from './page.client';
@@ -28,11 +27,12 @@ export default async function TranslationProjectPage({
     redirect('/dashboard');
   }
 
-  const [members, versions, documents, users] = await Promise.all([
+  // The roster is read for the assignment dialog's list of people; it is
+  // edited at /languages/[code]/team.
+  const [members, versions, documents] = await Promise.all([
     listTranslationProjectMembersAction(translationProjectId),
     listVersionsForTranslationProjectAction(translationProjectId),
     listDocumentsAction({ sourceProjectId: sourceProject.id }),
-    listUsersAction(),
   ]);
 
   return (
@@ -41,7 +41,6 @@ export default async function TranslationProjectPage({
       members={members}
       versions={versions}
       documents={documents}
-      users={users}
     />
   );
 }

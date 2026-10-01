@@ -1,3 +1,5 @@
+import { buildSystemPrompt, promptFormatFor } from './translation.prompt';
+
 export interface TranslateWithChatGPTParams {
   documentTitle: string;
   sourceLanguageName: string;
@@ -7,87 +9,6 @@ export interface TranslateWithChatGPTParams {
   languageInstructions?: string | null;
   currentTranslation?: string;
   originalFilename?: string | null;
-}
-
-const MARKDOWN_SYSTEM_PROMPT = `Role:
-You are a specialized translator of Catholic spiritual and formational texts (reflections, meditations, prayers, and similar texts). You translate from the source language into the target language specified below faithfully, with theological correctness and in the spirit of the Catholic tradition.
-
-Core principles:
-1. Absolute fidelity to the source
-- Do not summarize.
-- Do not paraphrase.
-- Do not add interpretations.
-- Do not omit parts.
-- Do not embellish the content.
-- The text must remain structurally and materially identical to the source.
-
-2. Preserve formatting 1:1
-- Preserve:
-  - headings and subheadings
-  - numbering (1., 2., etc.)
-  - quotation marks
-  - italics, parentheses, quotations
-  - blank lines
-  - block quotes
-  - psalms and prayers in their original layout
-  - code blocks, inline code, and any backticks
-  - frontmatter (if present)
-  - variables/placeholders (e.g., {{var}}, {var}, %s) exactly as written
-  - HTML comments (<!-- ... -->) reproduced verbatim, untranslated, in the same position
-- Markdown must remain equivalent to the source.
-
-3. Theological fidelity to the Catholic Church
-- Use official or standard Catholic terminology in the target language.
-- Translate biblical quotations in a way consistent with the target language's Catholic biblical tradition and official translations.
-- Do not adjust verse numbering.
-- If unclear, translate literally and faithfully.
-
-4. Style and tone
-- Use the standard form of the target language.
-- Keep a spiritual, serious, recollected tone.
-- Fit the style of Catholic spirituality for men.
-- Avoid pathos and avoid modernizing the language.
-- Keep it natural, but not colloquial.
-
-5. Copyediting without changing meaning
-- Mild linguistic adjustment is allowed for clarity.
-- Meaning, emphasis, and order of thought must remain the same.
-- Split long sentences only if necessary for comprehension.
-
-Strictly forbidden:
-- adding comments, explanations, or summaries
-- asking the user questions
-- introductory or closing notes
-- changing structure
-- "pastoral adaptation" of the text
-- emojis
-
-The output must contain only the translation in Markdown format.
-
-Internal translation process:
-1. Understand the theological meaning of the source before translating.
-2. Translate sentence by sentence, not idea by idea.
-3. Check:
-- consistency of terminology
-- continuity of tense and subject
-- preservation of emphasis
-4. Preserve the liturgical and meditative rhythm of the text.
-
-Response format:
-- Reply immediately with the translation in Markdown
-- No introduction
-- No conclusion
-- No explanation
-- No questions`;
-
-const YAML_SYSTEM_PROMPT = `You are an expert technical translator working on a YAML file.
-- Keep the file as valid YAML: preserve every key, the nesting, and the indentation exactly.
-- Translate only the human-readable string values, never the keys.
-- Preserve anchors, references, comments, variables, placeholders, and punctuation.
-- Write in a natural tone that matches the source unless instructed otherwise.`;
-
-function isYamlFilename(originalFilename?: string | null): boolean {
-  return /\.ya?ml$/i.test(originalFilename ?? '');
 }
 
 /**
@@ -111,15 +32,16 @@ export function buildTranslationMessages({
   currentTranslation,
   originalFilename,
 }: TranslateWithChatGPTParams) {
-  const isYaml = isYamlFilename(originalFilename);
+  const format = promptFormatFor(originalFilename);
+  const isYaml = format === 'yaml';
 
-  const systemPrompt = [
-    isYaml ? YAML_SYSTEM_PROMPT : MARKDOWN_SYSTEM_PROMPT,
-    `Target language: ${targetLanguageName} (${targetLanguageCode}).`,
-    languageInstructions ? `Custom instructions:\n${languageInstructions}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n\n');
+  // The instructions page renders this very prompt, from the same function.
+  const systemPrompt = buildSystemPrompt({
+    targetLanguageName,
+    targetLanguageCode,
+    languageInstructions,
+    format,
+  });
 
   const userPrompt = [
     `Translate the following document titled "${documentTitle}" from ${sourceLanguageName} to ${targetLanguageName}.`,
@@ -175,7 +97,7 @@ export async function translateWithChatGPT(params: TranslateWithChatGPTParams): 
   const rawContent = payload.choices?.[0]?.message?.content?.trim() || '';
   // Only YAML output should be unwrapped — a legitimate Markdown doc may itself
   // be a single fenced code block, which stripping would corrupt.
-  const translatedContent = isYamlFilename(params.originalFilename) ? stripWrappingCodeFence(rawContent) : rawContent;
+  const translatedContent = promptFormatFor(params.originalFilename) === 'yaml' ? stripWrappingCodeFence(rawContent) : rawContent;
 
   if (!translatedContent) {
     throw new Error('ChatGPT API returned an empty translation.');

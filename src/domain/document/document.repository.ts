@@ -1,6 +1,7 @@
 import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
-import { DocumentType, Prisma, SuggestionStatus } from '@prisma/client';
+import { Prisma, type Document } from '@/generated/prisma/client';
+import { DocumentType, SuggestionStatus } from '@/generated/prisma/enums';
 
 const userWithLanguages = {
   select: {
@@ -111,14 +112,14 @@ export async function getDocumentById(id: string): Promise<DocumentDetail | null
  * Resolves the URL form /documents/{project}/{slug}/... to a document.
  *
  * findFirst rather than findUnique: slug is unique per project, but the
- * constraint is on sourceProjectId, and callers hold the identifier.
+ * constraint is on sourceProjectId, and callers hold the project's slug.
  */
 export async function getDocumentByProjectAndSlug(
-  projectIdentifier: string,
+  projectSlug: string,
   slug: string,
 ): Promise<DocumentDetail | null> {
   return prisma.document.findFirst({
-    where: { slug, sourceProject: { identifier: projectIdentifier } },
+    where: { slug, sourceProject: { slug: projectSlug } },
     include: documentDetailInclude,
   });
 }
@@ -167,7 +168,7 @@ export async function updateDocument(
   });
 }
 
-export async function deleteDocument(id: string): Promise<Prisma.DocumentGetPayload<{}>> {
+export async function deleteDocument(id: string): Promise<Document> {
   return prisma.document.delete({
     where: { id },
   });
@@ -191,7 +192,7 @@ const documentOverviewSelect = {
   type: true,
   originalFilename: true,
   sourceProjectId: true,
-  sourceProject: { select: { id: true, name: true, identifier: true } },
+  sourceProject: { select: { id: true, name: true, slug: true } },
   versions: {
     select: { id: true, languageId: true, status: true },
   },

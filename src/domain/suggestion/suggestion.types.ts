@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SuggestionStatus, SuggestionType } from '@prisma/client';
+import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 
 export const createSuggestionSchema = z.object({
   documentVersionId: z.string(),
@@ -47,4 +47,40 @@ export interface SuggestionFilters {
   status?: SuggestionStatus | 'ALL';
   type?: SuggestionType | 'ALL';
   userId?: string;
+}
+
+export interface SuggestionReplyWithUser {
+  id: string;
+  suggestionId: string;
+  content: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    image: string | null;
+  };
+}
+
+/** A suggestion joined with its author, as the editor and sidebar render it. */
+export interface SuggestionWithUser {
+  id: string;
+  startLine?: number | null;
+  startColumn?: number | null;
+  endLine?: number | null;
+  endColumn?: number | null;
+  type: SuggestionType;
+  status: SuggestionStatus;
+  comment: string;
+  proposedText: string | null;
+  originalText: string | null;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    image: string | null;
+  };
+  createdAt: string;
+  version: number;
+  replies?: SuggestionReplyWithUser[];
 }

@@ -1,4 +1,4 @@
-import matter from 'gray-matter';
+import { parseFrontmatter } from '@/lib/frontmatter';
 
 /**
  * Pure conversion of stored Markdown into a speech script: the prose a
@@ -90,7 +90,7 @@ function stripInvisibleFormatting(text: string): string {
 
 function stripFrontmatter(markdown: string): string {
   try {
-    return matter(markdown).content;
+    return parseFrontmatter(markdown).content;
   } catch {
     return markdown;
   }
@@ -113,7 +113,7 @@ const BLOCK_TAGS = new Set([
 const BLOCK_TAG_PATTERN = new RegExp(`</?(?:${[...BLOCK_TAGS].join('|')})\\b[^>]*>`, 'gi');
 
 /** Removes every element marked data-read="false", content and all. */
-export function stripUnreadElements(text: string): string {
+function stripUnreadElements(text: string): string {
   let match: RegExpMatchArray | null;
   while ((match = text.match(UNREAD_OPEN_TAG)) !== null) {
     const start = match.index ?? 0;

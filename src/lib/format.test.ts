@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatLastActive, formatUnambiguousDate, getInitials } from './format';
+import { formatLastActive, formatTimeAgo, formatUnambiguousDate, getInitials } from './format';
 
 describe('formatLastActive', () => {
   const now = new Date('2026-07-21T12:00:00Z');
@@ -46,5 +46,19 @@ describe('getInitials', () => {
     assert.equal(getInitials(''), '?');
     assert.equal(getInitials(null), '?');
     assert.equal(getInitials(undefined), '?');
+  });
+});
+
+describe('formatTimeAgo', () => {
+  const now = new Date('2026-09-21T12:00:00Z');
+
+  it('counts minutes and hours within the day', () => {
+    assert.equal(formatTimeAgo('2026-09-21T11:59:30Z', now), 'just now');
+    assert.equal(formatTimeAgo('2026-09-21T11:55:00Z', now), '5 min ago');
+    assert.equal(formatTimeAgo('2026-09-21T09:00:00Z', now), '3 h ago');
+  });
+
+  it('falls back to days after a day', () => {
+    assert.equal(formatTimeAgo('2026-09-19T12:00:00Z', now), '2 days ago');
   });
 });

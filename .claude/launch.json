@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "demo",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "set -a; . ./.env; set +a; export DATABASE_URL=postgresql://postgres:postgres@localhost:5511/translation_helper_demo NEXT_PUBLIC_APP_URL=http://localhost:3300 PORT=3300; exec ./node_modules/.bin/next dev --port 3300"
+      ],
+      "port": 3300
+    }
+  ]
+}

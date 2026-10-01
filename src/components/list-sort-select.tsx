@@ -47,9 +47,11 @@ export function ListSortSelect({
       <Select
         value={value}
         onValueChange={(next) => {
+          if (next == null) return;
           const option = options.find((o) => `${o.sort}:${o.order}` === next);
           if (option) onChange(option.sort, option.order);
         }}
+        items={Object.fromEntries(options.map((option) => [`${option.sort}:${option.order}`, option.label]))}
       >
         <SelectTrigger id={selectId} className="min-w-44">
           <SelectValue />

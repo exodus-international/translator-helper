@@ -1,30 +1,46 @@
 import { RawEditorPane } from '@/components/raw-editor-panel';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DocumentPanel } from '@/components/editor/document-panel';
+import { PaneTabs } from '@/components/editor/pane-tabs';
+import type { CodeEditorHandle } from '@/components/editor/code-editor';
+import { useCursorSync } from '@/components/editor/use-cursor-sync';
+import { useSourceEditing } from '@/components/editor/use-source-editing';
+import { useFollowSelection } from '@/components/editor/toolbar-placement';
+import { DiscardDialog } from '@/components/editor/discard-dialog';
+import { useSuggestionAuthoring } from '@/components/editor/use-suggestion-authoring';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Sidebar, SidebarContent, SidebarHeader, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import { SuggestionStatus } from '@prisma/client';
-import { ChevronDown, ChevronRight, Edit, Eye, FileEdit, PanelRightClose, PanelRightOpen, Save, X } from 'lucide-react';
-import { ReactNode, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { MarkdownPreview } from '@/components/markdown-preview';
-import { SuggestionWithUser } from './monaco-suggestion-decorations';
+import { getDocumentStatusConfig } from '@/constants/document-status';
+import { EDITOR_SIDEBAR_COOKIE_NAME } from '@/lib/sidebar-cookie';
+import { DocumentStatus, SuggestionStatus } from '@/generated/prisma/enums';
+import {
+  Edit,
+  Eye,
+  FileCode,
+  FileEdit,
+  Loader2,
+  PanelRightOpen,
+  Plus,
+  Save,
+  X,
+} from 'lucide-react';
+import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { ReaderPreview } from '@/components/reader-preview';
+import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
+import type { LintDiagnostic } from '@/lib/lint';
+import { LintStatusBar } from '@/components/editor/lint-status-bar';
+import { MarkdownGuideDialog } from '@/components/markdown-guide';
 import { SuggestionDiffViewer } from './suggestion-diff-viewer';
 import { SuggestionForm } from './suggestion-form';
+import { CopyAllButton } from './editor/copy-all-button';
+import { FormattingToolbar } from './editor/formatting-toolbar';
+import { useFormattingToolbar } from './editor/use-formatting-toolbar';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
-import { ThreadSidebar } from './thread-sidebar';
 import { AudioTextPanel } from '@/components/audio-text-panel';
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 // SuggestionType enum values
@@ -100,33 +116,95 @@ interface SourceTranslationViewerProps {
   documentVersion?: number;
   isApplyingSuggestion?: boolean;
   isDismissingSuggestion?: boolean;
-  editorRef?: React.RefObject<any>; // Ref to the Monaco editor to get cursor position
+  editorRef?: React.RefObject<CodeEditorHandle | null>; // Ref to the editor, to read cursor position
   onReply?: (suggestionId: string, content: string) => void;
   onCreateGeneralThread?: (comment: string) => void;
   disableReopen?: boolean;
   sidebarHeader?: ReactNode;
+  /** Workflow buttons, shown under the info card in the panel. */
+  sidebarActions?: ReactNode;
   /** Compact one-line rows shown under the header (audio, deploy). */
   sidebarSummary?: ReactNode;
   /** Full panels shown in place of the feedback list when the user opens details. */
   sidebarDetails?: ReactNode;
   /** Start with the details panels open instead of the feedback list. */
   sidebarDetailsDefaultOpen?: boolean;
-  /** Monaco language for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
+  /**
+   * The state the version is in. The panel's collapsed rail shows it as one
+   * coloured dot, so a folded panel still says where the document stands.
+   */
+  status?: DocumentStatus | null;
+  /**
+   * The editor's own controls -- the save state, the zen toggle -- drawn in the
+   * panel's header row. They are chrome about the document, which is what the
+   * panel is; the row above the panes had them only because it came first.
+   */
+  panelActions?: ReactNode;
+  /**
+   * Toggles zen mode. Present only on the editor that has one; the folded rail
+   * then keeps its button, because zen is a change of view and the rail is
+   * still on screen.
+   */
+  onToggleZen?: () => void;
+  /** Language id for the code panes. When 'yaml', the Markdown-rendered views are hidden. */
   contentLanguage?: 'markdown' | 'yaml';
+  /**
+   * False until this language has a version. The translation pane then offers
+   * the call to action instead of an editor — there is nothing to type into yet,
+   * and linting an empty document only reports everything as missing.
+   */
+  translationStarted?: boolean;
+  onStartTranslation?: () => void;
+  startingTranslation?: boolean;
+  /**
+   * True when this document has no target language yet, so there is nothing to
+   * translate into. The panel says so in full; the folded rail has to say it
+   * too, since the panel's folded state persists across documents and would
+   * otherwise leave the next one silently empty.
+   */
+  targetLanguageMissing?: boolean;
+  /** Opens the Markdown guide from a lint finding. */
+  onOpenGuide?: () => void;
   /** Passed through to the Audio text tab so the sidebar card's badge follows what happens in it. */
   onAudioTranscriptStateChange?: (state: AudioTranscriptState) => void;
 }
 
-const mapLineNumber = (_lineNumber: number, _fromTotal: number, toTotal: number) => {
-  return Math.min(Math.max(_lineNumber, 1), Math.max(toTotal, 1));
-};
+/**
+ * Where the cursor sits in this pane and where its counterpart sits in the
+ * other, kept in step by the cursor handlers above. It lives in the pane header
+ * because it is chrome: as a strip above the editor it bought its own line of
+ * the document it only describes.
+ */
+function CursorSync({ line, otherLine, title }: { line: number; otherLine: number; title: string }) {
+  return (
+    <span
+      className="hidden shrink-0 items-center gap-1 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline-flex"
+      title={title}
+    >
+      L{line}
+      <span className="text-muted-foreground/50" aria-hidden>
+        ↔
+      </span>
+      <span className="text-muted-foreground/60">L{otherLine}</span>
+    </span>
+  );
+}
 
 export const SourceTranslationViewer = forwardRef<SourceTranslationViewerHandle, SourceTranslationViewerProps>(
   function SourceTranslationViewerOuter(props, ref) {
     const hasSidebar = (props.suggestions?.length ?? 0) > 0 || props.canCreateSuggestions;
+    // Same condition the inner component renders the panel on -- keep the two
+    // in step, or a document with only a summary renders a panel that starts
+    // closed.
+    const hasPanel = hasSidebar || !!props.sidebarHeader || !!props.sidebarSummary;
     return (
       <SidebarProvider
-        defaultOpen={hasSidebar || !!props.sidebarHeader}
+        defaultOpen={hasPanel}
+        // Nested inside the app shell's own provider: keep this one from
+        // stealing ⌘B (which would toggle both sidebars at once) and from
+        // overwriting the shell's persisted state cookie.
+        keyboardShortcut={false}
+        cookieName={EDITOR_SIDEBAR_COOKIE_NAME}
         className={cn(props.className, props.layout === 'zen' && 'h-full')}
       >
         <SourceTranslationViewerInner ref={ref} {...props} />
@@ -174,10 +252,19 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       onCreateGeneralThread,
       disableReopen = false,
       sidebarHeader,
+      sidebarActions,
       sidebarSummary,
       sidebarDetails,
       sidebarDetailsDefaultOpen = false,
+      status,
+      panelActions,
+      onToggleZen,
       contentLanguage = 'markdown',
+      translationStarted = true,
+      targetLanguageMissing = false,
+      onStartTranslation,
+      startingTranslation = false,
+      onOpenGuide,
       onAudioTranscriptStateChange,
     },
     ref,
@@ -211,33 +298,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       }
     }, [requestedView, audioTabVersionId, onRequestedViewShown]);
     const [isReviewEditing, setIsReviewEditing] = useState(reviewConfig?.editingDefault ?? false);
-    const [showSuggestionForm, setShowSuggestionForm] = useState(false);
-    const [suggestionFormType, setSuggestionFormType] = useState<SuggestionType>(SuggestionType.COMMENT);
-    const [selectedRange, setSelectedRange] = useState<{
-      startLine: number;
-      startColumn: number;
-      endLine: number;
-      endColumn: number;
-    } | null>(null);
-    const [selectedText, setSelectedText] = useState<string>(''); // Store selected text for pre-filling
-    const suggestionFormDirtyRef = useRef(false);
-    // The Audio text tab is unmounted the moment another tab is chosen, taking
-    // an unsaved draft with it. Same guard the suggestion form gets.
-    const audioDraftDirtyRef = useRef(false);
-    const [showDiscardDialog, setShowDiscardDialog] = useState(false);
-    const [discardKind, setDiscardKind] = useState<'suggestion' | 'audioText'>('suggestion');
-    const pendingDiscardActionRef = useRef<(() => void) | null>(null);
-    const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null);
-    const translationEditorRef = useRef<any>(null);
+    const translationEditorRef = useRef<CodeEditorHandle | null>(null);
+    const [translationDiagnostics, setTranslationDiagnostics] = useState<LintDiagnostic[]>([]);
+    const sourceEditorRef = useRef<CodeEditorHandle | null>(null);
+    const sourceContainerRef = useRef<HTMLDivElement>(null);
     const translationContainerRef = useRef<HTMLDivElement>(null);
     const [selectedUserId] = useState<string | null>(null); // Filter by user for diff view
-    const [isSourceEditing, setIsSourceEditing] = useState(false);
-    const [sourceEditValue, setSourceEditValue] = useState(sourceEditContent ?? sourceContent);
-    const [sourceSaving, setSourceSaving] = useState(false);
-    const [sourceLine, setSourceLine] = useState(1);
-    const [translationLine, setTranslationLine] = useState(1);
-    const [syncedSourceLine, setSyncedSourceLine] = useState<number | undefined>(undefined);
-    const [syncedTranslationLine, setSyncedTranslationLine] = useState<number | undefined>(undefined);
 
     useEffect(() => {
       setMounted(true);
@@ -248,84 +314,92 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       return suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length;
     }, [suggestions]);
 
-    const sourceLineCount = useMemo(() => sourceContent.split('\n').length, [sourceContent]);
-    const translationLineCount = useMemo(() => translationContent.split('\n').length, [translationContent]);
-
     const translationPreview = translationFormattedContent ?? translationContent;
     const translationRawVisible =
       variant === 'translate' ? translateTab === 'edit' : isReviewEditing || reviewViewMode === 'review';
     const isReviewMode = variant === 'review' && reviewViewMode === 'review';
+    // The cursor chip only means something when both panes are showing editors:
+    // it names this pane's line and the line the other pane is parked on. It is
+    // also when a line moved to in one comes level in the other -- side by
+    // side, not a tab apart.
+    const showCursorSync = sourceViewMode === 'raw' && translationRawVisible;
+    const {
+      sourceLine,
+      translationLine,
+      syncedSourceLine,
+      syncedTranslationLine,
+      handleSourceCursorChange,
+      handleTranslationCursorChange,
+      jumpToTranslationLine,
+      clearTranslationSync,
+    } = useCursorSync({
+      sourceContent,
+      translationContent,
+      sourceEditorRef,
+      translationEditorRef,
+      active: showCursorSync && !isMobile,
+      translationRawVisible,
+      sourceRawVisible: sourceViewMode === 'raw',
+    });
+    const {
+      isSourceEditing,
+      sourceEditValue,
+      sourceSaving,
+      sourcePaneDiagnostics,
+      setSourceDiagnostics,
+      handleSourceEditChange,
+      handleSourceSave,
+      handleSourceCancel,
+      enterSourceEditMode,
+    } = useSourceEditing({
+      canEditSource,
+      sourceContent,
+      sourceEditContent,
+      onSourceChange,
+      onSourceSave,
+      // `!isYaml` for the same reason the editor gates itself on the language:
+      // these are Markdown rules.
+      inPreview: !isYaml && sourceViewMode === 'formatted',
+      onEnter: () => setSourceViewMode('raw'),
+    });
 
-    // Update source edit value when sourceEditContent prop changes
-    useEffect(() => {
-      if (sourceEditContent !== undefined) {
-        setSourceEditValue(sourceEditContent);
-      }
-    }, [sourceEditContent]);
+    // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
+    const showSuggestionDecorations = suggestions.length > 0;
+    const showSelectionToolbar = canCreateSuggestions && (isReviewMode || showSuggestionDecorations);
+    // Formatting is offered wherever the translation pane is the thing being
+    // typed into. Where the suggestion toolbar owns the selection (review, or a
+    // document with feedback), that toolbar keeps the spot.
+    const formattingEnabled = variant === 'translate' && translateTab === 'edit' && !showSelectionToolbar;
 
-    const handleSourceEditChange = (value: string) => {
-      setSourceEditValue(value);
-      onSourceChange?.(value);
-    };
+    const authoring = useSuggestionAuthoring({
+      translationContent,
+      editorRef: translationEditorRef,
+      externalEditorRef,
+      showSelectionToolbar,
+      formattingEnabled,
+      documentVersion,
+      onCreateSuggestion,
+      viewKey: `${reviewViewMode}:${translateTab}:${isReviewEditing}`,
+    });
+    const {
+      showSuggestionForm,
+      suggestionFormType,
+      selectedRange,
+      selectedText,
+      toolbarPosition,
+      setToolbarPosition,
+      suggestionFormDirtyRef,
+      audioDraftDirtyRef,
+      requestLeaveAudioText,
+      requestCloseSuggestionForm,
+      handleSelectionChange,
+      openSuggestionForm: handleCreateSuggestion,
+      submitSuggestionForm: handleSuggestionFormSubmit,
+    } = authoring;
 
-    const handleSourceSave = async () => {
-      if (!onSourceSave) return;
-      setSourceSaving(true);
-      try {
-        await onSourceSave();
-        setIsSourceEditing(false);
-      } catch (error) {
-        console.error('Error saving source:', error);
-      } finally {
-        setSourceSaving(false);
-      }
-    };
-
-    const handleSourceCancel = () => {
-      setSourceEditValue(sourceEditContent ?? sourceContent);
-      setIsSourceEditing(false);
-    };
-
-    const enterSourceEditMode = () => {
-      if (!canEditSource) return;
-      setSourceEditValue(sourceEditContent ?? sourceContent);
-      setIsSourceEditing(true);
-      setSourceViewMode('raw');
-    };
-
-    const handleSourceCursorChange = (lineNumber: number) => {
-      setSourceLine(lineNumber);
-      // Clear stale decoration on the source pane (user is now active here)
-      setSyncedSourceLine(undefined);
-      if (!translationRawVisible) {
-        setSyncedTranslationLine(undefined);
-        return;
-      }
-
-      const sourceTotalLines = sourceLineCount;
-      const translationTotalLines = translationLineCount;
-      const translationTargetLine = mapLineNumber(lineNumber, sourceTotalLines, translationTotalLines);
-      setSyncedTranslationLine(translationTargetLine);
-      // Update the translation pane's displayed line to match the synced target
-      setTranslationLine(translationTargetLine);
-    };
-
-    const handleTranslationCursorChange = (lineNumber: number) => {
-      setTranslationLine(lineNumber);
-      // Clear stale decoration on the translation pane (user is now active here)
-      setSyncedTranslationLine(undefined);
-      if (sourceViewMode !== 'raw') {
-        setSyncedSourceLine(undefined);
-        return;
-      }
-
-      const sourceTotalLines = sourceLineCount;
-      const translationTotalLines = translationLineCount;
-      const sourceTargetLine = mapLineNumber(lineNumber, translationTotalLines, sourceTotalLines);
-      setSyncedSourceLine(sourceTargetLine);
-      // Update the source pane's displayed line to match the synced target
-      setSourceLine(sourceTargetLine);
-    };
+    // The suggestion toolbar is placed where the selection is on screen, so it
+    // moves with the selection as the pane scrolls.
+    useFollowSelection(toolbarPosition !== null, translationContainerRef, translationEditorRef, setToolbarPosition);
 
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
       setActiveThreadId(suggestion.id);
@@ -343,33 +417,24 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           suggestion.endLine != null &&
           suggestion.endColumn != null
         ) {
-          const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-          const editor = editorWrapper?.editor;
-          const monaco = editorWrapper?.monaco;
-          if (editor && monaco) {
-            const range = new monaco.Range(
-              suggestion.startLine,
-              suggestion.startColumn,
-              suggestion.endLine,
-              suggestion.endColumn,
-            );
-            editor.revealRangeInCenter(range);
+          const editor = (translationEditorRef.current || externalEditorRef?.current)?.editor;
+          if (editor) {
+            const range = {
+              startLine: suggestion.startLine,
+              startColumn: suggestion.startColumn,
+              endLine: suggestion.endLine,
+              endColumn: suggestion.endColumn,
+            };
+            editor.revealRange(range);
             editor.setSelection(range);
           }
 
-          // Always sync both panes for context
-          setTranslationLine(suggestion.startLine);
-          setSyncedTranslationLine(suggestion.startLine);
-
-          // Sync source pane — switch to raw view if needed so the line highlight is visible
-          const sourceTotalLines = sourceContent.split('\n').length;
-          const translationTotalLines = translationContent.split('\n').length;
-          const sourceTargetLine = mapLineNumber(suggestion.startLine, translationTotalLines, sourceTotalLines);
-
+          // Both panes mark the lines for context; the source shows its
+          // editor if it was on the preview, so the mark is visible.
+          jumpToTranslationLine(suggestion.startLine);
           if (sourceViewMode !== 'raw') {
             setSourceViewMode('raw');
           }
-          setSyncedSourceLine(sourceTargetLine);
         }
       } catch (error) {
         console.error('Error selecting suggestion in editor:', error);
@@ -378,19 +443,24 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       }
     };
 
-    const cardClassName = isZen
-      ? 'p-3 flex flex-1 flex-col min-w-0 min-h-0'
-      : 'p-0 gap-0 shadow-none flex flex-1 flex-col min-w-0 min-h-0';
-    const bodyClassName = isZen ? 'flex-1 min-h-0 overflow-hidden relative' : 'flex-1 min-h-0 overflow-hidden';
+    // One pane object, shared by both sides: a sheet on the workspace ground,
+    // with room for a header and nothing else of its own.
+    const paneClassName = 'min-h-0 min-w-0 flex-1 gap-0 overflow-hidden rounded-lg border bg-editor p-0 shadow-none';
+    const panelStatus = status ? getDocumentStatusConfig(status) : null;
+    const bodyClassName = 'relative min-h-0 flex-1 overflow-hidden';
     // Mobile: only the active pane is displayed; desktop keeps both side by side.
     const paneVisibility = (visible: boolean) => (visible ? 'flex' : 'hidden md:flex');
     const sourcePaneVisible = !isMobile || mobilePane === 'source';
     const translationPaneVisible = !isMobile || mobilePane === 'translation';
+    // Report only once there is text to report on. A version that has just
+    // been started is empty, and checking it against the source calls every
+    // heading, key and link missing — an error the translator has not made.
+    const translationHasContent = translationContent.trim().length > 0;
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
       setReviewViewMode('review');
-      setSyncedTranslationLine(undefined);
+      clearTranslationSync();
     };
 
     const enterReviewEditMode = () => {
@@ -429,180 +499,77 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       [variant, enterReviewEditMode, exitReviewEditMode],
     );
 
-    const doCloseSuggestionForm = useCallback(() => {
-      setShowSuggestionForm(false);
-      setSelectedRange(null);
-      setSelectedText('');
-      suggestionFormDirtyRef.current = false;
-    }, []);
-
-    const requestCloseSuggestionForm = useCallback(
-      (onConfirmed?: () => void) => {
-        if (!suggestionFormDirtyRef.current) {
-          doCloseSuggestionForm();
-          onConfirmed?.();
-          return;
-        }
-        pendingDiscardActionRef.current = onConfirmed ?? null;
-        setDiscardKind('suggestion');
-        setShowDiscardDialog(true);
-      },
-      [doCloseSuggestionForm],
-    );
-
-    /** Leaving the Audio text tab, once whoever is in it has agreed to lose the draft. */
-    const requestLeaveAudioText = useCallback((proceed: () => void) => {
-      if (!audioDraftDirtyRef.current) {
-        proceed();
-        return;
-      }
-      pendingDiscardActionRef.current = () => {
-        audioDraftDirtyRef.current = false;
-        proceed();
-      };
-      setDiscardKind('audioText');
-      setShowDiscardDialog(true);
-    }, []);
-
-    const handleDiscardConfirm = useCallback(() => {
-      if (discardKind === 'suggestion') doCloseSuggestionForm();
-      setShowDiscardDialog(false);
-      pendingDiscardActionRef.current?.();
-      pendingDiscardActionRef.current = null;
-    }, [doCloseSuggestionForm, discardKind]);
-
-    const handleDiscardCancel = useCallback(() => {
-      setShowDiscardDialog(false);
-      pendingDiscardActionRef.current = null;
-    }, []);
-
-    const handleSelectionChange = (
-      range: {
-        startLine: number;
-        startColumn: number;
-        endLine: number;
-        endColumn: number;
-      } | null,
-    ) => {
-      // Close suggestion form if open when selection changes
-      if (showSuggestionForm) {
-        requestCloseSuggestionForm();
-        return;
-      }
-
-      setSelectedRange(range);
-      // Get selected text from editor
-      if (range) {
-        const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-        const editor = editorWrapper?.editor;
-        const monaco = editorWrapper?.monaco;
-
-        if (editor && monaco && typeof editor.getModel === 'function') {
-          try {
-            const model = editor.getModel();
-            if (model) {
-              const monacoRange = new monaco.Range(range.startLine, range.startColumn, range.endLine, range.endColumn);
-              const text = model.getValueInRange(monacoRange);
-              setSelectedText(text);
-            }
-          } catch (error) {
-            console.error('Error getting selected text from Monaco:', error);
-            // Fallback to content extraction
-            extractTextFromContent(range);
-          }
-        } else {
-          // Fallback: extract text from content
-          extractTextFromContent(range);
-        }
-      } else {
-        setSelectedText('');
-      }
-
-      function extractTextFromContent(range: {
-        startLine: number;
-        startColumn: number;
-        endLine: number;
-        endColumn: number;
-      }) {
-        const lines = translationContent.split('\n');
-        if (range.startLine === range.endLine) {
-          const line = lines[range.startLine - 1] || '';
-          const text = line.substring(range.startColumn - 1, range.endColumn - 1);
-          setSelectedText(text);
-        } else {
-          // Multi-line selection
-          const firstLine = lines[range.startLine - 1] || '';
-          const lastLine = lines[range.endLine - 1] || '';
-          const firstPart = firstLine.substring(range.startColumn - 1);
-          const lastPart = lastLine.substring(0, range.endColumn - 1);
-          const middleLines = lines.slice(range.startLine, range.endLine - 1);
-          setSelectedText([firstPart, ...middleLines, lastPart].join('\n'));
-        }
-      }
-
-      const showToolbar = range && canCreateSuggestions && (isReviewMode || suggestions.length > 0);
-      if (showToolbar) {
-        // Try to get actual position from editor
-        const editorWrapper = translationEditorRef.current || externalEditorRef?.current;
-        const editor = editorWrapper?.editor;
-        if (editor && typeof editor.getScrolledVisiblePosition === 'function') {
-          try {
-            const pos = editor.getScrolledVisiblePosition({ lineNumber: range.endLine, column: range.endColumn });
-            if (pos) {
-              setToolbarPosition({ x: pos.left + 20, y: pos.top + pos.height + 4 });
-            } else {
-              setToolbarPosition({ x: 180, y: 20 });
-            }
-          } catch {
-            setToolbarPosition({ x: 180, y: 20 });
-          }
-        } else {
-          setToolbarPosition({ x: 180, y: 20 });
-        }
-      } else {
-        setToolbarPosition(null);
-      }
-    };
-
-    const handleCreateSuggestion = (type: SuggestionType) => {
-      if (!selectedRange) return;
-      setSuggestionFormType(type);
-      setShowSuggestionForm(true);
-      setToolbarPosition(null);
-    };
-
-    const handleSuggestionFormSubmit = (data: { comment: string; proposedText?: string }) => {
-      if (!selectedRange || !onCreateSuggestion) return;
-      onCreateSuggestion({
-        ...data,
-        type: suggestionFormType,
-        range: selectedRange,
-        version: documentVersion,
-      });
-      suggestionFormDirtyRef.current = false;
-      setShowSuggestionForm(false);
-      setSelectedRange(null);
-      setSelectedText('');
-    };
-
     const hasSidebar = suggestions.length > 0 || canCreateSuggestions;
+
+    // A notification about a suggestion links here with ?thread=<id>. Once that
+    // thread has loaded, open the panel on it and bring its lines into view,
+    // the same as clicking it. Only once: after that the panel is the user's.
+    const threadLinkHandled = useRef(false);
+    useEffect(() => {
+      if (!mounted || threadLinkHandled.current) return;
+      const threadId = new URLSearchParams(window.location.search).get('thread');
+      if (!threadId) {
+        threadLinkHandled.current = true;
+        return;
+      }
+      const suggestion = suggestions.find((s) => s.id === threadId);
+      if (!suggestion) return;
+      threadLinkHandled.current = true;
+      setSidebarView('threads');
+      if (isMobile) {
+        // On a phone the thread list is a sheet; show the thread there.
+        setActiveThreadId(suggestion.id);
+        setOpenMobile(true);
+        return;
+      }
+      if (!sidebarOpen) toggleSidebar();
+      // The editor mounts after the page; give it a moment before scrolling it.
+      setTimeout(() => handleSuggestionClickInternal(suggestion), 300);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the linked thread first appears
+    }, [mounted, suggestions]);
     // On mobile the panel is the offcanvas Sheet (openMobile); on desktop it's
     // the docked sidebar (open). "Show panel" must appear whenever it's closed,
     // otherwise mobile users with a pre-opened desktop state can't reach it.
     const panelHidden = isMobile ? !openMobile : !sidebarOpen;
+    // The panel exists whenever it has anything to show; Document info alone is
+    // enough. `hasSidebar` is narrower -- it gates the thread list -- so using
+    // it for the reopen button made the panel a trapdoor on documents without
+    // suggestions, and hid it outright on mobile, where it starts closed.
+    const hasPanel = hasSidebar || !!sidebarHeader || !!sidebarSummary;
+    // There is a translation to copy once one has been started, and the Audio
+    // text tab shows a different text -- the transcript, with its own editor
+    // -- so a button there reading "copy translation" would not copy what is
+    // on screen.
+    const showingAudioText =
+      variant === 'review' && !isReviewEditing && !!audioTabVersionId && reviewViewMode === 'audio';
+    const showTranslationCopy = (variant === 'review' || translationStarted) && !showingAudioText;
 
-    // Show suggestions decorations and selection toolbar in review mode OR when suggestions exist in translate mode
-    const showSuggestionDecorations = suggestions.length > 0;
-    const showSelectionToolbar = canCreateSuggestions && (isReviewMode || showSuggestionDecorations);
+    // The same toolbar for both panes: one hook each, pointed at the editor of
+    // the pane and the box it floats over.
+    const sourceFormatting = useFormattingToolbar({
+      editorRef: sourceEditorRef,
+      containerRef: sourceContainerRef,
+      enabled: isSourceEditing,
+    });
+    const translationFormatting = useFormattingToolbar({
+      editorRef: translationEditorRef,
+      containerRef: translationContainerRef,
+      enabled: formattingEnabled,
+    });
 
     return (
       <>
-        <div className={cn('flex min-w-0 flex-1 flex-col border-0 md:grid md:grid-cols-2', isZen && 'h-full')}>
+        <div
+          className={cn(
+            'flex min-w-0 flex-1 flex-col gap-2 bg-workspace p-2 md:grid md:grid-cols-2',
+            isZen && 'h-full',
+          )}
+        >
           {/* Mobile: one pane at a time, toggled by this switcher. Desktop: both panes side by side. */}
           <Tabs
             value={mobilePane}
             onValueChange={(value) => setMobilePane(value as 'source' | 'translation')}
-            className="shrink-0 px-2 pt-2 md:hidden"
+            className="shrink-0 md:hidden"
           >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="source">Source</TabsTrigger>
@@ -610,55 +577,33 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             </TabsList>
           </Tabs>
 
-          <Card
-            className={cn(
-              cardClassName,
-              'rounded-none border-t-0 border-r-0 pt-1',
-              paneVisibility(sourcePaneVisible),
-            )}
-          >
-            <div className="flex h-12 items-center justify-between px-2">
+          <Card className={cn(paneClassName, paneVisibility(sourcePaneVisible))}>
+            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
               {/* The mobile switcher above already names this pane; the language
                   badge below still travels with the header. */}
-              <h2 className="hidden min-w-0 truncate text-sm font-semibold md:block">Source (English)</h2>
-              <div className="flex flex-1 items-center gap-2 md:flex-none md:justify-end">
-                {!isSourceEditing &&
-                  !isYaml &&
-                  (mounted ? (
-                    <Tabs
-                      value={sourceViewMode}
-                      onValueChange={(value) => setSourceViewMode(value as 'formatted' | 'raw')}
-                    >
-                      <TabsList>
-                        <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                        <TabsTrigger value="raw">Raw</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  ) : (
-                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          sourceViewMode === 'formatted' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        Formatted
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          sourceViewMode === 'raw' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        Raw
-                      </button>
-                    </div>
-                  ))}
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="hidden min-w-0 truncate text-sm font-medium md:block">Source</h2>
                 {sourceBadge}
+                {showCursorSync && (
+                  <CursorSync
+                    line={sourceLine}
+                    otherLine={syncedTranslationLine ?? translationLine}
+                    title={`Source line ${sourceLine} ↔ translation line ${syncedTranslationLine ?? translationLine}`}
+                  />
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {!isSourceEditing && !isYaml && (
+                  <PaneTabs
+                    mounted={mounted}
+                    value={sourceViewMode}
+                    onValueChange={setSourceViewMode}
+                    tabs={[
+                      { value: 'raw', label: 'Markdown', icon: <FileCode /> },
+                      { value: 'formatted', label: 'Preview', icon: <Eye /> },
+                    ]}
+                  />
+                )}
                 {canEditSource && !isSourceEditing && (
                   <>
                     <Button variant="outline" size="sm" onClick={enterSourceEditMode}>
@@ -667,7 +612,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     </Button>
                     {/* <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline">
                         <Trash2 />
                         Delete
                       </Button>
@@ -699,34 +644,55 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     </Button>
                   </>
                 )}
+                {/* Last in the row, so it keeps its place while Edit turns
+                    into Save and Cancel. What is being edited is what gets
+                    copied. */}
+                <CopyAllButton pane="source" text={isSourceEditing ? sourceEditValue : sourceContent} />
                 {sourceHeaderExtra}
               </div>
             </div>
-            <div className={bodyClassName}>
+            <div ref={sourceContainerRef} className={bodyClassName}>
+              {sourceFormatting.position && (
+                <FormattingToolbar
+                  position={sourceFormatting.position}
+                  active={sourceFormatting.active}
+                  containerRef={sourceContainerRef}
+                  onFormat={sourceFormatting.onFormat}
+                />
+              )}
               {isSourceEditing ? (
                 <RawEditorPane
+                  ariaLabel="Source text"
+                  ref={sourceEditorRef}
                   value={sourceEditValue}
                   onChange={handleSourceEditChange}
+                  onSelectionChange={sourceFormatting.onSelectionChange}
                   currentLine={sourceLine}
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
                   language={contentLanguage}
-                  lineInfo={{
-                    primaryLabel: 'Source Line',
-                    primaryValue: sourceLine,
-                    secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                    secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
-                    direction: 'to',
-                  }}
+                  isSource
+                  onDiagnosticsChange={setSourceDiagnostics}
+                  onOpenGuide={onOpenGuide}
+                  footer={
+                    <LintStatusBar
+                      diagnostics={sourcePaneDiagnostics}
+                      onFixAll={() => sourceEditorRef.current?.fixAll()}
+                    />
+                  }
                 />
               ) : !isYaml && sourceViewMode === 'formatted' ? (
-                <MarkdownPreview
-                  content={sourceFormattedContent}
-                  className="prose max-w-none h-full overflow-y-auto p-3"
-                />
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <ReaderPreview content={sourceFormattedContent} />
+                  </div>
+                  <LintStatusBar diagnostics={sourcePaneDiagnostics} />
+                </div>
               ) : (
                 <RawEditorPane
+                  ariaLabel="Source text"
+                  ref={sourceEditorRef}
                   value={sourceContent}
                   readOnly
                   language={contentLanguage}
@@ -734,148 +700,92 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}
                   fullHeight
-                  lineInfo={{
-                    primaryLabel: 'Source Line',
-                    primaryValue: sourceLine,
-                    secondaryLabel: translationRawVisible ? 'Translation Line' : undefined,
-                    secondaryValue: translationRawVisible ? (syncedTranslationLine ?? translationLine) : undefined,
-                    direction: 'to',
-                  }}
+                  isSource
+                  onDiagnosticsChange={setSourceDiagnostics}
+                  onOpenGuide={onOpenGuide}
+                  footer={
+                    <LintStatusBar
+                      diagnostics={sourcePaneDiagnostics}
+                      onFixAll={() => sourceEditorRef.current?.fixAll()}
+                    />
+                  }
                 />
               )}
             </div>
           </Card>
 
-          <Card
-            className={cn(
-              cardClassName,
-              'rounded-none border-t-0 border-r-0 pt-1',
-              paneVisibility(translationPaneVisible),
-            )}
-          >
-            <div className="flex h-12 items-center justify-between px-2">
-              <h2 className="hidden min-w-0 truncate text-sm font-semibold md:block">Translation</h2>
-              <div className="flex flex-1 items-center gap-2 md:flex-none md:justify-end">
+          <Card className={cn(paneClassName, paneVisibility(translationPaneVisible))}>
+            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="hidden min-w-0 truncate text-sm font-medium md:block">Translation</h2>
+                {translationBadge}
+                {showCursorSync && (
+                  <CursorSync
+                    line={translationLine}
+                    otherLine={syncedSourceLine ?? sourceLine}
+                    title={`Translation line ${translationLine} ↔ source line ${syncedSourceLine ?? sourceLine}`}
+                  />
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
                 {variant === 'translate' ? (
-                  isYaml ? null : mounted ? (
-                    <Tabs value={translateTab} onValueChange={(value) => setTranslateTab(value as 'edit' | 'preview')}>
-                      <TabsList>
-                        <TabsTrigger value="edit">
-                          <FileEdit />
-                          Edit
-                        </TabsTrigger>
-                        <TabsTrigger value="preview">
-                          <Eye />
-                          Preview
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  ) : (
-                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          translateTab === 'edit' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        <FileEdit />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          translateTab === 'preview' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        <Eye />
-                        Preview
-                      </button>
-                    </div>
+                  isYaml ? null : (
+                    <PaneTabs
+                      mounted={mounted}
+                      value={translateTab}
+                      onValueChange={setTranslateTab}
+                      tabs={[
+                        { value: 'edit', label: 'Edit', icon: <FileEdit /> },
+                        { value: 'preview', label: 'Preview', icon: <Eye /> },
+                      ]}
+                    />
                   )
                 ) : !isReviewEditing && !isYaml ? (
-                  mounted ? (
-                    <Tabs
-                      value={reviewViewMode}
-                      onValueChange={(value) => {
-                        const next = value as TranslationViewMode;
-                        if (reviewViewMode === 'audio' && next !== 'audio') {
-                          requestLeaveAudioText(() => setReviewViewMode(next));
-                          return;
-                        }
-                        setReviewViewMode(next);
-                      }}
-                    >
-                      <TabsList>
-                        <TabsTrigger value="formatted">Formatted</TabsTrigger>
-                        <TabsTrigger value="review" className="relative">
-                          Review
-                          {openSuggestionsCount > 0 && (
-                            <Badge
-                              variant="primary"
-                              className="absolute -top-3 -right-3 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
-                            >
-                              {openSuggestionsCount}
-                            </Badge>
-                          )}
-                        </TabsTrigger>
-                        {audioTabVersionId && <TabsTrigger value="audio">Audio text</TabsTrigger>}
-                      </TabsList>
-                    </Tabs>
-                  ) : (
-                    <div className="inline-flex h-9 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          reviewViewMode === 'formatted' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        Formatted
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          'relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
-                          reviewViewMode === 'review' && 'bg-background shadow-sm',
-                        )}
-                      >
-                        Review
-                        {openSuggestionsCount > 0 && (
-                          <Badge
-                            variant="primary"
-                            className="absolute -top-1 -left-1 h-5 min-w-5 px-1.5 text-xs flex items-center justify-center"
-                          >
-                            {openSuggestionsCount}
-                          </Badge>
-                        )}
-                      </button>
-                    </div>
-                  )
+                  <PaneTabs
+                    mounted={mounted}
+                    value={reviewViewMode}
+                    onValueChange={(next) => {
+                      if (reviewViewMode === 'audio' && next !== 'audio') {
+                        requestLeaveAudioText(() => setReviewViewMode(next));
+                        return;
+                      }
+                      setReviewViewMode(next);
+                    }}
+                    tabs={[
+                      { value: 'formatted', label: 'Live' },
+                      {
+                        value: 'review',
+                        label: (
+                          <>
+                            Review
+                            {openSuggestionsCount > 0 && (
+                              <Badge variant="default" className="h-4 min-w-4 px-1 text-[10px]">
+                                {openSuggestionsCount}
+                              </Badge>
+                            )}
+                          </>
+                        ),
+                      },
+                      ...(audioTabVersionId ? [{ value: 'audio' as const, label: 'Audio text' }] : []),
+                    ]}
+                  />
                 ) : null}
-                {translationBadge}
+                {showTranslationCopy && <CopyAllButton pane="translation" text={translationContent} />}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
-                {hasSidebar && panelHidden && (
+                {/* On desktop the panel folds to its own rail, so it needs no
+                    button here. On mobile it is a sheet with no rail to reach
+                    for, and this icon is the only way in. */}
+                {hasPanel && !isZen && panelHidden && (
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon-sm"
                     onClick={toggleSidebar}
-                    className="h-7 text-xs"
-                    aria-label="Show panel"
+                    className="md:hidden"
+                    aria-label="Open document panel"
+                    title="Open document panel"
                   >
                     <PanelRightOpen />
-                    <span className="hidden sm:inline">Show panel</span>
-                    {openSuggestionsCount > 0 && (
-                      <Badge variant="primary" className="h-4 min-w-4 px-1 text-[10px]">
-                        {openSuggestionsCount}
-                      </Badge>
-                    )}
                   </Button>
                 )}
               </div>
@@ -883,30 +793,72 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
 
             <div className={bodyClassName}>
               {variant === 'translate' ? (
-                isYaml || translateTab === 'edit' ? (
+                !translationStarted ? (
+                  <Empty className="h-full border-0">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <FileEdit />
+                      </EmptyMedia>
+                      <EmptyTitle>No translation yet</EmptyTitle>
+                      <EmptyDescription>
+                        Start the translation for this document and write it here, next to the source.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                      <Button onClick={onStartTranslation} disabled={startingTranslation}>
+                        {startingTranslation ? <Loader2 className="animate-spin" /> : <Plus />}
+                        Start translation
+                      </Button>
+                    </EmptyContent>
+                  </Empty>
+                ) : isYaml || translateTab === 'edit' ? (
                   <div ref={translationContainerRef} className="relative h-full">
                     <RawEditorPane
+                      ariaLabel="Translation"
                       ref={translationEditorRef}
                       value={translationContent}
                       onChange={onTranslationChange}
                       onCursorChange={handleTranslationCursorChange}
                       language={contentLanguage}
+                      sourceContent={sourceContent}
+                      onDiagnosticsChange={setTranslationDiagnostics}
+                      footer={
+                        translationHasContent ? (
+                          <LintStatusBar
+                            diagnostics={translationDiagnostics}
+                            onFixAll={() => translationEditorRef.current?.fixAll()}
+                          />
+                        ) : undefined
+                      }
                       placeholder={translationPlaceholder}
                       currentLine={translationLine}
                       highlightLine={syncedTranslationLine}
                       fullHeight
                       suggestions={showSuggestionDecorations ? suggestions : undefined}
                       onSuggestionClick={showSuggestionDecorations ? handleSuggestionClickInternal : undefined}
-                      onSelectionChange={showSelectionToolbar ? handleSelectionChange : undefined}
-                      lineInfo={{
-                        primaryLabel: 'Translation Line',
-                        primaryValue: translationLine,
-                        secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                        secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
-                        direction: 'from',
+                      onSelectionChange={(range) => {
+                        if (showSelectionToolbar || formattingEnabled) handleSelectionChange(range);
+                        translationFormatting.onSelectionChange(range);
                       }}
+                      onOpenGuide={onOpenGuide}
                     />
-                    {toolbarPosition && canCreateSuggestions && (
+                    {translationFormatting.position && (
+                      <FormattingToolbar
+                        position={translationFormatting.position}
+                        active={translationFormatting.active}
+                        containerRef={translationContainerRef}
+                        onFormat={translationFormatting.onFormat}
+                      />
+                    )}
+                    {/*
+                      `showSelectionToolbar`, not `canCreateSuggestions`: the
+                      two toolbars share a position, and `formattingEnabled` is
+                      already its negation, so this is what keeps them apart.
+                      Until this pane offered formatting, a selection was only
+                      ever reported when the suggestion toolbar was the one
+                      that wanted it, and the wider gate never showed.
+                    */}
+                    {toolbarPosition && showSelectionToolbar && (
                       <SuggestionInlineToolbar
                         position={toolbarPosition}
                         containerRef={translationContainerRef}
@@ -929,32 +881,24 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     )}
                   </div>
                 ) : (
-                  <MarkdownPreview
-                    content={translationPreview || translationPreviewEmptyText}
-                    className="prose max-w-none h-full overflow-y-auto p-3"
-                  />
+                  <ReaderPreview content={translationPreview || translationPreviewEmptyText} />
                 )
               ) : isReviewEditing ? (
                 <div className="h-full flex flex-col space-y-2">
+                  {/* The one translation editor on screen while editing, so it
+                      is the one the source lines up with (align-lines). */}
                   <RawEditorPane
+                    ref={translationEditorRef}
+                    ariaLabel="Translation"
                     value={translationContent}
                     onChange={onTranslationChange}
                     onCursorChange={handleTranslationCursorChange}
                     currentLine={translationLine}
                     highlightLine={syncedTranslationLine}
                     language={contentLanguage}
+                    sourceContent={sourceContent}
                     fullHeight
-                    lineInfo={
-                      sourceViewMode === 'raw'
-                        ? {
-                            primaryLabel: 'Translation Line',
-                            primaryValue: translationLine,
-                            secondaryLabel: 'Source Line',
-                            secondaryValue: sourceLine,
-                            direction: 'from',
-                          }
-                        : undefined
-                    }
+                    onOpenGuide={onOpenGuide}
                   />
                   {translationEditActions}
                 </div>
@@ -967,10 +911,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   }}
                 />
               ) : !isYaml && reviewViewMode === 'formatted' ? (
-                <MarkdownPreview
-                  content={translationPreview}
-                  className="prose max-w-none h-full overflow-y-auto p-3"
-                />
+                <ReaderPreview content={translationPreview} />
               ) : (
                 <div ref={translationContainerRef} className="relative h-full">
                   {selectedUserId ? (
@@ -986,23 +927,19 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     // Show normal editor with suggestions
                     <>
                       <RawEditorPane
+                        ariaLabel="Translation"
                         ref={translationEditorRef}
                         value={translationContent}
                         readOnly
                         language={contentLanguage}
+                        sourceContent={sourceContent}
                         currentLine={translationLine}
                         highlightLine={syncedTranslationLine}
                         onCursorChange={handleTranslationCursorChange}
                         suggestions={suggestions}
                         onSuggestionClick={handleSuggestionClickInternal}
                         onSelectionChange={handleSelectionChange}
-                        lineInfo={{
-                          primaryLabel: 'Translation Line',
-                          primaryValue: translationLine,
-                          secondaryLabel: sourceViewMode === 'raw' ? 'Source Line' : undefined,
-                          secondaryValue: sourceViewMode === 'raw' ? (syncedSourceLine ?? sourceLine) : undefined,
-                          direction: 'from',
-                        }}
+                        onOpenGuide={onOpenGuide}
                       />
                       {toolbarPosition && canCreateSuggestions && (
                         <SuggestionInlineToolbar
@@ -1034,99 +971,50 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
             </div>
           </Card>
 
-          <AlertDialog
-            open={showDiscardDialog}
-            onOpenChange={(open) => {
-              if (!open) handleDiscardCancel();
-            }}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {discardKind === 'audioText' ? 'Discard unsaved audio text?' : 'Discard unsaved suggestion?'}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {discardKind === 'audioText'
-                    ? 'The audio text has changes that have not been saved. Leaving this tab loses them.'
-                    : 'You have unsaved changes in your suggestion. Are you sure you want to discard them?'}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={handleDiscardCancel}>Keep editing</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDiscardConfirm}>Discard</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <DiscardDialog prompt={authoring.discard} />
         </div>
 
-        {(hasSidebar || sidebarHeader || sidebarSummary) && (
-          <Sidebar side="right" collapsible="offcanvas">
-            <SidebarHeader className="p-0 gap-0">
-              <div className="px-3 py-2 flex items-center justify-between border-b">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Document info
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleSidebar}
-                  className="h-7 w-7 p-0"
-                  aria-label="Close panel"
-                >
-                  <PanelRightClose />
-                </Button>
-              </div>
-              {sidebarHeader}
-              {sidebarSummary && (
-                <div className="border-b border-l-0 px-3 py-2 space-y-1.5 bg-white">
-                  {sidebarSummary}
-                  {sidebarDetails && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-full justify-start px-1 text-xs text-muted-foreground"
-                      onClick={() => setSidebarView(sidebarView === 'details' ? 'threads' : 'details')}
-                    >
-                      {sidebarView === 'details' ? (
-                        <>
-                          <ChevronDown />
-                          Hide details
-                        </>
-                      ) : (
-                        <>
-                          <ChevronRight />
-                          Open details
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              )}
-            </SidebarHeader>
-            <SidebarContent className="p-0 gap-0">
-              {sidebarView === 'details' && sidebarDetails && <div className="shrink-0">{sidebarDetails}</div>}
-              {hasSidebar && (
-                <div className="flex-1 min-h-[16rem] flex flex-col">
-                <ThreadSidebar
-                  suggestions={suggestions}
-                  currentUserId={currentUserId || ''}
-                  translationContent={translationContent}
-                  canCreateSuggestions={canCreateSuggestions}
-                  onReply={onReply}
-                  onApply={onApplySuggestion}
-                  onDismiss={(id) => onDismissSuggestion?.(id)}
-                  onReopen={(id) => onReopenSuggestion?.(id)}
-                  onEdit={onEditSuggestion}
-                  onSuggestionClick={handleSuggestionClickInternal}
-                  onCreateGeneralThread={onCreateGeneralThread}
-                  activeThreadId={activeThreadId}
-                  disableReopen={disableReopen}
-                />
-                </div>
-              )}
-            </SidebarContent>
-          </Sidebar>
+        {/* Zen mode is the writing surface, so it carries neither sidebar: the
+            shell's own nav is hidden by the overlay, and this panel is simply
+            not rendered. Its header row goes with it, which is why zen mode's
+            bar shows the save state. */}
+        {hasPanel && !isZen && (
+          <DocumentPanel
+            isZen={isZen}
+            targetLanguageMissing={targetLanguageMissing}
+            status={panelStatus}
+            openSuggestionsCount={openSuggestionsCount}
+            onOpenGuide={onOpenGuide}
+            onToggleZen={onToggleZen}
+            panelActions={panelActions}
+            header={sidebarHeader}
+            actions={sidebarActions}
+            summary={sidebarSummary}
+            details={sidebarDetails}
+            view={sidebarView}
+            onViewChange={setSidebarView}
+            threads={{
+              show: hasSidebar,
+              suggestions,
+              currentUserId: currentUserId || '',
+              translationContent,
+              canCreateSuggestions,
+              activeThreadId,
+              disableReopen,
+              onReply,
+              onApply: onApplySuggestion,
+              onDismiss: (id) => onDismissSuggestion?.(id),
+              onReopen: (id) => onReopenSuggestion?.(id),
+              onEdit: onEditSuggestion,
+              onSuggestionClick: handleSuggestionClickInternal,
+              onCreateGeneralThread,
+            }}
+          />
         )}
+
+        {/* Mounted once for the whole editor: the lint cards and the panel
+            button both open this one dialog. */}
+        <MarkdownGuideDialog />
       </>
     );
   },

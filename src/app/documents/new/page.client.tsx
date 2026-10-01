@@ -16,12 +16,13 @@ import { validateFilename } from '@/domain/document/validate-filename';
 import { buildDefaultTitle, dayNumberFromFilename, parseDayNumber } from '@/domain/document/document-title';
 import { createDocumentAction } from '@/domain/document/document.actions';
 import { createSourceProjectAction } from '@/domain/source-project/source-project.actions';
+import { slugifyProjectName } from '@/domain/source-project/source-project.form';
 import { capture } from '@/lib/analytics';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '@/lib/frontmatter';
 import { FileText, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import type { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
 
 interface NewDocumentClientProps {
@@ -42,11 +43,11 @@ function generateSlug(title: string): string {
   return base ? `${base}-${suffix}` : '';
 }
 
-// Mirrors `sourceProjectIdentifier` in source-project.types.ts. Checked here
-// because the Create button is not a submit, so the input's `pattern` never
-// runs, and a server action's zod error reaches production as a generic
-// failure rather than something the user can act on.
-const IDENTIFIER_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// Mirrors `segment` in source-project.types.ts. Checked here because the
+// Create button is not a submit, so the input's `pattern` never runs, and a
+// server action's zod error reaches production as a generic failure rather
+// than something the user can act on.
+const SEGMENT_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
 function extractLabelsFromFrontmatter(frontmatter: Record<string, unknown>): string[] {
   const labels: string[] = [];
@@ -73,7 +74,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   const [content, setContent] = useState('');
   const [sourceProjectId, setSourceProjectId] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectIdentifier, setNewProjectIdentifier] = useState('');
+  const [newProjectSlug, setNewProjectSlug] = useState('');
   const [showNewProjectInput, setShowNewProjectInput] = useState(false);
   const [labels, setLabels] = useState<string[]>([]);
   const [deadline, setDeadline] = useState('');
@@ -109,9 +110,9 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      // YAML documents often start with a `---` line, which gray-matter would
-      // misread as frontmatter and strip from the content — so skip it for YAML.
-      const { data: frontmatter } = isYaml ? { data: {} as Record<string, unknown> } : matter(text);
+      // YAML documents often start with a `---` line, which would
+      // be misread as frontmatter and stripped from the content — so skip it for YAML.
+      const { data: frontmatter } = isYaml ? { data: {} as Record<string, unknown> } : parseFrontmatter(text);
 
       setContent(text);
 
@@ -181,21 +182,25 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       toast.warning('Please enter a project name');
       return;
     }
-    const identifier = newProjectIdentifier.trim();
-    if (!identifier) {
-      toast.warning('Please enter a project identifier');
+    const slug = newProjectSlug.trim();
+    if (!slug) {
+      toast.warning('Please enter a URL slug');
       return;
     }
-    if (!IDENTIFIER_PATTERN.test(identifier)) {
-      toast.warning('Identifier can only contain lowercase letters, numbers and single dashes');
+    if (!SEGMENT_PATTERN.test(slug)) {
+      toast.warning('The slug can only contain lowercase letters, numbers and single dashes');
       return;
     }
 
     setCreatingProject(true);
     try {
+      // The shortcut creates a project that deploys, which is what it did when
+      // one field was both the URL and the repo folder. Settings can turn that
+      // off, or point it at a different folder.
       const project = await createSourceProjectAction({
         name: newProjectName.trim(),
-        identifier,
+        slug,
+        repositoryDirectory: slug,
       });
       setSourceProjects([
         ...sourceProjects,
@@ -204,7 +209,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
       setSourceProjectId(project.id);
       setShowNewProjectInput(false);
       setNewProjectName('');
-      setNewProjectIdentifier('');
+      setNewProjectSlug('');
       capture('source_project_created', { location: 'document_new' });
     } catch (error: any) {
       console.error('Error creating project:', error);
@@ -256,10 +261,10 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader title="New Document" description="Upload a markdown or YAML file, or create a new document" />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <Card className="p-4">
           <Tabs value={mode} onValueChange={(value) => setMode(value as 'upload' | 'create')}>
             <div className="flex justify-center mb-6">
@@ -283,19 +288,19 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                   onDrop={handleDrop}
                   className={`
                     border-2 border-dashed rounded-lg p-12 text-center
-                    ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
+                    ${isDragging ? 'border-info bg-info/10' : 'border-border'}
                   `}
                 >
-                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-lg font-medium mb-2">Drag and drop your markdown or YAML file here</p>
-                  <p className="text-gray-600 mb-4">or</p>
+                  <p className="text-muted-foreground mb-4">or</p>
                   <label>
                     <input type="file" accept=".md,.yml,.yaml" onChange={handleFileSelect} className="hidden" />
-                    <Button type="button" variant="outline" asChild>
-                      <span>Browse Files</span>
+                    <Button type="button" variant="outline" render={<span />} nativeButton={false}>
+                      Browse Files
                     </Button>
                   </label>
-                  <p className="text-xs text-gray-500 mt-4">Supported files: .md, .yml, .yaml</p>
+                  <p className="text-xs text-muted-foreground mt-4">Supported files: .md, .yml, .yaml</p>
                 </div>
               </div>
             </TabsContent>
@@ -328,7 +333,12 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                       {!showNewProjectInput ? (
                         <>
                           <div className="flex gap-2">
-                            <Select value={sourceProjectId} onValueChange={setSourceProjectId} required>
+                            <Select
+                              value={sourceProjectId || null}
+                              onValueChange={(v) => setSourceProjectId(v ?? '')}
+                              required
+                              items={Object.fromEntries(sourceProjects.map((project) => [project.id, project.name]))}
+                            >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select source project" />
                               </SelectTrigger>
@@ -345,33 +355,36 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                             </Button>
                           </div>
                           {sourceProjects.length === 0 && (
-                            <p className="text-sm text-gray-500 mt-1">No projects available. Create a new one.</p>
+                            <p className="text-sm text-muted-foreground mt-1">No projects available. Create a new one.</p>
                           )}
                         </>
                       ) : (
                         <div className="space-y-2">
                           <Input
                             value={newProjectName}
-                            onChange={(e) => setNewProjectName(e.target.value)}
+                            onChange={(e) => {
+                              setNewProjectName(e.target.value);
+                              setNewProjectSlug(slugifyProjectName(e.target.value));
+                            }}
                             placeholder="Enter project name"
                             onKeyDown={handleNewProjectKeyDown}
                           />
                           <Input
-                            value={newProjectIdentifier}
-                            onChange={(e) => setNewProjectIdentifier(e.target.value)}
+                            value={newProjectSlug}
+                            onChange={(e) => setNewProjectSlug(e.target.value)}
                             placeholder="e.g., exodus90, lent2026"
-                            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                            pattern="[a-z0-9]+([-_][a-z0-9]+)*"
                             onKeyDown={handleNewProjectKeyDown}
                           />
-                          <p className="text-xs text-gray-500">
-                            The identifier is used in document URLs and as the folder name in the content repository.
+                          <p className="text-xs text-muted-foreground">
+                            The slug is the project&apos;s URL, and names its folder in the content repository.
                             Lowercase letters, numbers and dashes.
                           </p>
                           <div className="flex gap-2">
                             <Button
                               type="button"
                               onClick={handleCreateProject}
-                              disabled={creatingProject || !newProjectName.trim() || !newProjectIdentifier.trim()}
+                              disabled={creatingProject || !newProjectName.trim() || !newProjectSlug.trim()}
                             >
                               {creatingProject ? 'Creating...' : 'Create'}
                             </Button>
@@ -381,7 +394,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                               onClick={() => {
                                 setShowNewProjectInput(false);
                                 setNewProjectName('');
-                                setNewProjectIdentifier('');
+                                setNewProjectSlug('');
                               }}
                             >
                               Cancel
@@ -404,7 +417,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
 
                   <div>
                     <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
-                    <p className="text-xs text-gray-500 mt-1">Determines the file path in the content repository</p>
+                    <p className="text-xs text-muted-foreground mt-1">Determines the file path in the content repository</p>
                   </div>
 
                   <LabelsField labels={labels} onChange={setLabels} />
@@ -451,6 +464,6 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
           </Tabs>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

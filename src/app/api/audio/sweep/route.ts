@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'node:crypto';
 import { sweepPendingJobs } from '@/domain/audio/audio.service';
+import { hasBearerSecret } from '@/lib/bearer';
 
 const LOG_PREFIX = '[Audio Sweep]';
 
@@ -17,17 +17,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Sweep is not configured' }, { status: 503 });
   }
 
-  const presented = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
-  if (!safeEqual(presented, secret)) {
+  if (!hasBearerSecret(request.headers.get('authorization'), secret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const result = await sweepPendingJobs();
   return NextResponse.json(result);
-}
-
-function safeEqual(a: string, b: string): boolean {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
 }

@@ -1,7 +1,8 @@
 import prisma from '@/lib/db';
 import { isAudioStorageConfigured } from '@/lib/audio-storage-config';
 import { putObject } from '@/lib/object-storage';
-import { AudioStatus, type AudioFile, type AudioProvider, type DocumentType } from '@prisma/client';
+import type { AudioFile } from '@/generated/prisma/client';
+import { AudioProvider, AudioStatus, DocumentType } from '@/generated/prisma/enums';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { resolveAudioObjectKey } from './audio.paths';
 import {
@@ -73,7 +74,7 @@ export interface VersionForGeneration {
     type: DocumentType | null;
     originalFilename: string | null;
     slug: string;
-    sourceProject: { identifier: string | null; audioDocumentTypes: DocumentType[] } | null;
+    sourceProject: { slug: string; repositoryDirectory: string | null; audioDocumentTypes: DocumentType[] } | null;
   };
 }
 
@@ -322,14 +323,16 @@ async function complete(
   audioFile: AudioFile,
   result: SynthesisResult,
   ctx: {
-    document: { type: import('@prisma/client').DocumentType | null; originalFilename: string | null; slug: string; sourceProject: { identifier: string | null } | null };
+    document: { type: import('@/generated/prisma/client').DocumentType | null; originalFilename: string | null; slug: string; sourceProject: { slug: string; repositoryDirectory: string | null } | null };
     languageCode: string;
   },
 ): Promise<AudioFile> {
   const relativeKey = resolveAudioObjectKey({
     documentType: ctx.document.type!,
     languageCode: ctx.languageCode,
-    identifier: ctx.document.sourceProject?.identifier ?? 'unknown',
+    // Audio is generated for every approved document, including projects that
+    // do not deploy, so the slug stands in when there is no repo directory.
+    repositoryDirectory: ctx.document.sourceProject?.repositoryDirectory ?? ctx.document.sourceProject?.slug ?? 'unknown',
     originalFilename: ctx.document.originalFilename,
     slug: ctx.document.slug,
     audioFileId: audioFile.id,
@@ -380,8 +383,6 @@ async function failWith(
   }
   return updated;
 }
-
-export { localeFromVoice };
 
 /** Azure allows 3-64 chars of [A-Za-z0-9-_.]; a UUID with a prefix fits. */
 function jobIdFor(audioFileId: string): string {

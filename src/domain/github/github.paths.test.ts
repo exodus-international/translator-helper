@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { resolveFilePath } from './github.paths';
 
 const base = {
   languageCode: 'cs',
-  identifier: 'summer_2025',
+  repositoryDirectory: 'summer_2025',
   slug: 'some-doc',
 };
 

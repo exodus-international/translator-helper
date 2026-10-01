@@ -54,7 +54,7 @@ export function isObjectStorageConfigured(): boolean {
   return isAudioStorageConfigured();
 }
 
-export function publicUrlFor(key: string): string {
+function publicUrlFor(key: string): string {
   const base = getAudioStorageConfig().publicBaseUrl.replace(/\/+$/, '');
   return `${base}/${key.split('/').map(encodeURIComponent).join('/')}`;
 }

@@ -30,12 +30,12 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
 
   if (!validation.valid) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md p-6 text-center">
           <Logo size={48} className="mx-auto mb-2 block" />
           <h1 className="text-2xl font-bold mb-2">Invalid Invitation</h1>
-          <p className="text-gray-600 mb-4">{validation.reason}</p>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-muted-foreground mb-4">{validation.reason}</p>
+          <p className="text-sm text-muted-foreground mb-4">
             Please contact your administrator for a new invitation link.
           </p>
           <Link href="/login">
@@ -63,12 +63,12 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-muted/50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-4">
         <div className="text-center mb-4">
           <Logo size={48} className="mx-auto mb-2 block" />
           <h1 className="text-2xl font-bold">Translation Helper</h1>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             You were invited by {validation.inviterName}
           </p>
         </div>
@@ -112,9 +112,9 @@ export default function RegisterClient({ token, validation }: RegisterClientProp
           </Button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p className="text-center text-sm text-muted-foreground mt-4">
           Already have an account?{' '}
-          <Link href="/login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-primary underline-offset-4 hover:underline">
             Login
           </Link>
         </p>

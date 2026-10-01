@@ -63,6 +63,11 @@ export type AnalyticsEvent =
   | 'announcement_shown'
   | 'announcement_dismissed'
   | 'announcement_cta_clicked'
+  // ── Notifications ────────────────────────────────────────────────────
+  | 'notifications_opened'
+  | 'notification_clicked'
+  | 'notification_preference_changed'
+  | 'notification_emails_sent_now'
   // ── Documents ────────────────────────────────────────────────────────
   | 'document_upload_started'
   | 'document_upload_rejected'
@@ -77,6 +82,7 @@ export type AnalyticsEvent =
   | 'translation_deleted'
   | 'ai_translate_triggered'
   | 'source_saved'
+  | 'editor_content_copied'
   | 'zen_mode_toggled'
   // ── Workflow / status ────────────────────────────────────────────────
   | 'document_status_changed'
@@ -123,7 +129,6 @@ export type AnalyticsEvent =
   | 'user_banned'
   | 'user_unbanned'
   | 'admin_user_password_reset'
-  | 'admin_user_languages_updated'
   | 'admin_user_profile_updated'
   | 'invitation_created'
   | 'invitation_link_copied'
@@ -132,6 +137,9 @@ export type AnalyticsEvent =
   | 'language_updated'
   | 'language_deleted'
   | 'language_instructions_saved'
+  // The existing names survive the move to /languages so their funnels do; the
+  // tab is a property rather than a name per tab.
+  | 'language_page_viewed'
   // ── Generic UI ───────────────────────────────────────────────────────
   | 'dialog_opened'
   | 'document_type_filter_changed'

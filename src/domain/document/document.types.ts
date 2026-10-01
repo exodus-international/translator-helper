@@ -1,4 +1,4 @@
-import { DocumentType } from '@prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 import { z } from 'zod';
 import { isReservedSlug } from './document-url';
 import { validateFilename } from './validate-filename';

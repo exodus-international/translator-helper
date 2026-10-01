@@ -13,7 +13,7 @@ import {
   isUserOnboarded,
 } from './user.repository';
 import { avatarRejectionReason, resolveAvatarObjectKey, sniffImageContentType } from './user.avatar';
-import { Role } from '@prisma/client';
+import { Role } from '@/generated/prisma/enums';
 import { updateUserProfileSchema, completeOnboardingSchema, adminUpdateUserProfileSchema } from './user.types';
 
 export async function updateUserRoleAction(userId: string, role: Role) {
@@ -46,11 +46,6 @@ export async function completeOnboardingAction(input: unknown) {
 export async function isUserOnboardedAction() {
   const { user } = await authorize('authenticated');
   return await isUserOnboarded(user.id);
-}
-
-export async function adminGetUserProfileAction(userId: string) {
-  await authorize('admin');
-  return await getUserProfile(userId);
 }
 
 export async function adminUpdateUserProfileAction(userId: string, input: unknown) {

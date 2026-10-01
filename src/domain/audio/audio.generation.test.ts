@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AudioProvider, AudioStatus, DocumentType, type AudioFile } from '@prisma/client';
+import type { AudioFile } from '@/generated/prisma/client';
+import { AudioProvider, AudioStatus, DocumentType } from '@/generated/prisma/enums';
 import { createStartGeneration, type GenerationDeps, type VersionForGeneration } from './audio.service';
 import type { SpeechProvider } from './providers/speech-provider';
 
@@ -23,7 +24,7 @@ function versionFixture(overrides: Partial<VersionForGeneration> = {}): VersionF
       type: DocumentType.DAY,
       originalFilename: null,
       slug: 'day-03',
-      sourceProject: { identifier: 'exodus90', audioDocumentTypes: [DocumentType.DAY] },
+      sourceProject: { slug: 'exodus90', repositoryDirectory: 'exodus90', audioDocumentTypes: [DocumentType.DAY] },
     },
     ...overrides,
   };
@@ -189,7 +190,7 @@ test('a document whose project has the type turned off is skipped, not failed', 
         type: DocumentType.MEETING,
         originalFilename: 'meeting.md',
         slug: 'meeting',
-        sourceProject: { identifier: 'exodus90', audioDocumentTypes: [DocumentType.DAY] },
+        sourceProject: { slug: 'exodus90', repositoryDirectory: 'exodus90', audioDocumentTypes: [DocumentType.DAY] },
       },
     }),
   );

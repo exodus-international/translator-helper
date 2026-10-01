@@ -90,14 +90,13 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
       <PageHeader
-        back={{ href: '/documents', label: 'Documents' }}
         title="Edit Document"
         description={`Editing: ${document.title}`}
       />
 
-      <div className="container mx-auto px-4 py-4">
+      <div className="px-4 py-4">
         <Card className="p-4">
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
@@ -123,7 +122,11 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="sourceProject">Source Project</Label>
-                  <Select value={sourceProjectId} onValueChange={setSourceProjectId}>
+                  <Select
+                    value={sourceProjectId || null}
+                    onValueChange={(v) => setSourceProjectId(v ?? '')}
+                    items={Object.fromEntries(sourceProjects.map((project) => [project.id, project.name]))}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select source project" />
                     </SelectTrigger>
@@ -156,8 +159,8 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
               )}
 
               <div className="flex justify-between">
-                <Button asChild type="button" variant="outline">
-                  <Link href="/documents">Cancel</Link>
+                <Button type="button" variant="outline" nativeButton={false} render={<Link href="/documents" />}>
+                  Cancel
                 </Button>
                 <Button type="submit" disabled={loading || !title || !!filenameError}>
                   {loading ? 'Saving...' : 'Save Changes'}
@@ -167,6 +170,6 @@ export default function EditDocumentClient({ document, sourceVersion, sourceProj
           </form>
         </Card>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import type { AudioProvider, DocumentType } from '@prisma/client';
+import { AudioProvider, DocumentType } from '@/generated/prisma/enums';
 import type { AudioSkipReason } from './audio.types';
 
 /**

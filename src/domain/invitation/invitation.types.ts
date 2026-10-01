@@ -12,6 +12,3 @@ export const registerWithInviteSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
-
-export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
-export type RegisterWithInviteInput = z.infer<typeof registerWithInviteSchema>;

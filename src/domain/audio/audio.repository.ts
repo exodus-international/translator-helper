@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import { AudioProvider, AudioStatus } from '@prisma/client';
+import { AudioProvider, AudioStatus } from '@/generated/prisma/enums';
 
 export async function createAudioFile(data: {
   documentVersionId: string;

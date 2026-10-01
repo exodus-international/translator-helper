@@ -74,7 +74,8 @@ export function ListPagination({
             <FieldLabel htmlFor={sizeSelectId}>Rows per page</FieldLabel>
             <Select
               value={String(pageSize)}
-              onValueChange={(next) => onPageSizeChange(Number(next))}
+              onValueChange={(next) => next != null && onPageSizeChange(Number(next))}
+              items={Object.fromEntries(pageSizeOptions.map((option) => [String(option), option]))}
             >
               <SelectTrigger id={sizeSelectId} className="w-20">
                 <SelectValue />

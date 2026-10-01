@@ -1,5 +1,6 @@
 import prisma from '@/lib/db';
-import type { DocumentType, Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client';
+import { DocumentType } from '@/generated/prisma/enums';
 
 export async function listSourceProjects(options?: { includeComplete?: boolean }) {
   return prisma.sourceProject.findMany({
@@ -161,9 +162,9 @@ export async function getSourceProjectById(id: string) {
 }
 
 /** The readable URL segment, e.g. "advent2025" in /projects/advent2025. */
-export async function getSourceProjectByIdentifier(identifier: string) {
+export async function getSourceProjectBySlug(slug: string) {
   return prisma.sourceProject.findUnique({
-    where: { identifier },
+    where: { slug },
     include: sourceProjectDetailInclude,
   });
 }
@@ -171,7 +172,8 @@ export async function getSourceProjectByIdentifier(identifier: string) {
 export async function createSourceProject(data: {
   name: string;
   description?: string | null;
-  identifier: string;
+  slug: string;
+  repositoryDirectory?: string | null;
   acronym?: string | null;
 }) {
   return prisma.sourceProject.create({
@@ -184,7 +186,8 @@ export async function updateSourceProject(
   data: {
     name?: string;
     description?: string | null;
-    identifier?: string;
+    slug?: string;
+    repositoryDirectory?: string | null;
     acronym?: string | null;
     status?: 'ACTIVE' | 'COMPLETE';
     audioDocumentTypes?: DocumentType[];

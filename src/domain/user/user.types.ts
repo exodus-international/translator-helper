@@ -45,7 +45,3 @@ export const adminUpdateUserProfileSchema = z.object({
   tShirtSize: profileFields.tShirtSize,
   exodus90AppId: profileFields.exodus90AppId,
 });
-
-export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
-export type CompleteOnboardingInput = z.infer<typeof completeOnboardingSchema>;
-export type AdminUpdateUserProfileInput = z.infer<typeof adminUpdateUserProfileSchema>;

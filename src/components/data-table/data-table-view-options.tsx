@@ -1,6 +1,7 @@
 "use client";
 
-import type { Table } from "@tanstack/react-table";
+import type { RowData } from "@tanstack/react-table";
+import type { DataTableInstance } from "@/hooks/use-data-table";
 import { Settings2 } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
@@ -13,13 +14,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface DataTableViewOptionsProps<TData> {
-  table: Table<TData>;
+interface DataTableViewOptionsProps<TData extends RowData> {
+  table: DataTableInstance<TData>;
   disabled?: boolean;
   align?: "start" | "center" | "end";
 }
 
-export function DataTableViewOptions<TData>({
+export function DataTableViewOptions<TData extends RowData>({
   table,
   disabled,
   align = "end",
@@ -37,17 +38,19 @@ export function DataTableViewOptions<TData>({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label="Toggle columns"
-          variant="outline"
-          size="sm"
-          className="ml-auto hidden h-8 font-normal lg:flex"
-          disabled={disabled}
-        >
-          <Settings2 className="mr-2 h-4 w-4 text-muted-foreground" />
-          View
-        </Button>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            aria-label="Toggle columns"
+            variant="outline"
+            size="sm"
+            className="ml-auto hidden h-8 font-normal lg:flex"
+            disabled={disabled}
+          />
+        }
+      >
+        <Settings2 className="mr-2 h-4 w-4 text-muted-foreground" />
+        View
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-48">
         <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
@@ -58,7 +61,6 @@ export function DataTableViewOptions<TData>({
             className="capitalize"
             checked={column.getIsVisible()}
             onCheckedChange={(value) => column.toggleVisibility(!!value)}
-            onSelect={(event) => event.preventDefault()}
           >
             {column.columnDef.meta?.label ?? column.id}
           </DropdownMenuCheckboxItem>
