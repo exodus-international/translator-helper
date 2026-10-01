@@ -38,6 +38,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { resolveDeployLanguageFilter } from './deploy-language-filter';
 
 type VersionWithDetails = {
   id: string;
@@ -348,6 +349,8 @@ export default function DashboardClient({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [approvedVersions]);
 
+  const activeDeployLanguageFilter = resolveDeployLanguageFilter(deployLanguageFilter, deployLanguages);
+
   const handleDeployLanguageFilterChange = (value: string) => {
     setDeployLanguageFilter(value);
     localStorage.setItem('dashboard:deployLanguageFilter', value);
@@ -364,13 +367,15 @@ export default function DashboardClient({
 
   // Register the active deploy-filter language as a PostHog super property (value is a language id)
   const selectedDeployLanguage =
-    deployLanguageFilter === 'all' ? undefined : deployLanguages.find((l) => l.id === deployLanguageFilter);
+    activeDeployLanguageFilter === 'all'
+      ? undefined
+      : deployLanguages.find((l) => l.id === activeDeployLanguageFilter);
   useActiveLanguage(selectedDeployLanguage?.code, selectedDeployLanguage?.name);
 
   const filteredApprovedVersions = useMemo(() => {
-    if (deployLanguageFilter === 'all') return approvedVersions;
-    return approvedVersions.filter((v) => v.language.id === deployLanguageFilter);
-  }, [approvedVersions, deployLanguageFilter]);
+    if (activeDeployLanguageFilter === 'all') return approvedVersions;
+    return approvedVersions.filter((v) => v.language.id === activeDeployLanguageFilter);
+  }, [approvedVersions, activeDeployLanguageFilter]);
 
   // Create project dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -494,7 +499,7 @@ export default function DashboardClient({
                 </h2>
                 {deployLanguages.length > 1 && (
                   <Select
-                    value={deployLanguageFilter}
+                    value={activeDeployLanguageFilter}
                     onValueChange={(v) => handleDeployLanguageFilterChange(v ?? 'all')}
                     items={{
                       all: 'All languages',

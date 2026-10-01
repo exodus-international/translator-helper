@@ -14,6 +14,14 @@ Feature: Review and suggestions
     When I look at the status actions
     Then approving should be offered but not allowed
 
+  @reviewer @high-usage
+  Scenario: Every piece of feedback can be reached on a short screen
+    Given I open "Day 3 - Fasting and Freedom" in Czech
+    And there should be open feedback
+    When my window is too short to show all the feedback
+    And I show the resolved feedback
+    Then I should be able to scroll to the last piece of feedback
+
   @reviewer @high-usage @business-critical
   Scenario: Applying a suggestion changes the translation
     Given I open "Day 1 - The Call" in Croatian

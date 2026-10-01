@@ -175,11 +175,13 @@ function ReviewWorkflowActions({ document }: { document: any }) {
     <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
       {targetVersion?.status === DocumentStatus.PENDING_REVIEW && (
         <Button
-          variant={waitingForFinalLabel ? 'outline' : 'default'}
           size="sm"
           onClick={handleToggleWaitingForFinalLabel}
           disabled={labelLoading}
-          className={waitingForFinalLabel ? 'bg-success text-background border-success hover:bg-success/90' : ''}
+          // Not the outline variant: its dark:bg-input and dark:border-input
+          // outrank an unprefixed bg-success, which left dark text on a dark
+          // button in the dark theme.
+          className={waitingForFinalLabel ? 'bg-success text-background hover:bg-success/90' : ''}
         >
           {waitingForFinalLabel ? <FileCheck /> : <FilePlus />}
           {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
