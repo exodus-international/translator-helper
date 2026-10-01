@@ -62,3 +62,6 @@ generated-images/
 /playwright/.cache/
 /e2e/.auth/
 /.features-gen/
+
+# Raw demo recordings (demos/README.md)
+/demos/output/

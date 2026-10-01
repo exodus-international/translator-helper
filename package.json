@@ -14,6 +14,7 @@
     "lint:dead": "fallow dead-code",
     "test": "pnpm test:unit && pnpm test:components",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
     "email:dev": "email dev --dir src/emails --port 4001",
     "format": "prettier --write .",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
@@ -25,7 +26,9 @@
     "test:e2e": "bddgen && playwright test",
     "test:e2e:ui": "bddgen && playwright test --ui",
     "test:e2e:headed": "bddgen && playwright test --headed",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "demos": "playwright test -c demos/playwright.config.ts",
+    "demos:gif": "bash scripts/demos-to-gif.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
