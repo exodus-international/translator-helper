@@ -169,9 +169,13 @@ export function DocumentPanel({
       </SidebarHeader>
 
       {/* Unfolded: the facts, the actions and the status rows scroll together,
-          so a tall panel never clips the button someone came to press. */}
+          so a tall panel never clips the button someone came to press.
+          grow shrink-0: the column fills a short panel and outgrows a tall
+          one. Allowed to shrink, it squeezed the feedback card to its minimum
+          height instead of overflowing, so the panel had nothing to scroll and
+          the card clipped every thread past the second. */}
       <SidebarContent className="gap-0 p-0 group-data-[collapsible=icon]:hidden">
-        <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+        <div className="flex shrink-0 grow flex-col gap-3 p-3">
           {header}
           {actions}
           {summary && (

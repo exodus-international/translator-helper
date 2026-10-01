@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { When, Then } from './fixtures';
 import { changeStatus, openStatusMenu } from '../support/status';
-import { applyThread, dismissThread, showResolved, openThreadCount, reopenThread, threadContaining, waitForFeedback } from '../support/threads';
+import { applyThread, dismissThread, showResolved, openThreadCount, reopenThread, threadContaining, threads, waitForFeedback } from '../support/threads';
 
 // Steps match on their wording, not on the keyword, so this one definition
 // serves both the `Then` that asserts it and the `And` that relies on it.
@@ -26,6 +26,23 @@ Then('approving should be offered but not allowed', async ({ page }) => {
   await expect(approve).toBeDisabled();
   // The reviewer is told why, not just refused.
   await expect(approve).toContainText(/open comment/i);
+});
+
+When('my window is too short to show all the feedback', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 480 });
+});
+
+When('I show the resolved feedback', async ({ page }) => {
+  await showResolved(page);
+});
+
+Then('I should be able to scroll to the last piece of feedback', async ({ page }) => {
+  // The last control of the last thread, because a thread can be taller than
+  // the panel. toBeInViewport rather than toBeVisible: a thread clipped by its
+  // card still counts as visible, and that clipping is what this guards.
+  const lastControl = threads(page).last().getByRole('button').last();
+  await lastControl.scrollIntoViewIfNeeded();
+  await expect(lastControl).toBeInViewport({ ratio: 1 });
 });
 
 When('I apply the suggestion proposing {string}', async ({ page }, proposed: string) => {
