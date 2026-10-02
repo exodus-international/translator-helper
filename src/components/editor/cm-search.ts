@@ -6,7 +6,9 @@
  *
  * It keeps that editor's two keys and what each of them showed. Mod-f opens
  * find alone. Mod-Alt-f (Ctrl-h off macOS) opens the same panel with the
- * replace row under it and the cursor in the replace field. CodeMirror's panel
+ * replace row under it and the cursor in the replace field. Mod-Shift-f does
+ * the same: it is the one to reach for where the browser or the system keeps
+ * the Option combination for itself. CodeMirror's panel
  * always draws both rows, so the replace row is hidden until it is asked for,
  * by key or by the chevron at the start of the panel.
  *
@@ -114,7 +116,7 @@ const replaceToggle = ViewPlugin.fromClass(
 );
 
 /**
- * The replace key, matched by the physical key as well as by the keymap.
+ * The replace keys, matched by the physical key as well as by the keymap.
  *
  * On macOS Option turns F into "ƒ", and the keymap then has to recover the
  * letter from the legacy key code. A browser or a keyboard layout that
@@ -126,7 +128,9 @@ const replaceToggle = ViewPlugin.fromClass(
 const replaceKeyByPosition = ViewPlugin.fromClass(
   class {
     private readonly onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.code !== 'KeyF' || !event.altKey || event.shiftKey) return;
+      if (event.defaultPrevented || event.code !== 'KeyF') return;
+      // Option or Shift with it, not both.
+      if (event.altKey === event.shiftKey) return;
       // One of the two, not both: Cmd on macOS, Ctrl elsewhere.
       if (event.metaKey === event.ctrlKey) return;
       event.preventDefault();
@@ -146,6 +150,7 @@ const replaceKeyByPosition = ViewPlugin.fromClass(
 const findKeymap: KeyBinding[] = [
   { key: 'Mod-f', run: openFindPanel, scope: 'editor search-panel' },
   { key: 'Mod-Alt-f', run: openReplacePanel, scope: 'editor search-panel', preventDefault: true },
+  { key: 'Mod-Shift-f', run: openReplacePanel, scope: 'editor search-panel', preventDefault: true },
   // Not on macOS, where Ctrl-h deletes backwards.
   { win: 'Ctrl-h', linux: 'Ctrl-h', run: openReplacePanel, scope: 'editor search-panel', preventDefault: true },
   ...searchKeymap.filter(
