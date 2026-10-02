@@ -72,7 +72,9 @@ export default function TranslateClient({
           capture('zen_mode_toggled', { enabled: next });
           return next;
         });
-      } else if (e.key === 'Escape') {
+      } else if (e.key === 'Escape' && !e.defaultPrevented) {
+        // Not when the editor has already used the key, which is how its
+        // find panel closes: one press should not also leave zen mode.
         setZenMode(false);
       }
     };
