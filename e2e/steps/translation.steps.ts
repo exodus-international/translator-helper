@@ -3,7 +3,7 @@ import type { DocumentStatus } from '@/generated/prisma/enums';
 import { Given, When, Then } from './fixtures';
 import { openDocument } from '../support/documents';
 import { changeStatus, expectStatus, currentStatus } from '../support/status';
-import { replaceAllInTranslation, replaceTranslation, translationText, waitForTranslationPane } from '../support/editor';
+import { openReplaceFromKeyboard, replaceAllInTranslation, replaceTranslation, translationText, waitForTranslationPane } from '../support/editor';
 import { statusName } from '../support/status';
 
 Given('I open {string} in {word}', async ({ page }, title: string, language: string) => {
@@ -34,6 +34,14 @@ When(
     await replaceAllInTranslation(page, find, replacement);
   },
 );
+
+When('I press the replace shortcut in the translation', async ({ page }) => {
+  await openReplaceFromKeyboard(page);
+});
+
+Then('the replace field should have the cursor', async ({ page }) => {
+  await expect(page.getByRole('textbox', { name: 'Replace' })).toBeFocused();
+});
 
 When('I save the translation', async ({ page }) => {
   await page.getByRole('button', { name: 'Save' }).click();

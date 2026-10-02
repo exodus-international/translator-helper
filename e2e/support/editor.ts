@@ -42,6 +42,14 @@ export async function replaceTranslation(page: Page, text: string) {
   await page.keyboard.type(text);
 }
 
+/** Opens replace with the key the previous editor used for it. */
+export async function openReplaceFromKeyboard(page: Page) {
+  const pane = translationPane(page);
+  await pane.click();
+  await expect(pane).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+Alt+f');
+}
+
 /**
  * Replaces every match through the editor's own find panel, opened the way a
  * translator opens it: from the keyboard, with the cursor in the pane.

@@ -5,7 +5,13 @@ import { yaml } from '@codemirror/lang-yaml';
 import { xml } from '@codemirror/lang-xml';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { lintGutter, lintKeymap } from '@codemirror/lint';
-import { search, searchKeymap, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search';
+import {
+  openSearchPanel,
+  search,
+  searchKeymap,
+  selectNextOccurrence,
+  selectSelectionMatches,
+} from '@codemirror/search';
 import { Compartment, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
 import {
   Decoration,
@@ -15,6 +21,7 @@ import {
   highlightActiveLine,
   placeholder as placeholderExtension,
   type DecorationSet,
+  type KeyBinding,
 } from '@codemirror/view';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
@@ -42,6 +49,25 @@ const setHighlightLine = StateEffect.define<number | null>();
 const findKeymap = searchKeymap.filter(
   (binding) => binding.run !== selectNextOccurrence && binding.run !== selectSelectionMatches,
 );
+
+/**
+ * The previous editor's own key for replace, which people still reach for.
+ * CodeMirror has one panel for both, so this opens it and puts the cursor in
+ * the replace field. A read-only pane has no such field and gets plain find.
+ */
+function openReplacePanel(view: EditorView): boolean {
+  openSearchPanel(view);
+  const field = view.dom.querySelector<HTMLInputElement>('.cm-search input[name=replace]');
+  field?.focus();
+  field?.select();
+  return true;
+}
+
+const replaceKeymap: KeyBinding[] = [
+  { key: 'Mod-Alt-f', run: openReplacePanel, scope: 'editor search-panel', preventDefault: true },
+  // Not on macOS, where Ctrl-h deletes backwards.
+  { win: 'Ctrl-h', linux: 'Ctrl-h', run: openReplacePanel, scope: 'editor search-panel', preventDefault: true },
+];
 
 /** Language ids the panes actually ask for; anything else reads as Markdown. */
 function languageSupport(language: string): Extension {
@@ -283,7 +309,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       // The app's own palette, and nothing under it: see cm-theme.
       editorHighlighting,
       search({ top: true }),
-      keymap.of([...findKeymap, ...defaultKeymap, ...historyKeymap, ...lintKeymap]),
+      keymap.of([...replaceKeymap, ...findKeymap, ...defaultKeymap, ...historyKeymap, ...lintKeymap]),
       languageCompartment.of(languageExtension),
       readOnlyCompartment.of(readOnlyExtensions(readOnly)),
       placeholderCompartment.of(placeholder ? placeholderExtension(placeholder) : []),
