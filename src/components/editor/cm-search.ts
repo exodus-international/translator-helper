@@ -13,8 +13,9 @@
  * by key or by the chevron at the start of the panel.
  *
  * Mod-g and F3 step through the matches, Mod-Alt-g goes to a line, Escape
- * closes the panel. A read-only pane has no replace row at all, and both keys
- * open plain find there.
+ * closes the panel. A read-only pane has no replace row at all. The replace
+ * keys open find there and say why, in a line under it: opening find without
+ * a word looks like the key did the wrong thing.
  *
  * Two of the package's bindings are left out. Select-next-occurrence and
  * select-all-matches add a selection range per match, and this editor keeps a
@@ -61,8 +62,9 @@ function openFindPanel(view: EditorView): boolean {
 
 function openReplacePanel(view: EditorView): boolean {
   openSearchPanel(view);
-  if (view.state.readOnly) return true;
+  // Read-only too: there the open state shows the note instead of the row.
   view.dispatch({ effects: setReplaceOpen.of(true) });
+  if (view.state.readOnly) return true;
   const field = replaceField(view);
   field?.focus();
   field?.select();
@@ -70,9 +72,12 @@ function openReplacePanel(view: EditorView): boolean {
 }
 
 /**
- * The chevron that shows and hides the replace row, for anyone who does not
- * know the key. The panel's markup is CodeMirror's, so the button is added to
- * it once the panel exists rather than declared with it.
+ * What the app adds to CodeMirror's panel. Its markup is the library's, so
+ * both pieces are added once the panel exists rather than declared with it.
+ *
+ * An editable pane gets the chevron that shows and hides the replace row, for
+ * anyone who does not know the key. A read-only pane gets the note that says
+ * replace is not on offer, which the theme shows once replace is asked for.
  */
 const replaceToggle = ViewPlugin.fromClass(
   class {
@@ -93,7 +98,16 @@ const replaceToggle = ViewPlugin.fromClass(
 
     private sync() {
       const panel = this.view.dom.querySelector('.cm-search');
-      if (!panel || !replaceField(this.view)) return;
+      if (!panel) return;
+      if (!replaceField(this.view)) {
+        if (!panel.querySelector('.cm-replace-unavailable')) {
+          const note = document.createElement('p');
+          note.className = 'cm-replace-unavailable';
+          note.textContent = 'This text is read-only here, so replace is not available.';
+          panel.append(note);
+        }
+        return;
+      }
       const open = this.view.state.field(replaceOpen);
       let button = panel.querySelector<HTMLButtonElement>('button[name=toggleReplace]');
       if (!button) {

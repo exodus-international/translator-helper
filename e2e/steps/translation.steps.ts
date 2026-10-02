@@ -3,7 +3,15 @@ import type { DocumentStatus } from '@/generated/prisma/enums';
 import { Given, When, Then } from './fixtures';
 import { openDocument } from '../support/documents';
 import { changeStatus, expectStatus, currentStatus } from '../support/status';
-import { openFindFromKeyboard, openReplaceFromKeyboard, replaceAllInTranslation, replaceTranslation, translationText, waitForTranslationPane } from '../support/editor';
+import {
+  openFindFromKeyboard,
+  openReplaceFromKeyboard,
+  replaceAllInTranslation,
+  replaceTranslation,
+  sourcePane,
+  translationText,
+  waitForTranslationPane,
+} from '../support/editor';
 import { statusName } from '../support/status';
 
 Given('I open {string} in {word}', async ({ page }, title: string, language: string) => {
@@ -50,6 +58,19 @@ When('I press the replace shortcut in the translation', async ({ page }) => {
 
 Then('the replace field should have the cursor', async ({ page }) => {
   await expect(page.getByRole('textbox', { name: 'Replace' })).toBeFocused();
+});
+
+When('I press the replace shortcut in the source text', async ({ page }) => {
+  const pane = sourcePane(page);
+  await pane.click();
+  await expect(pane).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+Alt+f');
+});
+
+Then('I should be told that replace is not available there', async ({ page }) => {
+  await expect(page.getByRole('textbox', { name: 'Find' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Replace' })).toHaveCount(0);
+  await expect(page.getByText('replace is not available')).toBeVisible();
 });
 
 When('I save the translation', async ({ page }) => {

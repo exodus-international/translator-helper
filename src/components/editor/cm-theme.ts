@@ -228,6 +228,16 @@ export const editorTheme = EditorView.theme({
     {
       display: 'none',
     },
+  '.cm-replace-unavailable': {
+    display: 'none',
+    flexBasis: '100%',
+    margin: '0',
+    fontSize: '12px',
+    color: 'var(--muted-foreground)',
+  },
+  '&.cm-replace-open .cm-replace-unavailable': {
+    display: 'block',
+  },
   '.cm-replace-toggle': {
     width: '20px',
     height: '28px',
