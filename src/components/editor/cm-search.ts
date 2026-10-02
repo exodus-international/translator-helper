@@ -113,6 +113,36 @@ const replaceToggle = ViewPlugin.fromClass(
   },
 );
 
+/**
+ * The replace key, matched by the physical key as well as by the keymap.
+ *
+ * On macOS Option turns F into "ƒ", and the keymap then has to recover the
+ * letter from the legacy key code. A browser or a keyboard layout that
+ * reports another code leaves the binding unmatched, and the key falls
+ * through to whatever the browser does with it. `code` names the key itself,
+ * whatever it types. Listening on the editor's root covers the panel's own
+ * fields too.
+ */
+const replaceKeyByPosition = ViewPlugin.fromClass(
+  class {
+    private readonly onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.code !== 'KeyF' || !event.altKey || event.shiftKey) return;
+      // One of the two, not both: Cmd on macOS, Ctrl elsewhere.
+      if (event.metaKey === event.ctrlKey) return;
+      event.preventDefault();
+      openReplacePanel(this.view);
+    };
+
+    constructor(private readonly view: EditorView) {
+      view.dom.addEventListener('keydown', this.onKeyDown);
+    }
+
+    destroy() {
+      this.view.dom.removeEventListener('keydown', this.onKeyDown);
+    }
+  },
+);
+
 const findKeymap: KeyBinding[] = [
   { key: 'Mod-f', run: openFindPanel, scope: 'editor search-panel' },
   { key: 'Mod-Alt-f', run: openReplacePanel, scope: 'editor search-panel', preventDefault: true },
@@ -125,4 +155,10 @@ const findKeymap: KeyBinding[] = [
 ];
 
 /** The search extension, and the keys that go ahead of the editor's own keymap. */
-export const findAndReplace: Extension = [search({ top: true }), replaceOpen, replaceToggle, keymap.of(findKeymap)];
+export const findAndReplace: Extension = [
+  search({ top: true }),
+  replaceOpen,
+  replaceToggle,
+  replaceKeyByPosition,
+  keymap.of(findKeymap),
+];
