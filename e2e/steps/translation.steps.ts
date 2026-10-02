@@ -3,7 +3,7 @@ import type { DocumentStatus } from '@/generated/prisma/enums';
 import { Given, When, Then } from './fixtures';
 import { openDocument } from '../support/documents';
 import { changeStatus, expectStatus, currentStatus } from '../support/status';
-import { replaceTranslation, translationText, waitForTranslationPane } from '../support/editor';
+import { replaceAllInTranslation, replaceTranslation, translationText, waitForTranslationPane } from '../support/editor';
 import { statusName } from '../support/status';
 
 Given('I open {string} in {word}', async ({ page }, title: string, language: string) => {
@@ -27,6 +27,13 @@ When('I start the translation', async ({ page }) => {
 When('I write {string} as the translation', async ({ page }, text: string) => {
   await replaceTranslation(page, text);
 });
+
+When(
+  'I replace every {string} with {string} in the translation',
+  async ({ page }, find: string, replacement: string) => {
+    await replaceAllInTranslation(page, find, replacement);
+  },
+);
 
 When('I save the translation', async ({ page }) => {
   await page.getByRole('button', { name: 'Save' }).click();

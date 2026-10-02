@@ -195,6 +195,98 @@ export const editorTheme = EditorView.theme({
     borderBottomColor: 'var(--popover)',
   },
   /*
+   * The find and replace panel. CodeMirror styles it from the same `darkTheme`
+   * facet as the tooltip above, so left alone it is a light grey bar with
+   * gradient buttons in both themes. Painted from the tokens it reads as part
+   * of the pane's header instead.
+   */
+  '.cm-panels': {
+    backgroundColor: 'var(--card)',
+    color: 'var(--foreground)',
+  },
+  '.cm-panels.cm-panels-top': {
+    borderBottom: '1px solid var(--border)',
+  },
+  '.cm-panel.cm-search': {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 32px 8px 12px',
+    fontSize: '12px',
+  },
+  // The panel separates its two rows with a <br>, which a flex row ignores:
+  // made a full-width item, it breaks the line where the markup meant to.
+  '.cm-panel.cm-search br': {
+    display: 'block',
+    flexBasis: '100%',
+    height: '0',
+    content: '""',
+  },
+  '.cm-panel.cm-search label': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    margin: '0',
+    fontSize: '12px',
+    color: 'var(--muted-foreground)',
+  },
+  '.cm-panel.cm-search input, .cm-panel.cm-search button': {
+    margin: '0',
+  },
+  '.cm-textfield': {
+    height: '28px',
+    padding: '0 8px',
+    border: '1px solid var(--input)',
+    borderRadius: '6px',
+    backgroundColor: 'var(--background)',
+    color: 'var(--foreground)',
+    fontSize: '12px',
+    outline: 'none',
+  },
+  '.cm-textfield:focus-visible': {
+    borderColor: 'var(--ring)',
+    boxShadow: '0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent)',
+  },
+  '.cm-button': {
+    height: '28px',
+    padding: '0 10px',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+    backgroundColor: 'var(--muted)',
+    backgroundImage: 'none',
+    color: 'var(--foreground)',
+    fontSize: '12px',
+    textTransform: 'capitalize',
+    cursor: 'pointer',
+  },
+  '.cm-button:hover': {
+    backgroundColor: 'var(--accent)',
+  },
+  '.cm-button:active': {
+    backgroundImage: 'none',
+  },
+  '.cm-panel.cm-search [name=close]': {
+    top: '8px',
+    right: '8px',
+    padding: '0 6px',
+    color: 'var(--muted-foreground)',
+    fontSize: '18px',
+    lineHeight: '1',
+    cursor: 'pointer',
+  },
+  // "All" turns every match into a selection range. This editor keeps one
+  // selection, so the button would select a single match and look broken.
+  '.cm-panel.cm-search [name=select]': {
+    display: 'none',
+  },
+  '.cm-searchMatch': {
+    backgroundColor: 'color-mix(in oklab, var(--warning) 35%, transparent)',
+  },
+  '.cm-searchMatch.cm-searchMatch-selected': {
+    backgroundColor: 'color-mix(in oklab, var(--warning) 70%, transparent)',
+  },
+  /*
    * The lint message reads as a small card: the text wraps at a comfortable
    * measure instead of stretching across the editor, the repair sits on its own
    * row under it, and the rule id is a footnote. CodeMirror ships this markup

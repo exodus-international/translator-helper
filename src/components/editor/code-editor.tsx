@@ -5,6 +5,7 @@ import { yaml } from '@codemirror/lang-yaml';
 import { xml } from '@codemirror/lang-xml';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { lintGutter, lintKeymap } from '@codemirror/lint';
+import { search, searchKeymap, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search';
 import { Compartment, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
 import {
   Decoration,
@@ -27,6 +28,20 @@ import { markdownSupport } from './cm-markdown';
 import { editorHighlighting, editorTheme } from './cm-theme';
 
 const setHighlightLine = StateEffect.define<number | null>();
+
+/**
+ * Find and replace, which the editor before this one had built in and this one
+ * lost: Mod-f opens the panel, Mod-g and F3 step through the matches, Mod-Alt-g
+ * goes to a line. A read-only pane gets the same panel without the replace row.
+ *
+ * Two of the package's bindings are left out. Select-next-occurrence and
+ * select-all-matches add a selection range per match, and this editor keeps a
+ * single selection, so they would collapse to one range and do nothing a
+ * translator could see.
+ */
+const findKeymap = searchKeymap.filter(
+  (binding) => binding.run !== selectNextOccurrence && binding.run !== selectSelectionMatches,
+);
 
 /** Language ids the panes actually ask for; anything else reads as Markdown. */
 function languageSupport(language: string): Extension {
@@ -267,7 +282,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       highlightActiveLine(),
       // The app's own palette, and nothing under it: see cm-theme.
       editorHighlighting,
-      keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap]),
+      search({ top: true }),
+      keymap.of([...findKeymap, ...defaultKeymap, ...historyKeymap, ...lintKeymap]),
       languageCompartment.of(languageExtension),
       readOnlyCompartment.of(readOnlyExtensions(readOnly)),
       placeholderCompartment.of(placeholder ? placeholderExtension(placeholder) : []),

@@ -42,6 +42,20 @@ export async function replaceTranslation(page: Page, text: string) {
   await page.keyboard.type(text);
 }
 
+/**
+ * Replaces every match through the editor's own find panel, opened the way a
+ * translator opens it: from the keyboard, with the cursor in the pane.
+ */
+export async function replaceAllInTranslation(page: Page, find: string, replacement: string) {
+  const pane = translationPane(page);
+  await pane.click();
+  await expect(pane).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+f');
+  await page.getByRole('textbox', { name: 'Find' }).fill(find);
+  await page.getByRole('textbox', { name: 'Replace' }).fill(replacement);
+  await page.getByRole('button', { name: 'replace all' }).click();
+}
+
 /** Puts the cursor on a line and selects it, which is what reveals the
  * selection toolbar the suggestion flow starts from. */
 export async function selectTranslationLine(page: Page, line: number) {
