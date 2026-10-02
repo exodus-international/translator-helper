@@ -1,3 +1,15 @@
+## [1.4.2](https://github.com/exodus-international/translator-helper/compare/v1.4.1...v1.4.2) (2026-10-02)
+
+
+### Bug Fixes
+
+* **editor:** bring back find and replace ([#269](https://github.com/exodus-international/translator-helper/issues/269)) ([d2760b1](https://github.com/exodus-international/translator-helper/commit/d2760b1a3ca3a0d2c137f413540f612837bc5f1e))
+## [1.4.1](https://github.com/exodus-international/translator-helper/compare/v1.4.0...v1.4.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* feedback panel scroll, the dashboard deploy filter and the final approval button ([#267](https://github.com/exodus-international/translator-helper/issues/267)) ([cf67d01](https://github.com/exodus-international/translator-helper/commit/cf67d011f928ed1c38bb11f62496c61911854ac5))
 # [1.4.0](https://github.com/exodus-international/translator-helper/compare/v1.3.0...v1.4.0) (2026-09-23)
 
 
@@ -23,6 +35,7 @@
 
 * **analytics:** tag workflow events with the document, mask replay text ([#229](https://github.com/exodus-international/translator-helper/issues/229)) ([61746e8](https://github.com/exodus-international/translator-helper/commit/61746e8a2689cb38413746452509baaa5d60a150))
 * **data-table:** migrate TanStack Table v8 to v9 ([#178](https://github.com/exodus-international/translator-helper/issues/178)) ([cea766e](https://github.com/exodus-international/translator-helper/commit/cea766e9b47d9ed7b87b8b3635ae5f1d67421fa0))
+* **demos:** scripted product demos and a demo seed layer ([#261](https://github.com/exodus-international/translator-helper/issues/261)) ([a080c6c](https://github.com/exodus-international/translator-helper/commit/a080c6c48febcdad1c2b7f5ea9eb3efebd423571))
 * **deploy:** language managers publish their own language ([#249](https://github.com/exodus-international/translator-helper/issues/249)) ([eca6462](https://github.com/exodus-international/translator-helper/commit/eca6462d80d63e66b2ae1be9b4dab2894fae071d))
 * **editor:** a CodeMirror workspace, with the lint inside it ([#209](https://github.com/exodus-international/translator-helper/issues/209)) ([b6a10b8](https://github.com/exodus-international/translator-helper/commit/b6a10b85c48fea3d8e75fa4a8b65e5cd791a0d9e))
 * **editor:** better markdown/HTML highlighting, and the QA follow-up ([#219](https://github.com/exodus-international/translator-helper/issues/219)) ([f016700](https://github.com/exodus-international/translator-helper/commit/f0167004910bf867a332698bd89bf5089495c29c))
