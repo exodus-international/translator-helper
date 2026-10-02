@@ -22,6 +22,7 @@ import type { LintDiagnostic, LintOptions } from '@/lib/lint';
 import { lintDocument } from '@/lib/lint';
 import { createEditorApi, offsetToPosition, type EditorApi } from './editor-api';
 import { setSuggestions, suggestionExtension } from './cm-suggestions';
+import { findAndReplace } from './cm-search';
 import { frontmatterDecoration } from './cm-frontmatter';
 import { markdownSupport } from './cm-markdown';
 import { editorHighlighting, editorTheme } from './cm-theme';
@@ -267,6 +268,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       highlightActiveLine(),
       // The app's own palette, and nothing under it: see cm-theme.
       editorHighlighting,
+      findAndReplace,
       keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap]),
       languageCompartment.of(languageExtension),
       readOnlyCompartment.of(readOnlyExtensions(readOnly)),
