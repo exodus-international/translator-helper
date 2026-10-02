@@ -34,9 +34,11 @@ Feature: Translation lifecycle
     Then the translation should read "Pan je dobry. Pan je verny."
 
   @translator
-  Scenario: The replace shortcut opens the panel on the replace field
+  Scenario: The find key shows find alone and the replace key adds replace
     Given I open "Friday of the First Week" in Slovak
     And the translation has been started
+    When I press the find shortcut in the translation
+    Then I should be offered find without replace
     When I press the replace shortcut in the translation
     Then the replace field should have the cursor
 

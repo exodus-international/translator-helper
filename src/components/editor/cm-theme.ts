@@ -223,6 +223,30 @@ export const editorTheme = EditorView.theme({
     height: '0',
     content: '""',
   },
+  // The replace row waits to be asked for: see cm-search.
+  '&:not(.cm-replace-open) .cm-panel.cm-search :is(br, input[name=replace], button[name=replace], button[name=replaceAll])':
+    {
+      display: 'none',
+    },
+  '.cm-replace-toggle': {
+    width: '20px',
+    height: '28px',
+    padding: '0',
+    border: 'none',
+    borderRadius: '6px',
+    backgroundColor: 'transparent',
+    color: 'var(--muted-foreground)',
+    fontSize: '16px',
+    lineHeight: '1',
+    cursor: 'pointer',
+    transition: 'transform 150ms',
+  },
+  '.cm-replace-toggle:hover': {
+    color: 'var(--foreground)',
+  },
+  '.cm-replace-toggle[aria-expanded=true]': {
+    transform: 'rotate(90deg)',
+  },
   '.cm-panel.cm-search label': {
     display: 'inline-flex',
     alignItems: 'center',

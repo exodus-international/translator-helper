@@ -42,6 +42,14 @@ export async function replaceTranslation(page: Page, text: string) {
   await page.keyboard.type(text);
 }
 
+/** Opens find alone, the way the find key does. */
+export async function openFindFromKeyboard(page: Page) {
+  const pane = translationPane(page);
+  await pane.click();
+  await expect(pane).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+f');
+}
+
 /** Opens replace with the key the previous editor used for it. */
 export async function openReplaceFromKeyboard(page: Page) {
   const pane = translationPane(page);
@@ -58,7 +66,8 @@ export async function replaceAllInTranslation(page: Page, find: string, replacem
   const pane = translationPane(page);
   await pane.click();
   await expect(pane).toBeFocused();
-  await page.keyboard.press('ControlOrMeta+f');
+  // The replace key, not the find key: find alone opens without the replace row.
+  await page.keyboard.press('ControlOrMeta+Alt+f');
   await page.getByRole('textbox', { name: 'Find' }).fill(find);
   await page.getByRole('textbox', { name: 'Replace' }).fill(replacement);
   await page.getByRole('button', { name: 'replace all' }).click();

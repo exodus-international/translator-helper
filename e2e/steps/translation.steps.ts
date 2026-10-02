@@ -3,7 +3,7 @@ import type { DocumentStatus } from '@/generated/prisma/enums';
 import { Given, When, Then } from './fixtures';
 import { openDocument } from '../support/documents';
 import { changeStatus, expectStatus, currentStatus } from '../support/status';
-import { openReplaceFromKeyboard, replaceAllInTranslation, replaceTranslation, translationText, waitForTranslationPane } from '../support/editor';
+import { openFindFromKeyboard, openReplaceFromKeyboard, replaceAllInTranslation, replaceTranslation, translationText, waitForTranslationPane } from '../support/editor';
 import { statusName } from '../support/status';
 
 Given('I open {string} in {word}', async ({ page }, title: string, language: string) => {
@@ -34,6 +34,15 @@ When(
     await replaceAllInTranslation(page, find, replacement);
   },
 );
+
+When('I press the find shortcut in the translation', async ({ page }) => {
+  await openFindFromKeyboard(page);
+});
+
+Then('I should be offered find without replace', async ({ page }) => {
+  await expect(page.getByRole('textbox', { name: 'Find' })).toBeFocused();
+  await expect(page.getByRole('textbox', { name: 'Replace' })).toBeHidden();
+});
 
 When('I press the replace shortcut in the translation', async ({ page }) => {
   await openReplaceFromKeyboard(page);
