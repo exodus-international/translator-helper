@@ -26,6 +26,9 @@ import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
 import type { AnalyticsEvent, AnalyticsProperties } from '@/lib/analytics';
 
+/** Scripture notices shown one toast each after an AI draft; the rest are counted. */
+const MAX_SCRIPTURE_NOTICES = 3;
+
 // ─── Types ───────────────────────────────────────────────────
 
 export type LoadingKey =
@@ -386,6 +389,12 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
         set({ content: result.translatedContent, ...removeLoading(get(), 'aiTranslate') });
         track('ai_translate_triggered', { overwrite: before.trim().length > 0 });
         deps.notify.success('AI translation generated successfully!');
+        // Scripture the Bible API could not supply, or the model mishandled.
+        const { notices } = result;
+        for (const notice of notices.slice(0, MAX_SCRIPTURE_NOTICES)) deps.notify.warning(notice);
+        if (notices.length > MAX_SCRIPTURE_NOTICES) {
+          deps.notify.warning(`${notices.length - MAX_SCRIPTURE_NOTICES} more Scripture references need checking.`);
+        }
       } catch (error: any) {
         set(removeLoading(get(), 'aiTranslate'));
         deps.notify.error(error.message || 'Failed to generate AI translation');

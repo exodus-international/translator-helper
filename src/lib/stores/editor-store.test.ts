@@ -68,7 +68,7 @@ function fakeDeps(overrides: Partial<EditorStoreDeps> = {}) {
     getProjectReviewers: record('getProjectReviewers', async () => []),
     listTranslationProjectMembers: record('listTranslationProjectMembers', async () => []),
     deleteDocument: record('deleteDocument', async () => ({})),
-    translateDocument: record('translateDocument', async () => ({ translatedContent: 'AI draft' })),
+    translateDocument: record('translateDocument', async () => ({ translatedContent: 'AI draft', notices: [] })),
     getAudioTranscriptState: record('getAudioTranscriptState', async () => 'generated' as const),
     notify: {
       success: (message: string) => toasts.push({ fn: 'success', args: [message] }),
@@ -266,7 +266,7 @@ describe('translateWithAi', () => {
   });
 
   it('keeps what was typed while the model was working instead of replacing it', async () => {
-    const model = deferred<{ translatedContent: string }>();
+    const model = deferred<{ translatedContent: string; notices: string[] }>();
     const { deps, toasts } = fakeDeps({
       translateDocument: (() => model.promise) as unknown as EditorStoreDeps['translateDocument'],
     });
@@ -275,12 +275,29 @@ describe('translateWithAi', () => {
     const drafting = store.getState().translateWithAi();
     await settle();
     store.getState().setContent('first draft, kept typing');
-    model.resolve({ translatedContent: 'AI draft' });
+    model.resolve({ translatedContent: 'AI draft', notices: [] });
     await drafting;
 
     assert.equal(store.getState().content, 'first draft, kept typing');
     assert.equal(toasts.at(-1)?.fn, 'warning');
     assert.equal(store.getState().isLoading('aiTranslate'), false);
+  });
+
+  it('warns about the Scripture the Bible API could not supply, a few at a time', async () => {
+    const notices = ['A', 'B', 'C', 'D', 'E'].map((n) => `${n} 1:1: not in the Bible API`);
+    const { deps, toasts } = fakeDeps({
+      translateDocument: (async () => ({ translatedContent: 'AI draft', notices })) as EditorStoreDeps['translateDocument'],
+    });
+    const store = createEditorStore(CONFIG, deps);
+    await store.getState().translateWithAi();
+    assert.deepEqual(
+      toasts.map((t) => [t.fn, t.args[0]]),
+      [
+        ['success', 'AI translation generated successfully!'],
+        ...notices.slice(0, 3).map((n) => ['warning', n]),
+        ['warning', '2 more Scripture references need checking.'],
+      ],
+    );
   });
 
   it('does not ask the model when the edits it would replace could not be saved', async () => {
