@@ -251,6 +251,29 @@ describe('startTranslation', () => {
     assert.deepEqual(calls, []);
     assert.equal(toasts[0]?.fn, 'warning');
   });
+
+  it('claims a version still at Not Started and takes the status it comes back with', async () => {
+    // The button is offered on a version that already exists at
+    // PENDING_TRANSLATION, so this is the path that actually runs: the server
+    // claims that row and answers IN_PROGRESS, and the store has to adopt it
+    // or the pane would go on offering to start what has started.
+    const pending = { ...VERSION, status: DocumentStatus.PENDING_TRANSLATION, content: 'half a draft' };
+    const { deps } = fakeDeps({
+      assignDocumentVersion: (async () => ({
+        ...pending,
+        status: DocumentStatus.IN_PROGRESS,
+      })) as unknown as EditorStoreDeps['assignDocumentVersion'],
+    });
+    const store = createEditorStore({ ...CONFIG, targetVersion: pending }, deps);
+
+    await store.getState().startTranslation();
+
+    assert.equal(store.getState().targetVersion.status, DocumentStatus.IN_PROGRESS);
+    // The claim keeps whatever the version held; it must not come back blank.
+    assert.equal(store.getState().content, 'half a draft');
+    assert.equal(store.getState().savedContent, 'half a draft');
+    assert.equal(store.getState().isLoading('startTranslation'), false);
+  });
 });
 
 describe('translateWithAi', () => {

@@ -29,3 +29,17 @@ export function isStepCompleted(step: number, currentStatus: DocumentStatus | nu
 export function isDraftPhase(status: DocumentStatus | null | undefined): boolean {
   return !status || status === DocumentStatus.PENDING_TRANSLATION || status === DocumentStatus.IN_PROGRESS;
 }
+
+/**
+ * Whether work on this version has actually begun.
+ *
+ * A version row is not the same as a started translation: the document list
+ * and an assignment both create one at PENDING_TRANSLATION, and "Back to
+ * pending" returns a started one to it. In that state the app already refuses
+ * to autosave and hides the save control, so the editor must not be offered
+ * either -- the translation pane shows the call to action, and pressing it
+ * claims the version and moves it to IN_PROGRESS.
+ */
+export function isTranslationStarted(status: DocumentStatus | null | undefined): boolean {
+  return !!status && status !== DocumentStatus.PENDING_TRANSLATION;
+}

@@ -23,6 +23,7 @@ import { capture } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
+import { isTranslationStarted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@/generated/prisma/enums';
@@ -279,7 +280,7 @@ function TranslateSaveState() {
     }
   };
 
-  if (!targetVersion || targetVersion.status === DocumentStatus.PENDING_TRANSLATION) return null;
+  if (!isTranslationStarted(targetVersion?.status)) return null;
 
   return (
     <SaveControl status={saveStatus} lastSavedAt={lastSavedAt} onSave={handleSave} disabled={loading || isAnyLoading} />
@@ -310,7 +311,7 @@ function TranslatePanelActions({ zenMode, setZenMode }: { zenMode: boolean; setZ
     }
   };
 
-  if (!targetVersion || targetVersion.status === DocumentStatus.PENDING_TRANSLATION) return null;
+  if (!isTranslationStarted(targetVersion?.status)) return null;
 
   return (
     <>

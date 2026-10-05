@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { isTranslationStarted } from '@/lib/document-status';
 import { useEditorStore } from './editor-provider';
 
 /**
@@ -30,7 +31,7 @@ export function useAutoSave(opts?: { delayMs?: number; enabled?: boolean }) {
 
   useEffect(() => {
     if (!enabled) return;
-    if (!targetVersion || targetVersion.status === 'PENDING_TRANSLATION') return;
+    if (!isTranslationStarted(targetVersion?.status)) return;
     if (content === savedContent) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
