@@ -19,6 +19,22 @@ const STATUS_ORDER: DocumentStatus[] = [
 // Guards only apply on forward transitions to these statuses
 const FORWARD_GUARDED_STATUSES: DocumentStatus[] = [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED];
 
+/**
+ * A move the workflow refuses for the version as it is now: not allowed from
+ * its current status, or blocked by open suggestions. The usual cause is a
+ * page that went stale, so the status action returns this to the client as a
+ * refusal rather than a crash.
+ */
+export class StatusTransitionRefusedError extends Error {
+  constructor(
+    message: string,
+    readonly reason: 'not_allowed' | 'open_suggestions',
+  ) {
+    super(message);
+    this.name = 'StatusTransitionRefusedError';
+  }
+}
+
 interface TransitionContext {
   openSuggestionsCount: number;
 }
@@ -31,8 +47,9 @@ export function validateTransition(
   const allowed = VALID_TRANSITIONS[from];
 
   if (!allowed.includes(to)) {
-    throw new Error(
+    throw new StatusTransitionRefusedError(
       `Invalid status transition: ${from} → ${to}. Allowed transitions from ${from}: ${allowed.join(', ')}`,
+      'not_allowed',
     );
   }
 
@@ -44,8 +61,9 @@ export function validateTransition(
       throw new Error(`Transition to ${to} requires context with openSuggestionsCount`);
     }
     if (context.openSuggestionsCount > 0) {
-      throw new Error(
+      throw new StatusTransitionRefusedError(
         `Cannot transition to ${to}: there are ${context.openSuggestionsCount} open suggestions that must be resolved first`,
+        'open_suggestions',
       );
     }
   }

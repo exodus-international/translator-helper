@@ -118,4 +118,16 @@ describe('withStatusChangeFeedback', () => {
     );
     assert.deepEqual(fns(calls), ['toast.loading', 'toast.dismiss']);
   });
+
+  it('shows a refusal as an error, clears the deploy toast and sends no analytics', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await withStatusChangeFeedback(
+      deploy,
+      async () => ({ refused: { message: 'Status changed meanwhile.', currentStatus: DocumentStatus.PENDING_REVIEW } }),
+      deps,
+    );
+    assert.deepEqual(fns(calls), ['toast.loading', 'toast.dismiss', 'toast.error']);
+    assert.deepEqual(calls[2].args, ['Status changed meanwhile.']);
+    assert.ok('refused' in result);
+  });
 });

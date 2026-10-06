@@ -143,6 +143,18 @@ function EditorViewer({
   const createSuggestion = useEditorStore((s) => s.createSuggestion);
   const createGeneralThread = useEditorStore((s) => s.createGeneralThread);
   const replySuggestion = useEditorStore((s) => s.replySuggestion);
+  const reloadSuggestions = useEditorStore((s) => s.reloadSuggestions);
+  // The edit action lives outside the store, so the list is reloaded here:
+  // after an edit, and after a refused one, when the list was out of date.
+  const editSuggestion = useMemo(
+    () =>
+      onEditSuggestion &&
+      (async (id: string, data: { comment: string; proposedText?: string }) => {
+        await onEditSuggestion(id, data);
+        await reloadSuggestions();
+      }),
+    [onEditSuggestion, reloadSuggestions],
+  );
   const isApplyingSuggestion = useEditorStore((s) => s.loading.has('applySuggestion'));
   const isDismissingSuggestion = useEditorStore((s) => s.loading.has('dismissSuggestion'));
   const translationProjectId = useEditorStore((s) => s.translationProjectId);
@@ -232,7 +244,7 @@ function EditorViewer({
       onApplySuggestion={applySuggestion}
       onDismissSuggestion={dismissSuggestion}
       onReopenSuggestion={reopenSuggestion}
-      onEditSuggestion={onEditSuggestion}
+      onEditSuggestion={editSuggestion}
       onCreateSuggestion={createSuggestion}
       documentVersion={targetVersion?.version ?? 1}
       isApplyingSuggestion={isApplyingSuggestion}
