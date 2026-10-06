@@ -1,3 +1,4 @@
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { createStore } from 'zustand';
 import type { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import type {
@@ -429,7 +430,15 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
           deps.notify.success('Translation saved successfully!');
         } catch (error: any) {
           set(removeLoading(get(), 'save'));
-          deps.notify.error(error.message || 'Failed to save translation');
+          // The only redirect a save gets is to the login page, after the
+          // session expired. The browser is already leaving the editor, and
+          // the toast outlives it, so it is where the reader learns the text
+          // typed since the last save did not make it.
+          deps.notify.error(
+            isRedirectError(error)
+              ? 'You were signed out, so your latest changes were not saved. Sign in and add them again.'
+              : error.message || 'Failed to save translation',
+          );
           throw error;
         }
       };
