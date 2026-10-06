@@ -32,11 +32,12 @@ interface StatusDropdownProps {
    */
   canDeploy: boolean;
   /**
-   * Whether this person is the version's translator, the only one who may ask
-   * for feedback (In progress to Pending review). Everyone else does not see
-   * that move, because the server would refuse it.
+   * Whether this person is on the version's language team, or an
+   * administrator. Anyone on the team may move the version, not only its
+   * translator. Someone from another language may not, so the control is
+   * disabled for them.
    */
-  canSubmitForReview?: boolean;
+  canChangeStatus?: boolean;
   documentId?: string; // For navigation after status change
   onStatusChange?: (newStatus: DocumentStatus) => void;
   onReviewRequested?: () => void; // Called instead of direct transition when moving to PENDING_REVIEW
@@ -52,7 +53,7 @@ export function StatusDropdown({
   versionId,
   user,
   canDeploy,
-  canSubmitForReview = true,
+  canChangeStatus = true,
   documentId,
   onStatusChange,
   onReviewRequested,
@@ -104,14 +105,8 @@ export function StatusDropdown({
       statuses = statuses.filter((s) => validTargets.includes(s));
     }
 
-    // Asking for feedback belongs to the translator. Sending approved work back
-    // to review is a different move and stays open to the others.
-    if (!canSubmitForReview && currentStatus === DocumentStatus.IN_PROGRESS) {
-      statuses = statuses.filter((status) => status !== DocumentStatus.PENDING_REVIEW);
-    }
-
     return statuses;
-  }, [allowedStatuses, canDeploy, canSubmitForReview, currentStatus]);
+  }, [allowedStatuses, canDeploy, currentStatus]);
 
   const forwardLabels: Partial<Record<DocumentStatus, string>> = {
     [DocumentStatus.IN_PROGRESS]: 'Start translation',
@@ -210,7 +205,7 @@ export function StatusDropdown({
       // does, and carrying the status inside that name, gives screen readers
       // "Document status: Texts in Review" instead of a bare badge.
       aria-label={`Document status: ${currentStatusConfig.name}`}
-      disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
+      disabled={disabled || loading || !canChangeStatus || translatorCannotChangeDeployedDocumentStatus}
       className={cn(
         'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
         currentStatusConfig.color.badgeClass,

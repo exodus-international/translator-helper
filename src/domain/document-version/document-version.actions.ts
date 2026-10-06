@@ -46,7 +46,7 @@ async function loadVersionAndGateSourceEdits(id: string, user: SessionUser) {
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
 import { assertCanEditDocumentVersion } from './document-version.permissions';
-import { isVersionTranslator, ONLY_TRANSLATOR_SUBMITS, validateTransition } from './document-version.transitions';
+import { validateTransition } from './document-version.transitions';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
 import { getUserLanguages, getUserRoleForLanguage } from '../user-language/user-language.repository';
@@ -201,17 +201,11 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
 }
 
 /**
- * Sends a version to review. Only its translator may do this; everyone else
- * gets the refusal back as a result rather than a thrown error, because Next
- * replaces a thrown message with a generic one in production and Sentry
- * reports it as a crash.
+ * Sends a version to review. Its translator may do this, and so may anyone on
+ * that language's team or an administrator, so a translator who is away does
+ * not block the document.
  */
-export async function submitForReviewAction(
-  input: unknown,
-): Promise<
-  | { ok: true; version: Awaited<ReturnType<typeof updateDocumentVersionStatus>> }
-  | { ok: false; error: string }
-> {
+export async function submitForReviewAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = submitForReviewSchema.parse(input);
 
@@ -219,10 +213,6 @@ export async function submitForReviewAction(
   const existingVersion = await getDocumentVersionById(validated.versionId);
   if (!existingVersion) {
     throw new Error('Document version not found');
-  }
-
-  if (!isVersionTranslator(existingVersion.userId, user.id)) {
-    return { ok: false, error: ONLY_TRANSLATOR_SUBMITS };
   }
 
   // Get document to find source project
@@ -266,7 +256,7 @@ export async function submitForReviewAction(
     to: DocumentStatus.PENDING_REVIEW,
   });
 
-  return { ok: true, version };
+  return version;
 }
 
 export async function deleteDocumentVersionAction(id: string) {
@@ -310,6 +300,11 @@ export async function updateDocumentVersionStatusAction(
   if (!existingVersion) {
     throw new Error('Document version not found');
   }
+
+  // Moving a version through its workflow belongs to that language's team,
+  // whoever is assigned to it, so the work goes on when the translator is
+  // away. Someone from another language cannot move it.
+  await authorize({ language: existingVersion.languageId, role: 'member' });
 
   // Deploying publishes this language's work to the content repository, so it
   // belongs to the people answerable for that language -- its manager and any

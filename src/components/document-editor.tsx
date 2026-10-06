@@ -30,7 +30,6 @@ import { useTrailStore } from '@/lib/page-trail';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import { useAutoSave } from '@/lib/stores/hooks';
 import { buildProjectPath } from '@/domain/source-project/source-project-url';
-import { isVersionTranslator } from '@/domain/document-version/document-version.transitions';
 
 function getContentWithoutFrontmatter(text: string) {
   try {
@@ -45,15 +44,6 @@ function getContentWithoutFrontmatter(text: string) {
 // Internal: renders <SourceTranslationViewer> wired to the store
 // ──────────────────────────────────────────────────────────────
 
-/**
- * Who translates the version as the editor last heard it. Assigning or
- * unassigning a translator updates `user` in place and leaves `userId` stale,
- * so `user` wins whenever it is present, even as null.
- */
-function translatorId(version: { user?: { id: string } | null; userId?: string | null }) {
-  return version.user !== undefined ? (version.user?.id ?? null) : (version.userId ?? null);
-}
-
 type CapFn<T = boolean> = T | ((targetVersion: any) => T);
 
 interface ViewerConfig {
@@ -64,6 +54,8 @@ interface ViewerConfig {
   user: SessionUser;
   /** Resolved on the server against this version's language. */
   canDeploy: boolean;
+  /** On this language's team, or an administrator: may move the version's status. */
+  canChangeStatus: boolean;
   canEditSource: CapFn;
   canCreateSuggestions?: CapFn;
   disableReopen?: CapFn;
@@ -115,6 +107,7 @@ function EditorViewer({
   sourceVersion,
   user,
   canDeploy,
+  canChangeStatus,
   canEditSource,
   canCreateSuggestions,
   disableReopen,
@@ -292,7 +285,7 @@ function EditorViewer({
                 versionId={targetVersion.id}
                 user={user}
                 canDeploy={canDeploy}
-                canSubmitForReview={isVersionTranslator(translatorId(targetVersion), user.id)}
+                canChangeStatus={canChangeStatus}
                 documentId={documentId}
                 disabled={isAnyLoading}
                 onStatusChange={handleStatusChange}
@@ -425,6 +418,8 @@ interface DocumentEditorProps {
   user: SessionUser;
   /** Resolved on the server against this version's language. */
   canDeploy: boolean;
+  /** On this language's team, or an administrator: may move the version's status. */
+  canChangeStatus: boolean;
 
   // Header — page-supplied, and now only for chrome a view adds to itself:
   // zen mode's own bar. The default layout has none.
@@ -485,6 +480,7 @@ export function DocumentEditor({
   targetLanguageId,
   user,
   canDeploy,
+  canChangeStatus,
   header,
   fullscreen,
   outerClassName,
@@ -580,6 +576,7 @@ export function DocumentEditor({
               sourceVersion={sourceVersion}
               user={user}
               canDeploy={canDeploy}
+              canChangeStatus={canChangeStatus}
               canEditSource={canEditSource}
               canCreateSuggestions={canCreateSuggestions}
               disableReopen={disableReopen}

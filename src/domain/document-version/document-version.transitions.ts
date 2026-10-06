@@ -68,16 +68,3 @@ export function validateTransition(
     }
   }
 }
-
-/** Why someone other than the translator cannot send a version to review. */
-export const ONLY_TRANSLATOR_SUBMITS = 'Only the translator can submit this version for review';
-
-/**
- * Whether `userId` is the translator of a version, the one person who may send
- * it to review. Reviewers, language managers and administrators are not, even
- * though they may change its status in other ways. The status dropdown hides
- * "Give me feedback" with this, and the server refuses with it.
- */
-export function isVersionTranslator(translatorId: string | null | undefined, userId: string): boolean {
-  return Boolean(translatorId) && translatorId === userId;
-}
