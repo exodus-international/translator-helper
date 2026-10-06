@@ -219,13 +219,15 @@ flowchart LR
 
 1. **PENDING_TRANSLATION (TODO)**: Initial state when a document needs translation
 2. **IN_PROGRESS (Translations in Progress)**: Translator takes the text and starts working on it
-3. **PENDING_REVIEW (Texts in Review)**: After translation, the translator submits it for review
+3. **PENDING_REVIEW (Texts in Review)**: After translation, the translator, or any member of that language's team, submits it for review
 4. **Communication Step**: Reviewer reviews the text and requests a final check from the translator (or another team member) via messages in the Dashboard
 5. **APPROVED (Texts Approved)**: Translator performs the final check and approves the translation
 
 - Also AUDIO file is generated and added to the document
 
 6. **DEPLOYED (Texts Deployed)**: Deployer (e.g., Pavel) moves the approved text to deployed status
+
+Anyone on a language's team, in any role, and any administrator can move that language's documents between statuses, not only the assigned translator. A translator who is ill or away then does not block the document. People from other languages cannot change the status. Deploying, and moving back from deployed, stays with the language's manager and administrators.
 
 ## Database Schema
 
