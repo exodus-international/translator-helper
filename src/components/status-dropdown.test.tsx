@@ -7,6 +7,7 @@ import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { createTestRouter } from '../../tests/next-router';
 import { StatusDropdown } from './status-dropdown';
 import type { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
+import type { StatusChangeRefusal } from '@/domain/document-version/document-version.status-change';
 
 /**
  * What the status control tells the person after a move, pinned before the
@@ -33,7 +34,7 @@ function toastTitles(): string[] {
 const admin = { id: 'user-admin', email: 'admin@example.org', name: 'Admin', role: Role.ADMIN };
 
 type ChangeStatus = typeof updateDocumentVersionStatusAction;
-type Outcome = Awaited<ReturnType<ChangeStatus>>;
+type Outcome = Exclude<Awaited<ReturnType<ChangeStatus>>, StatusChangeRefusal>;
 
 function outcome(partial: Partial<Outcome>): Outcome {
   return { version: { id: 'version-1' } as Outcome['version'], ...partial };
@@ -125,4 +126,17 @@ test('a move the server refused is reported and the status stays', async () => {
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.ok(toastTitles().includes('Forbidden: requires manager permission in language'));
   assert.deepEqual(moved, []);
+});
+
+test('a move refused because the page was stale shows the reason and the status the server has', async () => {
+  const moved: DocumentStatus[] = [];
+  await renderApproved(
+    async () => ({
+      refused: { message: 'The page now shows its current status.', currentStatus: DocumentStatus.DEPLOYED },
+    }),
+    (status) => moved.push(status),
+  );
+  assert.ok(await screen.findByRole('button', { name: 'Document status: Deployed' }));
+  assert.ok(toastTitles().includes('The page now shows its current status.'));
+  assert.deepEqual(moved, [DocumentStatus.DEPLOYED]);
 });

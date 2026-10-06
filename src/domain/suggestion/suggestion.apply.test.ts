@@ -1,7 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
-import { createApplySuggestion, planSuggestionApplication, type ApplicableSuggestion, type ApplySuggestionDeps } from './suggestion.apply';
+import { isRefusal } from '@/lib/action-refusal';
+import {
+  createApplySuggestion,
+  planSuggestionApplication,
+  SuggestionNotOpenError,
+  type ApplicableSuggestion,
+  type ApplySuggestionDeps,
+} from './suggestion.apply';
 
 const content = ['The call came early.', 'Nobody answered it.', 'So it came again.'].join('\n');
 
@@ -25,7 +32,10 @@ describe('planSuggestionApplication', () => {
   });
 
   it('refuses a suggestion that is not open', () => {
-    assert.throws(() => planSuggestionApplication({ ...change, status: SuggestionStatus.APPLIED }, content), /Only open/);
+    assert.throws(
+      () => planSuggestionApplication({ ...change, status: SuggestionStatus.APPLIED }, content),
+      (error) => error instanceof SuggestionNotOpenError && /Only open/.test(error.message),
+    );
   });
 
   it('refuses a comment, which proposes nothing', () => {
@@ -65,8 +75,15 @@ describe('applySuggestion', () => {
     };
     const applySuggestion = createApplySuggestion(deps);
 
-    const version = await applySuggestion({ suggestion: change, versionId: 'v1', content, actorId: 'me' });
+    const version = await applySuggestion({
+      suggestion: change,
+      versionId: 'v1',
+      content,
+      currentVersion: { id: 'v1', content },
+      actorId: 'me',
+    });
 
+    assert.ok(!isRefusal(version));
     assert.equal(version.content.split('\n')[0], 'The summons came early.');
     assert.deepEqual(
       calls.map((call) => call.fn),
@@ -83,27 +100,66 @@ describe('applySuggestion', () => {
     ]);
   });
 
-  it('writes nothing when the plan is refused', async () => {
-    let wrote = false;
-    const applySuggestion = createApplySuggestion({
-      updateVersion: async () => {
-        wrote = true;
-        return {};
+  function recordingWrites() {
+    const writes: string[] = [];
+    const applySuggestion = createApplySuggestion<{ id: string; content: string }>({
+      updateVersion: async (id, text) => {
+        writes.push('updateVersion');
+        return { id, content: text };
       },
       markApplied: async () => {
-        wrote = true;
+        writes.push('markApplied');
       },
       log: async () => {
-        wrote = true;
+        writes.push('log');
       },
       revalidateDocumentPage: () => {
-        wrote = true;
+        writes.push('revalidate');
       },
     });
+    return { writes, applySuggestion };
+  }
+
+  it('returns the version untouched when the suggestion is already applied, so a retry succeeds', async () => {
+    const { writes, applySuggestion } = recordingWrites();
+    const current = { id: 'v1', content: 'already changed' };
+    const result = await applySuggestion({
+      suggestion: { ...change, status: SuggestionStatus.APPLIED },
+      versionId: 'v1',
+      content: current.content,
+      currentVersion: current,
+      actorId: 'me',
+    });
+    assert.equal(result, current);
+    assert.deepEqual(writes, []);
+  });
+
+  it('refuses a dismissed suggestion with a message for the person, and writes nothing', async () => {
+    const { writes, applySuggestion } = recordingWrites();
+    const result = await applySuggestion({
+      suggestion: { ...change, status: SuggestionStatus.DISMISSED },
+      versionId: 'v1',
+      content,
+      currentVersion: { id: 'v1', content },
+      actorId: 'me',
+    });
+    assert.ok(isRefusal(result));
+    assert.match(result.refused.message, /no longer open/);
+    assert.deepEqual(writes, []);
+  });
+
+  it('still throws for a suggestion that can never be applied, and writes nothing', async () => {
+    const { writes, applySuggestion } = recordingWrites();
     await assert.rejects(
-      applySuggestion({ suggestion: { ...change, status: SuggestionStatus.DISMISSED }, versionId: 'v1', content, actorId: 'me' }),
-      /Only open/,
+      applySuggestion({
+        suggestion: { ...change, type: SuggestionType.COMMENT },
+        versionId: 'v1',
+        content,
+        currentVersion: { id: 'v1', content },
+        actorId: 'me',
+      }),
+      /Only CHANGE/,
     );
-    assert.equal(wrote, false);
+    assert.deepEqual(writes, []);
   });
 });

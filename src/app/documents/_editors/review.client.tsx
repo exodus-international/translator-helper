@@ -10,6 +10,7 @@ import { updateDocumentVersionAction } from '@/domain/document-version/document-
 import { toggleDocumentLabelAction } from '@/domain/document/document.actions';
 import { editSuggestionAction } from '@/domain/suggestion/suggestion.actions';
 import { capture } from '@/lib/analytics';
+import { isRefusal } from '@/lib/action-refusal';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -76,7 +77,11 @@ export default function ReviewClient({
       }}
       onEditSuggestion={async (suggestionId, data) => {
         try {
-          await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
+          const result = await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
+          if (isRefusal(result)) {
+            toast.error(result.refused.message);
+            return;
+          }
           capture('suggestion_edited');
           toast.success('Suggestion updated!');
         } catch (error: any) {

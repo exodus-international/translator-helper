@@ -9,6 +9,7 @@ import { updateDocumentVersionStatusAction } from '@/domain/document-version/doc
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { useStatusTransitionPending, useStatusTransitionStore } from '@/lib/stores/status-transition';
 import { SessionUser } from '@/lib/session';
+import { isRefusal } from '@/lib/action-refusal';
 import { cn } from '@/lib/utils';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { Menu as DropdownMenuPrimitive } from '@base-ui/react/menu';
@@ -156,15 +157,18 @@ export function StatusDropdown({
     if (!beginTransition(versionId)) return;
 
     try {
-      await withStatusChangeFeedback(
+      const result = await withStatusChangeFeedback(
         { from: displayedStatus, to: newStatus, via: 'dropdown', documentId: documentId ?? null, versionId },
         () => changeStatus(versionId, newStatus),
       );
+      // A refused move means this page was stale: show the status the server
+      // has, and reload the rest of the page below.
+      const shownStatus = isRefusal(result) ? result.refused.currentStatus : newStatus;
 
       // Update displayed status immediately for optimistic UI update
-      setDisplayedStatus(newStatus);
+      setDisplayedStatus(shownStatus);
       // Update parent state first so stepper and other components update immediately
-      onStatusChange?.(newStatus);
+      onStatusChange?.(shownStatus);
       setOpen(false);
 
       // The URL does not encode which editor is showing, so a status change never

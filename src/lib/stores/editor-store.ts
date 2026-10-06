@@ -25,6 +25,7 @@ import type { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
 import type { AnalyticsEvent, AnalyticsProperties } from '@/lib/analytics';
+import { isRefusal } from '@/lib/action-refusal';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -503,6 +504,12 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
       set(addLoading(get(), 'applySuggestion'));
       try {
         const updatedVersion = await deps.applySuggestion({ suggestionId });
+        if (isRefusal(updatedVersion)) {
+          set(removeLoading(get(), 'applySuggestion'));
+          deps.notify.error(updatedVersion.refused.message);
+          await get().reloadSuggestions();
+          return;
+        }
         set({
           targetVersion: updatedVersion,
           content: updatedVersion.content,
@@ -521,8 +528,13 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
     dismissSuggestion: async (suggestionId, reason?) => {
       set(addLoading(get(), 'dismissSuggestion'));
       try {
-        await deps.dismissSuggestion({ suggestionId, dismissedReason: reason });
+        const result = await deps.dismissSuggestion({ suggestionId, dismissedReason: reason });
         set(removeLoading(get(), 'dismissSuggestion'));
+        if (isRefusal(result)) {
+          deps.notify.error(result.refused.message);
+          await get().reloadSuggestions();
+          return;
+        }
         track('suggestion_dismissed', { suggestionId });
         deps.notify.success('Suggestion dismissed!');
         await get().reloadSuggestions();
