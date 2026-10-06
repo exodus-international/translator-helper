@@ -76,3 +76,16 @@ export function canAdministerLanguages(viewer: LanguageViewer): boolean {
 export function canDeployLanguage(viewer: LanguageViewer, languageId: string): boolean {
   return canViewLanguage(viewer, languageId);
 }
+
+/**
+ * Moving a document version through its workflow is open to everyone on that
+ * language's team, in any role, and to administrators. The translator being
+ * away must not block the document. The server asks the same question with
+ * `authorize({ language, role: 'member' })`.
+ */
+export function canChangeLanguageStatus(
+  params: { isAdmin: boolean; memberships: LanguageMembership[] },
+  languageId: string,
+): boolean {
+  return params.isAdmin || params.memberships.some((membership) => membership.languageId === languageId);
+}

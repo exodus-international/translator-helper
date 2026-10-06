@@ -351,6 +351,21 @@ describe('submitForReview', () => {
     assert.equal(store.getState().targetVersion.status, DocumentStatus.PENDING_REVIEW);
     assert.equal(store.getState().dialog.type, 'closed');
   });
+
+  it('shows the refusal when someone outside the language submits, and leaves the version and dialog as they were', async () => {
+    const { deps, toasts } = fakeDeps({
+      submitForReview: async () => {
+        throw new Error("Forbidden: requires 'member' permission in project");
+      },
+    });
+    const store = createEditorStore(CONFIG, deps);
+    await store.getState().openReviewDialog();
+    await store.getState().submitForReview();
+    assert.deepEqual(toasts, [{ fn: 'error', args: ["Forbidden: requires 'member' permission in project"] }]);
+    assert.equal(store.getState().targetVersion.status, DocumentStatus.IN_PROGRESS);
+    assert.equal(store.getState().dialog.type, 'submitReview');
+    assert.equal(store.getState().isLoading('submitForReview'), false);
+  });
 });
 
 describe('suggestions', () => {

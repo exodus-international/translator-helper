@@ -56,8 +56,9 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     // Member of the project when there is one, administrator otherwise.
     submitForReviewAction: ['authenticated', 'project:member', 'admin'],
     deleteDocumentVersionAction: ['authenticated'],
-    // The language's manager only when the move enters or leaves DEPLOYED.
-    updateDocumentVersionStatusAction: ['authenticated', 'language:manager'],
+    // Anyone on the language team moves a version, not only its translator;
+    // the language's manager as well when the move enters or leaves DEPLOYED.
+    updateDocumentVersionStatusAction: ['authenticated', 'language:member', 'language:manager'],
     assignDocumentVersionAction: ['authenticated', 'project:translator'],
     getApprovedVersionsAction: ['authenticated'],
   },

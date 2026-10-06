@@ -200,6 +200,11 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   return version;
 }
 
+/**
+ * Sends a version to review. Its translator may do this, and so may anyone on
+ * that language's team or an administrator, so a translator who is away does
+ * not block the document.
+ */
 export async function submitForReviewAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = submitForReviewSchema.parse(input);
@@ -208,11 +213,6 @@ export async function submitForReviewAction(input: unknown) {
   const existingVersion = await getDocumentVersionById(validated.versionId);
   if (!existingVersion) {
     throw new Error('Document version not found');
-  }
-
-  // Only the owner can submit for review
-  if (existingVersion.userId !== user.id) {
-    throw new Error('Only the translator can submit this version for review');
   }
 
   // Get document to find source project
@@ -300,6 +300,11 @@ export async function updateDocumentVersionStatusAction(
   if (!existingVersion) {
     throw new Error('Document version not found');
   }
+
+  // Moving a version through its workflow belongs to that language's team,
+  // whoever is assigned to it, so the work goes on when the translator is
+  // away. Someone from another language cannot move it.
+  await authorize({ language: existingVersion.languageId, role: 'member' });
 
   // Deploying publishes this language's work to the content repository, so it
   // belongs to the people answerable for that language -- its manager and any

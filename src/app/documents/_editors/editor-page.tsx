@@ -5,7 +5,7 @@ import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-p
 import { isDraftPhase } from '@/lib/document-status';
 import { SessionUser } from '@/lib/session';
 import { Role } from '@/generated/prisma/enums';
-import { canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
+import { canChangeLanguageStatus, canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { EDITOR_SIDEBAR_COOKIE_NAME, parseSidebarState } from '@/lib/sidebar-cookie';
 import { SidebarStoredStateProvider } from '@/components/ui/sidebar';
@@ -35,11 +35,14 @@ export async function DocumentEditorPage({
   // Deploying publishes this language's work, so the answer depends on the
   // language rather than on the session alone: an administrator, or this
   // language's manager. Both editors and the status control take it from here.
-  const viewer = resolveLanguageViewer({
+  const languageAccess = {
     isAdmin: user.role === Role.ADMIN,
     memberships: user.role === Role.ADMIN ? [] : await getUserLanguages(user.id),
-  });
+  };
+  const viewer = resolveLanguageViewer(languageAccess);
   const canDeploy = canDeployLanguage(viewer, language.id);
+  // Anyone on this language's team moves the version, not only its translator.
+  const canChangeStatus = canChangeLanguageStatus(languageAccess, language.id);
 
   const sourceVersion = document.versions.find((v: { language: { code: string } }) => v.language.code === 'en');
 
@@ -78,6 +81,7 @@ export async function DocumentEditorPage({
           translationProjectId={translationProject?.id ?? null}
           user={user}
           canDeploy={canDeploy}
+          canChangeStatus={canChangeStatus}
           audioTextVersionId={audioTextVersionId}
           initialSuggestions={initialSuggestions}
         />
@@ -96,6 +100,7 @@ export async function DocumentEditorPage({
         translationProject={translationProject}
         user={user}
         canDeploy={canDeploy}
+        canChangeStatus={canChangeStatus}
         initialSuggestions={initialSuggestions}
       />
     </SidebarStoredStateProvider>
