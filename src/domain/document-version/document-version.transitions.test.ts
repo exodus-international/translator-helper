@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentStatus } from '@/generated/prisma/enums';
-import { validateTransition } from './document-version.transitions';
+import { StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
 
 describe('validateTransition', () => {
   describe('valid forward transitions', () => {
@@ -120,5 +120,28 @@ describe('validateTransition', () => {
         { message: /requires context/ },
       );
     });
+  });
+});
+
+describe('StatusTransitionRefusedError', () => {
+  it('marks a move the workflow does not allow', () => {
+    assert.throws(
+      () => validateTransition(DocumentStatus.APPROVED, DocumentStatus.IN_PROGRESS),
+      (error) => error instanceof StatusTransitionRefusedError && error.reason === 'not_allowed',
+    );
+  });
+
+  it('marks a move blocked by open suggestions', () => {
+    assert.throws(
+      () => validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED, { openSuggestionsCount: 1 }),
+      (error) => error instanceof StatusTransitionRefusedError && error.reason === 'open_suggestions',
+    );
+  });
+
+  it('leaves a missing context as a plain error, since that is a bug in the caller', () => {
+    assert.throws(
+      () => validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED),
+      (error) => error instanceof Error && !(error instanceof StatusTransitionRefusedError),
+    );
   });
 });

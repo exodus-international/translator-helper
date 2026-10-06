@@ -7,7 +7,13 @@ import { type SessionUser } from '@/lib/session';
 import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { isGitHubConfigured } from '@/lib/github-config';
-import { createStatusChange, involvesDeployed, type StatusChangeResult } from './document-version.status-change';
+import {
+  createStatusChange,
+  involvesDeployed,
+  toStatusChangeRefusal,
+  type StatusChangeRefusal,
+  type StatusChangeResult,
+} from './document-version.status-change';
 import { createStartTranslation } from './document-version.start-translation';
 import {
   notifyReviewerAssignment,
@@ -287,7 +293,7 @@ const changeStatus = createStatusChange({
 export async function updateDocumentVersionStatusAction(
   versionId: string,
   status: DocumentStatus,
-): Promise<StatusChangeResult<Awaited<ReturnType<typeof updateDocumentVersionStatus>>>> {
+): Promise<StatusChangeResult<Awaited<ReturnType<typeof updateDocumentVersionStatus>>> | StatusChangeRefusal> {
   const { user } = await authorize('authenticated');
 
   const existingVersion = await getDocumentVersionById(versionId);
@@ -302,7 +308,15 @@ export async function updateDocumentVersionStatusAction(
     await authorize({ language: existingVersion.languageId, role: 'manager' });
   }
 
-  return changeStatus({ version: existingVersion, to: status, actorId: user.id });
+  try {
+    return await changeStatus({ version: existingVersion, to: status, actorId: user.id });
+  } catch (error) {
+    // Someone else moved the version after this page loaded. Tell the client
+    // where it is now instead of failing the request.
+    const refusal = toStatusChangeRefusal(error, existingVersion.status);
+    if (refusal) return refusal;
+    throw error;
+  }
 }
 
 /** Starting a translation as the app wires it: the real repository writes. */

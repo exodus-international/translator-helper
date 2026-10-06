@@ -317,6 +317,29 @@ describe('applySuggestion', () => {
   });
 });
 
+describe('a suggestion the server says is no longer open', () => {
+  const refusal = { refused: { message: 'This suggestion is no longer open.' } };
+
+  it('apply shows the reason, keeps the text and reloads the threads', async () => {
+    const { deps, calls, toasts } = fakeDeps({ applySuggestion: (async () => refusal) as unknown as EditorStoreDeps['applySuggestion'] });
+    const store = createEditorStore(CONFIG, deps);
+    const before = store.getState().content;
+    await store.getState().applySuggestion('suggestion-1');
+    assert.deepEqual(toasts, [{ fn: 'error', args: ['This suggestion is no longer open.'] }]);
+    assert.equal(store.getState().content, before);
+    assert.equal(store.getState().isLoading('applySuggestion'), false);
+    assert.ok(calledFns(calls).includes('getSuggestionsByDocumentVersion'));
+  });
+
+  it('dismiss shows the reason and reloads the threads', async () => {
+    const { deps, calls, toasts } = fakeDeps({ dismissSuggestion: (async () => refusal) as unknown as EditorStoreDeps['dismissSuggestion'] });
+    const store = createEditorStore(CONFIG, deps);
+    await store.getState().dismissSuggestion('suggestion-1');
+    assert.deepEqual(toasts, [{ fn: 'error', args: ['This suggestion is no longer open.'] }]);
+    assert.ok(calledFns(calls).includes('getSuggestionsByDocumentVersion'));
+  });
+});
+
 describe('submitForReview', () => {
   it('moves the version to review and closes the dialog', async () => {
     const { deps, calls } = fakeDeps();

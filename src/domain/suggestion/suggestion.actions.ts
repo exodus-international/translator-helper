@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
 import { resolveTranslationProject } from '../document-version/resolve-translation-project';
-import { createApplySuggestion } from './suggestion.apply';
+import { createApplySuggestion, refuseClosedSuggestion } from './suggestion.apply';
 import { notifySuggestionAdded, notifySuggestionReply } from '../notification/notification.service';
 import {
   applySuggestionSchema,
@@ -122,6 +122,7 @@ export async function applySuggestionAction(input: unknown) {
     suggestion,
     versionId: suggestion.documentVersionId,
     content: documentVersion.content,
+    currentVersion: documentVersion,
     actorId: user.id,
   });
 }
@@ -136,16 +137,21 @@ export async function dismissSuggestionAction(input: unknown) {
     throw new Error('Suggestion not found');
   }
 
-  if (suggestion.status !== SuggestionStatus.OPEN) {
-    throw new Error('Only open suggestions can be dismissed');
-  }
-
   const { translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'translator' });
   } else {
     await authorize('admin');
+  }
+
+  // Already dismissed: a retried request, or someone else got there first.
+  // Either way the outcome the caller asked for holds, so nothing is written.
+  if (suggestion.status === SuggestionStatus.DISMISSED) {
+    return suggestion;
+  }
+  if (suggestion.status !== SuggestionStatus.OPEN) {
+    return refuseClosedSuggestion();
   }
 
   // Update suggestion status
@@ -259,7 +265,7 @@ export async function editSuggestionAction(input: unknown) {
   }
 
   if (suggestion.status !== SuggestionStatus.OPEN) {
-    throw new Error('Only open suggestions can be edited');
+    return refuseClosedSuggestion();
   }
 
   const updated = await updateSuggestionContent(validated.suggestionId, {
