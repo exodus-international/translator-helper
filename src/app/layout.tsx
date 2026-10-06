@@ -10,6 +10,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { FeedbackButton } from '@/components/feedback-button';
 import { PostHogProvider } from '@/components/posthog-provider';
+import { SessionKeepAlive } from '@/components/session-keep-alive';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 
 const geistSans = Geist({
@@ -100,6 +101,7 @@ export default async function RootLayout({
               </AppShell>
               {/* Signed-in users get these two links in the sidebar footer instead. */}
               {!user && <FeedbackButton />}
+              {user && <SessionKeepAlive />}
               <Toaster />
             </NuqsAdapter>
           </PostHogProvider>
