@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import { SuggestionStatus } from '@/generated/prisma/enums';
-import { getStatusStep, isDraftPhase, isStepCompleted } from '@/lib/document-status';
+import { getStatusStep, isDraftPhase, isStepCompleted, isTranslationStarted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useTrailStore } from '@/lib/page-trail';
@@ -214,7 +214,7 @@ function EditorViewer({
       onTranslationChange={setContent}
       sourceBadge={<Badge variant="outline">{sourceVersion.language.name}</Badge>}
       translationBadge={<Badge variant="outline">{targetVersion?.language?.name || 'New Translation'}</Badge>}
-      translationStarted={!!targetVersion}
+      translationStarted={isTranslationStarted(targetVersion?.status)}
       targetLanguageMissing={targetLanguageMissing}
       onStartTranslation={startTranslation}
       startingTranslation={isStartingTranslation}
