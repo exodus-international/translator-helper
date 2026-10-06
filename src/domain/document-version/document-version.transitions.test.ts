@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentStatus } from '@/generated/prisma/enums';
-import { StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
+import { isVersionTranslator, StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
 
 describe('validateTransition', () => {
   describe('valid forward transitions', () => {
@@ -143,5 +143,17 @@ describe('StatusTransitionRefusedError', () => {
       () => validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED),
       (error) => error instanceof Error && !(error instanceof StatusTransitionRefusedError),
     );
+  });
+});
+
+describe('isVersionTranslator', () => {
+  it('is true only for the person assigned as translator', () => {
+    assert.equal(isVersionTranslator('user-1', 'user-1'), true);
+    assert.equal(isVersionTranslator('user-1', 'user-2'), false);
+  });
+
+  it('is false for everyone while no translator is assigned', () => {
+    assert.equal(isVersionTranslator(null, 'user-1'), false);
+    assert.equal(isVersionTranslator(undefined, 'user-1'), false);
   });
 });

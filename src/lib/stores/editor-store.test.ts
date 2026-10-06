@@ -56,7 +56,7 @@ function fakeDeps(overrides: Partial<EditorStoreDeps> = {}) {
       content: input.content,
       version: 2,
     })),
-    submitForReview: record('submitForReview', async () => ({})),
+    submitForReview: record('submitForReview', async () => ({ ok: true, version: VERSION })),
     assignReviewerToVersion: record('assignReviewerToVersion', async () => ({})),
     assignTranslatorToVersion: record('assignTranslatorToVersion', async () => ({})),
     applySuggestion: record('applySuggestion', async () => ({ ...VERSION, content: 'applied text', version: 3 })),
@@ -350,6 +350,35 @@ describe('submitForReview', () => {
     assert.deepEqual(calls.at(-1), { fn: 'submitForReview', args: [{ versionId: 'version-1', reviewerId: 'reviewer-1' }] });
     assert.equal(store.getState().targetVersion.status, DocumentStatus.PENDING_REVIEW);
     assert.equal(store.getState().dialog.type, 'closed');
+  });
+
+  it('shows the reason when the request fails, and leaves the version and dialog as they were', async () => {
+    const { deps, toasts } = fakeDeps({
+      submitForReview: async () => {
+        throw new Error('Network down');
+      },
+    });
+    const store = createEditorStore(CONFIG, deps);
+    await store.getState().openReviewDialog();
+    await store.getState().submitForReview();
+    assert.deepEqual(toasts, [{ fn: 'error', args: ['Network down'] }]);
+    assert.equal(store.getState().targetVersion.status, DocumentStatus.IN_PROGRESS);
+    assert.equal(store.getState().dialog.type, 'submitReview');
+    assert.equal(store.getState().isLoading('submitForReview'), false);
+  });
+
+  it('shows the server refusal as written when someone other than the translator submits', async () => {
+    const { deps, toasts, events } = fakeDeps({
+      submitForReview: async () => ({ ok: false as const, error: 'Only the translator can submit this version for review' }),
+    });
+    const store = createEditorStore(CONFIG, deps);
+    await store.getState().openReviewDialog();
+    await store.getState().submitForReview();
+    assert.deepEqual(toasts, [{ fn: 'error', args: ['Only the translator can submit this version for review'] }]);
+    assert.equal(store.getState().targetVersion.status, DocumentStatus.IN_PROGRESS);
+    assert.equal(store.getState().dialog.type, 'submitReview');
+    assert.equal(store.getState().isLoading('submitForReview'), false);
+    assert.ok(!events.some((event) => event.fn === 'submitted_for_review'));
   });
 });
 

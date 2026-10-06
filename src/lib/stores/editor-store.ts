@@ -657,10 +657,15 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
 
       set(addLoading(get(), 'submitForReview'));
       try {
-        await deps.submitForReview({
+        const result = await deps.submitForReview({
           versionId: targetVersion.id,
           ...(reviewerId ? { reviewerId } : {}),
         });
+        if (!result.ok) {
+          set(removeLoading(get(), 'submitForReview'));
+          deps.notify.error(result.error);
+          return;
+        }
         set({
           dialog: { type: 'closed' },
           targetVersion: { ...targetVersion, status: DocumentStatus.PENDING_REVIEW },

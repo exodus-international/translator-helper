@@ -30,6 +30,7 @@ import { useTrailStore } from '@/lib/page-trail';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import { useAutoSave } from '@/lib/stores/hooks';
 import { buildProjectPath } from '@/domain/source-project/source-project-url';
+import { isVersionTranslator } from '@/domain/document-version/document-version.transitions';
 
 function getContentWithoutFrontmatter(text: string) {
   try {
@@ -43,6 +44,15 @@ function getContentWithoutFrontmatter(text: string) {
 // ──────────────────────────────────────────────────────────────
 // Internal: renders <SourceTranslationViewer> wired to the store
 // ──────────────────────────────────────────────────────────────
+
+/**
+ * Who translates the version as the editor last heard it. Assigning or
+ * unassigning a translator updates `user` in place and leaves `userId` stale,
+ * so `user` wins whenever it is present, even as null.
+ */
+function translatorId(version: { user?: { id: string } | null; userId?: string | null }) {
+  return version.user !== undefined ? (version.user?.id ?? null) : (version.userId ?? null);
+}
 
 type CapFn<T = boolean> = T | ((targetVersion: any) => T);
 
@@ -282,6 +292,7 @@ function EditorViewer({
                 versionId={targetVersion.id}
                 user={user}
                 canDeploy={canDeploy}
+                canSubmitForReview={isVersionTranslator(translatorId(targetVersion), user.id)}
                 documentId={documentId}
                 disabled={isAnyLoading}
                 onStatusChange={handleStatusChange}
