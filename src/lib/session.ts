@@ -25,6 +25,14 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
+      // Renewing here pushed the session's expiry forward in the database
+      // while the browser cookie kept the 7-day max-age it got at login: a
+      // full page load is not flagged as RSC, so better-auth renewed, and the
+      // Set-Cookie it wanted to send was dropped because a server component
+      // cannot write cookies. Users were logged out 7 days after signing in,
+      // however active. `SessionKeepAlive` renews through the auth route
+      // handler instead, which can re-issue the cookie.
+      query: { disableRefresh: true },
     });
 
     if (!session?.user) {
