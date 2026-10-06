@@ -203,6 +203,27 @@ describe('saveContent', () => {
     assert.equal(store.getState().saveStatus(), 'unsaved');
   });
 
+  // An expired session makes the action redirect to the login page. The
+  // browser leaves the editor, so the unsaved text is gone with it.
+  it('says the edits were not saved when the session has expired', async () => {
+    const { deps, toasts } = fakeDeps({
+      updateDocumentVersion: (async () => {
+        throw Object.assign(new Error('NEXT_REDIRECT'), {
+          digest: 'NEXT_REDIRECT;push;/login?from=%2Fdocuments%2Fsml;307;',
+        });
+      }) as EditorStoreDeps['updateDocumentVersion'],
+    });
+    const store = createEditorStore(CONFIG, deps);
+    store.getState().setContent('typed after the session expired');
+    await assert.rejects(store.getState().saveContent('auto'), /NEXT_REDIRECT/);
+    assert.deepEqual(toasts, [
+      {
+        fn: 'error',
+        args: ['You were signed out, so your latest changes were not saved. Sign in and add them again.'],
+      },
+    ]);
+  });
+
   it('lets a write queued behind a failed one still go out', async () => {
     const { deps, calls } = fakeDeps();
     let writes = 0;
