@@ -22,6 +22,7 @@ import { translateDocumentAction } from '@/domain/translation/translation.action
 import { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions';
 import { capture } from '@/lib/analytics';
 import { toast } from 'sonner';
+import { sessionDraftStorage } from './editor-draft';
 import type { EditorStoreDeps } from './editor-store';
 
 /**
@@ -54,4 +55,5 @@ export const editorStoreDeps: EditorStoreDeps = {
     warning: (message) => toast.warning(message),
   },
   capture,
+  drafts: sessionDraftStorage,
 };

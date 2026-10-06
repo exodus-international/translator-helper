@@ -26,6 +26,7 @@ import type { getAudioTranscriptStateAction } from '@/domain/audio/audio.actions
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
 import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
 import type { AnalyticsEvent, AnalyticsProperties } from '@/lib/analytics';
+import { clearDraft, readDraft, writeDraft, type Draft, type DraftStorage } from './editor-draft';
 import { isRefusal } from '@/lib/action-refusal';
 
 // ─── Types ───────────────────────────────────────────────────
@@ -106,6 +107,8 @@ export interface EditorStoreDeps {
     warning: (message: string) => void;
   };
   capture: (event: AnalyticsEvent, properties?: AnalyticsProperties) => void;
+  /** Where unsaved text is kept until it is saved. Without it, nothing is kept. */
+  drafts?: DraftStorage;
 }
 
 // ─── State ───────────────────────────────────────────────────
@@ -148,6 +151,13 @@ interface EditorState {
    */
   markdownGuideOpen: boolean;
 
+  /**
+   * Unsaved text left over from an earlier visit to this version (usually one
+   * that ended at the login page), waiting for the reader to restore or
+   * discard it. The editor never puts it in place on its own.
+   */
+  draftOffer: Draft | null;
+
   // Config (set once at init)
   documentId: string;
   targetLanguageId: string;
@@ -168,6 +178,10 @@ interface EditorActions {
   // Content
   setContent: (content: string) => void;
   setSourceEditContent: (content: string) => void;
+  /** Puts the offered draft into the editor as unsaved changes. */
+  restoreDraft: () => void;
+  /** Throws the offered draft away. */
+  discardDraft: () => void;
 
   // Version
   setTargetVersion: (version: any) => void;
@@ -276,6 +290,7 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
   let transcriptStateRequest: Promise<void> | null = null;
   /** The write currently in flight, so the next one can queue behind it. */
   let pendingSave: Promise<void> | null = null;
+  const drafts = deps.drafts ?? null;
 
   // Every editor event names the document and version it is about, so PostHog
   // can follow one document from translation through review to deploy.
@@ -299,6 +314,7 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
     requestedTranslationView: null,
     audioTranscriptState: null,
     markdownGuideOpen: false,
+    draftOffer: config.targetVersion ? readDraft(drafts, config.targetVersion.id, initialContent) : null,
     documentId: config.documentId,
     targetLanguageId: config.targetLanguageId,
     translationProjectId: config.translationProjectId,
@@ -306,6 +322,15 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
 
     // ─── Content ───────────────────────────────────────
     setContent: (content) => set({ content }),
+    restoreDraft: () => {
+      const { draftOffer } = get();
+      if (draftOffer) set({ content: draftOffer.content, draftOffer: null });
+    },
+    discardDraft: () => {
+      const { targetVersion } = get();
+      if (targetVersion) clearDraft(drafts, targetVersion.id);
+      set({ draftOffer: null });
+    },
     setSourceEditContent: (sourceEditContent) => set({ sourceEditContent }),
     setMarkdownGuideOpen: (markdownGuideOpen) => set({ markdownGuideOpen }),
 
@@ -432,11 +457,11 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
           set(removeLoading(get(), 'save'));
           // The only redirect a save gets is to the login page, after the
           // session expired. The browser is already leaving the editor, and
-          // the toast outlives it, so it is where the reader learns the text
-          // typed since the last save did not make it.
+          // the toast outlives it. The text is not lost: the draft kept below
+          // is offered back when the editor opens again.
           deps.notify.error(
             isRedirectError(error)
-              ? 'You were signed out, so your latest changes were not saved. Sign in and add them again.'
+              ? 'You were signed out. Your unsaved changes are kept in this tab and will be offered back after you sign in.'
               : error.message || 'Failed to save translation',
           );
           throw error;
@@ -841,6 +866,25 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
       return 'saved';
     },
   }));
+
+  // Keep a copy of the text whenever it differs from what the server has, and
+  // drop it once the two agree. Kept on every change rather than when a save
+  // fails, because any server action (the notification bell's poll among
+  // them) can be the one that finds the session gone and leaves the page.
+  // While a draft from an earlier visit waits for an answer, the stored copy
+  // is that draft, and it is left alone.
+  store.subscribe((state, previous) => {
+    if (state.draftOffer || !state.targetVersion) return;
+    if (
+      state.content === previous.content &&
+      state.savedContent === previous.savedContent &&
+      state.targetVersion === previous.targetVersion
+    ) {
+      return;
+    }
+    if (state.content === state.savedContent) clearDraft(drafts, state.targetVersion.id);
+    else writeDraft(drafts, state.targetVersion.id, { content: state.content, savedContent: state.savedContent });
+  });
 
   return store;
 }
