@@ -140,3 +140,35 @@ test('a move refused because the page was stale shows the reason and the status 
   assert.ok(toastTitles().includes('The page now shows its current status.'));
   assert.deepEqual(moved, [DocumentStatus.DEPLOYED]);
 });
+
+async function openInProgress(props: { canSubmitForReview?: boolean; onReviewRequested?: () => void }) {
+  const { TestRouter } = createTestRouter('/documents/exodus90/ex90-day-2/cs');
+  render(
+    <TestRouter>
+      <StatusDropdown
+        currentStatus={DocumentStatus.IN_PROGRESS}
+        versionId="version-1"
+        user={admin}
+        canDeploy
+        documentId="doc-1"
+        {...props}
+      />
+    </TestRouter>,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: /^Document status: / }));
+  return user;
+}
+
+test('the translator can ask for feedback, which opens the reviewer picker', async () => {
+  let requested = 0;
+  const user = await openInProgress({ canSubmitForReview: true, onReviewRequested: () => requested++ });
+  await user.click(await screen.findByRole('menuitem', { name: /Give me feedback/ }));
+  assert.equal(requested, 1);
+});
+
+test('someone other than the translator is not offered "Give me feedback"', async () => {
+  await openInProgress({ canSubmitForReview: false, onReviewRequested: () => {} });
+  assert.ok(await screen.findByRole('menuitem', { name: /Back to pending/ }));
+  assert.equal(screen.queryByRole('menuitem', { name: /Give me feedback/ }), null);
+});

@@ -31,6 +31,12 @@ interface StatusDropdownProps {
    * alone, which is why it arrives as a prop.
    */
   canDeploy: boolean;
+  /**
+   * Whether this person is the version's translator, the only one who may ask
+   * for feedback (In progress to Pending review). Everyone else does not see
+   * that move, because the server would refuse it.
+   */
+  canSubmitForReview?: boolean;
   documentId?: string; // For navigation after status change
   onStatusChange?: (newStatus: DocumentStatus) => void;
   onReviewRequested?: () => void; // Called instead of direct transition when moving to PENDING_REVIEW
@@ -46,6 +52,7 @@ export function StatusDropdown({
   versionId,
   user,
   canDeploy,
+  canSubmitForReview = true,
   documentId,
   onStatusChange,
   onReviewRequested,
@@ -97,8 +104,14 @@ export function StatusDropdown({
       statuses = statuses.filter((s) => validTargets.includes(s));
     }
 
+    // Asking for feedback belongs to the translator. Sending approved work back
+    // to review is a different move and stays open to the others.
+    if (!canSubmitForReview && currentStatus === DocumentStatus.IN_PROGRESS) {
+      statuses = statuses.filter((status) => status !== DocumentStatus.PENDING_REVIEW);
+    }
+
     return statuses;
-  }, [allowedStatuses, canDeploy, currentStatus]);
+  }, [allowedStatuses, canDeploy, canSubmitForReview, currentStatus]);
 
   const forwardLabels: Partial<Record<DocumentStatus, string>> = {
     [DocumentStatus.IN_PROGRESS]: 'Start translation',

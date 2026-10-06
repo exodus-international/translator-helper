@@ -46,7 +46,7 @@ async function loadVersionAndGateSourceEdits(id: string, user: SessionUser) {
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
 import { assertCanEditDocumentVersion } from './document-version.permissions';
-import { validateTransition } from './document-version.transitions';
+import { isVersionTranslator, ONLY_TRANSLATOR_SUBMITS, validateTransition } from './document-version.transitions';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
 import { getUserLanguages, getUserRoleForLanguage } from '../user-language/user-language.repository';
@@ -200,7 +200,18 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   return version;
 }
 
-export async function submitForReviewAction(input: unknown) {
+/**
+ * Sends a version to review. Only its translator may do this; everyone else
+ * gets the refusal back as a result rather than a thrown error, because Next
+ * replaces a thrown message with a generic one in production and Sentry
+ * reports it as a crash.
+ */
+export async function submitForReviewAction(
+  input: unknown,
+): Promise<
+  | { ok: true; version: Awaited<ReturnType<typeof updateDocumentVersionStatus>> }
+  | { ok: false; error: string }
+> {
   const { user } = await authorize('authenticated');
   const validated = submitForReviewSchema.parse(input);
 
@@ -210,9 +221,8 @@ export async function submitForReviewAction(input: unknown) {
     throw new Error('Document version not found');
   }
 
-  // Only the owner can submit for review
-  if (existingVersion.userId !== user.id) {
-    throw new Error('Only the translator can submit this version for review');
+  if (!isVersionTranslator(existingVersion.userId, user.id)) {
+    return { ok: false, error: ONLY_TRANSLATOR_SUBMITS };
   }
 
   // Get document to find source project
@@ -256,7 +266,7 @@ export async function submitForReviewAction(input: unknown) {
     to: DocumentStatus.PENDING_REVIEW,
   });
 
-  return version;
+  return { ok: true, version };
 }
 
 export async function deleteDocumentVersionAction(id: string) {
