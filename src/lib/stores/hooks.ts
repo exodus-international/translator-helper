@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { useEditorStore } from './editor-provider';
 
 /**
@@ -51,4 +52,32 @@ export function useAutoSave(opts?: { delayMs?: number; enabled?: boolean }) {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [content, savedContent, saveContent, delayMs, enabled, targetVersion]);
+}
+
+/**
+ * Offers back unsaved text left from an earlier visit to this version, most
+ * often one that ended at the login page after the session expired. The toast
+ * stays until the reader answers: Restore puts the text in the editor as
+ * unsaved changes (autosave then writes it), Discard throws it away. Closing
+ * the toast without answering keeps the draft for the next visit.
+ */
+export function useDraftRestoreOffer() {
+  const draftOffer = useEditorStore((s) => s.draftOffer);
+  const restoreDraft = useEditorStore((s) => s.restoreDraft);
+  const discardDraft = useEditorStore((s) => s.discardDraft);
+
+  useEffect(() => {
+    if (!draftOffer) return;
+    const id = toast.warning('You have unsaved changes from your last visit.', {
+      description: draftOffer.baseChanged
+        ? 'This translation was changed since. Restoring replaces the current text with yours.'
+        : 'Restore them to keep working where you left off.',
+      duration: Infinity,
+      action: { label: 'Restore', onClick: restoreDraft },
+      cancel: { label: 'Discard', onClick: discardDraft },
+    });
+    return () => {
+      toast.dismiss(id);
+    };
+  }, [draftOffer, restoreDraft, discardDraft]);
 }

@@ -28,7 +28,7 @@ import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useTrailStore } from '@/lib/page-trail';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
-import { useAutoSave } from '@/lib/stores/hooks';
+import { useAutoSave, useDraftRestoreOffer } from '@/lib/stores/hooks';
 import { buildProjectPath } from '@/domain/source-project/source-project-url';
 
 function getContentWithoutFrontmatter(text: string) {
@@ -365,9 +365,11 @@ function EditorDetails({ extraDetails, activityLogs }: { extraDetails?: ReactNod
   );
 }
 
-// Tiny helper: enable autosave from inside the provider context
+// Tiny helper: enable autosave from inside the provider context, and offer
+// back any unsaved text a previous visit left behind.
 function AutoSaveTrigger({ delayMs }: { delayMs: number }) {
   useAutoSave({ delayMs });
+  useDraftRestoreOffer();
   return null;
 }
 

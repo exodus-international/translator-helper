@@ -20,7 +20,12 @@ export async function proxy(request: NextRequest) {
 
   // If accessing protected path without session cookie, redirect to login
   // NOTE: This is NOT a security check - actual validation happens in each page
-  if (isProtectedPath && !sessionCookie) {
+  // Only page visits are redirected. A 307 keeps the method, body and
+  // `Next-Action` header, so a server action posted here would be replayed
+  // against /login. Actions check the session themselves (`requireUser`) and
+  // send the browser to the login page from there.
+  const isPageVisit = request.method === 'GET' || request.method === 'HEAD';
+  if (isProtectedPath && !sessionCookie && isPageVisit) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('from', pathname + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);
