@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { createEditorStore, type EditorStoreConfig, type EditorStoreDeps } from './editor-store';
+import type { DraftStorage } from './editor-draft';
 
 /** A promise the test settles by hand, for holding a request in flight. */
 function deferred<T>() {
@@ -79,6 +80,17 @@ function fakeDeps(overrides: Partial<EditorStoreDeps> = {}) {
     ...overrides,
   } as unknown as EditorStoreDeps;
   return { deps, calls, toasts, events };
+}
+
+/** sessionStorage stand-in, open for the test to look inside. */
+function memoryDrafts(): DraftStorage & { items: Map<string, string> } {
+  const items = new Map<string, string>();
+  return {
+    items,
+    getItem: (key) => items.get(key) ?? null,
+    setItem: (key, value) => void items.set(key, value),
+    removeItem: (key) => void items.delete(key),
+  };
 }
 
 function calledFns(calls: Call[]) {
@@ -205,8 +217,10 @@ describe('saveContent', () => {
 
   // An expired session makes the action redirect to the login page. The
   // browser leaves the editor, so the unsaved text is gone with it.
-  it('says the edits were not saved when the session has expired', async () => {
+  it('keeps the edits and says so when the session has expired', async () => {
+    const drafts = memoryDrafts();
     const { deps, toasts } = fakeDeps({
+      drafts,
       updateDocumentVersion: (async () => {
         throw Object.assign(new Error('NEXT_REDIRECT'), {
           digest: 'NEXT_REDIRECT;push;/login?from=%2Fdocuments%2Fsml;307;',
@@ -219,9 +233,12 @@ describe('saveContent', () => {
     assert.deepEqual(toasts, [
       {
         fn: 'error',
-        args: ['You were signed out, so your latest changes were not saved. Sign in and add them again.'],
+        args: [
+          'You were signed out. Your unsaved changes are kept in this tab and will be offered back after you sign in.',
+        ],
       },
     ]);
+    assert.equal(JSON.parse(drafts.items.get('editor-draft:version-1')!).content, 'typed after the session expired');
   });
 
   it('lets a write queued behind a failed one still go out', async () => {
@@ -425,5 +442,65 @@ describe('loadAudioTranscriptState', () => {
     await store.getState().loadAudioTranscriptState('version-1');
     assert.equal(store.getState().audioTranscriptState, 'generated');
     assert.deepEqual(toasts, []);
+  });
+});
+
+describe('unsaved drafts', () => {
+  const KEY = 'editor-draft:version-1';
+
+  it('keeps unsaved text and drops it once saved', async () => {
+    const drafts = memoryDrafts();
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().setContent('second draft');
+    assert.equal(JSON.parse(drafts.items.get(KEY)!).content, 'second draft');
+    await store.getState().saveContent();
+    assert.equal(drafts.items.has(KEY), false);
+  });
+
+  it('drops the copy when the text is typed back to what was saved', () => {
+    const drafts = memoryDrafts();
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().setContent('second draft');
+    store.getState().setContent(VERSION.content);
+    assert.equal(drafts.items.has(KEY), false);
+  });
+
+  it('offers a leftover draft without putting it in the editor', () => {
+    const drafts = memoryDrafts();
+    createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().setContent('lost in the redirect');
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    assert.deepEqual(store.getState().draftOffer, { content: 'lost in the redirect', baseChanged: false });
+    assert.equal(store.getState().content, VERSION.content);
+    assert.equal(store.getState().saveStatus(), 'saved');
+  });
+
+  it('restores the draft as unsaved changes and keeps tracking it', () => {
+    const drafts = memoryDrafts();
+    createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().setContent('lost in the redirect');
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().restoreDraft();
+    assert.equal(store.getState().draftOffer, null);
+    assert.equal(store.getState().content, 'lost in the redirect');
+    assert.equal(store.getState().saveStatus(), 'unsaved');
+    assert.equal(JSON.parse(drafts.items.get(KEY)!).content, 'lost in the redirect');
+  });
+
+  it('discards the draft for good', () => {
+    const drafts = memoryDrafts();
+    createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().setContent('lost in the redirect');
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().discardDraft();
+    assert.equal(store.getState().draftOffer, null);
+    assert.equal(drafts.items.has(KEY), false);
+    assert.equal(createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().draftOffer, null);
+  });
+
+  it('leaves a waiting draft alone until the reader answers', () => {
+    const drafts = memoryDrafts();
+    createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().setContent('lost in the redirect');
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().setContent(VERSION.content + ' and more');
+    store.getState().setContent(VERSION.content);
+    assert.equal(JSON.parse(drafts.items.get(KEY)!).content, 'lost in the redirect');
   });
 });
