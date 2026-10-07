@@ -61,6 +61,31 @@ export function buildTranslationMessages({
   ];
 }
 
+const REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+/**
+ * The sampling parameters a model accepts.
+ *
+ * Only the gpt-4 and gpt-3.5 families take `temperature`. Every newer model is
+ * a reasoning model that rejects it (gpt-6 answers 400 for any value but the
+ * default), so they get `reasoning_effort` instead. Checking for the old
+ * families, not the new ones, keeps the next model change from breaking AI
+ * Translate. `low` is the smallest effort gpt-6 accepts and is plenty for a
+ * translation with a detailed prompt; `CHATGPT_REASONING_EFFORT` overrides it.
+ */
+export function modelSamplingParams(
+  model: string,
+  configuredEffort?: string,
+): { temperature: number } | { reasoning_effort: ReasoningEffort } {
+  if (/^gpt-(4|3\.5)/.test(model)) {
+    return { temperature: 0.2 };
+  }
+  const effort = configuredEffort?.trim().toLowerCase();
+  const isKnownEffort = REASONING_EFFORTS.includes(effort as ReasoningEffort);
+  return { reasoning_effort: isKnownEffort ? (effort as ReasoningEffort) : 'low' };
+}
+
 export async function translateWithChatGPT(params: TranslateWithChatGPTParams): Promise<string> {
   const apiKey = process.env.CHATGPT_API;
   const endpoint = process.env.CHATGPT_API_BASE_URL?.replace(/\/$/, '') || 'https://api.openai.com/v1/chat/completions';
@@ -73,7 +98,7 @@ export async function translateWithChatGPT(params: TranslateWithChatGPTParams): 
   const body = {
     model,
     messages: buildTranslationMessages(params),
-    ...(model.includes('gpt-5') ? { reasoning_effort: 'low' as const } : { temperature: 0.2 }),
+    ...modelSamplingParams(model, process.env.CHATGPT_REASONING_EFFORT),
   };
 
   const response = await fetch(endpoint, {
