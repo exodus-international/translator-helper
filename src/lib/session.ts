@@ -1,8 +1,9 @@
 import { Role } from '@/generated/prisma/enums';
 import { headers } from 'next/headers';
-import { unstable_rethrow } from 'next/navigation';
+import { redirect, unstable_rethrow } from 'next/navigation';
 import { cache } from 'react';
 import { auth } from './auth';
+import { loginPath } from './safe-redirect';
 
 export interface SessionUser {
   id: string;
@@ -47,10 +48,22 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   }
 });
 
+/**
+ * The signed-in user, or a redirect to the login page when the session is gone.
+ *
+ * Throwing here surfaced as an unhandled server error, and the page that made
+ * the call (often a background poll) failed without telling anyone. `redirect`
+ * makes the browser navigate to the login page instead. A server action sends
+ * the `Next-Action` header, and its `Referer` is the page it was called from,
+ * so that page becomes `from`. During a page render the referer is the
+ * previous page, so it is not used there.
+ */
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) {
-    throw new Error('Unauthorized');
+    const requestHeaders = await headers();
+    const isServerAction = requestHeaders.has('next-action');
+    redirect(loginPath(isServerAction ? requestHeaders.get('referer') : null));
   }
   return user;
 }
