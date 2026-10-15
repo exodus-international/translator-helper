@@ -67,6 +67,11 @@ reach the dashboard. The variable lives in Coolify for staging and production
 only, together with `NEXT_PUBLIC_SENTRY_ENVIRONMENT` (`staging` / `production`).
 See [docs/ANALYTICS.md](docs/ANALYTICS.md#sentry).
 
+Scripture in AI translations comes from the
+[Bible API](https://github.com/exodus-international/bible-api) once
+`BIBLE_API_URL` and `BIBLE_API_TOKEN` are set; without them the model
+translates it. See [docs/SCRIPTURE.md](docs/SCRIPTURE.md).
+
 ### 4. Run Database Migrations
 
 ```bash
