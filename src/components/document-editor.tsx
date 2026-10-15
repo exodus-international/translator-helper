@@ -54,6 +54,8 @@ interface ViewerConfig {
   user: SessionUser;
   /** Resolved on the server against this version's language. */
   canDeploy: boolean;
+  /** On this language's team, or an administrator: may move the version's status. */
+  canChangeStatus: boolean;
   canEditSource: CapFn;
   canCreateSuggestions?: CapFn;
   disableReopen?: CapFn;
@@ -105,6 +107,7 @@ function EditorViewer({
   sourceVersion,
   user,
   canDeploy,
+  canChangeStatus,
   canEditSource,
   canCreateSuggestions,
   disableReopen,
@@ -282,6 +285,7 @@ function EditorViewer({
                 versionId={targetVersion.id}
                 user={user}
                 canDeploy={canDeploy}
+                canChangeStatus={canChangeStatus}
                 documentId={documentId}
                 disabled={isAnyLoading}
                 onStatusChange={handleStatusChange}
@@ -414,6 +418,8 @@ interface DocumentEditorProps {
   user: SessionUser;
   /** Resolved on the server against this version's language. */
   canDeploy: boolean;
+  /** On this language's team, or an administrator: may move the version's status. */
+  canChangeStatus: boolean;
 
   // Header — page-supplied, and now only for chrome a view adds to itself:
   // zen mode's own bar. The default layout has none.
@@ -474,6 +480,7 @@ export function DocumentEditor({
   targetLanguageId,
   user,
   canDeploy,
+  canChangeStatus,
   header,
   fullscreen,
   outerClassName,
@@ -569,6 +576,7 @@ export function DocumentEditor({
               sourceVersion={sourceVersion}
               user={user}
               canDeploy={canDeploy}
+              canChangeStatus={canChangeStatus}
               canEditSource={canEditSource}
               canCreateSuggestions={canCreateSuggestions}
               disableReopen={disableReopen}

@@ -233,6 +233,8 @@ The translation interface has two panels:
 
 Drafts are auto-saved every 5 seconds while you type.
 
+You do not have to be the assigned translator to submit. Anyone on that language's team, and any administrator, can submit a document for review or move it to another status, so the work goes on when the translator is away. Only the language's manager or an administrator can deploy.
+
 After submitting for review, you cannot edit the translation until a reviewer either approves it or requests changes.
 
 ### Handling Review Feedback

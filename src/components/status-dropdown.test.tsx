@@ -140,3 +140,34 @@ test('a move refused because the page was stale shows the reason and the status 
   assert.ok(toastTitles().includes('The page now shows its current status.'));
   assert.deepEqual(moved, [DocumentStatus.DEPLOYED]);
 });
+
+function renderInProgress(props: { canChangeStatus?: boolean; onReviewRequested?: () => void }) {
+  const { TestRouter } = createTestRouter('/documents/exodus90/ex90-day-2/cs');
+  render(
+    <TestRouter>
+      <StatusDropdown
+        currentStatus={DocumentStatus.IN_PROGRESS}
+        versionId="version-1"
+        user={admin}
+        canDeploy={false}
+        documentId="doc-1"
+        {...props}
+      />
+    </TestRouter>,
+  );
+}
+
+test('a language team member who is not the translator can ask for feedback', async () => {
+  let requested = 0;
+  renderInProgress({ canChangeStatus: true, onReviewRequested: () => requested++ });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: /^Document status: / }));
+  await user.click(await screen.findByRole('menuitem', { name: /Give me feedback/ }));
+  assert.equal(requested, 1);
+});
+
+test('someone from another language cannot open the status control', async () => {
+  renderInProgress({ canChangeStatus: false, onReviewRequested: () => {} });
+  const trigger = await screen.findByRole('button', { name: /^Document status: / });
+  assert.equal((trigger as HTMLButtonElement).disabled, true);
+});
