@@ -2,7 +2,13 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { DeploySkippedError } from '../github/github.errors';
-import { createStatusChange, guardedByOpenSuggestions, involvesDeployed, type StatusChangeDeps } from './document-version.status-change';
+import {
+  createStatusChange,
+  guardedByOpenSuggestions,
+  involvesDeployed,
+  toStatusChangeRefusal,
+  type StatusChangeDeps,
+} from './document-version.status-change';
 
 type Call = { fn: string; args: unknown[] };
 type Version = { id: string; status: DocumentStatus };
@@ -183,5 +189,33 @@ describe('recording audio on entering APPROVED', () => {
     const { changeStatus, calls } = fakeDeps();
     await changeStatus({ version: version(DocumentStatus.DEPLOYED), to: DocumentStatus.APPROVED, actorId: 'u' });
     assert.equal(calls.some((call) => call.fn === 'startAudio'), true);
+  });
+});
+
+describe('toStatusChangeRefusal', () => {
+  it('turns a move from a stale page into a refusal that carries the real status', async () => {
+    const { changeStatus } = fakeDeps();
+    const error = await changeStatus({
+      version: version(DocumentStatus.APPROVED),
+      to: DocumentStatus.IN_PROGRESS,
+      actorId: 'u',
+    }).catch((caught: unknown) => caught);
+    const refusal = toStatusChangeRefusal(error, DocumentStatus.APPROVED);
+    assert.equal(refusal?.refused.currentStatus, DocumentStatus.APPROVED);
+    assert.match(refusal?.refused.message ?? '', /status changed while you had it open/);
+  });
+
+  it('passes the open suggestions reason through as it is', async () => {
+    const { changeStatus } = fakeDeps({ countOpenSuggestions: async () => 2 });
+    const error = await changeStatus({
+      version: version(DocumentStatus.PENDING_REVIEW),
+      to: DocumentStatus.APPROVED,
+      actorId: 'u',
+    }).catch((caught: unknown) => caught);
+    assert.match(toStatusChangeRefusal(error, DocumentStatus.PENDING_REVIEW)?.refused.message ?? '', /2 open suggestions/);
+  });
+
+  it('is not a refusal for any other failure', () => {
+    assert.equal(toStatusChangeRefusal(new Error('database down'), DocumentStatus.APPROVED), null);
   });
 });
