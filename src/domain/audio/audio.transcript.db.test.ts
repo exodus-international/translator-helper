@@ -18,13 +18,18 @@ afterEach(async () => {
   const language = await seededLanguage('sk');
   await prisma.language.update({
     where: { id: language.id },
-    data: { audioProvider: null, audioVoice: null, audioRate: null, audioPitch: null },
+    data: { audioProvider: null, audioVoice: null, audioRate: null, audioPitch: null, audioSentencePauseMs: null, audioCommaPauseMs: null },
   });
   const version = await seededVersion('ex90-day-14', 'sk');
   await prisma.documentVersion.update({ where: { id: version.id }, data: { audioSsml: null, audioSsmlBase: null } });
 });
 
-async function slovakWithVoice(narration: { audioRate: string | null; audioPitch: string | null }) {
+async function slovakWithVoice(narration: {
+  audioRate?: string | null;
+  audioPitch?: string | null;
+  audioSentencePauseMs?: number | null;
+  audioCommaPauseMs?: number | null;
+}) {
   const language = await seededLanguage('sk');
   await prisma.language.update({
     where: { id: language.id },
@@ -39,7 +44,7 @@ describe('retuning a language', () => {
     assert.equal(await saveTranscript(version.id, '<speak>Rucne</speak>', null), true);
     assert.equal(await getTranscriptState(version.id), 'edited');
 
-    await slovakWithVoice({ audioRate: '0.85', audioPitch: '-10%' });
+    await slovakWithVoice({ audioRate: '0.85', audioPitch: '-10%', audioSentencePauseMs: 800, audioCommaPauseMs: 150 });
 
     assert.equal(await getTranscriptState(version.id), 'edited');
   });

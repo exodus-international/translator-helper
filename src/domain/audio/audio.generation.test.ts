@@ -120,6 +120,20 @@ test('the provider is sent the rate and pitch stored on the language', async () 
   assert.match(submitted[0], /<prosody rate="0\.85" pitch="-10%">/);
 });
 
+test('the provider is sent the pauses stored on the language', async () => {
+  const version = versionFixture();
+  const { submitted, start } = harness({
+    ...version,
+    language: { ...version.language, audioSentencePauseMs: 800, audioCommaPauseMs: 150 },
+  });
+
+  await start('version-1', 'user-1');
+
+  assert.match(submitted[0], /xmlns:mstts="https:\/\/www\.w3\.org\/2001\/mstts"/);
+  assert.match(submitted[0], /<mstts:silence type="Sentenceboundary-exact" value="800ms"\/>/);
+  assert.match(submitted[0], /<mstts:silence type="Comma-exact" value="150ms"\/>/);
+});
+
 test('an override is sent verbatim whatever the language narration says', async () => {
   const override =
     '<speak version="1.0" xml:lang="cs-CZ"><voice name="cs-CZ-AntoninNeural"><prosody rate="1.2">Rucne.</prosody></voice></speak>';

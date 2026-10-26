@@ -51,6 +51,8 @@ export async function updateLanguageSettings(
     audioVoice: string | null;
     audioRate: string | null;
     audioPitch: string | null;
+    audioSentencePauseMs: number | null;
+    audioCommaPauseMs: number | null;
   },
 ) {
   return prisma.language.update({ where: { id }, data });

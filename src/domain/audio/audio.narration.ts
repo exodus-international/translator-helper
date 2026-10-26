@@ -13,6 +13,8 @@ import { DEFAULT_PROSODY } from './audio.ssml';
 export interface NarrationSettings {
   audioRate?: string | null;
   audioPitch?: string | null;
+  audioSentencePauseMs?: number | null;
+  audioCommaPauseMs?: number | null;
 }
 
 export interface NarrationProfile {
@@ -20,14 +22,25 @@ export interface NarrationProfile {
   rate: string;
   /** Pitch as a percentage, `-6%` being slightly lower. */
   pitch: string;
+  /** Silence after every sentence in milliseconds, or null for the voice's own. */
+  sentencePauseMs: number | null;
+  /** Silence after every comma in milliseconds, or null for the voice's own. */
+  commaPauseMs: number | null;
 }
 
-export const DEFAULT_NARRATION: NarrationProfile = { ...DEFAULT_PROSODY };
+/**
+ * The pauses default to null, not to a number: no pause setting means the
+ * voice's own timing and no `mstts` markup at all, which is what every
+ * language had before pauses could be set.
+ */
+export const DEFAULT_NARRATION: NarrationProfile = { ...DEFAULT_PROSODY, sentencePauseMs: null, commaPauseMs: null };
 
 export function narrationProfile(settings: NarrationSettings): NarrationProfile {
   return {
     rate: settings.audioRate?.trim() || DEFAULT_NARRATION.rate,
     pitch: settings.audioPitch?.trim() || DEFAULT_NARRATION.pitch,
+    sentencePauseMs: settings.audioSentencePauseMs ?? DEFAULT_NARRATION.sentencePauseMs,
+    commaPauseMs: settings.audioCommaPauseMs ?? DEFAULT_NARRATION.commaPauseMs,
   };
 }
 
@@ -40,3 +53,5 @@ export function narrationProfile(settings: NarrationSettings): NarrationProfile 
  */
 export const RATE_RANGE = { min: 0.5, max: 2 } as const;
 export const PITCH_RANGE = { min: -50, max: 50 } as const;
+/** What Azure accepts for an `mstts:silence` value. */
+export const PAUSE_RANGE_MS = { min: 0, max: 5000 } as const;

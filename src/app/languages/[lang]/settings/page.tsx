@@ -48,6 +48,8 @@ export default async function LanguageSettingsPage({ params }: { params: Promise
         audioVoice: language.audioVoice,
         audioRate: language.audioRate,
         audioPitch: language.audioPitch,
+        audioSentencePauseMs: language.audioSentencePauseMs,
+        audioCommaPauseMs: language.audioCommaPauseMs,
         translationInstructions: language.translationInstructions,
       }}
       members={members}

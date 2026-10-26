@@ -36,6 +36,8 @@ interface LanguageSettingsClientProps {
     audioVoice: string | null;
     audioRate: string | null;
     audioPitch: string | null;
+    audioSentencePauseMs: number | null;
+    audioCommaPauseMs: number | null;
     translationInstructions: string | null;
   };
   members: { memberCount: number; managerNames: string[] };
@@ -50,6 +52,8 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
   const [audioVoice, setAudioVoice] = useState(language.audioVoice ?? '');
   const [audioRate, setAudioRate] = useState(language.audioRate ?? '');
   const [audioPitch, setAudioPitch] = useState(language.audioPitch ?? '');
+  const [sentencePause, setSentencePause] = useState(language.audioSentencePauseMs?.toString() ?? '');
+  const [commaPause, setCommaPause] = useState(language.audioCommaPauseMs?.toString() ?? '');
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmation, setConfirmation] = useState('');
@@ -94,6 +98,8 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
         audioVoice: audioProvider === 'NONE' ? null : audioVoice.trim() || null,
         audioRate: audioProvider === 'NONE' ? null : audioRate.trim() || null,
         audioPitch: audioProvider === 'NONE' ? null : audioPitch.trim() || null,
+        audioSentencePauseMs: audioProvider === 'NONE' ? null : sentencePause.trim() || null,
+        audioCommaPauseMs: audioProvider === 'NONE' ? null : commaPause.trim() || null,
       });
       capture('language_updated', { code: language.code });
       toast.success('Language saved');
@@ -256,10 +262,12 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                         type="button"
                         variant="ghost"
                         size="sm"
-                        disabled={!audioRate && !audioPitch}
+                        disabled={!audioRate && !audioPitch && !sentencePause && !commaPause}
                         onClick={() => {
                           setAudioRate('');
                           setAudioPitch('');
+                          setSentencePause('');
+                          setCommaPause('');
                         }}
                       >
                         Reset to defaults
@@ -288,6 +296,32 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                           className="mt-1"
                         />
                         <p className="text-muted-foreground mt-1 text-xs">0% is the voice&apos;s own pitch.</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4 sm:flex-row">
+                      <div className="sm:w-56">
+                        <Label htmlFor="language-sentence-pause">Pause after sentence (ms)</Label>
+                        <Input
+                          id="language-sentence-pause"
+                          inputMode="numeric"
+                          value={sentencePause}
+                          onChange={(event) => setSentencePause(event.target.value)}
+                          placeholder="Voice default"
+                          className="mt-1"
+                        />
+                        <p className="text-muted-foreground mt-1 text-xs">Silence at every sentence end, e.g. 800.</p>
+                      </div>
+                      <div className="sm:w-56">
+                        <Label htmlFor="language-comma-pause">Pause after comma (ms)</Label>
+                        <Input
+                          id="language-comma-pause"
+                          inputMode="numeric"
+                          value={commaPause}
+                          onChange={(event) => setCommaPause(event.target.value)}
+                          placeholder="Voice default"
+                          className="mt-1"
+                        />
+                        <p className="text-muted-foreground mt-1 text-xs">Silence at every comma, e.g. 150.</p>
                       </div>
                     </div>
                     <p className="text-muted-foreground text-xs">

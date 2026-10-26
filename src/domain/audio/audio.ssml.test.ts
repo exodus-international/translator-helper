@@ -322,3 +322,38 @@ test('problems in formatted SSML are reported on the line they sit on', () => {
     { line: 3, message: 'A bare & has to be written as &amp; or the provider cannot read the text.' },
   ]);
 });
+
+// ─── Pauses ──────────────────────────────────────────────────
+
+const PAUSE_SCRIPT = { segments: [{ kind: 'text' as const, text: 'Ahoj, svet.' }] };
+const PAUSE_OPTIONS = { voice: 'sk-SK-LukasNeural', locale: 'sk-SK', maxBreakMs: 20_000, rate: '0.85', pitch: '-10%' };
+
+test('with no pauses set there is no mstts markup at all', () => {
+  const ssml = speechScriptToSsml(PAUSE_SCRIPT, PAUSE_OPTIONS);
+  assert.ok(!ssml.includes('mstts'));
+  assert.equal(ssml, speechScriptToSsml(PAUSE_SCRIPT, { ...PAUSE_OPTIONS, sentencePauseMs: null, commaPauseMs: null }));
+});
+
+test('both pauses produce the header the Slovak team pasted by hand', () => {
+  const ssml = speechScriptToSsml(PAUSE_SCRIPT, { ...PAUSE_OPTIONS, sentencePauseMs: 800, commaPauseMs: 150 });
+  assert.equal(
+    ssml,
+    '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="sk-SK">\n' +
+      '  <voice name="sk-SK-LukasNeural">\n' +
+      '    <mstts:silence type="Sentenceboundary-exact" value="800ms"/>\n' +
+      '    <mstts:silence type="Comma-exact" value="150ms"/>\n' +
+      '    <prosody rate="0.85" pitch="-10%">\n' +
+      '      <p>Ahoj, svet.</p>\n' +
+      '    </prosody>\n' +
+      '  </voice>\n' +
+      '</speak>',
+  );
+  assert.deepEqual(validateSsml(ssml), []);
+});
+
+test('one pause alone declares the namespace and only its own silence', () => {
+  const ssml = speechScriptToSsml(PAUSE_SCRIPT, { ...PAUSE_OPTIONS, commaPauseMs: 0 });
+  assert.match(ssml, /xmlns:mstts=/);
+  assert.match(ssml, /<mstts:silence type="Comma-exact" value="0ms"\/>/);
+  assert.ok(!ssml.includes('Sentenceboundary'));
+});

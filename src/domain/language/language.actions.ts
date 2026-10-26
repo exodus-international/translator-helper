@@ -51,6 +51,8 @@ export async function updateLanguageSettingsAction(id: string, input: unknown) {
       audioVoice: null,
       audioRate: null,
       audioPitch: null,
+      audioSentencePauseMs: null,
+      audioCommaPauseMs: null,
     });
   }
 
