@@ -26,7 +26,7 @@ export interface SsmlOptions {
 }
 
 /** Microsoft's extension namespace, which `<mstts:silence>` lives in. */
-export const MSTTS_NAMESPACE = 'https://www.w3.org/2001/mstts';
+const MSTTS_NAMESPACE = 'https://www.w3.org/2001/mstts';
 
 /**
  * Chosen by ear on real Czech content (Antonín, 2026-08-25): the untuned voice
