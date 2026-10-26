@@ -26,6 +26,7 @@ import { DEFAULT_AUDIO_VOICES, updateLanguageSettingsSchema } from '@/domain/lan
 import { useAutosave, type AutosaveStatus } from '@/hooks/use-autosave';
 import { formatIssues } from '@/lib/validation';
 import { capture } from '@/lib/analytics';
+import { cn } from '@/lib/utils';
 import { useTrailStore } from '@/lib/page-trail';
 
 const QUALITY_LABELS: Record<AudioQuality, string> = {
@@ -512,14 +513,21 @@ const AUTOSAVE_LABELS: Record<AutosaveStatus, string> = {
   failed: 'Not saved',
 };
 
-/** Where the page's own saving stands, and why it is waiting when it is. */
+/**
+ * Where the page's own saving stands, and why it is waiting when it is.
+ * Sticky under the topbar: the field being edited is usually far down the
+ * page, and that is where the answer is needed.
+ */
 function AutosaveNotice({ status, problem }: { status: AutosaveStatus; problem: string | null }) {
   const blocked = status === 'invalid' || status === 'failed';
   return (
     <p
       aria-live="polite"
       data-status={status}
-      className={blocked ? 'text-destructive text-xs' : 'text-muted-foreground text-xs'}
+      className={cn(
+        'bg-background/95 sticky top-[calc(var(--header-height,3rem)+0.5rem)] z-[5] self-start rounded-full border px-3 py-1 text-xs shadow-xs backdrop-blur',
+        blocked ? 'border-destructive/40 text-destructive' : 'text-muted-foreground',
+      )}
     >
       {AUTOSAVE_LABELS[status]}
       {blocked && problem ? `: ${problem}` : ''}
