@@ -1,11 +1,49 @@
 import { z } from 'zod';
 import { AudioProvider } from '@/generated/prisma/enums';
+import { PITCH_RANGE, RATE_RANGE } from '@/domain/audio/audio.narration';
 
 export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
 
 const NAME_LENGTH = 'must be at least two characters';
 const CODE_LENGTH = 'must be two to five characters, like hr or en-US';
 const BRANCH_REQUIRED = 'is required: without a branch, every deploy of this language fails';
+const RATE_MESSAGE = `must be a number from ${RATE_RANGE.min} to ${RATE_RANGE.max}, where 1 is the voice's own pace`;
+const PITCH_MESSAGE = `must be a percentage from ${PITCH_RANGE.min}% to +${PITCH_RANGE.max}%, like -10%`;
+
+/** Blank is "use the app default", stored as null. Absent means the same. */
+const blankToNull = (value: string | null | undefined) => value?.trim() || null;
+
+/** A factor such as `0.85`. Kept as the admin typed it, minus whitespace. */
+const audioRate = z
+  .string()
+  .nullish()
+  .transform(blankToNull)
+  .refine((rate) => {
+    if (rate === null) return true;
+    if (!/^\d+(\.\d+)?$/.test(rate)) return false;
+    const value = Number(rate);
+    return value >= RATE_RANGE.min && value <= RATE_RANGE.max;
+  }, RATE_MESSAGE);
+
+/**
+ * A percentage such as `-10%`. The sign and the percent sign are both easy to
+ * leave off, so `10` and `-10` are read as `+10%` and `-10%`.
+ */
+const audioPitch = z
+  .string()
+  .nullish()
+  .transform(blankToNull)
+  .refine((pitch) => pitch === null || /^[+-]?\d+(\.\d+)?%?$/.test(pitch), PITCH_MESSAGE)
+  .transform((pitch) => {
+    if (pitch === null) return null;
+    const bare = pitch.replace(/%$/, '');
+    return `${/^[+-]/.test(bare) ? bare : `+${bare}`}%`;
+  })
+  .refine((pitch) => {
+    if (pitch === null) return true;
+    const value = Number(pitch.slice(0, -1));
+    return value >= PITCH_RANGE.min && value <= PITCH_RANGE.max;
+  }, PITCH_MESSAGE);
 
 /**
  * A branch is required from the moment a language exists. Every language has at
@@ -34,6 +72,8 @@ export const updateLanguageSettingsSchema = z
     branchName: z.string().trim().min(1, BRANCH_REQUIRED).nullable(),
     audioProvider: z.enum(AudioProvider).nullable(),
     audioVoice: z.string().trim().max(100, 'is longer than any provider voice id').nullable(),
+    audioRate,
+    audioPitch,
   })
   .transform((v) => ({ ...v, audioVoice: v.audioVoice || null }))
   .refine((v) => !v.audioProvider || !!v.audioVoice, { message: 'A voice is required when a provider is selected' });

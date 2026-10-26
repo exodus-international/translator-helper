@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createTestRouter } from '../../../../../tests/next-router';
 import LanguageSettingsClient from './page.client';
 
@@ -18,8 +18,10 @@ const brandNew = {
   name: 'Croatian',
   isSource: false,
   branchName: null,
-  audioProvider: null,
-  audioVoice: null,
+  audioProvider: null as 'AZURE_SPEECH' | null,
+  audioVoice: null as string | null,
+  audioRate: null as string | null,
+  audioPitch: null as string | null,
   translationInstructions: null,
 };
 
@@ -50,4 +52,46 @@ test('the source language reports no gaps, because nothing translates into it', 
 
   assert.ok(screen.getByText('None of the four checks apply to the source language.'));
   assert.equal(screen.queryByText('No members'), null);
+});
+
+const slovak = {
+  ...brandNew,
+  id: 'lang-sk',
+  code: 'sk',
+  name: 'Slovak',
+  audioProvider: 'AZURE_SPEECH' as const,
+  audioVoice: 'sk-SK-LukasNeural',
+};
+
+test('narration fields show the app default when nothing is stored', () => {
+  renderSettings(slovak);
+
+  const rate = screen.getByLabelText('Speaking rate') as HTMLInputElement;
+  const pitch = screen.getByLabelText('Pitch') as HTMLInputElement;
+  assert.equal(rate.value, '');
+  assert.equal(rate.placeholder, '0.8');
+  assert.equal(pitch.value, '');
+  assert.equal(pitch.placeholder, '-6%');
+});
+
+test('narration fields show what the language stores', () => {
+  renderSettings({ ...slovak, audioRate: '0.85', audioPitch: '-10%' });
+
+  assert.equal((screen.getByLabelText('Speaking rate') as HTMLInputElement).value, '0.85');
+  assert.equal((screen.getByLabelText('Pitch') as HTMLInputElement).value, '-10%');
+});
+
+test('reset to defaults empties the narration fields', () => {
+  renderSettings({ ...slovak, audioRate: '0.85', audioPitch: '-10%' });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
+
+  assert.equal((screen.getByLabelText('Speaking rate') as HTMLInputElement).value, '');
+  assert.equal((screen.getByLabelText('Pitch') as HTMLInputElement).value, '');
+});
+
+test('a language with no speech provider has no narration to tune', () => {
+  renderSettings();
+
+  assert.equal(screen.queryByLabelText('Speaking rate'), null);
 });

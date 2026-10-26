@@ -25,7 +25,7 @@ export async function createLanguageAction(input: unknown) {
 }
 
 /**
- * Name, branch and voice are saved together: they are one form, and saving them
+ * Name, branch, voice and narration are saved together: they are one form, and saving them
  * one action at a time is how the old admin dialog left a language half-updated
  * when the second call failed. `code` is not accepted -- the schema is strict,
  * so an attempt to change the URL is rejected here rather than relied upon to
@@ -49,6 +49,8 @@ export async function updateLanguageSettingsAction(id: string, input: unknown) {
       branchName: null,
       audioProvider: null,
       audioVoice: null,
+      audioRate: null,
+      audioPitch: null,
     });
   }
 

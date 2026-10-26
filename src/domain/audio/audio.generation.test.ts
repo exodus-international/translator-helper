@@ -108,6 +108,32 @@ test('with no override, the provider is sent the default narration rate and pitc
   assert.match(submitted[0], /<prosody rate="0\.8" pitch="-6%">/);
 });
 
+test('the provider is sent the rate and pitch stored on the language', async () => {
+  const version = versionFixture();
+  const { submitted, start } = harness({
+    ...version,
+    language: { ...version.language, audioRate: '0.85', audioPitch: '-10%' },
+  });
+
+  await start('version-1', 'user-1');
+
+  assert.match(submitted[0], /<prosody rate="0\.85" pitch="-10%">/);
+});
+
+test('an override is sent verbatim whatever the language narration says', async () => {
+  const override =
+    '<speak version="1.0" xml:lang="cs-CZ"><voice name="cs-CZ-AntoninNeural"><prosody rate="1.2">Rucne.</prosody></voice></speak>';
+  const version = versionFixture({ audioSsml: override });
+  const { submitted, start } = harness({
+    ...version,
+    language: { ...version.language, audioRate: '0.85', audioPitch: '-10%' },
+  });
+
+  await start('version-1', 'user-1');
+
+  assert.equal(submitted[0], override);
+});
+
 test('with an override, the provider is sent exactly that, wrapper and voice included', async () => {
   const override =
     '<speak version="1.0" xml:lang="cs-CZ"><voice name="cs-CZ-JitkaNeural">Rucne napsany text.</voice></speak>';

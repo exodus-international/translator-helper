@@ -28,7 +28,8 @@ import {
   type AudioTranscriptState,
 } from './audio.rules';
 import { markdownToSpeechScript } from './audio.script';
-import { DEFAULT_PROSODY, speechScriptToSsml, voiceFromSsml } from './audio.ssml';
+import { DEFAULT_NARRATION, narrationProfile, type NarrationProfile, type NarrationSettings } from './audio.narration';
+import { speechScriptToSsml, voiceFromSsml } from './audio.ssml';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
@@ -42,6 +43,12 @@ export interface DerivationInput {
   voice: string;
   /** Longest single break the provider honours. */
   maxBreakMs: number;
+  /**
+   * The language's rate and pitch. Omitted, the app default, which is also
+   * what every transcript fingerprint is taken with: an admin retuning a
+   * language must not put every hand-edited transcript in it out of date.
+   */
+  narration?: NarrationProfile;
 }
 
 /**
@@ -49,12 +56,12 @@ export interface DerivationInput {
  * rather than with the rules because it needs the Markdown parser, and the
  * audio card imports the rules into the browser.
  */
-export function deriveAudioSsml({ content, voice, maxBreakMs }: DerivationInput): string {
+export function deriveAudioSsml({ content, voice, maxBreakMs, narration = DEFAULT_NARRATION }: DerivationInput): string {
   return speechScriptToSsml(markdownToSpeechScript(content), {
     voice,
     locale: localeFromVoice(voice),
     maxBreakMs,
-    ...DEFAULT_PROSODY,
+    ...narration,
   });
 }
 
@@ -69,7 +76,7 @@ export interface VersionForGeneration {
   content: string;
   audioSsml: string | null;
   version: number;
-  language: { code: string; audioProvider: AudioProvider | null; audioVoice: string | null };
+  language: { code: string; audioProvider: AudioProvider | null; audioVoice: string | null } & NarrationSettings;
   document: {
     type: DocumentType | null;
     originalFilename: string | null;
@@ -177,7 +184,13 @@ export function createStartGeneration(deps: GenerationDeps = defaultGenerationDe
     }
     const { ssml } = resolveAudioSsml({
       override: version.audioSsml,
-      derive: () => deriveAudioSsml({ content: version.content, voice, maxBreakMs: provider.maxBreakMs }),
+      derive: () =>
+        deriveAudioSsml({
+          content: version.content,
+          voice,
+          maxBreakMs: provider.maxBreakMs,
+          narration: narrationProfile(language),
+        }),
     });
 
     phase = 'provider';
@@ -449,10 +462,14 @@ export async function getTranscript(
     voice: version.language.audioVoice!,
     maxBreakMs: provider.maxBreakMs,
   };
-  const resolved = resolveAudioSsml({ override: version.audioSsml, derive: () => deriveAudioSsml(input) });
+  const resolved = resolveAudioSsml({
+    override: version.audioSsml,
+    derive: () => deriveAudioSsml({ ...input, narration: narrationProfile(version.language) }),
+  });
 
   // Derived only to compare against the fingerprint, and only when there is an
   // override to compare: a document with no override cannot be out of date.
+  // Default narration on purpose, the same the fingerprint was taken with.
   const state = transcriptState({
     override: version.audioSsml,
     baseline: version.audioSsmlBase,

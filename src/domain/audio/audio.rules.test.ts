@@ -181,6 +181,11 @@ test('a Markdown-only change leaves an edited transcript alone', () => {
   assert.equal(transcriptState({ override: '<speak>Rucne</speak>', baseline, derived: cosmetic }), 'edited');
 });
 
+test('the derived SSML carries the narration it is given', () => {
+  const ssml = deriveAudioSsml({ ...transcriptInput, narration: { rate: '0.85', pitch: '-10%' } });
+  assert.match(ssml, /<prosody rate="0\.85" pitch="-10%">/);
+});
+
 test('a document with no override is never out of date', () => {
   assert.equal(transcriptState({ override: null, baseline: 'stale', derived: 'anything' }), 'generated');
 });
