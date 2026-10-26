@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Ban, Lock, ScrollText } from 'lucide-react';
@@ -537,12 +537,22 @@ function AutosaveNotice({
   lastSavedAt: Date | null;
   onSaveNow: () => void;
 }) {
+  const { sentinel, notice, isStuck } = useStuck();
   return (
-    <div
-      aria-live="polite"
-      data-status={status}
-      className="bg-background/95 sticky top-[calc(var(--header-height,3rem)+0.5rem)] z-[5] flex items-center gap-2 self-end rounded-md border py-0.5 pr-0.5 pl-3 shadow-xs backdrop-blur"
-    >
+    <>
+      {/* Zero height, cancelling the column gap: it marks where the notice
+          would sit unstuck, and leaves the viewport the moment it sticks. */}
+      <div ref={sentinel} aria-hidden className="-mb-4 h-0" />
+      <div
+        ref={notice}
+        aria-live="polite"
+        data-status={status}
+        data-stuck={isStuck || undefined}
+        className={cn(
+          'sticky top-[calc(var(--header-height,3rem)+0.5rem)] z-[5] flex items-center gap-2 self-end rounded-md border py-0.5 pr-0.5 pl-3 backdrop-blur transition-[background-color,box-shadow]',
+          isStuck ? 'bg-muted/95 shadow-lg' : 'bg-background/95 shadow-xs',
+        )}
+      >
       <span className={cn('text-xs', problem ? 'text-destructive' : 'text-muted-foreground')}>
         {problem ? `Not saved: ${problem}` : 'Changes save automatically'}
       </span>
@@ -552,6 +562,31 @@ function AutosaveNotice({
         onSave={onSaveNow}
         disabled={status === 'invalid'}
       />
-    </div>
+      </div>
+    </>
   );
+}
+
+/**
+ * Whether the notice is stuck under the topbar, so it can look lifted off the
+ * cards scrolling beneath it. The sentinel sits where the notice would be if
+ * it scrolled with the page; once that spot passes under the topbar, the
+ * notice is being held in place.
+ */
+function useStuck() {
+  const sentinel = useRef<HTMLDivElement>(null);
+  const notice = useRef<HTMLDivElement>(null);
+  const [isStuck, setIsStuck] = useState(false);
+
+  useEffect(() => {
+    if (!sentinel.current || !notice.current || typeof IntersectionObserver === 'undefined') return;
+    const top = parseFloat(getComputedStyle(notice.current).top) || 0;
+    const observer = new IntersectionObserver(([entry]) => setIsStuck(!entry.isIntersecting), {
+      rootMargin: `-${top}px 0px 0px 0px`,
+    });
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return { sentinel, notice, isStuck };
 }
