@@ -1,0 +1,150 @@
+name: Release
+
+# One button, the whole release in docs/RELEASE.md: bump and changelog into
+# develop, promote develop to production, wait for Coolify to serve it, tag.
+# Nobody reviews the production diff on the way, so every merge waits for the
+# Test workflow on that PR and stops the release when anything fails.
+#
+# Needs the RELEASE_TOKEN secret: a fine-grained personal access token for
+# this repository with Contents and Pull requests set to read and write. The
+# default GITHUB_TOKEN cannot open PRs here, and PRs it opens never run the
+# Test workflow, which is the only review this flow has.
+#
+# Not for the release right after a hotfix: that one needs the version bumped
+# by hand (see docs/RELEASE.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump: patch for fixes only, minor when any feat landed, major for breaking changes'
+        required: true
+        type: choice
+        options: [patch, minor, major]
+
+# Two releases at once would bump from the same version and race each other
+# into production.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+  PRODUCTION_URL: https://exodus-translations.ff0000.cz
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check the token is set
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::The RELEASE_TOKEN secret is missing. See the comment at the top of release.yml."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          # The changelog is generated from history since the last tag.
+          fetch-depth: 0
+          fetch-tags: true
+          # Pushes made with the default token do not trigger other workflows.
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Check there is something to release
+        run: |
+          git fetch origin production --quiet
+          ahead="$(git rev-list --count origin/production..origin/develop)"
+          if [ "$ahead" -eq 0 ]; then
+            echo "::error::develop has nothing production does not already have."
+            exit 1
+          fi
+          echo "develop is $ahead commits ahead of production."
+
+      # The last push to develop is what goes live. If its Test run failed,
+      # or has not finished, stop before anything is bumped.
+      - name: Check develop is green
+        run: |
+          sha="$(git rev-parse origin/develop)"
+          conclusion="$(gh run list --workflow test.yml --branch develop --commit "$sha" --event push \
+            --json conclusion --jq '.[0].conclusion // "none"')"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::The Test workflow on develop ($sha) is '$conclusion', not 'success'."
+            exit 1
+          fi
+
+      - name: Prepare the release PR
+        id: prepare
+        run: |
+          pnpm release:prepare "${{ inputs.bump }}"
+          branch="$(git branch --show-current)"
+          echo "version=${branch#release/}" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Merge the release PR into develop
+        env:
+          BRANCH: ${{ steps.prepare.outputs.branch }}
+        run: |
+          pr="$(gh pr view "$BRANCH" --json number --jq .number)"
+          .github/scripts/wait-for-checks.sh "$pr"
+          gh pr merge "$pr" --squash --delete-branch
+
+      - name: Open and merge the promote PR into production
+        id: promote
+        env:
+          VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          url="$(gh pr create --base production --head develop --title "release: $VERSION" \
+            --body "Promotes develop to production for $VERSION. Opened and merged by the Release workflow.")"
+          pr="${url##*/}"
+          .github/scripts/wait-for-checks.sh "$pr"
+          # A merge commit, never a squash: a squash makes production and
+          # develop diverge for good, and the tag has to sit on a commit
+          # develop can reach.
+          gh pr merge "$pr" --merge --subject "release: $VERSION (#$pr)"
+          git fetch origin production --quiet
+          echo "sha=$(git rev-parse origin/production)" >> "$GITHUB_OUTPUT"
+
+      # The login page names the commit it was built from once the new build
+      # serves. A deploy takes about eight minutes.
+      - name: Wait for Coolify to serve the release
+        env:
+          SHA: ${{ steps.promote.outputs.sha }}
+        run: |
+          for attempt in $(seq 1 50); do
+            if curl -fsS "$PRODUCTION_URL/login" | grep -q "sentry-release=$SHA"; then
+              echo "Production serves $SHA."
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::Production did not serve $SHA within 25 minutes. Check the Coolify deploy, then run pnpm release:tag by hand."
+          exit 1
+
+      - name: Tag the release
+        env:
+          VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          # release-tag.sh reads the changelog from the working tree.
+          git checkout --quiet --detach origin/production
+          pnpm release:tag "$VERSION"
