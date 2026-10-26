@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AudioFile } from '@/generated/prisma/client';
 import { AudioProvider, AudioQuality, AudioStatus, DocumentType } from '@/generated/prisma/enums';
-import { createStartGeneration, type GenerationDeps, type VersionForGeneration } from './audio.service';
+import { DEFAULT_NARRATION } from './audio.narration';
+import { createStartGeneration, previewAudio, type GenerationDeps, type VersionForGeneration } from './audio.service';
 import type { SpeechProvider } from './providers/speech-provider';
 
 /**
@@ -260,4 +261,61 @@ test('a document whose project has the type turned off is skipped, not failed', 
 
   assert.equal(outcome.status, 'skipped');
   assert.equal(submitted.length, 0);
+});
+
+// ─── Preview ─────────────────────────────────────────────────
+
+function previewProvider(overrides: Partial<SpeechProvider> = {}) {
+  const asked: { ssml: string; quality: AudioQuality }[] = [];
+  const provider = {
+    id: AudioProvider.AZURE_SPEECH,
+    maxBreakMs: 20_000,
+    isConfigured: () => true,
+    submit: async () => assert.fail('a preview never submits a job'),
+    poll: async () => assert.fail('a preview never polls'),
+    preview: async (request: { ssml: string; quality: AudioQuality }) => {
+      asked.push(request);
+      return { audio: new Uint8Array([1]), contentType: 'audio/mpeg' };
+    },
+    ...overrides,
+  } as unknown as SpeechProvider;
+  return { asked, getProvider: () => provider };
+}
+
+const PREVIEW = {
+  provider: AudioProvider.AZURE_SPEECH,
+  voice: 'sk-SK-LukasNeural',
+  text: '# Deň 1\n\nDnes sa zastav, buď v tichu.',
+  narration: { ...DEFAULT_NARRATION, rate: '0.85', pitch: '-10%', sentencePauseMs: 800, commaPauseMs: 150 },
+  quality: AudioQuality.HIGH,
+};
+
+test('a preview is derived the way a document is, with the unsaved settings', async () => {
+  const { asked, getProvider } = previewProvider();
+
+  await previewAudio(PREVIEW, getProvider);
+
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].quality, AudioQuality.HIGH);
+  assert.match(asked[0].ssml, /<voice name="sk-SK-LukasNeural">/);
+  assert.match(asked[0].ssml, /<prosody rate="0\.85" pitch="-10%">/);
+  assert.match(asked[0].ssml, /value="800ms"/);
+  assert.match(asked[0].ssml, /Dnes sa zastav, buď v tichu\./);
+  assert.doesNotMatch(asked[0].ssml, /#/);
+});
+
+test('a preview of nothing readable is refused before the provider is asked', async () => {
+  const { asked, getProvider } = previewProvider();
+  await assert.rejects(previewAudio({ ...PREVIEW, text: '<!-- pause-duration="3s" -->' }, getProvider), /no readable text/);
+  assert.equal(asked.length, 0);
+});
+
+test('a provider without a preview says so', async () => {
+  const { getProvider } = previewProvider({ preview: undefined });
+  await assert.rejects(previewAudio(PREVIEW, getProvider), /has no preview/);
+});
+
+test('an unconfigured provider says so', async () => {
+  const { getProvider } = previewProvider({ isConfigured: () => false });
+  await assert.rejects(previewAudio(PREVIEW, getProvider), /not configured/);
 });

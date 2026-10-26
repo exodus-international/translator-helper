@@ -1,7 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatIssues } from '@/lib/validation';
-import { createLanguageSchema, updateLanguageSettingsSchema } from './language.types';
+import {
+  createLanguageSchema,
+  previewLanguageAudioSchema,
+  updateLanguagePreviewTextSchema,
+  updateLanguageSettingsSchema,
+} from './language.types';
 
 const SETTINGS = {
   name: 'Croatian',
@@ -149,5 +154,41 @@ describe('the messages these rules reject with', () => {
       result.success === false && formatIssues(result.error),
       'code: must be two to five characters, like hr or en-US',
     );
+  });
+});
+
+describe('updateLanguagePreviewTextSchema', () => {
+  it('accepts a blank sample, which means the built-in one', () => {
+    assert.equal(updateLanguagePreviewTextSchema.parse({ text: '' }).text, '');
+  });
+
+  it('refuses a sample over 500 characters', () => {
+    assert.throws(() => updateLanguagePreviewTextSchema.parse({ text: 'a'.repeat(501) }));
+    assert.equal(updateLanguagePreviewTextSchema.parse({ text: 'a'.repeat(500) }).text.length, 500);
+  });
+});
+
+describe('previewLanguageAudioSchema', () => {
+  const PREVIEW = { audioProvider: 'AZURE_SPEECH', audioVoice: 'sk-SK-LukasNeural', text: 'Dnes sa zastav.' };
+
+  it('takes the unsaved form values the way the settings do', () => {
+    const parsed = previewLanguageAudioSchema.parse({
+      ...PREVIEW,
+      audioRate: '0.85',
+      audioPitch: '-10',
+      audioSentencePauseMs: '800',
+      audioCommaPauseMs: '',
+      audioQuality: 'HIGH',
+    });
+    assert.equal(parsed.audioPitch, '-10%');
+    assert.equal(parsed.audioSentencePauseMs, 800);
+    assert.equal(parsed.audioCommaPauseMs, null);
+    assert.equal(parsed.audioQuality, 'HIGH');
+  });
+
+  it('needs a voice and something to read, and no more than 500 characters of it', () => {
+    assert.throws(() => previewLanguageAudioSchema.parse({ ...PREVIEW, audioVoice: ' ' }));
+    assert.throws(() => previewLanguageAudioSchema.parse({ ...PREVIEW, text: '  ' }));
+    assert.throws(() => previewLanguageAudioSchema.parse({ ...PREVIEW, text: 'a'.repeat(501) }));
   });
 });

@@ -236,6 +236,8 @@ model Language {
   audioCommaPauseMs       Int?
   /// Null means STANDARD.
   audioQuality            AudioQuality?
+  /// Sample the settings page reads aloud when tuning the voice. Null uses the built-in sample for the language.
+  audioPreviewText        String?              @db.Text
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   documentVersions        DocumentVersion[]

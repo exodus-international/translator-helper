@@ -7,6 +7,7 @@ import { Ban, Lock, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/page-header';
+import { LanguageAudioPreview } from '@/components/language-audio-preview';
 import { LanguageHealthPills } from '@/components/language-health-pills';
 import { LanguageTabs } from '@/components/language-tabs';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +45,7 @@ interface LanguageSettingsClientProps {
     audioSentencePauseMs: number | null;
     audioCommaPauseMs: number | null;
     audioQuality: AudioQuality | null;
+    audioPreviewText: string | null;
     translationInstructions: string | null;
   };
   members: { memberCount: number; managerNames: string[] };
@@ -357,6 +359,19 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                       Empty fields use the app default. New settings apply to audio generated from now on; existing
                       recordings and hand-edited audio text stay as they are.
                     </p>
+                    <h3 className="pt-2 text-sm font-semibold">Preview</h3>
+                    <LanguageAudioPreview
+                      language={language}
+                      settings={{
+                        audioProvider,
+                        audioVoice,
+                        audioRate,
+                        audioPitch,
+                        audioSentencePauseMs: sentencePause,
+                        audioCommaPauseMs: commaPause,
+                        audioQuality: quality,
+                      }}
+                    />
                   </div>
                 )}
                 <p className="text-muted-foreground text-xs">

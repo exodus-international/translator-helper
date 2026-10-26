@@ -2,7 +2,7 @@ import prisma from '@/lib/db';
 import { isAudioStorageConfigured } from '@/lib/audio-storage-config';
 import { putObject } from '@/lib/object-storage';
 import type { AudioFile } from '@/generated/prisma/client';
-import { AudioProvider, AudioStatus, DocumentType } from '@/generated/prisma/enums';
+import { AudioProvider, AudioStatus, DocumentType, type AudioQuality } from '@/generated/prisma/enums';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { resolveAudioObjectKey } from './audio.paths';
 import {
@@ -214,6 +214,39 @@ export function createStartGeneration(deps: GenerationDeps = defaultGenerationDe
 
 /** Production instance. */
 export const startGeneration = createStartGeneration();
+
+export interface PreviewInput {
+  provider: AudioProvider;
+  voice: string;
+  /** Markdown, read the way a document is: pause markers and all. */
+  text: string;
+  narration: NarrationProfile;
+  quality: AudioQuality;
+}
+
+/**
+ * Speaks a sample with settings that may not be saved yet, so an admin can
+ * tune a language by ear before any document is generated with them. The
+ * sample goes through the same derivation as a document, so what is heard is
+ * what generation would send. Nothing is stored and nothing is logged.
+ */
+export async function previewAudio(
+  input: PreviewInput,
+  getProvider: typeof getSpeechProvider = getSpeechProvider,
+): Promise<SynthesisResult> {
+  const provider = getProvider(input.provider);
+  if (!provider.isConfigured()) throw new Error('The speech provider is not configured on this server.');
+  if (!provider.preview) throw new Error('This speech provider has no preview.');
+  if (!hasReadableText(input.text)) throw new Error('The sample has no readable text after stripping Markdown.');
+
+  const ssml = deriveAudioSsml({
+    content: input.text,
+    voice: input.voice,
+    maxBreakMs: provider.maxBreakMs,
+    narration: input.narration,
+  });
+  return provider.preview({ ssml, quality: input.quality });
+}
 
 /**
  * Moves one record forward: polls the provider, and on success uploads the
