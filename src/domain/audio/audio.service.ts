@@ -28,7 +28,7 @@ import {
   type AudioTranscriptState,
 } from './audio.rules';
 import { markdownToSpeechScript } from './audio.script';
-import { DEFAULT_NARRATION, narrationProfile, type NarrationProfile, type NarrationSettings } from './audio.narration';
+import { audioQuality, DEFAULT_NARRATION, narrationProfile, type NarrationProfile, type NarrationSettings } from './audio.narration';
 import { speechScriptToSsml, voiceFromSsml } from './audio.ssml';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
@@ -194,7 +194,7 @@ export function createStartGeneration(deps: GenerationDeps = defaultGenerationDe
     });
 
     phase = 'provider';
-    const outcome = await provider.submit({ jobId: jobIdFor(audioFile.id), ssml });
+    const outcome = await provider.submit({ jobId: jobIdFor(audioFile.id), ssml, quality: audioQuality(language) });
     if (outcome.kind === 'result') {
       // Synchronous provider: finish in the same call.
       await deps.claimForProcessing(audioFile.id);

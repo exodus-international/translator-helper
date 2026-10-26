@@ -16,14 +16,19 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AudioProvider } from '@/generated/prisma/enums';
-import { DEFAULT_NARRATION } from '@/domain/audio/audio.narration';
+import { AudioProvider, AudioQuality } from '@/generated/prisma/enums';
+import { DEFAULT_AUDIO_QUALITY, DEFAULT_NARRATION } from '@/domain/audio/audio.narration';
 import type { LanguageDeletionPlan } from '@/domain/language/language-delete';
 import { languageHealth } from '@/domain/language/language-health';
 import { deleteLanguageAction, updateLanguageSettingsAction } from '@/domain/language/language.actions';
 import { DEFAULT_AUDIO_VOICES } from '@/domain/language/language.types';
 import { capture } from '@/lib/analytics';
 import { useTrailStore } from '@/lib/page-trail';
+
+const QUALITY_LABELS: Record<AudioQuality, string> = {
+  [AudioQuality.STANDARD]: '24 kHz, 96 kbps',
+  [AudioQuality.HIGH]: '48 kHz, 192 kbps',
+};
 
 interface LanguageSettingsClientProps {
   language: {
@@ -38,6 +43,7 @@ interface LanguageSettingsClientProps {
     audioPitch: string | null;
     audioSentencePauseMs: number | null;
     audioCommaPauseMs: number | null;
+    audioQuality: AudioQuality | null;
     translationInstructions: string | null;
   };
   members: { memberCount: number; managerNames: string[] };
@@ -54,6 +60,7 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
   const [audioPitch, setAudioPitch] = useState(language.audioPitch ?? '');
   const [sentencePause, setSentencePause] = useState(language.audioSentencePauseMs?.toString() ?? '');
   const [commaPause, setCommaPause] = useState(language.audioCommaPauseMs?.toString() ?? '');
+  const [quality, setQuality] = useState<AudioQuality>(language.audioQuality ?? DEFAULT_AUDIO_QUALITY);
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmation, setConfirmation] = useState('');
@@ -100,6 +107,7 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
         audioPitch: audioProvider === 'NONE' ? null : audioPitch.trim() || null,
         audioSentencePauseMs: audioProvider === 'NONE' ? null : sentencePause.trim() || null,
         audioCommaPauseMs: audioProvider === 'NONE' ? null : commaPause.trim() || null,
+        audioQuality: audioProvider === 'NONE' || quality === DEFAULT_AUDIO_QUALITY ? null : quality,
       });
       capture('language_updated', { code: language.code });
       toast.success('Language saved');
@@ -262,12 +270,15 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                         type="button"
                         variant="ghost"
                         size="sm"
-                        disabled={!audioRate && !audioPitch && !sentencePause && !commaPause}
+                        disabled={
+                          !audioRate && !audioPitch && !sentencePause && !commaPause && quality === DEFAULT_AUDIO_QUALITY
+                        }
                         onClick={() => {
                           setAudioRate('');
                           setAudioPitch('');
                           setSentencePause('');
                           setCommaPause('');
+                          setQuality(DEFAULT_AUDIO_QUALITY);
                         }}
                       >
                         Reset to defaults
@@ -323,6 +334,24 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                         />
                         <p className="text-muted-foreground mt-1 text-xs">Silence at every comma, e.g. 150.</p>
                       </div>
+                    </div>
+                    <h3 className="pt-2 text-sm font-semibold">Output</h3>
+                    <div className="sm:w-56">
+                      <Label htmlFor="language-quality">Quality</Label>
+                      <Select
+                        value={quality}
+                        onValueChange={(value) => setQuality((value ?? DEFAULT_AUDIO_QUALITY) as AudioQuality)}
+                        items={QUALITY_LABELS}
+                      >
+                        <SelectTrigger id="language-quality" className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={AudioQuality.STANDARD}>{QUALITY_LABELS[AudioQuality.STANDARD]}</SelectItem>
+                          <SelectItem value={AudioQuality.HIGH}>{QUALITY_LABELS[AudioQuality.HIGH]}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-muted-foreground mt-1 text-xs">48 kHz keeps more highs and about doubles the file size.</p>
                     </div>
                     <p className="text-muted-foreground text-xs">
                       Empty fields use the app default. New settings apply to audio generated from now on; existing

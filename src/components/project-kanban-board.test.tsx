@@ -28,6 +28,7 @@ const croatian: Language = {
   audioPitch: null,
   audioSentencePauseMs: null,
   audioCommaPauseMs: null,
+  audioQuality: null,
   createdAt: new Date('2026-09-01'),
   updatedAt: new Date('2026-09-01'),
 };

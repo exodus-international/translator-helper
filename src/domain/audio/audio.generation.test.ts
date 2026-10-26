@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AudioFile } from '@/generated/prisma/client';
-import { AudioProvider, AudioStatus, DocumentType } from '@/generated/prisma/enums';
+import { AudioProvider, AudioQuality, AudioStatus, DocumentType } from '@/generated/prisma/enums';
 import { createStartGeneration, type GenerationDeps, type VersionForGeneration } from './audio.service';
 import type { SpeechProvider } from './providers/speech-provider';
 
@@ -54,6 +54,7 @@ function audioFileFixture(): AudioFile {
 /** Captures what the provider was asked to say, and what was logged about it. */
 function harness(version: VersionForGeneration) {
   const submitted: string[] = [];
+  const qualities: AudioQuality[] = [];
   const logged: { action: string; details?: unknown }[] = [];
   const created: { voice: string }[] = [];
 
@@ -61,8 +62,9 @@ function harness(version: VersionForGeneration) {
     id: AudioProvider.AZURE_SPEECH,
     maxBreakMs: 20_000,
     isConfigured: () => true,
-    submit: async ({ ssml }: { jobId: string; ssml: string }) => {
+    submit: async ({ ssml, quality }: { jobId: string; ssml: string; quality: AudioQuality }) => {
       submitted.push(ssml);
+      qualities.push(quality);
       return { kind: 'job' as const, jobId: 'job-1' };
     },
     poll: async () => ({ kind: 'running' as const }),
@@ -86,7 +88,7 @@ function harness(version: VersionForGeneration) {
     finish: async () => audioFileFixture(),
   };
 
-  return { submitted, logged, created, start: createStartGeneration(deps) };
+  return { submitted, qualities, logged, created, start: createStartGeneration(deps) };
 }
 
 test('with no override, the provider is sent the script derived from the document', async () => {
@@ -132,6 +134,17 @@ test('the provider is sent the pauses stored on the language', async () => {
   assert.match(submitted[0], /xmlns:mstts="https:\/\/www\.w3\.org\/2001\/mstts"/);
   assert.match(submitted[0], /<mstts:silence type="Sentenceboundary-exact" value="800ms"\/>/);
   assert.match(submitted[0], /<mstts:silence type="Comma-exact" value="150ms"\/>/);
+});
+
+test('the provider is asked for 24 kHz unless the language says otherwise', async () => {
+  const standard = harness(versionFixture());
+  await standard.start('version-1', 'user-1');
+  assert.deepEqual(standard.qualities, [AudioQuality.STANDARD]);
+
+  const version = versionFixture();
+  const high = harness({ ...version, language: { ...version.language, audioQuality: AudioQuality.HIGH } });
+  await high.start('version-1', 'user-1');
+  assert.deepEqual(high.qualities, [AudioQuality.HIGH]);
 });
 
 test('an override is sent verbatim whatever the language narration says', async () => {

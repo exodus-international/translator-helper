@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_NARRATION, narrationProfile } from './audio.narration';
+import { AudioQuality } from '@/generated/prisma/enums';
+import { audioQuality, DEFAULT_NARRATION, narrationProfile } from './audio.narration';
 
 test('a language with nothing stored is narrated with the app default', () => {
   assert.deepEqual(narrationProfile({}), DEFAULT_NARRATION);
@@ -32,4 +33,10 @@ test('a blank stored value is no value', () => {
 
 test('a pause of zero is a setting, not an absent one', () => {
   assert.equal(narrationProfile({ audioCommaPauseMs: 0 }).commaPauseMs, 0);
+});
+
+test('a language with no quality stored gets 24 kHz', () => {
+  assert.equal(audioQuality({}), AudioQuality.STANDARD);
+  assert.equal(audioQuality({ audioQuality: null }), AudioQuality.STANDARD);
+  assert.equal(audioQuality({ audioQuality: AudioQuality.HIGH }), AudioQuality.HIGH);
 });

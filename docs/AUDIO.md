@@ -106,6 +106,11 @@ Pause after sentence and pause after comma, in whole milliseconds from 0 to
 every sentence end and comma. A blank field leaves the voice's own timing and
 adds no `mstts` markup at all.
 
+Quality picks the MP3 Azure renders: 24 kHz at 96 kbps (the default) or 48 kHz
+at 192 kbps. 48 kHz keeps the highs some voices lose at 24 kHz and about
+doubles the file size. Quality goes to the provider as the output format and
+never appears in the SSML.
+
 Settings apply from the next generation on. Existing recordings keep the sound
 they were made with, and hand-edited audio text is sent unchanged. PRD: issue
 #294.

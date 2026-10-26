@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AudioProvider } from '@/generated/prisma/enums';
+import { AudioProvider, AudioQuality } from '@/generated/prisma/enums';
 import { PAUSE_RANGE_MS, PITCH_RANGE, RATE_RANGE } from '@/domain/audio/audio.narration';
 
 export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
@@ -92,6 +92,10 @@ export const updateLanguageSettingsSchema = z
     audioPitch,
     audioSentencePauseMs: audioPauseMs,
     audioCommaPauseMs: audioPauseMs,
+    audioQuality: z
+      .enum(AudioQuality)
+      .nullish()
+      .transform((quality) => quality ?? null),
   })
   .transform((v) => ({ ...v, audioVoice: v.audioVoice || null }))
   .refine((v) => !v.audioProvider || !!v.audioVoice, { message: 'A voice is required when a provider is selected' });
