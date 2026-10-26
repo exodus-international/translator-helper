@@ -123,15 +123,11 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
       if (!language.isSource && !value.branchName) return 'A GitHub branch is required.';
       return null;
     },
+    // No toasts: the sticky notice says saved, saving or why not, and a
+    // toast on every save repeated it in a second place.
     save: async (value) => {
-      try {
-        await updateLanguageSettingsAction(language.id, value);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to save the language');
-        throw error;
-      }
+      await updateLanguageSettingsAction(language.id, value);
       capture('language_updated', { code: language.code });
-      toast.success('Settings saved');
       router.refresh();
     },
   });

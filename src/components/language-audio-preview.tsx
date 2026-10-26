@@ -66,7 +66,6 @@ export function LanguageAudioPreview({
         toast.error(error instanceof Error ? error.message : 'Failed to save the preview text');
         throw error;
       }
-      toast.success('Preview text saved');
     },
   });
 

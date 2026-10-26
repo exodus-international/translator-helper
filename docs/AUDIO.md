@@ -116,7 +116,7 @@ or not, through Azure's real-time endpoint (`/tts/cognitiveservices/v1` on the
 same endpoint and key as batch). The sample goes through the same derivation as
 a document, so pause markers work in it. Nothing is stored. Each team language
 has a built-in sample in `src/domain/audio/audio.preview.ts`. Admins can replace
-it; the box saves itself 1.5 s after typing stops and shows a toast. A blank
+it; the box saves itself 1.5 s after typing stops. A blank
 sample or one equal to the built-in one is stored as null, so a corrected
 built-in sample reaches every language that never changed it.
 
