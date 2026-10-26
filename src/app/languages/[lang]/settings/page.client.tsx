@@ -511,12 +511,12 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
   );
 }
 
-/** The editor's save states, with "waiting for a valid value" read as unsaved. */
+/** No Save button while a save is coming anyway; only a failed save offers one. */
 const SAVE_CONTROL_STATUS: Record<AutosaveStatus, SaveStatus> = {
   saved: 'saved',
-  pending: 'unsaved',
-  invalid: 'unsaved',
-  saving: 'saving',
+  pending: 'pending',
+  invalid: 'blocked',
+  saving: 'pending',
   failed: 'error',
 };
 
@@ -560,7 +560,6 @@ function AutosaveNotice({
         status={SAVE_CONTROL_STATUS[status]}
         lastSavedAt={lastSavedAt}
         onSave={onSaveNow}
-        disabled={status === 'invalid'}
       />
       </div>
     </>

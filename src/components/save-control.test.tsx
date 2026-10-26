@@ -35,3 +35,15 @@ test('a failed save says so and offers to try again', () => {
   render(<SaveControl status="error" lastSavedAt={null} onSave={() => undefined} />);
   assert.equal(screen.getByRole('button', { name: 'Save failed' }).getAttribute('title'), 'The last save failed — save again');
 });
+
+test('a change waiting for autosave shows that it is coming, with no button', () => {
+  render(<SaveControl status="pending" lastSavedAt={null} onSave={() => undefined} />);
+  assert.ok(screen.getByText('Saving...'));
+  assert.equal(screen.queryByRole('button'), null);
+});
+
+test('a change that cannot be saved says so, with no button', () => {
+  render(<SaveControl status="blocked" lastSavedAt={null} onSave={() => undefined} />);
+  assert.ok(screen.getByText('Not saved'));
+  assert.equal(screen.queryByRole('button'), null);
+});

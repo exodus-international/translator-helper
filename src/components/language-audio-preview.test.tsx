@@ -56,7 +56,8 @@ test('typing saves once, a moment after the typing stops', async () => {
 
   fireEvent.change(box(), { target: { value: 'Prvý' } });
   fireEvent.change(box(), { target: { value: 'Prvý pokus.' } });
-  assert.ok(screen.getByRole('button', { name: 'Save' }));
+  assert.ok(screen.getByText('Saving...'));
+  assert.equal(screen.queryByRole('button', { name: /^Save/ }), null);
   assert.deepEqual(saved, []);
 
   await waitFor(() => assert.deepEqual(saved, ['Prvý pokus.']), AFTER_AUTOSAVE);

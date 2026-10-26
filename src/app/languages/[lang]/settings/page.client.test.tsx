@@ -121,6 +121,8 @@ test('a half-typed value waits with the reason instead of saving', () => {
 
   fireEvent.change(screen.getByLabelText('Speaking rate'), { target: { value: '5' } });
 
-  assert.match(screen.getByText(/^Not saved/).textContent ?? '', /audioRate: must be a number from 0.5 to 2/);
-  assert.equal((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled, true);
+  assert.match(screen.getByText(/^Not saved:/).textContent ?? '', /audioRate: must be a number from 0.5 to 2/);
+  const notice = screen.getByText(/^Not saved:/).parentElement!;
+  assert.ok(within(notice).getByText('Not saved'));
+  assert.equal(within(notice).queryByRole('button'), null);
 });

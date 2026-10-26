@@ -5,7 +5,12 @@ import { CloudCheck, CloudOff, Loader2, Save, type LucideIcon } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
+/**
+ * `pending` and `blocked` are for pages that only save themselves: a change
+ * waiting for its timer, and a change that cannot be saved as it stands. Both
+ * are chips, not buttons, because pressing Save would add nothing there.
+ */
+export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'pending' | 'blocked';
 
 const SAVE_STATUS_META: Record<'unsaved' | 'saving' | 'error', { icon: LucideIcon; label: string; spin?: boolean }> = {
   saving: { icon: Loader2, label: 'Saving...', spin: true },
@@ -37,6 +42,23 @@ export function SaveControl({
   // button and the chip below carry the same label length and padding for that
   // reason, not by accident.
   const slot = 'h-8 min-w-20 px-3';
+
+  if (status === 'pending' || status === 'blocked') {
+    const blocked = status === 'blocked';
+    const Icon = blocked ? CloudOff : Loader2;
+    return (
+      <span
+        className={cn(
+          slot,
+          'inline-flex items-center justify-center gap-1.5 text-xs',
+          blocked ? 'text-destructive' : 'text-muted-foreground',
+        )}
+      >
+        <Icon className={cn('size-3.5', !blocked && 'animate-spin')} />
+        <span>{blocked ? 'Not saved' : 'Saving...'}</span>
+      </span>
+    );
+  }
 
   if (status === 'saved') {
     const time = lastSavedAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });

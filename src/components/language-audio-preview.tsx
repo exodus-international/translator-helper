@@ -30,9 +30,9 @@ const serverActions: LanguageAudioPreviewActions = {
 
 const SAVE_CONTROL_STATUS: Record<AutosaveStatus, SaveStatus> = {
   saved: 'saved',
-  pending: 'unsaved',
-  invalid: 'unsaved',
-  saving: 'saving',
+  pending: 'pending',
+  invalid: 'blocked',
+  saving: 'pending',
   failed: 'error',
 };
 
@@ -101,7 +101,6 @@ export function LanguageAudioPreview({
             status={SAVE_CONTROL_STATUS[autosave.status]}
             lastSavedAt={autosave.lastSavedAt}
             onSave={autosave.saveNow}
-            disabled={autosave.status === 'invalid'}
           />
         </span>
       </div>
