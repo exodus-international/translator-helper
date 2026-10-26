@@ -92,6 +92,22 @@ test('the derived SSML carries the voice, the locale and the words', () => {
   assert.doesNotMatch(ssml, /#/);
 });
 
+// Pinned byte for byte. Stored fingerprints were taken from exactly this
+// output, so any change to it marks every edited transcript out of date.
+test('the derived SSML for a language with default narration is exactly this', () => {
+  assert.equal(
+    deriveAudioSsml(transcriptInput),
+    '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="cs-CZ">\n' +
+      '  <voice name="cs-CZ-AntoninNeural">\n' +
+      '    <prosody rate="0.8" pitch="-6%">\n' +
+      '      <p>Den 3</p>\n' +
+      '      <p>Dnes se budeme modlit.</p>\n' +
+      '    </prosody>\n' +
+      '  </voice>\n' +
+      '</speak>',
+  );
+});
+
 test('with no override, the derived script is what gets spoken', () => {
   const resolved = resolveAudioSsml({ derive: () => deriveAudioSsml(transcriptInput) });
   assert.equal(resolved.source, 'derived');

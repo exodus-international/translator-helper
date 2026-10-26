@@ -100,6 +100,14 @@ test('with no override, the provider is sent the script derived from the documen
   assert.match(submitted[0], new RegExp(`name="${VOICE}"`));
 });
 
+test('with no override, the provider is sent the default narration rate and pitch', async () => {
+  const { submitted, start } = harness(versionFixture());
+
+  await start('version-1', 'user-1');
+
+  assert.match(submitted[0], /<prosody rate="0\.8" pitch="-6%">/);
+});
+
 test('with an override, the provider is sent exactly that, wrapper and voice included', async () => {
   const override =
     '<speak version="1.0" xml:lang="cs-CZ"><voice name="cs-CZ-JitkaNeural">Rucne napsany text.</voice></speak>';
