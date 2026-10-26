@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createTestRouter } from '../../../../../tests/next-router';
 import LanguageSettingsClient from './page.client';
 
@@ -111,8 +111,8 @@ test('a language with no speech provider has no narration to tune', () => {
 test('the page says its changes save themselves, and shows them saved', () => {
   renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
 
-  assert.ok(screen.getByText('Changes save automatically'));
-  assert.equal(screen.getByTitle('All changes saved').textContent, 'Saved');
+  const notice = screen.getByText('Changes save automatically').parentElement!;
+  assert.equal(within(notice).getByTitle('All changes saved').textContent, 'Saved');
   assert.equal(screen.queryByRole('button', { name: 'Save changes' }), null);
 });
 
