@@ -22,6 +22,23 @@ pnpm release:tag vX.Y.Z                # tag + GitHub Release, after deploy
 
 That's the whole flow. The rest of this document explains each piece.
 
+## One-click release from GitHub Actions
+
+The **Release** workflow (`.github/workflows/release.yml`) runs the whole flow above without anyone at a terminal. Open Actions, pick Release, press *Run workflow* and choose the bump.
+
+It stops before changing anything when develop has nothing new or when the Test workflow on the develop tip is not green. Then it:
+
+1. runs `pnpm release:prepare <bump>`, waits for the release PR's checks, and squash-merges it into `develop`;
+2. opens the promote PR `develop → production`, waits for its checks, and merges it with a merge commit;
+3. polls `/login` on production until `sentry-release=<sha>` names the merged commit, for up to 25 minutes;
+4. runs `pnpm release:tag vX.Y.Z`.
+
+Nobody reviews the production diff in this flow. A failing check on either PR stops the release there, and the PR stays open for a human. If the deploy wait times out, production may still be fine: check Coolify, then tag by hand.
+
+It needs the `RELEASE_TOKEN` repository secret, a fine-grained personal access token for this repository with *Contents* and *Pull requests* set to read and write. The default `GITHUB_TOKEN` cannot open PRs here, and PRs it opens never run the Test workflow.
+
+Do not use it for the release right after a hotfix. That one needs the version bumped by hand, as described in the hotfix section.
+
 ## Branch model
 
 ```
