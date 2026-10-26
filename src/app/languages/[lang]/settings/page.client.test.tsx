@@ -17,7 +17,7 @@ const brandNew = {
   code: 'hr',
   name: 'Croatian',
   isSource: false,
-  branchName: null,
+  branchName: null as string | null,
   audioProvider: null as 'AZURE_SPEECH' | null,
   audioVoice: null as string | null,
   audioRate: null as string | null,
@@ -106,4 +106,19 @@ test('a language with no speech provider has no narration to tune', () => {
   renderSettings();
 
   assert.equal(screen.queryByLabelText('Speaking rate'), null);
+});
+
+test('the page says its changes save themselves, and has no Save button', () => {
+  renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
+
+  assert.ok(screen.getByText('All changes saved'));
+  assert.equal(screen.queryByRole('button', { name: /Save/ }), null);
+});
+
+test('a half-typed value waits with the reason instead of saving', () => {
+  renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
+
+  fireEvent.change(screen.getByLabelText('Speaking rate'), { target: { value: '5' } });
+
+  assert.match(screen.getByText(/^Not saved/).textContent ?? '', /audioRate: must be a number from 0.5 to 2/);
 });

@@ -22,7 +22,9 @@ import { DEFAULT_AUDIO_QUALITY, DEFAULT_NARRATION } from '@/domain/audio/audio.n
 import type { LanguageDeletionPlan } from '@/domain/language/language-delete';
 import { languageHealth } from '@/domain/language/language-health';
 import { deleteLanguageAction, updateLanguageSettingsAction } from '@/domain/language/language.actions';
-import { DEFAULT_AUDIO_VOICES } from '@/domain/language/language.types';
+import { DEFAULT_AUDIO_VOICES, updateLanguageSettingsSchema } from '@/domain/language/language.types';
+import { useAutosave, type AutosaveStatus } from '@/hooks/use-autosave';
+import { formatIssues } from '@/lib/validation';
 import { capture } from '@/lib/analytics';
 import { useTrailStore } from '@/lib/page-trail';
 
@@ -63,7 +65,6 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
   const [sentencePause, setSentencePause] = useState(language.audioSentencePauseMs?.toString() ?? '');
   const [commaPause, setCommaPause] = useState(language.audioCommaPauseMs?.toString() ?? '');
   const [quality, setQuality] = useState<AudioQuality>(language.audioQuality ?? DEFAULT_AUDIO_QUALITY);
-  const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -96,30 +97,42 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
     }
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-
-    try {
-      await updateLanguageSettingsAction(language.id, {
-        name: name.trim(),
-        branchName: branchName.trim() || null,
-        audioProvider: audioProvider === 'NONE' ? null : audioProvider,
-        audioVoice: audioProvider === 'NONE' ? null : audioVoice.trim() || null,
-        audioRate: audioProvider === 'NONE' ? null : audioRate.trim() || null,
-        audioPitch: audioProvider === 'NONE' ? null : audioPitch.trim() || null,
-        audioSentencePauseMs: audioProvider === 'NONE' ? null : sentencePause.trim() || null,
-        audioCommaPauseMs: audioProvider === 'NONE' ? null : commaPause.trim() || null,
-        audioQuality: audioProvider === 'NONE' || quality === DEFAULT_AUDIO_QUALITY ? null : quality,
-      });
-      capture('language_updated', { code: language.code });
-      toast.success('Language saved');
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save the language');
-    } finally {
-      setSaving(false);
-    }
+  const noAudio = audioProvider === 'NONE';
+  const settings = {
+    name: name.trim(),
+    branchName: branchName.trim() || null,
+    audioProvider: noAudio ? null : audioProvider,
+    audioVoice: noAudio ? null : audioVoice.trim() || null,
+    audioRate: noAudio ? null : audioRate.trim() || null,
+    audioPitch: noAudio ? null : audioPitch.trim() || null,
+    audioSentencePauseMs: noAudio ? null : sentencePause.trim() || null,
+    audioCommaPauseMs: noAudio ? null : commaPause.trim() || null,
+    audioQuality: noAudio || quality === DEFAULT_AUDIO_QUALITY ? null : quality,
   };
+
+  // The page saves itself: every field here is a setting, not a draft, and a
+  // forgotten Save button is how a tuned voice got lost. The same schema the
+  // action uses runs first, so a half-typed value waits instead of failing.
+  const autosave = useAutosave({
+    value: settings,
+    validate: (value) => {
+      const parsed = updateLanguageSettingsSchema.safeParse(value);
+      if (!parsed.success) return formatIssues(parsed.error);
+      if (!language.isSource && !value.branchName) return 'A GitHub branch is required.';
+      return null;
+    },
+    save: async (value) => {
+      try {
+        await updateLanguageSettingsAction(language.id, value);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to save the language');
+        throw error;
+      }
+      capture('language_updated', { code: language.code });
+      toast.success('Settings saved');
+      router.refresh();
+    },
+  });
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -157,6 +170,7 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
 
       <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row">
         <div className="flex max-w-2xl flex-1 flex-col gap-4">
+          <AutosaveNotice status={autosave.status} problem={autosave.problem} />
           {language.isSource && (
             <p className="text-muted-foreground bg-muted/40 rounded-lg border px-3 py-2.5 text-xs">
               {language.name} is the source language. Documents are authored in it and translated out of it, so it has
@@ -208,11 +222,6 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                 </div>
               )}
 
-              <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving || !name.trim()}>
-                  {saving ? 'Saving…' : 'Save changes'}
-                </Button>
-              </div>
             </CardContent>
           </Card>
 
@@ -492,5 +501,29 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+const AUTOSAVE_LABELS: Record<AutosaveStatus, string> = {
+  saved: 'All changes saved',
+  pending: 'Unsaved changes',
+  saving: 'Saving…',
+  invalid: 'Not saved',
+  failed: 'Not saved',
+};
+
+/** Where the page's own saving stands, and why it is waiting when it is. */
+function AutosaveNotice({ status, problem }: { status: AutosaveStatus; problem: string | null }) {
+  const blocked = status === 'invalid' || status === 'failed';
+  return (
+    <p
+      aria-live="polite"
+      data-status={status}
+      className={blocked ? 'text-destructive text-xs' : 'text-muted-foreground text-xs'}
+    >
+      {AUTOSAVE_LABELS[status]}
+      {blocked && problem ? `: ${problem}` : ''}
+      {status === 'saved' || status === 'saving' ? '' : '. Changes save automatically.'}
+    </p>
   );
 }
