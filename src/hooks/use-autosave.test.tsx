@@ -18,15 +18,18 @@ function Form({
   initial = 'Slovak',
   save,
   validate,
+  delay = DELAY,
 }: {
   initial?: string;
+  delay?: number;
   save: (value: { name: string }) => Promise<void>;
   validate?: (value: { name: string }) => string | null;
 }) {
   const [name, setName] = useState(initial);
-  const { status, problem } = useAutosave({ value: { name }, save, validate, delay: DELAY });
+  const { status, problem, saveNow } = useAutosave({ value: { name }, save, validate, delay });
   return (
     <>
+      <button onClick={saveNow}>Save now</button>
       <input aria-label="Name" value={name} onChange={(event) => setName(event.target.value)} />
       <output aria-label="Status">{status}</output>
       <output aria-label="Problem">{problem ?? ''}</output>
@@ -119,4 +122,18 @@ test('an edit still waiting when the form goes away is saved on the way out', as
   unmount();
 
   await waitFor(() => assert.deepEqual(saved, ['Slovenčina']), SETTLED);
+});
+
+test('save now skips the wait, and the wait comes back for the next edit', async () => {
+  const saved: string[] = [];
+  render(<Form delay={60_000} save={async (value) => void saved.push(value.name)} />);
+
+  type('Slovenčina');
+  fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
+  await waitFor(() => assert.deepEqual(saved, ['Slovenčina']), SETTLED);
+
+  type('Slovenčina!');
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.deepEqual(saved, ['Slovenčina']);
+  assert.equal(status(), 'pending');
 });

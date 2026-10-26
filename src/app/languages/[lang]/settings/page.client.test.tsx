@@ -108,11 +108,12 @@ test('a language with no speech provider has no narration to tune', () => {
   assert.equal(screen.queryByLabelText('Speaking rate'), null);
 });
 
-test('the page says its changes save themselves, and has no Save button', () => {
+test('the page says its changes save themselves, and shows them saved', () => {
   renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
 
-  assert.ok(screen.getByText('All changes saved'));
-  assert.equal(screen.queryByRole('button', { name: /Save/ }), null);
+  assert.ok(screen.getByText('Changes save automatically'));
+  assert.equal(screen.getByTitle('All changes saved').textContent, 'Saved');
+  assert.equal(screen.queryByRole('button', { name: 'Save changes' }), null);
 });
 
 test('a half-typed value waits with the reason instead of saving', () => {
@@ -121,4 +122,5 @@ test('a half-typed value waits with the reason instead of saving', () => {
   fireEvent.change(screen.getByLabelText('Speaking rate'), { target: { value: '5' } });
 
   assert.match(screen.getByText(/^Not saved/).textContent ?? '', /audioRate: must be a number from 0.5 to 2/);
+  assert.equal((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled, true);
 });

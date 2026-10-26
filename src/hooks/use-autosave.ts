@@ -26,12 +26,15 @@ export function useAutosave<T>({
   save: (value: T) => Promise<void>;
   validate?: (value: T) => string | null;
   delay?: number;
-}): { status: AutosaveStatus; problem: string | null } {
+}): { status: AutosaveStatus; problem: string | null; lastSavedAt: Date | null; saveNow: () => void } {
   const json = JSON.stringify(value);
   const lastSaved = React.useRef(json);
   const timer = React.useRef(0);
   const [status, setStatus] = React.useState<AutosaveStatus>('saved');
   const [problem, setProblem] = React.useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = React.useState<Date | null>(null);
+  const [nowRequested, setNowRequested] = React.useState(0);
+  const skipWait = React.useRef(false);
 
   // Read through refs so a re-render with new callbacks does not restart the wait.
   const saveRef = React.useRef(save);
@@ -65,6 +68,7 @@ export function useAutosave<T>({
       try {
         await saveRef.current(valueRef.current);
         lastSaved.current = json;
+        setLastSavedAt(new Date());
         // A change made while this save was in flight has its own timer and
         // status already; only the save of the latest value may say "saved".
         if (JSON.stringify(valueRef.current) === json) setStatus('saved');
@@ -72,10 +76,11 @@ export function useAutosave<T>({
         setStatus('failed');
         setProblem(error instanceof Error ? error.message : 'The save failed');
       }
-    }, delay);
+    }, skipWait.current ? 0 : delay);
+    skipWait.current = false;
 
     return () => window.clearTimeout(timer.current);
-  }, [json, delay]);
+  }, [json, delay, nowRequested]);
 
   // Leaving the page inside the wait would drop the last edit. Send it on the
   // way out instead; nobody is left to show the result to.
@@ -89,5 +94,11 @@ export function useAutosave<T>({
     [],
   );
 
-  return { status, problem };
+  // Skipping the wait is a re-run of the effect above with no delay.
+  const saveNow = React.useCallback(() => {
+    skipWait.current = true;
+    setNowRequested((n) => n + 1);
+  }, []);
+
+  return { status, problem, lastSavedAt, saveNow };
 }

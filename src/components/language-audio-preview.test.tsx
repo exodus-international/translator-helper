@@ -36,7 +36,7 @@ const box = () => screen.getByLabelText('Preview text') as HTMLTextAreaElement;
 test('the box starts with the built-in sample when the language saved none', () => {
   render(<LanguageAudioPreview language={SLOVAK} settings={SETTINGS} actions={stubActions().actions} />);
   assert.equal(box().value, DEFAULT_PREVIEW_TEXTS.sk);
-  assert.ok(screen.getByText('Saved'));
+  assert.equal(screen.getByTitle('All changes saved').textContent, 'Saved');
 });
 
 test('the box starts with the sample the language saved', () => {
@@ -56,11 +56,11 @@ test('typing saves once, a moment after the typing stops', async () => {
 
   fireEvent.change(box(), { target: { value: 'Prvý' } });
   fireEvent.change(box(), { target: { value: 'Prvý pokus.' } });
-  assert.ok(screen.getByText('Unsaved'));
+  assert.ok(screen.getByRole('button', { name: 'Save' }));
   assert.deepEqual(saved, []);
 
   await waitFor(() => assert.deepEqual(saved, ['Prvý pokus.']), AFTER_AUTOSAVE);
-  await waitFor(() => assert.ok(screen.getByText('Saved')));
+  await waitFor(() => assert.ok(screen.getByTitle(/^All changes saved at/)));
 });
 
 test('a failed save says so next to the box', async () => {
@@ -74,7 +74,7 @@ test('a failed save says so next to the box', async () => {
 
   fireEvent.change(box(), { target: { value: 'Text.' } });
 
-  await waitFor(() => assert.ok(screen.getByText('Not saved')), AFTER_AUTOSAVE);
+  await waitFor(() => assert.ok(screen.getByRole('button', { name: 'Save failed' })), AFTER_AUTOSAVE);
 });
 
 test('preview sends the unsaved settings with the text and plays the result', async () => {

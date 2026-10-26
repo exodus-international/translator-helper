@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/page-header';
 import { LanguageAudioPreview } from '@/components/language-audio-preview';
 import { LanguageHealthPills } from '@/components/language-health-pills';
+import { SaveControl, type SaveStatus } from '@/components/save-control';
 import { LanguageTabs } from '@/components/language-tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -171,7 +172,12 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
 
       <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row">
         <div className="flex max-w-2xl flex-1 flex-col gap-4">
-          <AutosaveNotice status={autosave.status} problem={autosave.problem} />
+          <AutosaveNotice
+            status={autosave.status}
+            problem={autosave.problem}
+            lastSavedAt={autosave.lastSavedAt}
+            onSaveNow={autosave.saveNow}
+          />
           {language.isSource && (
             <p className="text-muted-foreground bg-muted/40 rounded-lg border px-3 py-2.5 text-xs">
               {language.name} is the source language. Documents are authored in it and translated out of it, so it has
@@ -505,33 +511,47 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
   );
 }
 
-const AUTOSAVE_LABELS: Record<AutosaveStatus, string> = {
-  saved: 'All changes saved',
-  pending: 'Unsaved changes',
-  saving: 'Saving…',
-  invalid: 'Not saved',
-  failed: 'Not saved',
+/** The editor's save states, with "waiting for a valid value" read as unsaved. */
+const SAVE_CONTROL_STATUS: Record<AutosaveStatus, SaveStatus> = {
+  saved: 'saved',
+  pending: 'unsaved',
+  invalid: 'unsaved',
+  saving: 'saving',
+  failed: 'error',
 };
 
 /**
- * Where the page's own saving stands, and why it is waiting when it is.
- * Sticky under the topbar: the field being edited is usually far down the
- * page, and that is where the answer is needed.
+ * Where the page's own saving stands, in the same slot the translation editor
+ * uses, and why it is waiting when it is. Sticky under the topbar: the field
+ * being edited is usually far down the page, and that is where the answer is
+ * needed.
  */
-function AutosaveNotice({ status, problem }: { status: AutosaveStatus; problem: string | null }) {
-  const blocked = status === 'invalid' || status === 'failed';
+function AutosaveNotice({
+  status,
+  problem,
+  lastSavedAt,
+  onSaveNow,
+}: {
+  status: AutosaveStatus;
+  problem: string | null;
+  lastSavedAt: Date | null;
+  onSaveNow: () => void;
+}) {
   return (
-    <p
+    <div
       aria-live="polite"
       data-status={status}
-      className={cn(
-        'bg-background/95 sticky top-[calc(var(--header-height,3rem)+0.5rem)] z-[5] self-start rounded-full border px-3 py-1 text-xs shadow-xs backdrop-blur',
-        blocked ? 'border-destructive/40 text-destructive' : 'text-muted-foreground',
-      )}
+      className="bg-background/95 sticky top-[calc(var(--header-height,3rem)+0.5rem)] z-[5] flex items-center gap-2 self-end rounded-md border py-0.5 pr-0.5 pl-3 shadow-xs backdrop-blur"
     >
-      {AUTOSAVE_LABELS[status]}
-      {blocked && problem ? `: ${problem}` : ''}
-      {status === 'saved' || status === 'saving' ? '' : '. Changes save automatically.'}
-    </p>
+      <span className={cn('text-xs', problem ? 'text-destructive' : 'text-muted-foreground')}>
+        {problem ? `Not saved: ${problem}` : 'Changes save automatically'}
+      </span>
+      <SaveControl
+        status={SAVE_CONTROL_STATUS[status]}
+        lastSavedAt={lastSavedAt}
+        onSave={onSaveNow}
+        disabled={status === 'invalid'}
+      />
+    </div>
   );
 }

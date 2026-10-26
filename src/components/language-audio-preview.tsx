@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Loader2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { SaveControl, type SaveStatus } from '@/components/save-control';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,10 +14,9 @@ import {
   updateLanguagePreviewTextAction,
   type LanguagePreviewOutcome,
 } from '@/domain/language/language.actions';
-import { useDebouncedCallback } from '@/hooks/use-debounced-callback';
+import { AUTOSAVE_MS, useAutosave, type AutosaveStatus } from '@/hooks/use-autosave';
 
-/** Long enough that typing a sentence is one save, short enough to feel automatic. */
-export const PREVIEW_AUTOSAVE_MS = 1500;
+export const PREVIEW_AUTOSAVE_MS = AUTOSAVE_MS;
 
 export interface LanguageAudioPreviewActions {
   save: (languageId: string, text: string) => Promise<void>;
@@ -28,7 +28,13 @@ const serverActions: LanguageAudioPreviewActions = {
   preview: previewLanguageAudioAction,
 };
 
-type SaveState = 'saved' | 'pending' | 'saving' | 'failed';
+const SAVE_CONTROL_STATUS: Record<AutosaveStatus, SaveStatus> = {
+  saved: 'saved',
+  pending: 'unsaved',
+  invalid: 'unsaved',
+  saving: 'saving',
+  failed: 'error',
+};
 
 /**
  * The sample an admin listens to while tuning a language. It saves itself a
@@ -46,35 +52,23 @@ export function LanguageAudioPreview({
   actions?: LanguageAudioPreviewActions;
 }) {
   const [text, setText] = useState(() => previewText(language));
-  const [saveState, setSaveState] = useState<SaveState>('saved');
   const [previewing, setPreviewing] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const lastSaved = useRef(text);
-
-  const save = async (value: string) => {
-    if (value === lastSaved.current) {
-      setSaveState('saved');
-      return;
-    }
-    setSaveState('saving');
-    try {
-      await actions.save(language.id, value);
-      lastSaved.current = value;
-      setSaveState('saved');
+  const autosave = useAutosave({
+    value: text,
+    validate: (value) =>
+      value.length > PREVIEW_TEXT_MAX_LENGTH ? `The sample is longer than ${PREVIEW_TEXT_MAX_LENGTH} characters.` : null,
+    save: async (value) => {
+      try {
+        await actions.save(language.id, value);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to save the preview text');
+        throw error;
+      }
       toast.success('Preview text saved');
-    } catch (error) {
-      setSaveState('failed');
-      toast.error(error instanceof Error ? error.message : 'Failed to save the preview text');
-    }
-  };
-  const saveLater = useDebouncedCallback(save, PREVIEW_AUTOSAVE_MS);
-
-  const change = (value: string) => {
-    setText(value);
-    setSaveState('pending');
-    saveLater(value);
-  };
+    },
+  });
 
   const handlePreview = async () => {
     setPreviewing(true);
@@ -102,14 +96,19 @@ export function LanguageAudioPreview({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor="language-preview-text">Preview text</Label>
-        <span className="text-muted-foreground text-xs" aria-live="polite">
-          {saveState === 'saving' ? 'Saving…' : saveState === 'pending' ? 'Unsaved' : saveState === 'failed' ? 'Not saved' : 'Saved'}
+        <span aria-live="polite" data-status={autosave.status}>
+          <SaveControl
+            status={SAVE_CONTROL_STATUS[autosave.status]}
+            lastSavedAt={autosave.lastSavedAt}
+            onSave={autosave.saveNow}
+            disabled={autosave.status === 'invalid'}
+          />
         </span>
       </div>
       <Textarea
         id="language-preview-text"
         value={text}
-        onChange={(event) => change(event.target.value)}
+        onChange={(event) => setText(event.target.value)}
         aria-invalid={tooLong}
         rows={3}
       />
@@ -118,7 +117,7 @@ export function LanguageAudioPreview({
           {text.length} / {PREVIEW_TEXT_MAX_LENGTH} characters. Saved for the whole team as you type.
         </p>
         <div className="flex gap-2">
-          <Button type="button" variant="ghost" size="sm" disabled={text === builtIn} onClick={() => change(builtIn)}>
+          <Button type="button" variant="ghost" size="sm" disabled={text === builtIn} onClick={() => setText(builtIn)}>
             Use the built-in sample
           </Button>
           <Button type="button" size="sm" disabled={previewing || tooLong || !text.trim()} onClick={handlePreview}>
