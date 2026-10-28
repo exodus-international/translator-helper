@@ -72,6 +72,12 @@ export async function reopenThread(page: Page, text: string) {
  * the same rather than claiming a click it never delivered.
  */
 async function waitForToastsToClear(page: Page) {
+  // Sonner pauses a toast's timer while the pointer rests over it, and the
+  // pointer is still wherever the last click landed -- often the bottom of the
+  // panel, which is where the toast appears once the list collapses. Move it
+  // out of the corner so the toast can run its own timer down instead of
+  // holding the click hostage forever.
+  await page.mouse.move(0, 0);
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, {
     timeout: 15_000,
   });
