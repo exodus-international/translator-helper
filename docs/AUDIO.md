@@ -99,6 +99,13 @@ in `src/domain/audio/audio.ssml.ts`: rate 0.8, pitch -6%, chosen in a listening
 test on real Czech content. Rate is a factor from 0.5 to 2, pitch a percentage
 from -50% to +50%.
 
+Pause after sentence and pause after comma, in whole milliseconds from 0 to
+5000, become `<mstts:silence type="Sentenceboundary-exact">` and
+`<mstts:silence type="Comma-exact">` at the top of the voice element, with the
+`xmlns:mstts` namespace on `<speak>`. They replace the voice's own pause at
+every sentence end and comma. A blank field leaves the voice's own timing and
+adds no `mstts` markup at all.
+
 Settings apply from the next generation on. Existing recordings keep the sound
 they were made with, and hand-edited audio text is sent unchanged. PRD: issue
 #294.

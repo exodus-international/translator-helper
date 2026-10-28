@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AudioProvider } from '@/generated/prisma/enums';
-import { PITCH_RANGE, RATE_RANGE } from '@/domain/audio/audio.narration';
+import { PAUSE_RANGE_MS, PITCH_RANGE, RATE_RANGE } from '@/domain/audio/audio.narration';
 
 export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
 
@@ -9,6 +9,7 @@ const CODE_LENGTH = 'must be two to five characters, like hr or en-US';
 const BRANCH_REQUIRED = 'is required: without a branch, every deploy of this language fails';
 const RATE_MESSAGE = `must be a number from ${RATE_RANGE.min} to ${RATE_RANGE.max}, where 1 is the voice's own pace`;
 const PITCH_MESSAGE = `must be a percentage from ${PITCH_RANGE.min}% to +${PITCH_RANGE.max}%, like -10%`;
+const PAUSE_MESSAGE = `must be whole milliseconds from ${PAUSE_RANGE_MS.min} to ${PAUSE_RANGE_MS.max}`;
 
 /** Blank is "use the app default", stored as null. Absent means the same. */
 const blankToNull = (value: string | null | undefined) => value?.trim() || null;
@@ -46,6 +47,21 @@ const audioPitch = z
   }, PITCH_MESSAGE);
 
 /**
+ * Whole milliseconds. The form sends what was typed, so a string of digits is
+ * read as a number and a blank as no pause setting.
+ */
+const audioPauseMs = z
+  .union([z.number(), z.string()])
+  .nullish()
+  .transform((value) => (typeof value === 'string' ? value.trim() || null : (value ?? null)))
+  .refine((value) => value === null || (typeof value === 'number' ? true : /^\d+$/.test(value)), PAUSE_MESSAGE)
+  .transform((value) => (value === null ? null : Number(value)))
+  .refine(
+    (ms) => ms === null || (Number.isInteger(ms) && ms >= PAUSE_RANGE_MS.min && ms <= PAUSE_RANGE_MS.max),
+    PAUSE_MESSAGE,
+  );
+
+/**
  * A branch is required from the moment a language exists. Every language has at
  * least one project that deploys, so an absent branch is not a configuration
  * an admin might have meant -- it is a deploy that will throw, which is exactly
@@ -74,6 +90,8 @@ export const updateLanguageSettingsSchema = z
     audioVoice: z.string().trim().max(100, 'is longer than any provider voice id').nullable(),
     audioRate,
     audioPitch,
+    audioSentencePauseMs: audioPauseMs,
+    audioCommaPauseMs: audioPauseMs,
   })
   .transform((v) => ({ ...v, audioVoice: v.audioVoice || null }))
   .refine((v) => !v.audioProvider || !!v.audioVoice, { message: 'A voice is required when a provider is selected' });

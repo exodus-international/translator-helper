@@ -33,6 +33,24 @@ describe('updateLanguageSettingsSchema', () => {
     assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioPitch: '+5%' }).audioPitch, '+5%');
   });
 
+  it('reads pauses typed into the form as whole milliseconds', () => {
+    const parsed = updateLanguageSettingsSchema.parse({ ...SETTINGS, audioSentencePauseMs: '800', audioCommaPauseMs: 150 });
+    assert.equal(parsed.audioSentencePauseMs, 800);
+    assert.equal(parsed.audioCommaPauseMs, 150);
+  });
+
+  it('reads a blank or absent pause as the voice default, and keeps a zero', () => {
+    assert.equal(updateLanguageSettingsSchema.parse(SETTINGS).audioSentencePauseMs, null);
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioCommaPauseMs: ' ' }).audioCommaPauseMs, null);
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioCommaPauseMs: '0' }).audioCommaPauseMs, 0);
+  });
+
+  for (const pause of ['5001', '-1', '1.5', '800ms', 'long', 99999]) {
+    it(`refuses the pause ${pause}`, () => {
+      assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, audioSentencePauseMs: pause }));
+    });
+  }
+
   for (const audioRate of ['0.4', '2.5', 'slow', '-1', '85%']) {
     it(`refuses the rate ${audioRate}`, () => {
       assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, audioRate }));

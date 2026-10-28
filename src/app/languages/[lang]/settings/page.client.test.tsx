@@ -22,6 +22,8 @@ const brandNew = {
   audioVoice: null as string | null,
   audioRate: null as string | null,
   audioPitch: null as string | null,
+  audioSentencePauseMs: null as number | null,
+  audioCommaPauseMs: null as number | null,
   translationInstructions: null,
 };
 
@@ -81,13 +83,21 @@ test('narration fields show what the language stores', () => {
   assert.equal((screen.getByLabelText('Pitch') as HTMLInputElement).value, '-10%');
 });
 
+test('pause fields show what the language stores', () => {
+  renderSettings({ ...slovak, audioSentencePauseMs: 800, audioCommaPauseMs: 150 });
+
+  assert.equal((screen.getByLabelText('Pause after sentence (ms)') as HTMLInputElement).value, '800');
+  assert.equal((screen.getByLabelText('Pause after comma (ms)') as HTMLInputElement).value, '150');
+});
+
 test('reset to defaults empties the narration fields', () => {
-  renderSettings({ ...slovak, audioRate: '0.85', audioPitch: '-10%' });
+  renderSettings({ ...slovak, audioRate: '0.85', audioPitch: '-10%', audioSentencePauseMs: 800, audioCommaPauseMs: 150 });
 
   fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
 
-  assert.equal((screen.getByLabelText('Speaking rate') as HTMLInputElement).value, '');
-  assert.equal((screen.getByLabelText('Pitch') as HTMLInputElement).value, '');
+  for (const label of ['Speaking rate', 'Pitch', 'Pause after sentence (ms)', 'Pause after comma (ms)']) {
+    assert.equal((screen.getByLabelText(label) as HTMLInputElement).value, '', label);
+  }
 });
 
 test('a language with no speech provider has no narration to tune', () => {

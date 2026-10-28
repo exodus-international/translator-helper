@@ -12,6 +12,7 @@ import {
   transcriptBaseline,
   transcriptState,
 } from './audio.rules';
+import { DEFAULT_NARRATION } from './audio.narration';
 import { deriveAudioSsml, hasReadableText } from './audio.service';
 
 test('audio generated from the current version is not stale', () => {
@@ -182,7 +183,7 @@ test('a Markdown-only change leaves an edited transcript alone', () => {
 });
 
 test('the derived SSML carries the narration it is given', () => {
-  const ssml = deriveAudioSsml({ ...transcriptInput, narration: { rate: '0.85', pitch: '-10%' } });
+  const ssml = deriveAudioSsml({ ...transcriptInput, narration: { ...DEFAULT_NARRATION, rate: '0.85', pitch: '-10%' } });
   assert.match(ssml, /<prosody rate="0\.85" pitch="-10%">/);
 });
 
