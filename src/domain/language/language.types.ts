@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AudioProvider, AudioQuality } from '@/generated/prisma/enums';
 import { PAUSE_RANGE_MS, PITCH_RANGE, RATE_RANGE } from '@/domain/audio/audio.narration';
+import { PREVIEW_TEXT_MAX_LENGTH } from '@/domain/audio/audio.preview';
 
 export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
 
@@ -82,6 +83,13 @@ export const createLanguageSchema = z.object({
  * -- a strict object makes the action itself reject a change, which is where the
  * rule has to live for those URLs to be safe.
  */
+const audioQuality = z
+  .enum(AudioQuality)
+  .nullish()
+  .transform((quality) => quality ?? null);
+
+const PREVIEW_TEXT_TOO_LONG = `is longer than the ${PREVIEW_TEXT_MAX_LENGTH} characters a preview may read`;
+
 export const updateLanguageSettingsSchema = z
   .strictObject({
     name: z.string().trim().min(2, NAME_LENGTH),
@@ -92,13 +100,30 @@ export const updateLanguageSettingsSchema = z
     audioPitch,
     audioSentencePauseMs: audioPauseMs,
     audioCommaPauseMs: audioPauseMs,
-    audioQuality: z
-      .enum(AudioQuality)
-      .nullish()
-      .transform((quality) => quality ?? null),
+    audioQuality,
   })
   .transform((v) => ({ ...v, audioVoice: v.audioVoice || null }))
   .refine((v) => !v.audioProvider || !!v.audioVoice, { message: 'A voice is required when a provider is selected' });
+
+/** The sample text on its own, saved as the admin types. Blank is allowed: it means the built-in sample. */
+export const updateLanguagePreviewTextSchema = z.strictObject({
+  text: z.string().max(PREVIEW_TEXT_MAX_LENGTH, PREVIEW_TEXT_TOO_LONG),
+});
+
+/**
+ * A preview is read with what the form holds, saved or not, so it takes the
+ * same audio fields the settings do, plus the sample.
+ */
+export const previewLanguageAudioSchema = z.strictObject({
+  audioProvider: z.enum(AudioProvider),
+  audioVoice: z.string().trim().min(1, 'is required to preview').max(100, 'is longer than any provider voice id'),
+  audioRate,
+  audioPitch,
+  audioSentencePauseMs: audioPauseMs,
+  audioCommaPauseMs: audioPauseMs,
+  audioQuality,
+  text: z.string().trim().min(1, 'is empty, so there is nothing to read').max(PREVIEW_TEXT_MAX_LENGTH, PREVIEW_TEXT_TOO_LONG),
+});
 
 export const updateLanguageInstructionsSchema = z.object({
   translationInstructions: z

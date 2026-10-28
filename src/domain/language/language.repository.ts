@@ -59,6 +59,10 @@ export async function updateLanguageSettings(
   return prisma.language.update({ where: { id }, data });
 }
 
+export async function updateLanguagePreviewText(id: string, audioPreviewText: string | null) {
+  return prisma.language.update({ where: { id }, data: { audioPreviewText } });
+}
+
 export async function updateLanguageInstructions(id: string, translationInstructions: string | null) {
   return prisma.language.update({
     where: { id },

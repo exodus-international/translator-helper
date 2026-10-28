@@ -90,6 +90,8 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     createLanguageAction: ['can:manage-languages'],
     updateLanguageSettingsAction: ['can:manage-languages'],
     updateLanguageInstructionsAction: ['language:manager'],
+    updateLanguagePreviewTextAction: ['can:manage-languages'],
+    previewLanguageAudioAction: ['can:manage-languages'],
     deleteLanguageAction: ['can:manage-languages'],
   },
   'notification/notification.actions.ts': {

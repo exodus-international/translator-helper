@@ -93,6 +93,29 @@ export const azureSpeechProvider: SpeechProvider = {
     );
     return { kind: 'succeeded', result };
   },
+
+  /**
+   * The real-time endpoint: fine for a few sentences, and the reason batch
+   * is used for documents is that this one truncates at ten minutes. It
+   * takes the same endpoint and key as batch (checked in #298).
+   */
+  async preview({ ssml, quality }): Promise<SynthesisResult> {
+    const res = await fetch(`${getAzureSpeechConfig().endpoint}/tts/cognitiveservices/v1`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/ssml+xml',
+        'X-Microsoft-OutputFormat': OUTPUT_FORMATS[quality],
+        'User-Agent': 'translation-helper',
+      },
+      body: ssml,
+    });
+    if (!res.ok) {
+      throw new Error(`Azure preview failed (${res.status}): ${(await safeText(res)) || res.statusText}`);
+    }
+    const audio = new Uint8Array(await res.arrayBuffer());
+    return { audio, contentType: 'audio/mpeg', sizeBytes: audio.byteLength };
+  },
 };
 
 async function downloadResult(resultUrl: string, job: BatchJob): Promise<SynthesisResult> {

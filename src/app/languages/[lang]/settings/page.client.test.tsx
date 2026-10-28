@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createTestRouter } from '../../../../../tests/next-router';
 import LanguageSettingsClient from './page.client';
 
@@ -17,7 +17,7 @@ const brandNew = {
   code: 'hr',
   name: 'Croatian',
   isSource: false,
-  branchName: null,
+  branchName: null as string | null,
   audioProvider: null as 'AZURE_SPEECH' | null,
   audioVoice: null as string | null,
   audioRate: null as string | null,
@@ -25,6 +25,7 @@ const brandNew = {
   audioSentencePauseMs: null as number | null,
   audioCommaPauseMs: null as number | null,
   audioQuality: null as 'STANDARD' | 'HIGH' | null,
+  audioPreviewText: null as string | null,
   translationInstructions: null,
 };
 
@@ -105,4 +106,23 @@ test('a language with no speech provider has no narration to tune', () => {
   renderSettings();
 
   assert.equal(screen.queryByLabelText('Speaking rate'), null);
+});
+
+test('the page says its changes save themselves, and shows them saved', () => {
+  renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
+
+  const notice = screen.getByText('Changes save automatically').parentElement!;
+  assert.equal(within(notice).getByTitle('All changes saved').textContent, 'Saved');
+  assert.equal(screen.queryByRole('button', { name: 'Save changes' }), null);
+});
+
+test('a half-typed value waits with the reason instead of saving', () => {
+  renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
+
+  fireEvent.change(screen.getByLabelText('Speaking rate'), { target: { value: '5' } });
+
+  assert.match(screen.getByText(/^Not saved:/).textContent ?? '', /audioRate: must be a number from 0.5 to 2/);
+  const notice = screen.getByText(/^Not saved:/).parentElement!;
+  assert.ok(within(notice).getByText('Not saved'));
+  assert.equal(within(notice).queryByRole('button'), null);
 });

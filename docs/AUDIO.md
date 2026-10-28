@@ -111,6 +111,15 @@ at 192 kbps. 48 kHz keeps the highs some voices lose at 24 kHz and about
 doubles the file size. Quality goes to the provider as the output format and
 never appears in the SSML.
 
+Preview reads a short sample aloud with whatever the Audio card holds, saved
+or not, through Azure's real-time endpoint (`/tts/cognitiveservices/v1` on the
+same endpoint and key as batch). The sample goes through the same derivation as
+a document, so pause markers work in it. Nothing is stored. Each team language
+has a built-in sample in `src/domain/audio/audio.preview.ts`. Admins can replace
+it; the box saves itself 1.5 s after typing stops. A blank
+sample or one equal to the built-in one is stored as null, so a corrected
+built-in sample reaches every language that never changed it.
+
 Settings apply from the next generation on. Existing recordings keep the sound
 they were made with, and hand-edited audio text is sent unchanged. PRD: issue
 #294.

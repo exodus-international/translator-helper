@@ -38,6 +38,12 @@ export interface SpeechProvider {
   isConfigured(): boolean;
   submit(request: SynthesisRequest): Promise<SubmitOutcome>;
   poll(jobId: string): Promise<PollOutcome>;
+  /**
+   * Speaks a short SSML at once and returns the audio, for tuning a voice by
+   * ear. Nothing is stored. Optional: a provider without a fast path has no
+   * preview, and the settings page says so.
+   */
+  preview?(request: Omit<SynthesisRequest, 'jobId'>): Promise<SynthesisResult>;
 }
 
 export function getSpeechProvider(provider: AudioProvider): SpeechProvider {
