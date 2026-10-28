@@ -51,6 +51,12 @@ describe('updateLanguageSettingsSchema', () => {
     });
   }
 
+  it('reads an absent quality as the default and keeps a chosen one', () => {
+    assert.equal(updateLanguageSettingsSchema.parse(SETTINGS).audioQuality, null);
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioQuality: 'HIGH' }).audioQuality, 'HIGH');
+    assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, audioQuality: '96KHZ' }));
+  });
+
   for (const audioRate of ['0.4', '2.5', 'slow', '-1', '85%']) {
     it(`refuses the rate ${audioRate}`, () => {
       assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, audioRate }));

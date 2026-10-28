@@ -1,3 +1,4 @@
+import { AudioQuality } from '@/generated/prisma/enums';
 import { DEFAULT_PROSODY } from './audio.ssml';
 
 /**
@@ -15,6 +16,7 @@ export interface NarrationSettings {
   audioPitch?: string | null;
   audioSentencePauseMs?: number | null;
   audioCommaPauseMs?: number | null;
+  audioQuality?: AudioQuality | null;
 }
 
 export interface NarrationProfile {
@@ -42,6 +44,16 @@ export function narrationProfile(settings: NarrationSettings): NarrationProfile 
     sentencePauseMs: settings.audioSentencePauseMs ?? DEFAULT_NARRATION.sentencePauseMs,
     commaPauseMs: settings.audioCommaPauseMs ?? DEFAULT_NARRATION.commaPauseMs,
   };
+}
+
+/**
+ * Quality is not narration and never reaches the SSML, so it is resolved on
+ * its own: it goes to the provider beside the SSML, as the output format.
+ */
+export const DEFAULT_AUDIO_QUALITY: AudioQuality = AudioQuality.STANDARD;
+
+export function audioQuality(settings: NarrationSettings): AudioQuality {
+  return settings.audioQuality ?? DEFAULT_AUDIO_QUALITY;
 }
 
 // ─── Limits ──────────────────────────────────────────────────

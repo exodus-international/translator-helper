@@ -1,4 +1,4 @@
-import { AudioProvider } from '@/generated/prisma/enums';
+import { AudioProvider, type AudioQuality } from '@/generated/prisma/enums';
 
 /**
  * The one interface the rest of the app talks to. Vendor specifics
@@ -12,6 +12,8 @@ export interface SynthesisRequest {
   /** Caller-chosen id; providers that accept one use it so retries are idempotent. */
   jobId: string;
   ssml: string;
+  /** Output quality; the provider picks its own format for it. */
+  quality: AudioQuality;
 }
 
 export interface SynthesisResult {

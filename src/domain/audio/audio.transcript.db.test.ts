@@ -18,7 +18,7 @@ afterEach(async () => {
   const language = await seededLanguage('sk');
   await prisma.language.update({
     where: { id: language.id },
-    data: { audioProvider: null, audioVoice: null, audioRate: null, audioPitch: null, audioSentencePauseMs: null, audioCommaPauseMs: null },
+    data: { audioProvider: null, audioVoice: null, audioRate: null, audioPitch: null, audioSentencePauseMs: null, audioCommaPauseMs: null, audioQuality: null },
   });
   const version = await seededVersion('ex90-day-14', 'sk');
   await prisma.documentVersion.update({ where: { id: version.id }, data: { audioSsml: null, audioSsmlBase: null } });

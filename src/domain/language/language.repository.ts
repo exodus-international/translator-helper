@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import { AudioProvider, ProjectRole, SourceProjectStatus } from '@/generated/prisma/enums';
+import { AudioProvider, AudioQuality, ProjectRole, SourceProjectStatus } from '@/generated/prisma/enums';
 import type { LanguageDependents } from './language-delete';
 import {
   buildLanguageDocumentRows,
@@ -53,6 +53,7 @@ export async function updateLanguageSettings(
     audioPitch: string | null;
     audioSentencePauseMs: number | null;
     audioCommaPauseMs: number | null;
+    audioQuality: AudioQuality | null;
   },
 ) {
   return prisma.language.update({ where: { id }, data });

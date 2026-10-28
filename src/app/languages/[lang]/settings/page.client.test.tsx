@@ -24,6 +24,7 @@ const brandNew = {
   audioPitch: null as string | null,
   audioSentencePauseMs: null as number | null,
   audioCommaPauseMs: null as number | null,
+  audioQuality: null as 'STANDARD' | 'HIGH' | null,
   translationInstructions: null,
 };
 
