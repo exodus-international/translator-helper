@@ -23,12 +23,12 @@ import {
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
 import { SuggestionStatus } from '@/generated/prisma/enums';
-import { getStatusStep, isDraftPhase, isStepCompleted } from '@/lib/document-status';
+import { getStatusStep, isDraftPhase, isStepCompleted, isTranslationStarted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useTrailStore } from '@/lib/page-trail';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
-import { useAutoSave } from '@/lib/stores/hooks';
+import { useAutoSave, useDraftRestoreOffer } from '@/lib/stores/hooks';
 import { buildProjectPath } from '@/domain/source-project/source-project-url';
 
 function getContentWithoutFrontmatter(text: string) {
@@ -54,6 +54,8 @@ interface ViewerConfig {
   user: SessionUser;
   /** Resolved on the server against this version's language. */
   canDeploy: boolean;
+  /** On this language's team, or an administrator: may move the version's status. */
+  canChangeStatus: boolean;
   canEditSource: CapFn;
   canCreateSuggestions?: CapFn;
   disableReopen?: CapFn;
@@ -105,6 +107,7 @@ function EditorViewer({
   sourceVersion,
   user,
   canDeploy,
+  canChangeStatus,
   canEditSource,
   canCreateSuggestions,
   disableReopen,
@@ -143,6 +146,18 @@ function EditorViewer({
   const createSuggestion = useEditorStore((s) => s.createSuggestion);
   const createGeneralThread = useEditorStore((s) => s.createGeneralThread);
   const replySuggestion = useEditorStore((s) => s.replySuggestion);
+  const reloadSuggestions = useEditorStore((s) => s.reloadSuggestions);
+  // The edit action lives outside the store, so the list is reloaded here:
+  // after an edit, and after a refused one, when the list was out of date.
+  const editSuggestion = useMemo(
+    () =>
+      onEditSuggestion &&
+      (async (id: string, data: { comment: string; proposedText?: string }) => {
+        await onEditSuggestion(id, data);
+        await reloadSuggestions();
+      }),
+    [onEditSuggestion, reloadSuggestions],
+  );
   const isApplyingSuggestion = useEditorStore((s) => s.loading.has('applySuggestion'));
   const isDismissingSuggestion = useEditorStore((s) => s.loading.has('dismissSuggestion'));
   const translationProjectId = useEditorStore((s) => s.translationProjectId);
@@ -214,7 +229,7 @@ function EditorViewer({
       onTranslationChange={setContent}
       sourceBadge={<Badge variant="outline">{sourceVersion.language.name}</Badge>}
       translationBadge={<Badge variant="outline">{targetVersion?.language?.name || 'New Translation'}</Badge>}
-      translationStarted={!!targetVersion}
+      translationStarted={isTranslationStarted(targetVersion?.status)}
       targetLanguageMissing={targetLanguageMissing}
       onStartTranslation={startTranslation}
       startingTranslation={isStartingTranslation}
@@ -232,7 +247,7 @@ function EditorViewer({
       onApplySuggestion={applySuggestion}
       onDismissSuggestion={dismissSuggestion}
       onReopenSuggestion={reopenSuggestion}
-      onEditSuggestion={onEditSuggestion}
+      onEditSuggestion={editSuggestion}
       onCreateSuggestion={createSuggestion}
       documentVersion={targetVersion?.version ?? 1}
       isApplyingSuggestion={isApplyingSuggestion}
@@ -270,6 +285,7 @@ function EditorViewer({
                 versionId={targetVersion.id}
                 user={user}
                 canDeploy={canDeploy}
+                canChangeStatus={canChangeStatus}
                 documentId={documentId}
                 disabled={isAnyLoading}
                 onStatusChange={handleStatusChange}
@@ -349,9 +365,11 @@ function EditorDetails({ extraDetails, activityLogs }: { extraDetails?: ReactNod
   );
 }
 
-// Tiny helper: enable autosave from inside the provider context
+// Tiny helper: enable autosave from inside the provider context, and offer
+// back any unsaved text a previous visit left behind.
 function AutoSaveTrigger({ delayMs }: { delayMs: number }) {
   useAutoSave({ delayMs });
+  useDraftRestoreOffer();
   return null;
 }
 
@@ -402,6 +420,8 @@ interface DocumentEditorProps {
   user: SessionUser;
   /** Resolved on the server against this version's language. */
   canDeploy: boolean;
+  /** On this language's team, or an administrator: may move the version's status. */
+  canChangeStatus: boolean;
 
   // Header — page-supplied, and now only for chrome a view adds to itself:
   // zen mode's own bar. The default layout has none.
@@ -462,6 +482,7 @@ export function DocumentEditor({
   targetLanguageId,
   user,
   canDeploy,
+  canChangeStatus,
   header,
   fullscreen,
   outerClassName,
@@ -557,6 +578,7 @@ export function DocumentEditor({
               sourceVersion={sourceVersion}
               user={user}
               canDeploy={canDeploy}
+              canChangeStatus={canChangeStatus}
               canEditSource={canEditSource}
               canCreateSuggestions={canCreateSuggestions}
               disableReopen={disableReopen}

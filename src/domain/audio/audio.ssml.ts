@@ -19,7 +19,14 @@ export interface SsmlOptions {
   rate?: string;
   /** Pitch as a percentage (`-6%`). Omit for the voice default. */
   pitch?: string;
+  /** Silence after every sentence, in milliseconds. Omit for the voice default. */
+  sentencePauseMs?: number | null;
+  /** Silence after every comma, in milliseconds. Omit for the voice default. */
+  commaPauseMs?: number | null;
 }
+
+/** Microsoft's extension namespace, which `<mstts:silence>` lives in. */
+const MSTTS_NAMESPACE = 'https://www.w3.org/2001/mstts';
 
 /**
  * Chosen by ear on real Czech content (Antonín, 2026-08-25): the untuned voice
@@ -40,11 +47,27 @@ export function speechScriptToSsml(script: SpeechScript, options: SsmlOptions): 
   // Formatted, not compact: this is what the Audio text tab shows and what a
   // person edits, so the structure has to be visible at a glance. Whitespace
   // between elements is not spoken.
+  // The namespace is declared only when something uses it, so SSML without
+  // pauses stays byte for byte what it was before pauses existed.
+  const silences = renderSilences(options);
+  const namespace = silences ? ` xmlns:mstts="${MSTTS_NAMESPACE}"` : '';
+
   return formatSsml(
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${escapeXml(options.locale)}">` +
-      `<voice name="${escapeXml(options.voice)}">${wrapProsody(body, options)}</voice>` +
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis"${namespace} xml:lang="${escapeXml(options.locale)}">` +
+      `<voice name="${escapeXml(options.voice)}">${silences}${wrapProsody(body, options)}</voice>` +
       `</speak>`,
   );
+}
+
+/**
+ * Azure's `-exact` silence types replace the pause the voice would make at
+ * every sentence end or comma, for the whole of the voice element. That is
+ * what a <break> per sentence would do, without anyone writing one.
+ */
+function renderSilences({ sentencePauseMs, commaPauseMs }: SsmlOptions): string {
+  const silence = (type: string, ms: number | null | undefined) =>
+    ms == null ? '' : `<mstts:silence type="${type}" value="${Math.round(ms)}ms"/>`;
+  return silence('Sentenceboundary-exact', sentencePauseMs) + silence('Comma-exact', commaPauseMs);
 }
 
 function wrapProsody(body: string, { rate, pitch }: SsmlOptions): string {

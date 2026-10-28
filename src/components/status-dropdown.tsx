@@ -9,6 +9,7 @@ import { updateDocumentVersionStatusAction } from '@/domain/document-version/doc
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { useStatusTransitionPending, useStatusTransitionStore } from '@/lib/stores/status-transition';
 import { SessionUser } from '@/lib/session';
+import { isRefusal } from '@/lib/action-refusal';
 import { cn } from '@/lib/utils';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { Menu as DropdownMenuPrimitive } from '@base-ui/react/menu';
@@ -30,6 +31,13 @@ interface StatusDropdownProps {
    * alone, which is why it arrives as a prop.
    */
   canDeploy: boolean;
+  /**
+   * Whether this person is on the version's language team, or an
+   * administrator. Anyone on the team may move the version, not only its
+   * translator. Someone from another language may not, so the control is
+   * disabled for them.
+   */
+  canChangeStatus?: boolean;
   documentId?: string; // For navigation after status change
   onStatusChange?: (newStatus: DocumentStatus) => void;
   onReviewRequested?: () => void; // Called instead of direct transition when moving to PENDING_REVIEW
@@ -45,6 +53,7 @@ export function StatusDropdown({
   versionId,
   user,
   canDeploy,
+  canChangeStatus = true,
   documentId,
   onStatusChange,
   onReviewRequested,
@@ -156,15 +165,18 @@ export function StatusDropdown({
     if (!beginTransition(versionId)) return;
 
     try {
-      await withStatusChangeFeedback(
+      const result = await withStatusChangeFeedback(
         { from: displayedStatus, to: newStatus, via: 'dropdown', documentId: documentId ?? null, versionId },
         () => changeStatus(versionId, newStatus),
       );
+      // A refused move means this page was stale: show the status the server
+      // has, and reload the rest of the page below.
+      const shownStatus = isRefusal(result) ? result.refused.currentStatus : newStatus;
 
       // Update displayed status immediately for optimistic UI update
-      setDisplayedStatus(newStatus);
+      setDisplayedStatus(shownStatus);
       // Update parent state first so stepper and other components update immediately
-      onStatusChange?.(newStatus);
+      onStatusChange?.(shownStatus);
       setOpen(false);
 
       // The URL does not encode which editor is showing, so a status change never
@@ -193,7 +205,7 @@ export function StatusDropdown({
       // does, and carrying the status inside that name, gives screen readers
       // "Document status: Texts in Review" instead of a bare badge.
       aria-label={`Document status: ${currentStatusConfig.name}`}
-      disabled={disabled || loading || translatorCannotChangeDeployedDocumentStatus}
+      disabled={disabled || loading || !canChangeStatus || translatorCannotChangeDeployedDocumentStatus}
       className={cn(
         'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
         currentStatusConfig.color.badgeClass,

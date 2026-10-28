@@ -1,4 +1,4 @@
-import { AudioProvider } from '@/generated/prisma/enums';
+import { AudioProvider, AudioQuality } from '@/generated/prisma/enums';
 import { unzipSync } from 'fflate';
 import { getAzureSpeechConfig, isAzureSpeechConfigured } from '@/lib/azure-speech-config';
 import type { PollOutcome, SpeechProvider, SubmitOutcome, SynthesisRequest, SynthesisResult } from './speech-provider';
@@ -12,7 +12,15 @@ import type { PollOutcome, SpeechProvider, SubmitOutcome, SynthesisRequest, Synt
  */
 
 const API_VERSION = '2024-04-01';
-const OUTPUT_FORMAT = 'audio-24khz-96kbitrate-mono-mp3';
+/**
+ * Azure's MP3 formats for each quality. 48 kHz is for voices that sound
+ * dull at 24 kHz (Lukas, to the Slovak team's ears); it about doubles the
+ * file size.
+ */
+export const OUTPUT_FORMATS: Record<AudioQuality, string> = {
+  [AudioQuality.STANDARD]: 'audio-24khz-96kbitrate-mono-mp3',
+  [AudioQuality.HIGH]: 'audio-48khz-192kbitrate-mono-mp3',
+};
 const LOG_PREFIX = '[AzureSpeech]';
 
 interface BatchJob {
@@ -46,7 +54,7 @@ export const azureSpeechProvider: SpeechProvider = {
       body: JSON.stringify({
         inputKind: 'SSML',
         inputs: [{ content: request.ssml }],
-        properties: { outputFormat: OUTPUT_FORMAT, wordBoundaryEnabled: false, sentenceBoundaryEnabled: false },
+        properties: { outputFormat: OUTPUT_FORMATS[request.quality], wordBoundaryEnabled: false, sentenceBoundaryEnabled: false },
       }),
     });
 
@@ -84,6 +92,29 @@ export const azureSpeechProvider: SpeechProvider = {
       () => undefined,
     );
     return { kind: 'succeeded', result };
+  },
+
+  /**
+   * The real-time endpoint: fine for a few sentences, and the reason batch
+   * is used for documents is that this one truncates at ten minutes. It
+   * takes the same endpoint and key as batch (checked in #298).
+   */
+  async preview({ ssml, quality }): Promise<SynthesisResult> {
+    const res = await fetch(`${getAzureSpeechConfig().endpoint}/tts/cognitiveservices/v1`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders(),
+        'Content-Type': 'application/ssml+xml',
+        'X-Microsoft-OutputFormat': OUTPUT_FORMATS[quality],
+        'User-Agent': 'translation-helper',
+      },
+      body: ssml,
+    });
+    if (!res.ok) {
+      throw new Error(`Azure preview failed (${res.status}): ${(await safeText(res)) || res.statusText}`);
+    }
+    const audio = new Uint8Array(await res.arrayBuffer());
+    return { audio, contentType: 'audio/mpeg', sizeBytes: audio.byteLength };
   },
 };
 

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { createEditorStore, type EditorStoreConfig, type EditorStoreDeps } from './editor-store';
+import type { DraftStorage } from './editor-draft';
 
 /** A promise the test settles by hand, for holding a request in flight. */
 function deferred<T>() {
@@ -79,6 +80,17 @@ function fakeDeps(overrides: Partial<EditorStoreDeps> = {}) {
     ...overrides,
   } as unknown as EditorStoreDeps;
   return { deps, calls, toasts, events };
+}
+
+/** sessionStorage stand-in, open for the test to look inside. */
+function memoryDrafts(): DraftStorage & { items: Map<string, string> } {
+  const items = new Map<string, string>();
+  return {
+    items,
+    getItem: (key) => items.get(key) ?? null,
+    setItem: (key, value) => void items.set(key, value),
+    removeItem: (key) => void items.delete(key),
+  };
 }
 
 function calledFns(calls: Call[]) {
@@ -203,6 +215,32 @@ describe('saveContent', () => {
     assert.equal(store.getState().saveStatus(), 'unsaved');
   });
 
+  // An expired session makes the action redirect to the login page. The
+  // browser leaves the editor, so the unsaved text is gone with it.
+  it('keeps the edits and says so when the session has expired', async () => {
+    const drafts = memoryDrafts();
+    const { deps, toasts } = fakeDeps({
+      drafts,
+      updateDocumentVersion: (async () => {
+        throw Object.assign(new Error('NEXT_REDIRECT'), {
+          digest: 'NEXT_REDIRECT;push;/login?from=%2Fdocuments%2Fsml;307;',
+        });
+      }) as EditorStoreDeps['updateDocumentVersion'],
+    });
+    const store = createEditorStore(CONFIG, deps);
+    store.getState().setContent('typed after the session expired');
+    await assert.rejects(store.getState().saveContent('auto'), /NEXT_REDIRECT/);
+    assert.deepEqual(toasts, [
+      {
+        fn: 'error',
+        args: [
+          'You were signed out. Your unsaved changes are kept in this tab and will be offered back after you sign in.',
+        ],
+      },
+    ]);
+    assert.equal(JSON.parse(drafts.items.get('editor-draft:version-1')!).content, 'typed after the session expired');
+  });
+
   it('lets a write queued behind a failed one still go out', async () => {
     const { deps, calls } = fakeDeps();
     let writes = 0;
@@ -250,6 +288,29 @@ describe('startTranslation', () => {
     await store.getState().startTranslation();
     assert.deepEqual(calls, []);
     assert.equal(toasts[0]?.fn, 'warning');
+  });
+
+  it('claims a version still at Not Started and takes the status it comes back with', async () => {
+    // The button is offered on a version that already exists at
+    // PENDING_TRANSLATION, so this is the path that actually runs: the server
+    // claims that row and answers IN_PROGRESS, and the store has to adopt it
+    // or the pane would go on offering to start what has started.
+    const pending = { ...VERSION, status: DocumentStatus.PENDING_TRANSLATION, content: 'half a draft' };
+    const { deps } = fakeDeps({
+      assignDocumentVersion: (async () => ({
+        ...pending,
+        status: DocumentStatus.IN_PROGRESS,
+      })) as unknown as EditorStoreDeps['assignDocumentVersion'],
+    });
+    const store = createEditorStore({ ...CONFIG, targetVersion: pending }, deps);
+
+    await store.getState().startTranslation();
+
+    assert.equal(store.getState().targetVersion.status, DocumentStatus.IN_PROGRESS);
+    // The claim keeps whatever the version held; it must not come back blank.
+    assert.equal(store.getState().content, 'half a draft');
+    assert.equal(store.getState().savedContent, 'half a draft');
+    assert.equal(store.getState().isLoading('startTranslation'), false);
   });
 });
 
@@ -317,6 +378,29 @@ describe('applySuggestion', () => {
   });
 });
 
+describe('a suggestion the server says is no longer open', () => {
+  const refusal = { refused: { message: 'This suggestion is no longer open.' } };
+
+  it('apply shows the reason, keeps the text and reloads the threads', async () => {
+    const { deps, calls, toasts } = fakeDeps({ applySuggestion: (async () => refusal) as unknown as EditorStoreDeps['applySuggestion'] });
+    const store = createEditorStore(CONFIG, deps);
+    const before = store.getState().content;
+    await store.getState().applySuggestion('suggestion-1');
+    assert.deepEqual(toasts, [{ fn: 'error', args: ['This suggestion is no longer open.'] }]);
+    assert.equal(store.getState().content, before);
+    assert.equal(store.getState().isLoading('applySuggestion'), false);
+    assert.ok(calledFns(calls).includes('getSuggestionsByDocumentVersion'));
+  });
+
+  it('dismiss shows the reason and reloads the threads', async () => {
+    const { deps, calls, toasts } = fakeDeps({ dismissSuggestion: (async () => refusal) as unknown as EditorStoreDeps['dismissSuggestion'] });
+    const store = createEditorStore(CONFIG, deps);
+    await store.getState().dismissSuggestion('suggestion-1');
+    assert.deepEqual(toasts, [{ fn: 'error', args: ['This suggestion is no longer open.'] }]);
+    assert.ok(calledFns(calls).includes('getSuggestionsByDocumentVersion'));
+  });
+});
+
 describe('submitForReview', () => {
   it('moves the version to review and closes the dialog', async () => {
     const { deps, calls } = fakeDeps();
@@ -327,6 +411,21 @@ describe('submitForReview', () => {
     assert.deepEqual(calls.at(-1), { fn: 'submitForReview', args: [{ versionId: 'version-1', reviewerId: 'reviewer-1' }] });
     assert.equal(store.getState().targetVersion.status, DocumentStatus.PENDING_REVIEW);
     assert.equal(store.getState().dialog.type, 'closed');
+  });
+
+  it('shows the refusal when someone outside the language submits, and leaves the version and dialog as they were', async () => {
+    const { deps, toasts } = fakeDeps({
+      submitForReview: async () => {
+        throw new Error("Forbidden: requires 'member' permission in project");
+      },
+    });
+    const store = createEditorStore(CONFIG, deps);
+    await store.getState().openReviewDialog();
+    await store.getState().submitForReview();
+    assert.deepEqual(toasts, [{ fn: 'error', args: ["Forbidden: requires 'member' permission in project"] }]);
+    assert.equal(store.getState().targetVersion.status, DocumentStatus.IN_PROGRESS);
+    assert.equal(store.getState().dialog.type, 'submitReview');
+    assert.equal(store.getState().isLoading('submitForReview'), false);
   });
 });
 
@@ -366,5 +465,65 @@ describe('loadAudioTranscriptState', () => {
     await store.getState().loadAudioTranscriptState('version-1');
     assert.equal(store.getState().audioTranscriptState, 'generated');
     assert.deepEqual(toasts, []);
+  });
+});
+
+describe('unsaved drafts', () => {
+  const KEY = 'editor-draft:version-1';
+
+  it('keeps unsaved text and drops it once saved', async () => {
+    const drafts = memoryDrafts();
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().setContent('second draft');
+    assert.equal(JSON.parse(drafts.items.get(KEY)!).content, 'second draft');
+    await store.getState().saveContent();
+    assert.equal(drafts.items.has(KEY), false);
+  });
+
+  it('drops the copy when the text is typed back to what was saved', () => {
+    const drafts = memoryDrafts();
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().setContent('second draft');
+    store.getState().setContent(VERSION.content);
+    assert.equal(drafts.items.has(KEY), false);
+  });
+
+  it('offers a leftover draft without putting it in the editor', () => {
+    const drafts = memoryDrafts();
+    createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().setContent('lost in the redirect');
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    assert.deepEqual(store.getState().draftOffer, { content: 'lost in the redirect', baseChanged: false });
+    assert.equal(store.getState().content, VERSION.content);
+    assert.equal(store.getState().saveStatus(), 'saved');
+  });
+
+  it('restores the draft as unsaved changes and keeps tracking it', () => {
+    const drafts = memoryDrafts();
+    createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().setContent('lost in the redirect');
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().restoreDraft();
+    assert.equal(store.getState().draftOffer, null);
+    assert.equal(store.getState().content, 'lost in the redirect');
+    assert.equal(store.getState().saveStatus(), 'unsaved');
+    assert.equal(JSON.parse(drafts.items.get(KEY)!).content, 'lost in the redirect');
+  });
+
+  it('discards the draft for good', () => {
+    const drafts = memoryDrafts();
+    createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().setContent('lost in the redirect');
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().discardDraft();
+    assert.equal(store.getState().draftOffer, null);
+    assert.equal(drafts.items.has(KEY), false);
+    assert.equal(createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().draftOffer, null);
+  });
+
+  it('leaves a waiting draft alone until the reader answers', () => {
+    const drafts = memoryDrafts();
+    createEditorStore(CONFIG, fakeDeps({ drafts }).deps).getState().setContent('lost in the redirect');
+    const store = createEditorStore(CONFIG, fakeDeps({ drafts }).deps);
+    store.getState().setContent(VERSION.content + ' and more');
+    store.getState().setContent(VERSION.content);
+    assert.equal(JSON.parse(drafts.items.get(KEY)!).content, 'lost in the redirect');
   });
 });

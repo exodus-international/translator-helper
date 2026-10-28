@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createTestRouter } from '../../../../../tests/next-router';
 import LanguageSettingsClient from './page.client';
 
@@ -17,9 +17,15 @@ const brandNew = {
   code: 'hr',
   name: 'Croatian',
   isSource: false,
-  branchName: null,
-  audioProvider: null,
-  audioVoice: null,
+  branchName: null as string | null,
+  audioProvider: null as 'AZURE_SPEECH' | null,
+  audioVoice: null as string | null,
+  audioRate: null as string | null,
+  audioPitch: null as string | null,
+  audioSentencePauseMs: null as number | null,
+  audioCommaPauseMs: null as number | null,
+  audioQuality: null as 'STANDARD' | 'HIGH' | null,
+  audioPreviewText: null as string | null,
   translationInstructions: null,
 };
 
@@ -50,4 +56,73 @@ test('the source language reports no gaps, because nothing translates into it', 
 
   assert.ok(screen.getByText('None of the four checks apply to the source language.'));
   assert.equal(screen.queryByText('No members'), null);
+});
+
+const slovak = {
+  ...brandNew,
+  id: 'lang-sk',
+  code: 'sk',
+  name: 'Slovak',
+  audioProvider: 'AZURE_SPEECH' as const,
+  audioVoice: 'sk-SK-LukasNeural',
+};
+
+test('narration fields show the app default when nothing is stored', () => {
+  renderSettings(slovak);
+
+  const rate = screen.getByLabelText('Speaking rate') as HTMLInputElement;
+  const pitch = screen.getByLabelText('Pitch') as HTMLInputElement;
+  assert.equal(rate.value, '');
+  assert.equal(rate.placeholder, '0.8');
+  assert.equal(pitch.value, '');
+  assert.equal(pitch.placeholder, '-6%');
+});
+
+test('narration fields show what the language stores', () => {
+  renderSettings({ ...slovak, audioRate: '0.85', audioPitch: '-10%' });
+
+  assert.equal((screen.getByLabelText('Speaking rate') as HTMLInputElement).value, '0.85');
+  assert.equal((screen.getByLabelText('Pitch') as HTMLInputElement).value, '-10%');
+});
+
+test('pause fields show what the language stores', () => {
+  renderSettings({ ...slovak, audioSentencePauseMs: 800, audioCommaPauseMs: 150 });
+
+  assert.equal((screen.getByLabelText('Pause after sentence (ms)') as HTMLInputElement).value, '800');
+  assert.equal((screen.getByLabelText('Pause after comma (ms)') as HTMLInputElement).value, '150');
+});
+
+test('reset to defaults empties the narration fields', () => {
+  renderSettings({ ...slovak, audioRate: '0.85', audioPitch: '-10%', audioSentencePauseMs: 800, audioCommaPauseMs: 150 });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
+
+  for (const label of ['Speaking rate', 'Pitch', 'Pause after sentence (ms)', 'Pause after comma (ms)']) {
+    assert.equal((screen.getByLabelText(label) as HTMLInputElement).value, '', label);
+  }
+});
+
+test('a language with no speech provider has no narration to tune', () => {
+  renderSettings();
+
+  assert.equal(screen.queryByLabelText('Speaking rate'), null);
+});
+
+test('the page says its changes save themselves, and shows them saved', () => {
+  renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
+
+  const notice = screen.getByText('Changes save automatically').parentElement!;
+  assert.equal(within(notice).getByTitle('All changes saved').textContent, 'Saved');
+  assert.equal(screen.queryByRole('button', { name: 'Save changes' }), null);
+});
+
+test('a half-typed value waits with the reason instead of saving', () => {
+  renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
+
+  fireEvent.change(screen.getByLabelText('Speaking rate'), { target: { value: '5' } });
+
+  assert.match(screen.getByText(/^Not saved:/).textContent ?? '', /audioRate: must be a number from 0.5 to 2/);
+  const notice = screen.getByText(/^Not saved:/).parentElement!;
+  assert.ok(within(notice).getByText('Not saved'));
+  assert.equal(within(notice).queryByRole('button'), null);
 });

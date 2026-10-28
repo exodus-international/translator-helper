@@ -1,4 +1,4 @@
-import { AudioProvider } from '@/generated/prisma/enums';
+import { AudioProvider, type AudioQuality } from '@/generated/prisma/enums';
 
 /**
  * The one interface the rest of the app talks to. Vendor specifics
@@ -12,6 +12,8 @@ export interface SynthesisRequest {
   /** Caller-chosen id; providers that accept one use it so retries are idempotent. */
   jobId: string;
   ssml: string;
+  /** Output quality; the provider picks its own format for it. */
+  quality: AudioQuality;
 }
 
 export interface SynthesisResult {
@@ -36,6 +38,12 @@ export interface SpeechProvider {
   isConfigured(): boolean;
   submit(request: SynthesisRequest): Promise<SubmitOutcome>;
   poll(jobId: string): Promise<PollOutcome>;
+  /**
+   * Speaks a short SSML at once and returns the audio, for tuning a voice by
+   * ear. Nothing is stored. Optional: a provider without a fast path has no
+   * preview, and the settings page says so.
+   */
+  preview?(request: Omit<SynthesisRequest, 'jobId'>): Promise<SynthesisResult>;
 }
 
 export function getSpeechProvider(provider: AudioProvider): SpeechProvider {

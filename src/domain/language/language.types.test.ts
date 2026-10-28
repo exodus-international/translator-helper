@@ -1,7 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatIssues } from '@/lib/validation';
-import { createLanguageSchema, updateLanguageSettingsSchema } from './language.types';
+import {
+  createLanguageSchema,
+  previewLanguageAudioSchema,
+  updateLanguagePreviewTextSchema,
+  updateLanguageSettingsSchema,
+} from './language.types';
 
 const SETTINGS = {
   name: 'Croatian',
@@ -11,6 +16,64 @@ const SETTINGS = {
 };
 
 describe('updateLanguageSettingsSchema', () => {
+  it('reads absent or blank narration as the app default', () => {
+    const parsed = updateLanguageSettingsSchema.parse(SETTINGS);
+    assert.equal(parsed.audioRate, null);
+    assert.equal(parsed.audioPitch, null);
+
+    const blank = updateLanguageSettingsSchema.parse({ ...SETTINGS, audioRate: ' ', audioPitch: '' });
+    assert.equal(blank.audioRate, null);
+    assert.equal(blank.audioPitch, null);
+  });
+
+  it('accepts the rate and pitch the Slovak team tuned', () => {
+    const parsed = updateLanguageSettingsSchema.parse({ ...SETTINGS, audioRate: '0.85', audioPitch: '-10%' });
+    assert.equal(parsed.audioRate, '0.85');
+    assert.equal(parsed.audioPitch, '-10%');
+  });
+
+  it('writes a pitch typed without its sign or percent sign in full', () => {
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioPitch: '-10' }).audioPitch, '-10%');
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioPitch: '5' }).audioPitch, '+5%');
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioPitch: '+5%' }).audioPitch, '+5%');
+  });
+
+  it('reads pauses typed into the form as whole milliseconds', () => {
+    const parsed = updateLanguageSettingsSchema.parse({ ...SETTINGS, audioSentencePauseMs: '800', audioCommaPauseMs: 150 });
+    assert.equal(parsed.audioSentencePauseMs, 800);
+    assert.equal(parsed.audioCommaPauseMs, 150);
+  });
+
+  it('reads a blank or absent pause as the voice default, and keeps a zero', () => {
+    assert.equal(updateLanguageSettingsSchema.parse(SETTINGS).audioSentencePauseMs, null);
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioCommaPauseMs: ' ' }).audioCommaPauseMs, null);
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioCommaPauseMs: '0' }).audioCommaPauseMs, 0);
+  });
+
+  for (const pause of ['5001', '-1', '1.5', '800ms', 'long', 99999]) {
+    it(`refuses the pause ${pause}`, () => {
+      assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, audioSentencePauseMs: pause }));
+    });
+  }
+
+  it('reads an absent quality as the default and keeps a chosen one', () => {
+    assert.equal(updateLanguageSettingsSchema.parse(SETTINGS).audioQuality, null);
+    assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioQuality: 'HIGH' }).audioQuality, 'HIGH');
+    assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, audioQuality: '96KHZ' }));
+  });
+
+  for (const audioRate of ['0.4', '2.5', 'slow', '-1', '85%']) {
+    it(`refuses the rate ${audioRate}`, () => {
+      assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, audioRate }));
+    });
+  }
+
+  for (const audioPitch of ['-60%', '+51%', 'low', '10Hz']) {
+    it(`refuses the pitch ${audioPitch}`, () => {
+      assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, audioPitch }));
+    });
+  }
+
   it('rejects an attempt to change the code, because the code is the URL', () => {
     // /languages/hr and /documents/exodus90/day-1/hr both key off it. The old
     // form only happened to disable the input; the rule belongs here.
@@ -91,5 +154,41 @@ describe('the messages these rules reject with', () => {
       result.success === false && formatIssues(result.error),
       'code: must be two to five characters, like hr or en-US',
     );
+  });
+});
+
+describe('updateLanguagePreviewTextSchema', () => {
+  it('accepts a blank sample, which means the built-in one', () => {
+    assert.equal(updateLanguagePreviewTextSchema.parse({ text: '' }).text, '');
+  });
+
+  it('refuses a sample over 500 characters', () => {
+    assert.throws(() => updateLanguagePreviewTextSchema.parse({ text: 'a'.repeat(501) }));
+    assert.equal(updateLanguagePreviewTextSchema.parse({ text: 'a'.repeat(500) }).text.length, 500);
+  });
+});
+
+describe('previewLanguageAudioSchema', () => {
+  const PREVIEW = { audioProvider: 'AZURE_SPEECH', audioVoice: 'sk-SK-LukasNeural', text: 'Dnes sa zastav.' };
+
+  it('takes the unsaved form values the way the settings do', () => {
+    const parsed = previewLanguageAudioSchema.parse({
+      ...PREVIEW,
+      audioRate: '0.85',
+      audioPitch: '-10',
+      audioSentencePauseMs: '800',
+      audioCommaPauseMs: '',
+      audioQuality: 'HIGH',
+    });
+    assert.equal(parsed.audioPitch, '-10%');
+    assert.equal(parsed.audioSentencePauseMs, 800);
+    assert.equal(parsed.audioCommaPauseMs, null);
+    assert.equal(parsed.audioQuality, 'HIGH');
+  });
+
+  it('needs a voice and something to read, and no more than 500 characters of it', () => {
+    assert.throws(() => previewLanguageAudioSchema.parse({ ...PREVIEW, audioVoice: ' ' }));
+    assert.throws(() => previewLanguageAudioSchema.parse({ ...PREVIEW, text: '  ' }));
+    assert.throws(() => previewLanguageAudioSchema.parse({ ...PREVIEW, text: 'a'.repeat(501) }));
   });
 });

@@ -4,6 +4,7 @@ import { ActivityLog } from '@/components/activity-log';
 import { AudioStatus } from '@/components/audio-status';
 import { DocumentEditor } from '@/components/document-editor';
 import { MarkdownGuide } from '@/components/markdown-guide';
+import { SaveControl } from '@/components/save-control';
 import { GitHubStatus } from '@/components/github-status';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,14 +21,13 @@ import {
 import { SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { deleteDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { capture } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
-import type { LucideIcon } from 'lucide-react';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
+import { isTranslationStarted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { useEditorStore } from '@/lib/stores/editor-provider';
-import { CloudCheck, CloudOff, Loader2, Maximize2, Minimize2, Save, Sparkles, Trash2 } from 'lucide-react';
+import { Loader2, Maximize2, Minimize2, Sparkles, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -42,6 +42,8 @@ interface TranslateClientProps {
   user: SessionUser;
   /** Resolved on the server against this version's language. */
   canDeploy: boolean;
+  /** On this language's team, or an administrator. */
+  canChangeStatus: boolean;
   initialSuggestions?: any[];
 }
 
@@ -54,6 +56,7 @@ export default function TranslateClient({
   translationProject,
   user,
   canDeploy,
+  canChangeStatus,
   initialSuggestions = [],
 }: TranslateClientProps) {
   const [zenMode, setZenMode] = useState(false);
@@ -92,6 +95,7 @@ export default function TranslateClient({
       targetLanguageId={targetLanguageId}
       user={user}
       canDeploy={canDeploy}
+      canChangeStatus={canChangeStatus}
       variant="translate"
       layout={zenMode ? 'zen' : 'default'}
       fullscreen={zenMode}
@@ -155,69 +159,6 @@ export default function TranslateClient({
 // Toolbar (covers both regular and zen variants)
 // ──────────────────────────────────────────────────────────────────────
 
-const SAVE_STATUS_META: Record<'unsaved' | 'saving' | 'error', { icon: LucideIcon; label: string; spin?: boolean }> = {
-  saving: { icon: Loader2, label: 'Saving...', spin: true },
-  unsaved: { icon: Save, label: 'Save' },
-  error: { icon: CloudOff, label: 'Save failed' },
-};
-
-/**
- * The save button and the saved state, in one slot.
- *
- * They used to be two controls — a "Saved" badge that never said when, next to
- * a button that was often a no-op. Autosave flips this pair several times a
- * minute while someone types, so the slot holds its width and the change is
- * instant colour and text, no motion: a toolbar that twitches on every autosave
- * is worse than one that says less.
- */
-function SaveControl({
-  status,
-  lastSavedAt,
-  onSave,
-  disabled,
-}: {
-  status: 'saved' | 'unsaved' | 'saving' | 'error';
-  lastSavedAt: Date | null;
-  onSave: () => void;
-  disabled?: boolean;
-}) {
-  // The two states swap on every autosave, so they must measure the same: the
-  // button and the chip below carry the same label length and padding for that
-  // reason, not by accident.
-  const slot = 'h-8 min-w-20 px-3';
-
-  if (status === 'saved') {
-    const time = lastSavedAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    return (
-      <span
-        className={cn(slot, 'inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground')}
-        title={time ? `All changes saved at ${time}` : 'All changes saved'}
-      >
-        <CloudCheck className="size-3.5 text-success" />
-        <span className="tabular-nums">Saved</span>
-      </span>
-    );
-  }
-
-  const meta = SAVE_STATUS_META[status];
-  const Icon = meta.icon;
-  const isError = status === 'error';
-
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={onSave}
-      disabled={disabled || status === 'saving'}
-      className={cn(slot, 'gap-1.5', isError && 'border-destructive/40 text-destructive')}
-      title={isError ? 'The last save failed — save again' : 'Save now'}
-    >
-      <Icon className={cn(meta.spin && 'animate-spin')} />
-      {meta.label}
-    </Button>
-  );
-}
-
 /**
  * Zen mode hides the shell, so while it is on this bar is the only chrome the
  * page has: it names the document and offers the way back out. In the default
@@ -279,7 +220,7 @@ function TranslateSaveState() {
     }
   };
 
-  if (!targetVersion || targetVersion.status === DocumentStatus.PENDING_TRANSLATION) return null;
+  if (!isTranslationStarted(targetVersion?.status)) return null;
 
   return (
     <SaveControl status={saveStatus} lastSavedAt={lastSavedAt} onSave={handleSave} disabled={loading || isAnyLoading} />
@@ -310,7 +251,7 @@ function TranslatePanelActions({ zenMode, setZenMode }: { zenMode: boolean; setZ
     }
   };
 
-  if (!targetVersion || targetVersion.status === DocumentStatus.PENDING_TRANSLATION) return null;
+  if (!isTranslationStarted(targetVersion?.status)) return null;
 
   return (
     <>

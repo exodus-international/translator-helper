@@ -1,7 +1,8 @@
 import { DocumentStatus } from '@/generated/prisma/enums';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
 import { DeploySkippedError } from '../github/github.errors';
-import { validateTransition } from './document-version.transitions';
+import { refuse, type Refusal } from '@/lib/action-refusal';
+import { StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
 
 /**
  * What one status change does, apart from who may ask for it.
@@ -33,6 +34,22 @@ export interface StatusChangeResult<Version> {
   version: Version;
   github?: GitHubOutcome;
   audio?: AudioGenerationOutcome;
+}
+
+/** A move the server refused, with the status the version really has now. */
+export type StatusChangeRefusal = Refusal<{ currentStatus: DocumentStatus }>;
+
+/**
+ * Turns a refused transition into what the action returns to the client.
+ * Anything else is not a refusal, and the caller rethrows it.
+ */
+export function toStatusChangeRefusal(error: unknown, currentStatus: DocumentStatus): StatusChangeRefusal | null {
+  if (!(error instanceof StatusTransitionRefusedError)) return null;
+  const message =
+    error.reason === 'not_allowed'
+      ? "This document's status changed while you had it open. The page now shows its current status."
+      : error.message;
+  return refuse(message, { currentStatus });
 }
 
 export interface StatusChangeDeps<Version> {

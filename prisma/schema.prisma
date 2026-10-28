@@ -85,6 +85,12 @@ enum AudioProvider {
   AZURE_SPEECH
 }
 
+/// Output quality of generated audio. Each provider maps it to its own format.
+enum AudioQuality {
+  STANDARD // 24 kHz, 96 kbps MP3
+  HIGH // 48 kHz, 192 kbps MP3
+}
+
 enum AudioStatus {
   PENDING
   PROCESSING
@@ -220,6 +226,18 @@ model Language {
   isSource                Boolean              @default(false)
   audioProvider           AudioProvider?
   audioVoice              String? // provider voice id, e.g. "cs-CZ-AntoninNeural"
+  /// Narration speaking rate as a factor, e.g. "0.85". Null uses the app default.
+  audioRate               String?
+  /// Narration pitch as a percentage, e.g. "-10%". Null uses the app default.
+  audioPitch              String?
+  /// Silence after every sentence in ms, sent as mstts:silence. Null uses the voice's own timing.
+  audioSentencePauseMs    Int?
+  /// Silence after every comma in ms, sent as mstts:silence. Null uses the voice's own timing.
+  audioCommaPauseMs       Int?
+  /// Null means STANDARD.
+  audioQuality            AudioQuality?
+  /// Sample the settings page reads aloud when tuning the voice. Null uses the built-in sample for the language.
+  audioPreviewText        String?              @db.Text
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   documentVersions        DocumentVersion[]

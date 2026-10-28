@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { ProjectRole } from '@/generated/prisma/enums';
 import {
   canAdministerLanguages,
+  canChangeLanguageStatus,
   canDeployLanguage,
   canViewLanguage,
   resolveLanguageViewer,
@@ -112,5 +113,24 @@ describe('canDeployLanguage', () => {
   it('lets an admin publish any language, and everyone else none', () => {
     assert.equal(canDeployLanguage({ kind: 'admin' }, CS.id), true);
     assert.equal(canDeployLanguage({ kind: 'none' }, CS.id), false);
+  });
+});
+
+describe('canChangeLanguageStatus', () => {
+  const member = (role: ProjectRole, languageId = HR.id) => ({ isAdmin: false, memberships: [{ languageId, role }] });
+
+  it('lets anyone on the language team move a version, whatever their role', () => {
+    for (const role of [ProjectRole.TRANSLATOR, ProjectRole.REVIEWER, ProjectRole.EDITOR, ProjectRole.PROJECT_MANAGER]) {
+      assert.equal(canChangeLanguageStatus(member(role), HR.id), true, role);
+    }
+  });
+
+  it('refuses someone who is only on another language', () => {
+    assert.equal(canChangeLanguageStatus(member(ProjectRole.PROJECT_MANAGER, CS.id), HR.id), false);
+    assert.equal(canChangeLanguageStatus({ isAdmin: false, memberships: [] }, HR.id), false);
+  });
+
+  it('lets an administrator move any language', () => {
+    assert.equal(canChangeLanguageStatus({ isAdmin: true, memberships: [] }, DE.id), true);
   });
 });

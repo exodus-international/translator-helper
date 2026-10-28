@@ -1,3 +1,22 @@
+# [1.5.0](https://github.com/exodus-international/translator-helper/compare/v1.4.2...v1.5.0) (2026-10-28)
+
+
+### Bug Fixes
+
+* **auth:** re-issue the session cookie when the session is renewed ([#277](https://github.com/exodus-international/translator-helper/issues/277)) ([35f15c6](https://github.com/exodus-international/translator-helper/commit/35f15c6b60460f0c6c67ec74c7ec8f6c6d8b549d))
+* **auth:** send expired-session server actions to login and keep unsaved text ([#276](https://github.com/exodus-international/translator-helper/issues/276)) ([06cc0f4](https://github.com/exodus-international/translator-helper/commit/06cc0f40cf58457d59b94c5a175702b0a64de504))
+* **editor:** offer "Start translation" on a document that is Not Started ([#272](https://github.com/exodus-international/translator-helper/issues/272)) ([0266d36](https://github.com/exodus-international/translator-helper/commit/0266d36a6e7bf15e6c72887841388700ce4e9df4))
+* **release:** read the bumped version from package.json ([#308](https://github.com/exodus-international/translator-helper/issues/308)) ([768e078](https://github.com/exodus-international/translator-helper/commit/768e078e1edce51fc988d37186bdf91ce19d9c68))
+* return stale-state conflicts from suggestion and status actions ([#274](https://github.com/exodus-international/translator-helper/issues/274)) ([4a493a9](https://github.com/exodus-international/translator-helper/commit/4a493a9a83c8fdde571b2d7a7bd2907c9f52ee42))
+* **status:** let anyone on the language team move a version ([#275](https://github.com/exodus-international/translator-helper/issues/275)) ([df425dc](https://github.com/exodus-international/translator-helper/commit/df425dc132d6d69e161eb61ae2a18deb2424595f))
+
+
+### Features
+
+* **audio:** per-language 48 kHz output quality ([#305](https://github.com/exodus-international/translator-helper/issues/305)) ([1be408d](https://github.com/exodus-international/translator-helper/commit/1be408d94fd0b1a510d1330dcbab2cbaa5f8e29b)), closes [#297](https://github.com/exodus-international/translator-helper/issues/297)
+* **audio:** per-language sentence and comma pauses ([#303](https://github.com/exodus-international/translator-helper/issues/303)) ([1449a4f](https://github.com/exodus-international/translator-helper/commit/1449a4f2a148bf16cc6d9f99cfee74b8e3c41b14)), closes [#296](https://github.com/exodus-international/translator-helper/issues/296)
+* **audio:** per-language speaking rate and pitch ([#301](https://github.com/exodus-international/translator-helper/issues/301)) ([dd9f3aa](https://github.com/exodus-international/translator-helper/commit/dd9f3aa15a92374d48e81d7ad4cafb6945342834)), closes [#295](https://github.com/exodus-international/translator-helper/issues/295) [#295](https://github.com/exodus-international/translator-helper/issues/295)
+* **audio:** preview narration settings in the Audio card ([#306](https://github.com/exodus-international/translator-helper/issues/306)) ([a130229](https://github.com/exodus-international/translator-helper/commit/a13022919ed467614c0b53fa4ef5891d1cc89ff8)), closes [#298](https://github.com/exodus-international/translator-helper/issues/298) [#299](https://github.com/exodus-international/translator-helper/issues/299)
 ## [1.4.2](https://github.com/exodus-international/translator-helper/compare/v1.4.1...v1.4.2) (2026-10-02)
 
 

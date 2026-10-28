@@ -2,7 +2,7 @@ import prisma from '@/lib/db';
 import { isAudioStorageConfigured } from '@/lib/audio-storage-config';
 import { putObject } from '@/lib/object-storage';
 import type { AudioFile } from '@/generated/prisma/client';
-import { AudioProvider, AudioStatus, DocumentType } from '@/generated/prisma/enums';
+import { AudioProvider, AudioStatus, DocumentType, type AudioQuality } from '@/generated/prisma/enums';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { resolveAudioObjectKey } from './audio.paths';
 import {
@@ -28,7 +28,8 @@ import {
   type AudioTranscriptState,
 } from './audio.rules';
 import { markdownToSpeechScript } from './audio.script';
-import { DEFAULT_PROSODY, speechScriptToSsml, voiceFromSsml } from './audio.ssml';
+import { audioQuality, DEFAULT_NARRATION, narrationProfile, type NarrationProfile, type NarrationSettings } from './audio.narration';
+import { speechScriptToSsml, voiceFromSsml } from './audio.ssml';
 import { AUDIO_CONTENT_TYPE, type AudioGenerationOutcome, type AudioReadiness } from './audio.types';
 import { getSpeechProvider } from './providers/speech-provider';
 import type { SynthesisResult } from './providers/speech-provider';
@@ -42,6 +43,12 @@ export interface DerivationInput {
   voice: string;
   /** Longest single break the provider honours. */
   maxBreakMs: number;
+  /**
+   * The language's rate and pitch. Omitted, the app default, which is also
+   * what every transcript fingerprint is taken with: an admin retuning a
+   * language must not put every hand-edited transcript in it out of date.
+   */
+  narration?: NarrationProfile;
 }
 
 /**
@@ -49,12 +56,12 @@ export interface DerivationInput {
  * rather than with the rules because it needs the Markdown parser, and the
  * audio card imports the rules into the browser.
  */
-export function deriveAudioSsml({ content, voice, maxBreakMs }: DerivationInput): string {
+export function deriveAudioSsml({ content, voice, maxBreakMs, narration = DEFAULT_NARRATION }: DerivationInput): string {
   return speechScriptToSsml(markdownToSpeechScript(content), {
     voice,
     locale: localeFromVoice(voice),
     maxBreakMs,
-    ...DEFAULT_PROSODY,
+    ...narration,
   });
 }
 
@@ -69,7 +76,7 @@ export interface VersionForGeneration {
   content: string;
   audioSsml: string | null;
   version: number;
-  language: { code: string; audioProvider: AudioProvider | null; audioVoice: string | null };
+  language: { code: string; audioProvider: AudioProvider | null; audioVoice: string | null } & NarrationSettings;
   document: {
     type: DocumentType | null;
     originalFilename: string | null;
@@ -177,11 +184,17 @@ export function createStartGeneration(deps: GenerationDeps = defaultGenerationDe
     }
     const { ssml } = resolveAudioSsml({
       override: version.audioSsml,
-      derive: () => deriveAudioSsml({ content: version.content, voice, maxBreakMs: provider.maxBreakMs }),
+      derive: () =>
+        deriveAudioSsml({
+          content: version.content,
+          voice,
+          maxBreakMs: provider.maxBreakMs,
+          narration: narrationProfile(language),
+        }),
     });
 
     phase = 'provider';
-    const outcome = await provider.submit({ jobId: jobIdFor(audioFile.id), ssml });
+    const outcome = await provider.submit({ jobId: jobIdFor(audioFile.id), ssml, quality: audioQuality(language) });
     if (outcome.kind === 'result') {
       // Synchronous provider: finish in the same call.
       await deps.claimForProcessing(audioFile.id);
@@ -201,6 +214,39 @@ export function createStartGeneration(deps: GenerationDeps = defaultGenerationDe
 
 /** Production instance. */
 export const startGeneration = createStartGeneration();
+
+export interface PreviewInput {
+  provider: AudioProvider;
+  voice: string;
+  /** Markdown, read the way a document is: pause markers and all. */
+  text: string;
+  narration: NarrationProfile;
+  quality: AudioQuality;
+}
+
+/**
+ * Speaks a sample with settings that may not be saved yet, so an admin can
+ * tune a language by ear before any document is generated with them. The
+ * sample goes through the same derivation as a document, so what is heard is
+ * what generation would send. Nothing is stored and nothing is logged.
+ */
+export async function previewAudio(
+  input: PreviewInput,
+  getProvider: typeof getSpeechProvider = getSpeechProvider,
+): Promise<SynthesisResult> {
+  const provider = getProvider(input.provider);
+  if (!provider.isConfigured()) throw new Error('The speech provider is not configured on this server.');
+  if (!provider.preview) throw new Error('This speech provider has no preview.');
+  if (!hasReadableText(input.text)) throw new Error('The sample has no readable text after stripping Markdown.');
+
+  const ssml = deriveAudioSsml({
+    content: input.text,
+    voice: input.voice,
+    maxBreakMs: provider.maxBreakMs,
+    narration: input.narration,
+  });
+  return provider.preview({ ssml, quality: input.quality });
+}
 
 /**
  * Moves one record forward: polls the provider, and on success uploads the
@@ -449,10 +495,14 @@ export async function getTranscript(
     voice: version.language.audioVoice!,
     maxBreakMs: provider.maxBreakMs,
   };
-  const resolved = resolveAudioSsml({ override: version.audioSsml, derive: () => deriveAudioSsml(input) });
+  const resolved = resolveAudioSsml({
+    override: version.audioSsml,
+    derive: () => deriveAudioSsml({ ...input, narration: narrationProfile(version.language) }),
+  });
 
   // Derived only to compare against the fingerprint, and only when there is an
   // override to compare: a document with no override cannot be out of date.
+  // Default narration on purpose, the same the fingerprint was taken with.
   const state = transcriptState({
     override: version.audioSsml,
     baseline: version.audioSsmlBase,

@@ -41,7 +41,10 @@ git checkout -B release/_prepare "origin/$BASE_BRANCH" --quiet
 # --- Bump version ------------------------------------------------------------
 
 echo "→ Bumping $BUMP version …"
-new_version="$(pnpm version "$BUMP" --no-git-tag-version | tail -n 1)"   # e.g. v1.1.0
+# pnpm 12 prints "name: 1.4.2 → 1.5.0" instead of the bare tag, so read the
+# bumped version back from package.json rather than parsing that output.
+pnpm version "$BUMP" --no-git-tag-version >/dev/null
+new_version="v$(node -p 'require("./package.json").version')"   # e.g. v1.1.0
 release_branch="release/${new_version}"
 echo "  new version: $new_version"
 

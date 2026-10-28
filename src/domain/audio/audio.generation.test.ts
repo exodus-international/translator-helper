@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AudioFile } from '@/generated/prisma/client';
-import { AudioProvider, AudioStatus, DocumentType } from '@/generated/prisma/enums';
-import { createStartGeneration, type GenerationDeps, type VersionForGeneration } from './audio.service';
+import { AudioProvider, AudioQuality, AudioStatus, DocumentType } from '@/generated/prisma/enums';
+import { DEFAULT_NARRATION } from './audio.narration';
+import { createStartGeneration, previewAudio, type GenerationDeps, type VersionForGeneration } from './audio.service';
 import type { SpeechProvider } from './providers/speech-provider';
 
 /**
@@ -54,6 +55,7 @@ function audioFileFixture(): AudioFile {
 /** Captures what the provider was asked to say, and what was logged about it. */
 function harness(version: VersionForGeneration) {
   const submitted: string[] = [];
+  const qualities: AudioQuality[] = [];
   const logged: { action: string; details?: unknown }[] = [];
   const created: { voice: string }[] = [];
 
@@ -61,8 +63,9 @@ function harness(version: VersionForGeneration) {
     id: AudioProvider.AZURE_SPEECH,
     maxBreakMs: 20_000,
     isConfigured: () => true,
-    submit: async ({ ssml }: { jobId: string; ssml: string }) => {
+    submit: async ({ ssml, quality }: { jobId: string; ssml: string; quality: AudioQuality }) => {
       submitted.push(ssml);
+      qualities.push(quality);
       return { kind: 'job' as const, jobId: 'job-1' };
     },
     poll: async () => ({ kind: 'running' as const }),
@@ -86,7 +89,7 @@ function harness(version: VersionForGeneration) {
     finish: async () => audioFileFixture(),
   };
 
-  return { submitted, logged, created, start: createStartGeneration(deps) };
+  return { submitted, qualities, logged, created, start: createStartGeneration(deps) };
 }
 
 test('with no override, the provider is sent the script derived from the document', async () => {
@@ -98,6 +101,65 @@ test('with no override, the provider is sent the script derived from the documen
   assert.equal(submitted.length, 1);
   assert.match(submitted[0], /Dnes se budeme modlit\./);
   assert.match(submitted[0], new RegExp(`name="${VOICE}"`));
+});
+
+test('with no override, the provider is sent the default narration rate and pitch', async () => {
+  const { submitted, start } = harness(versionFixture());
+
+  await start('version-1', 'user-1');
+
+  assert.match(submitted[0], /<prosody rate="0\.8" pitch="-6%">/);
+});
+
+test('the provider is sent the rate and pitch stored on the language', async () => {
+  const version = versionFixture();
+  const { submitted, start } = harness({
+    ...version,
+    language: { ...version.language, audioRate: '0.85', audioPitch: '-10%' },
+  });
+
+  await start('version-1', 'user-1');
+
+  assert.match(submitted[0], /<prosody rate="0\.85" pitch="-10%">/);
+});
+
+test('the provider is sent the pauses stored on the language', async () => {
+  const version = versionFixture();
+  const { submitted, start } = harness({
+    ...version,
+    language: { ...version.language, audioSentencePauseMs: 800, audioCommaPauseMs: 150 },
+  });
+
+  await start('version-1', 'user-1');
+
+  assert.match(submitted[0], /xmlns:mstts="https:\/\/www\.w3\.org\/2001\/mstts"/);
+  assert.match(submitted[0], /<mstts:silence type="Sentenceboundary-exact" value="800ms"\/>/);
+  assert.match(submitted[0], /<mstts:silence type="Comma-exact" value="150ms"\/>/);
+});
+
+test('the provider is asked for 24 kHz unless the language says otherwise', async () => {
+  const standard = harness(versionFixture());
+  await standard.start('version-1', 'user-1');
+  assert.deepEqual(standard.qualities, [AudioQuality.STANDARD]);
+
+  const version = versionFixture();
+  const high = harness({ ...version, language: { ...version.language, audioQuality: AudioQuality.HIGH } });
+  await high.start('version-1', 'user-1');
+  assert.deepEqual(high.qualities, [AudioQuality.HIGH]);
+});
+
+test('an override is sent verbatim whatever the language narration says', async () => {
+  const override =
+    '<speak version="1.0" xml:lang="cs-CZ"><voice name="cs-CZ-AntoninNeural"><prosody rate="1.2">Rucne.</prosody></voice></speak>';
+  const version = versionFixture({ audioSsml: override });
+  const { submitted, start } = harness({
+    ...version,
+    language: { ...version.language, audioRate: '0.85', audioPitch: '-10%' },
+  });
+
+  await start('version-1', 'user-1');
+
+  assert.equal(submitted[0], override);
 });
 
 test('with an override, the provider is sent exactly that, wrapper and voice included', async () => {
@@ -199,4 +261,61 @@ test('a document whose project has the type turned off is skipped, not failed', 
 
   assert.equal(outcome.status, 'skipped');
   assert.equal(submitted.length, 0);
+});
+
+// ─── Preview ─────────────────────────────────────────────────
+
+function previewProvider(overrides: Partial<SpeechProvider> = {}) {
+  const asked: { ssml: string; quality: AudioQuality }[] = [];
+  const provider = {
+    id: AudioProvider.AZURE_SPEECH,
+    maxBreakMs: 20_000,
+    isConfigured: () => true,
+    submit: async () => assert.fail('a preview never submits a job'),
+    poll: async () => assert.fail('a preview never polls'),
+    preview: async (request: { ssml: string; quality: AudioQuality }) => {
+      asked.push(request);
+      return { audio: new Uint8Array([1]), contentType: 'audio/mpeg' };
+    },
+    ...overrides,
+  } as unknown as SpeechProvider;
+  return { asked, getProvider: () => provider };
+}
+
+const PREVIEW = {
+  provider: AudioProvider.AZURE_SPEECH,
+  voice: 'sk-SK-LukasNeural',
+  text: '# Deň 1\n\nDnes sa zastav, buď v tichu.',
+  narration: { ...DEFAULT_NARRATION, rate: '0.85', pitch: '-10%', sentencePauseMs: 800, commaPauseMs: 150 },
+  quality: AudioQuality.HIGH,
+};
+
+test('a preview is derived the way a document is, with the unsaved settings', async () => {
+  const { asked, getProvider } = previewProvider();
+
+  await previewAudio(PREVIEW, getProvider);
+
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].quality, AudioQuality.HIGH);
+  assert.match(asked[0].ssml, /<voice name="sk-SK-LukasNeural">/);
+  assert.match(asked[0].ssml, /<prosody rate="0\.85" pitch="-10%">/);
+  assert.match(asked[0].ssml, /value="800ms"/);
+  assert.match(asked[0].ssml, /Dnes sa zastav, buď v tichu\./);
+  assert.doesNotMatch(asked[0].ssml, /#/);
+});
+
+test('a preview of nothing readable is refused before the provider is asked', async () => {
+  const { asked, getProvider } = previewProvider();
+  await assert.rejects(previewAudio({ ...PREVIEW, text: '<!-- pause-duration="3s" -->' }, getProvider), /no readable text/);
+  assert.equal(asked.length, 0);
+});
+
+test('a provider without a preview says so', async () => {
+  const { getProvider } = previewProvider({ preview: undefined });
+  await assert.rejects(previewAudio(PREVIEW, getProvider), /has no preview/);
+});
+
+test('an unconfigured provider says so', async () => {
+  const { getProvider } = previewProvider({ isConfigured: () => false });
+  await assert.rejects(previewAudio(PREVIEW, getProvider), /not configured/);
 });

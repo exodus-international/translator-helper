@@ -456,6 +456,21 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // been started is empty, and checking it against the source calls every
     // heading, key and link missing — an error the translator has not made.
     const translationHasContent = translationContent.trim().length > 0;
+    // Not started covers two cases: a version that has never been written to,
+    // and one sent back to Not Started with text still on it. The second must
+    // not be told there is no translation -- and it is worth saying why the
+    // editor is closed, since autosave is off until the version is claimed.
+    const startCopy = translationHasContent
+      ? {
+          title: 'Translation not started',
+          description:
+            'This translation is back to Not Started, so nothing typed here would be saved. ' +
+            'Start it to pick up the text it already has.',
+        }
+      : {
+          title: 'No translation yet',
+          description: 'Start the translation for this document and write it here, next to the source.',
+        };
 
     const exitReviewEditMode = () => {
       setIsReviewEditing(false);
@@ -799,10 +814,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       <EmptyMedia variant="icon">
                         <FileEdit />
                       </EmptyMedia>
-                      <EmptyTitle>No translation yet</EmptyTitle>
-                      <EmptyDescription>
-                        Start the translation for this document and write it here, next to the source.
-                      </EmptyDescription>
+                      <EmptyTitle>{startCopy.title}</EmptyTitle>
+                      <EmptyDescription>{startCopy.description}</EmptyDescription>
                     </EmptyHeader>
                     <EmptyContent>
                       <Button onClick={onStartTranslation} disabled={startingTranslation}>

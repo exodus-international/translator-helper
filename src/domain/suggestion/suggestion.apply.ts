@@ -1,4 +1,5 @@
 import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
+import { refuse, type Refusal } from '@/lib/action-refusal';
 import { applyTextEditAtRange, extractTextAtRange, isRangeWithinBounds } from '@/lib/text-range';
 
 /**
@@ -9,6 +10,22 @@ import { applyTextEditAtRange, extractTextAtRange, isRangeWithinBounds } from '@
  * whether the suggestion can be applied to the text as it is now and what the
  * result is, and `createApplySuggestion(deps)` writes that result.
  */
+
+/**
+ * The suggestion was applied or dismissed after the page loaded, by someone
+ * else or by an earlier try of the same request.
+ */
+export class SuggestionNotOpenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SuggestionNotOpenError';
+  }
+}
+
+/** What the suggestion actions return when the suggestion is no longer open. */
+export function refuseClosedSuggestion(): Refusal {
+  return refuse('This suggestion is no longer open. The list now shows its current state.');
+}
 
 export interface ApplicableSuggestion {
   id: string;
@@ -38,7 +55,7 @@ export interface SuggestionApplication {
 /** Throws, with the reason, when the suggestion cannot be applied to `content`. */
 export function planSuggestionApplication(suggestion: ApplicableSuggestion, content: string): SuggestionApplication {
   if (suggestion.status !== SuggestionStatus.OPEN) {
-    throw new Error('Only open suggestions can be applied');
+    throw new SuggestionNotOpenError('Only open suggestions can be applied');
   }
   if (suggestion.type !== SuggestionType.CHANGE) {
     throw new Error('Only CHANGE type suggestions can be applied');
@@ -86,14 +103,31 @@ export interface ApplySuggestionDeps<Version> {
 }
 
 export function createApplySuggestion<Version>(deps: ApplySuggestionDeps<Version>) {
+  /**
+   * Applying a suggestion that is already applied writes nothing and returns
+   * the version as it is, so a retried request succeeds. One that was
+   * dismissed is refused.
+   */
   return async function applySuggestion(input: {
     suggestion: ApplicableSuggestion;
     versionId: string;
     content: string;
+    /** The version as stored now, returned when there is nothing to do. */
+    currentVersion: Version;
     actorId: string;
-  }): Promise<Version> {
-    const { suggestion, versionId, content, actorId } = input;
-    const plan = planSuggestionApplication(suggestion, content);
+  }): Promise<Version | Refusal> {
+    const { suggestion, versionId, content, currentVersion, actorId } = input;
+    if (suggestion.status === SuggestionStatus.APPLIED) {
+      return currentVersion;
+    }
+
+    let plan: SuggestionApplication;
+    try {
+      plan = planSuggestionApplication(suggestion, content);
+    } catch (error) {
+      if (error instanceof SuggestionNotOpenError) return refuseClosedSuggestion();
+      throw error;
+    }
 
     const version = await deps.updateVersion(versionId, plan.newContent, actorId);
     await deps.markApplied(suggestion.id, plan.originalText);

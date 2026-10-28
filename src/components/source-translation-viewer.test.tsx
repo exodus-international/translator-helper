@@ -140,12 +140,30 @@ test('the source switches between Markdown and a preview', async () => {
 
 test('a document not yet started offers to start it instead of an editor', async () => {
   let started = 0;
-  render(<Harness translationStarted={false} onStartTranslation={() => (started += 1)} />);
+  render(
+    <Harness
+      translationStarted={false}
+      translationContent=""
+      translationFormattedContent=""
+      onStartTranslation={() => (started += 1)}
+    />,
+  );
   const user = userEvent.setup();
   assert.equal(screen.queryByRole('textbox', { name: 'Translation' }), null);
   assert.ok(screen.getByText('No translation yet'));
   await user.click(screen.getByRole('button', { name: 'Start translation' }));
   assert.equal(started, 1);
+});
+
+test('a translation back at Not Started still offers to start it, and says the text is kept', () => {
+  // Not the same as never started: the version carries text that autosave is
+  // refusing to write while it sits at Not Started, so the pane must not claim
+  // there is none.
+  render(<Harness translationStarted={false} />);
+  assert.equal(screen.queryByRole('textbox', { name: 'Translation' }), null);
+  assert.ok(screen.getByText('Translation not started'));
+  assert.ok(screen.getByRole('button', { name: 'Start translation' }));
+  assert.equal(screen.queryByText('No translation yet'), null);
 });
 
 test('the source is edited in place, saved through the host, or cancelled back to what it was', async () => {

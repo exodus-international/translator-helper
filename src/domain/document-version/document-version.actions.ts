@@ -7,7 +7,13 @@ import { type SessionUser } from '@/lib/session';
 import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { isGitHubConfigured } from '@/lib/github-config';
-import { createStatusChange, involvesDeployed, type StatusChangeResult } from './document-version.status-change';
+import {
+  createStatusChange,
+  involvesDeployed,
+  toStatusChangeRefusal,
+  type StatusChangeRefusal,
+  type StatusChangeResult,
+} from './document-version.status-change';
 import { createStartTranslation } from './document-version.start-translation';
 import {
   notifyReviewerAssignment,
@@ -194,6 +200,11 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   return version;
 }
 
+/**
+ * Sends a version to review. Its translator may do this, and so may anyone on
+ * that language's team or an administrator, so a translator who is away does
+ * not block the document.
+ */
 export async function submitForReviewAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = submitForReviewSchema.parse(input);
@@ -202,11 +213,6 @@ export async function submitForReviewAction(input: unknown) {
   const existingVersion = await getDocumentVersionById(validated.versionId);
   if (!existingVersion) {
     throw new Error('Document version not found');
-  }
-
-  // Only the owner can submit for review
-  if (existingVersion.userId !== user.id) {
-    throw new Error('Only the translator can submit this version for review');
   }
 
   // Get document to find source project
@@ -287,13 +293,18 @@ const changeStatus = createStatusChange({
 export async function updateDocumentVersionStatusAction(
   versionId: string,
   status: DocumentStatus,
-): Promise<StatusChangeResult<Awaited<ReturnType<typeof updateDocumentVersionStatus>>>> {
+): Promise<StatusChangeResult<Awaited<ReturnType<typeof updateDocumentVersionStatus>>> | StatusChangeRefusal> {
   const { user } = await authorize('authenticated');
 
   const existingVersion = await getDocumentVersionById(versionId);
   if (!existingVersion) {
     throw new Error('Document version not found');
   }
+
+  // Moving a version through its workflow belongs to that language's team,
+  // whoever is assigned to it, so the work goes on when the translator is
+  // away. Someone from another language cannot move it.
+  await authorize({ language: existingVersion.languageId, role: 'member' });
 
   // Deploying publishes this language's work to the content repository, so it
   // belongs to the people answerable for that language -- its manager and any
@@ -302,7 +313,15 @@ export async function updateDocumentVersionStatusAction(
     await authorize({ language: existingVersion.languageId, role: 'manager' });
   }
 
-  return changeStatus({ version: existingVersion, to: status, actorId: user.id });
+  try {
+    return await changeStatus({ version: existingVersion, to: status, actorId: user.id });
+  } catch (error) {
+    // Someone else moved the version after this page loaded. Tell the client
+    // where it is now instead of failing the request.
+    const refusal = toStatusChangeRefusal(error, existingVersion.status);
+    if (refusal) return refusal;
+    throw error;
+  }
 }
 
 /** Starting a translation as the app wires it: the real repository writes. */

@@ -38,7 +38,7 @@ audio as skipped. Nothing breaks in an environment without credentials.
 
 The provider is not sent Markdown. The document is stripped to prose, pauses
 become `<break>` elements, and the result is wrapped in SSML with the language's
-voice and `DEFAULT_PROSODY`. The review editor shows that document in an **Audio
+voice and narration settings. The review editor shows that document in an **Audio
 text** tab beside Formatted and Review, on documents that get audio.
 
 Edit it and the next generation sends exactly what you wrote, wrapper and all.
@@ -59,7 +59,8 @@ readers see. The document itself is never modified by anything in the tab.
   every few seconds.
 - **An edited transcript pins its voice.** The stored SSML names the voice, so
   changing a language's default voice does not reach documents whose audio text
-  was edited. Reset to generated brings them back in line.
+  was edited. Reset to generated brings them back in line. The same goes for
+  rate and pitch, and changing them does not mark edited audio text out of date.
 
 PRD: issue #164.
 
@@ -92,8 +93,36 @@ included:
 
 ## Narration settings
 
-`DEFAULT_PROSODY` in `src/domain/audio/audio.ssml.ts`: rate 0.8, pitch -6%,
-chosen in a listening test on real Czech content. Applies to every language.
+Admins set speaking rate and pitch per language in the Audio card of the
+language's Settings tab. A blank field uses the app default, `DEFAULT_PROSODY`
+in `src/domain/audio/audio.ssml.ts`: rate 0.8, pitch -6%, chosen in a listening
+test on real Czech content. Rate is a factor from 0.5 to 2, pitch a percentage
+from -50% to +50%.
+
+Pause after sentence and pause after comma, in whole milliseconds from 0 to
+5000, become `<mstts:silence type="Sentenceboundary-exact">` and
+`<mstts:silence type="Comma-exact">` at the top of the voice element, with the
+`xmlns:mstts` namespace on `<speak>`. They replace the voice's own pause at
+every sentence end and comma. A blank field leaves the voice's own timing and
+adds no `mstts` markup at all.
+
+Quality picks the MP3 Azure renders: 24 kHz at 96 kbps (the default) or 48 kHz
+at 192 kbps. 48 kHz keeps the highs some voices lose at 24 kHz and about
+doubles the file size. Quality goes to the provider as the output format and
+never appears in the SSML.
+
+Preview reads a short sample aloud with whatever the Audio card holds, saved
+or not, through Azure's real-time endpoint (`/tts/cognitiveservices/v1` on the
+same endpoint and key as batch). The sample goes through the same derivation as
+a document, so pause markers work in it. Nothing is stored. Each team language
+has a built-in sample in `src/domain/audio/audio.preview.ts`. Admins can replace
+it; the box saves itself 1.5 s after typing stops. A blank
+sample or one equal to the built-in one is stored as null, so a corrected
+built-in sample reaches every language that never changed it.
+
+Settings apply from the next generation on. Existing recordings keep the sound
+they were made with, and hand-edited audio text is sent unchanged. PRD: issue
+#294.
 
 ## Scheduled sweep
 

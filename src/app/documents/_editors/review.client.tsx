@@ -10,6 +10,7 @@ import { updateDocumentVersionAction } from '@/domain/document-version/document-
 import { toggleDocumentLabelAction } from '@/domain/document/document.actions';
 import { editSuggestionAction } from '@/domain/suggestion/suggestion.actions';
 import { capture } from '@/lib/analytics';
+import { isRefusal } from '@/lib/action-refusal';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -29,6 +30,8 @@ interface ReviewClientProps {
   user: SessionUser;
   /** Resolved on the server against this version's language. */
   canDeploy: boolean;
+  /** On this language's team, or an administrator. */
+  canChangeStatus: boolean;
   /** Set when this document gets audio; enables the Audio text tab. */
   audioTextVersionId?: string | null;
   initialSuggestions?: any[];
@@ -48,6 +51,7 @@ export default function ReviewClient({
   translationProjectId = null,
   user,
   canDeploy,
+  canChangeStatus,
   audioTextVersionId = null,
   initialSuggestions = [],
 }: ReviewClientProps) {
@@ -64,6 +68,7 @@ export default function ReviewClient({
       targetLanguageId={initialTargetVersion.languageId ?? ''}
       user={user}
       canDeploy={canDeploy}
+      canChangeStatus={canChangeStatus}
       audioTextVersionId={audioTextVersionId}
       variant="review"
       targetLanguageName={targetLanguage?.name ?? null}
@@ -76,7 +81,11 @@ export default function ReviewClient({
       }}
       onEditSuggestion={async (suggestionId, data) => {
         try {
-          await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
+          const result = await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
+          if (isRefusal(result)) {
+            toast.error(result.refused.message);
+            return;
+          }
           capture('suggestion_edited');
           toast.success('Suggestion updated!');
         } catch (error: any) {
