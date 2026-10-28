@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AudioProvider } from '@/generated/prisma/enums';
+import { DEFAULT_NARRATION } from '@/domain/audio/audio.narration';
 import type { LanguageDeletionPlan } from '@/domain/language/language-delete';
 import { languageHealth } from '@/domain/language/language-health';
 import { deleteLanguageAction, updateLanguageSettingsAction } from '@/domain/language/language.actions';
@@ -33,6 +34,8 @@ interface LanguageSettingsClientProps {
     branchName: string | null;
     audioProvider: AudioProvider | null;
     audioVoice: string | null;
+    audioRate: string | null;
+    audioPitch: string | null;
     translationInstructions: string | null;
   };
   members: { memberCount: number; managerNames: string[] };
@@ -45,6 +48,8 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
   const [branchName, setBranchName] = useState(language.branchName ?? '');
   const [audioProvider, setAudioProvider] = useState<AudioProvider | 'NONE'>(language.audioProvider ?? 'NONE');
   const [audioVoice, setAudioVoice] = useState(language.audioVoice ?? '');
+  const [audioRate, setAudioRate] = useState(language.audioRate ?? '');
+  const [audioPitch, setAudioPitch] = useState(language.audioPitch ?? '');
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmation, setConfirmation] = useState('');
@@ -87,6 +92,8 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
         branchName: branchName.trim() || null,
         audioProvider: audioProvider === 'NONE' ? null : audioProvider,
         audioVoice: audioProvider === 'NONE' ? null : audioVoice.trim() || null,
+        audioRate: audioProvider === 'NONE' ? null : audioRate.trim() || null,
+        audioPitch: audioProvider === 'NONE' ? null : audioPitch.trim() || null,
       });
       capture('language_updated', { code: language.code });
       toast.success('Language saved');
@@ -241,6 +248,54 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                     </div>
                   )}
                 </div>
+                {audioProvider !== 'NONE' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold">Narration</h3>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={!audioRate && !audioPitch}
+                        onClick={() => {
+                          setAudioRate('');
+                          setAudioPitch('');
+                        }}
+                      >
+                        Reset to defaults
+                      </Button>
+                    </div>
+                    <div className="flex flex-col gap-4 sm:flex-row">
+                      <div className="sm:w-56">
+                        <Label htmlFor="language-rate">Speaking rate</Label>
+                        <Input
+                          id="language-rate"
+                          inputMode="decimal"
+                          value={audioRate}
+                          onChange={(event) => setAudioRate(event.target.value)}
+                          placeholder={DEFAULT_NARRATION.rate}
+                          className="mt-1"
+                        />
+                        <p className="text-muted-foreground mt-1 text-xs">1 is the voice&apos;s own pace, 0.8 is 20% slower.</p>
+                      </div>
+                      <div className="sm:w-56">
+                        <Label htmlFor="language-pitch">Pitch</Label>
+                        <Input
+                          id="language-pitch"
+                          value={audioPitch}
+                          onChange={(event) => setAudioPitch(event.target.value)}
+                          placeholder={DEFAULT_NARRATION.pitch}
+                          className="mt-1"
+                        />
+                        <p className="text-muted-foreground mt-1 text-xs">0% is the voice&apos;s own pitch.</p>
+                      </div>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Empty fields use the app default. New settings apply to audio generated from now on; existing
+                      recordings and hand-edited audio text stay as they are.
+                    </p>
+                  </div>
+                )}
                 <p className="text-muted-foreground text-xs">
                   Approved {language.name} translations get generated audio. With no voice, approval produces nothing
                   and says nothing.

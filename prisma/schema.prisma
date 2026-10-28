@@ -220,6 +220,10 @@ model Language {
   isSource                Boolean              @default(false)
   audioProvider           AudioProvider?
   audioVoice              String? // provider voice id, e.g. "cs-CZ-AntoninNeural"
+  /// Narration speaking rate as a factor, e.g. "0.85". Null uses the app default.
+  audioRate               String?
+  /// Narration pitch as a percentage, e.g. "-10%". Null uses the app default.
+  audioPitch              String?
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   documentVersions        DocumentVersion[]

@@ -46,6 +46,8 @@ export default async function LanguageSettingsPage({ params }: { params: Promise
         branchName: language.branchName,
         audioProvider: language.audioProvider,
         audioVoice: language.audioVoice,
+        audioRate: language.audioRate,
+        audioPitch: language.audioPitch,
         translationInstructions: language.translationInstructions,
       }}
       members={members}
