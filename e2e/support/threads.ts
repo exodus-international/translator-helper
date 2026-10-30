@@ -64,6 +64,26 @@ export async function reopenThread(page: Page, text: string) {
 }
 
 /**
+ * Waits for the toast corner to clear.
+ *
+ * A success toast fades out of the bottom-right corner, which is exactly where
+ * the resolved toggle sits when the list is short, and it swallows the click
+ * until it goes. A person would wait the few seconds out too, so the test does
+ * the same rather than claiming a click it never delivered.
+ */
+async function waitForToastsToClear(page: Page) {
+  // Sonner pauses a toast's timer while the pointer rests over it, and the
+  // pointer is still wherever the last click landed -- often the bottom of the
+  // panel, which is where the toast appears once the list collapses. Move it
+  // out of the corner so the toast can run its own timer down instead of
+  // holding the click hostage forever.
+  await page.mouse.move(0, 0);
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, {
+    timeout: 15_000,
+  });
+}
+
+/**
  * Reveals resolved threads.
  *
  * They stay in the list but collapse behind a counter once the first one is
@@ -72,6 +92,7 @@ export async function reopenThread(page: Page, text: string) {
 export async function showResolved(page: Page) {
   const toggle = feedbackPanel(page).getByRole('button', { name: /^Resolved \(/ });
   if ((await toggle.count()) === 0) return;
+  await waitForToastsToClear(page);
   if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }

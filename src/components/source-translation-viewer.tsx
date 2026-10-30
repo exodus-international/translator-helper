@@ -7,6 +7,7 @@ import { useSourceEditing } from '@/components/editor/use-source-editing';
 import { useFollowSelection } from '@/components/editor/toolbar-placement';
 import { DiscardDialog } from '@/components/editor/discard-dialog';
 import { useSuggestionAuthoring } from '@/components/editor/use-suggestion-authoring';
+import { FloatingSuggestionWindow } from '@/components/editor/floating-suggestion-window';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -880,7 +881,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       />
                     )}
                     {showSuggestionForm && selectedRange && (
-                      <div className="absolute inset-x-2 z-50 rounded-lg border bg-background p-4 shadow-lg sm:inset-x-auto sm:right-4 sm:w-96">
+                      <FloatingSuggestionWindow
+                        title={suggestionFormType === SuggestionType.CHANGE ? 'Suggest edit' : 'Comment'}
+                        containerRef={translationContainerRef}
+                        maxWidth={384}
+                        widthRatio={1}
+                      >
                         <SuggestionForm
                           type={suggestionFormType}
                           initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
@@ -890,7 +896,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                             suggestionFormDirtyRef.current = dirty;
                           }}
                         />
-                      </div>
+                      </FloatingSuggestionWindow>
                     )}
                   </div>
                 ) : (
@@ -963,7 +969,11 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         />
                       )}
                       {showSuggestionForm && selectedRange && (
-                        <div className="absolute inset-x-2 top-2 z-50 rounded-lg border bg-background p-4 shadow-lg sm:inset-x-auto sm:top-4 sm:right-4 sm:w-[75%]">
+                        <FloatingSuggestionWindow
+                          title={suggestionFormType === SuggestionType.CHANGE ? 'Suggest edit' : 'Comment'}
+                          containerRef={translationContainerRef}
+                          widthRatio={0.75}
+                        >
                           <SuggestionForm
                             type={suggestionFormType}
                             initialProposedText={
@@ -975,7 +985,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                               suggestionFormDirtyRef.current = dirty;
                             }}
                           />
-                        </div>
+                        </FloatingSuggestionWindow>
                       )}
                     </>
                   )}

@@ -45,3 +45,20 @@ Feature: Review and suggestions
     Then the comment mentioning "Check if this paragraph" should be resolved
     When I reopen the comment mentioning "Check if this paragraph"
     Then the comment mentioning "Check if this paragraph" should be open again
+
+  @reviewer @high-usage
+  Scenario: The window for writing feedback can be moved off the text it is about
+    Given I open "Day 1 - The Call" in Croatian
+    When I select a line and suggest an edit
+    Then the suggestion window should be open
+    And the comment field should have the caret
+    When I move the suggestion window out of the way
+    Then it should have moved with the pointer
+    When I drag the suggestion window far off the screen
+    Then it should stay on screen
+    When I write "Better wording after moving the window" in the suggestion window
+    Then the suggestion window should hold "Better wording after moving the window"
+    When I save the suggestion
+    Then the feedback should mention "Better wording after moving the window"
+    When I dismiss the comment mentioning "Better wording after moving the window"
+    Then the comment mentioning "Better wording after moving the window" should be resolved

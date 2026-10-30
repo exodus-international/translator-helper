@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { SuggestionType } from '@/generated/prisma/enums';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 interface SuggestionFormProps {
   type: SuggestionType;
@@ -28,6 +28,11 @@ export function SuggestionForm({
   const [comment, setComment] = useState(initialComment);
   const [proposedText, setProposedText] = useState(initialProposedText);
   const proposedTextRef = useRef<HTMLTextAreaElement>(null);
+  // Two of these forms can be on screen at once (the sidebar's edit form and
+  // the floating one), so the ids labels point at must not be hardcoded.
+  const fieldId = useId();
+  const commentId = `${fieldId}-comment`;
+  const proposedTextId = `${fieldId}-proposed-text`;
 
   // Track dirty state
   const isDirty = comment !== initialComment || proposedText !== initialProposedText;
@@ -68,9 +73,9 @@ export function SuggestionForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="comment">Comment</Label>
+        <Label htmlFor={commentId}>Comment</Label>
         <Textarea
-          id="comment"
+          id={commentId}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Add a comment..."
@@ -81,10 +86,10 @@ export function SuggestionForm({
 
       {type === SuggestionType.CHANGE && (
         <div>
-          <Label htmlFor="proposedText">Proposed replacement</Label>
+          <Label htmlFor={proposedTextId}>Proposed replacement</Label>
           <Textarea
             ref={proposedTextRef}
-            id="proposedText"
+            id={proposedTextId}
             value={proposedText}
             onChange={(e) => {
               setProposedText(e.target.value);
