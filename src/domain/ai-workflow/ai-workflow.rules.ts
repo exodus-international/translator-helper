@@ -77,18 +77,54 @@ export interface TextRange {
 
 /**
  * Where `quote` sits in `content`, 1-based like a suggestion's range, or null
- * when it is not there word for word.
+ * when it is not there.
  *
  * The model reports a quote instead of a line and column because models count
  * lines badly; finding the words is exact. The first occurrence wins, which is
  * wrong only when the same phrase repeats, and then the reviewer still sees
  * the note on a place that says the same thing.
+ *
+ * Models copy their own text loosely: straight quotes for the typographic
+ * ones the translation uses, or none at all, and one space for a line break.
+ * When the exact words are not there, a second pass compares them with quote
+ * marks left out and runs of whitespace made one space.
  */
 export function locateQuote(content: string, quote: string): TextRange | null {
   if (!quote.trim()) return null;
-  const offset = content.indexOf(quote);
-  if (offset === -1) return null;
-  return { ...positionAt(content, offset, 'start'), ...positionAt(content, offset + quote.length, 'end') } as TextRange;
+  const exact = content.indexOf(quote);
+  if (exact !== -1) return rangeOf(content, exact, exact + quote.length);
+
+  const haystack = loosen(content);
+  const needle = loosen(quote.trim()).text;
+  const found = haystack.text.indexOf(needle);
+  if (found === -1) return null;
+  const start = haystack.offsets[found];
+  const end = haystack.offsets[found + needle.length - 1] + 1;
+  return rangeOf(content, start, end);
+}
+
+const QUOTE_MARKS = /["'„“”‚‘’«»‹›]/;
+
+/** The text without quote marks and with every whitespace run as one space, and where each character came from. */
+function loosen(text: string): { text: string; offsets: number[] } {
+  let out = '';
+  const offsets: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (QUOTE_MARKS.test(char)) continue;
+    if (/\s/.test(char)) {
+      if (out.endsWith(' ')) continue;
+      out += ' ';
+    } else {
+      out += char;
+    }
+    offsets.push(i);
+  }
+  return { text: out, offsets };
+}
+
+function rangeOf(content: string, start: number, end: number): TextRange {
+  return { ...positionAt(content, start, 'start'), ...positionAt(content, end, 'end') } as TextRange;
 }
 
 function positionAt(content: string, offset: number, edge: 'start' | 'end') {

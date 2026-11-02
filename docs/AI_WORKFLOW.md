@@ -88,7 +88,7 @@ replaced by the AI.
 | Variable | Example | Notes |
 |---|---|---|
 | `CHATGPT_API` | | The model key the editor's AI translate button already uses. |
-| `CHATGPT_MODEL` | `gpt-4o-mini` | The model must support structured output (`response_format: json_schema`). |
+| `AI_WORKFLOW_MODEL` | `gpt-4.1` | The model for the AI workflow's draft and audio text. It must support structured output (`response_format: json_schema`). On a test document of 1,600 words, `gpt-4o-mini` left 3 notes, two of them on quotes it had copied wrong; `gpt-4.1` left 6 with a real alternative each. `CHATGPT_MODEL` still sets the editor's Translate button. |
 | `AI_WORKFLOW_SWEEP_SECRET` | random string | Bearer token for the sweep endpoint below. |
 | `AI_WORKFLOW_AUTO_MERGE` | `false` | Optional. `false` deploys without asking GitHub to merge, so a person merges. Anything else, or unset, merges. |
 | `GITHUB_AUTO_MERGE_METHOD` | `MERGE` | Optional. `MERGE`, `SQUASH` or `REBASE`. |

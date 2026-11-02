@@ -70,11 +70,15 @@ type ChatMessage = { role: 'system' | 'user'; content: string };
  */
 export async function requestChatCompletion(
   messages: ChatMessage[],
-  options: { jsonSchema?: { name: string; schema: Record<string, unknown> } } = {},
+  options: {
+    jsonSchema?: { name: string; schema: Record<string, unknown> };
+    /** Overrides CHATGPT_MODEL for this request. */
+    model?: string;
+  } = {},
 ): Promise<string> {
   const apiKey = process.env.CHATGPT_API;
   const endpoint = process.env.CHATGPT_API_BASE_URL?.replace(/\/$/, '') || 'https://api.openai.com/v1/chat/completions';
-  const model = process.env.CHATGPT_MODEL || 'gpt-4o-mini';
+  const model = options.model || process.env.CHATGPT_MODEL || 'gpt-4o-mini';
 
   if (!apiKey) {
     throw new Error('CHATGPT_API_KEY is not configured. Please set it in your environment.');

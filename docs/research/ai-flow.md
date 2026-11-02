@@ -20,7 +20,7 @@ Větev `feat/ai-flow`, stav k 2026-11-02. Původní rešerše proveditelnosti je
 
 1. Nastavit `AI_WORKFLOW_SWEEP_SECRET` a v Coolify naplánovanou úlohu `ai-workflow-sweep` (příkaz je v `docs/AI_WORKFLOW.md`). Bez ní nedoběhne deploy dokumentů, které čekají na nahrávku.
 2. V obsahovém repozitáři zapnout "Allow auto-merge" a na `main` nastavit required status checks. Bez required checks GitHub považuje PR za mergovatelný hned a aplikace ho mergne bez čekání na CI.
-3. Ověřit, že `CHATGPT_MODEL` umí structured output (`gpt-4o-mini` ano).
+3. Případně nastavit `AI_WORKFLOW_MODEL` (výchozí `gpt-4.1`). Model musí umět structured output.
 
 ## Otevřené otázky
 
@@ -44,7 +44,9 @@ Kde jsem nemohl čekat na odpověď, zvolil jsem výchozí variantu. U každé o
 
 9. **Uživatel "AI Translator".** Existuje v databázi, aby měl kdo být autorem komentářů a draftů. Nemůže se přihlásit a není v žádném týmu. Z admin seznamu uživatelů jsem ho skryl, aby ho nikdo nezabanoval ani nesmazal. Je potřeba ho ukázat jinde, třeba ve statistikách?
 
-10. **Model.** AI flow používá stejný model jako tlačítko AI translate (`CHATGPT_MODEL`, výchozí `gpt-4o-mini`). Kvalita poznámek o nejistotách na modelu hodně záleží. Chceš pro AI flow samostatnou proměnnou se silnějším modelem?
+10. **Model.** Vyřešeno 2026-11-02. AI flow má vlastní proměnnou `AI_WORKFLOW_MODEL`, výchozí `gpt-4.1`. Na dokumentu "God's Rescue Mission" (1 600 slov) dal `gpt-4o-mini` 0 poznámek se starým promptem a 3 s novým, dvě z nich na citace, které v textu nenašel. `gpt-4.1` dal 6 poznámek, každou s alternativou, kterou reviewer jedním klikem přijme. `gpt-5-mini` nechal v překladu anglické věty, ten nepoužívat. Tlačítko AI translate v editoru dál jede na `CHATGPT_MODEL`.
+
+    Navazující otázka: v jakém jazyce mají být komentáře AI? Prompt říká anglicky, `gpt-4.1` ale psal česky. Pro český tým je čeština asi lepší. Mám to přepnout na jazyk překladu?
 
 11. **Notifikace celému týmu.** Každý AI draft upozorní všechny členy jazyka. U českého týmu s hodně dokumenty to může být hodně notifikací. Nechat, nebo posílat jen e-mailový digest?
 

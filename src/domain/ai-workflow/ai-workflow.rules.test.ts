@@ -61,6 +61,18 @@ describe('locateQuote', () => {
     assert.deepEqual(range, { startLine: 7, startColumn: 1, endLine: 7, endColumn: 9 });
   });
 
+  it('finds a quote the model copied with other quote marks and spacing', () => {
+    const text = 'Pavel píše:\n„Mzdou hříchu je smrt“ (Římanům 6,23).';
+    const range = locateQuote(text, '"Mzdou hříchu je smrt" (Římanům 6,23)');
+    assert.ok(range);
+    assert.equal(extractTextAtRange(text, range), 'Mzdou hříchu je smrt“ (Římanům 6,23)');
+    assert.deepEqual(locateQuote(text, 'Mzdou hříchu je smrt (Římanům 6,23)'), range, 'or with none');
+
+    const wrapped = locateQuote(text, 'píše: „Mzdou');
+    assert.ok(wrapped);
+    assert.equal(extractTextAtRange(text, wrapped), 'píše:\n„Mzdou');
+  });
+
   it('returns null for words that are not there, or no words', () => {
     assert.equal(locateQuote(content, 'Pray'), null);
     assert.equal(locateQuote(content, '  '), null);
