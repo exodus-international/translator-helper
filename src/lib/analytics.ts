@@ -88,6 +88,11 @@ export type AnalyticsEvent =
   | 'document_status_changed'
   | 'document_deployed'
   | 'github_deploy_retried'
+  // ── AI workflow ──────────────────────────────────────────────────────
+  | 'ai_text_approved'
+  | 'ai_text_approval_withdrawn'
+  | 'ai_step_retried'
+  | 'ai_translation_started'
   // ── Audio ────────────────────────────────────────────────────────────
   | 'audio_generation_triggered'
   | 'audio_regeneration_triggered'

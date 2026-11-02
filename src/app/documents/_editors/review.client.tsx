@@ -1,6 +1,7 @@
 'use client';
 
 import { ActivityLog } from '@/components/activity-log';
+import { AiWorkflowPanel } from '@/components/ai-workflow-panel';
 import { cn } from '@/lib/utils';
 import { AudioStatus } from '@/components/audio-status';
 import { GitHubStatus } from '@/components/github-status';
@@ -18,7 +19,7 @@ import type { SourceTranslationViewerHandle } from '@/components/source-translat
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useEditorStore } from '@/lib/stores/editor-provider';
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import { Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
@@ -108,7 +109,12 @@ export default function ReviewClient({
           }
         }}
         hideDetails
-        sidebarActions={<ReviewWorkflowActions document={document} />}
+        sidebarActions={
+          <>
+            <AiWorkflowPanel user={user} canManage={canDeploy} />
+            <ReviewWorkflowActions document={document} />
+          </>
+        }
         sidebarSummary={
           <>
             <AudioStatus
@@ -198,7 +204,7 @@ function ReviewWorkflowActions({ document }: { document: any }) {
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
-      {targetVersion?.status === DocumentStatus.PENDING_REVIEW && (
+      {targetVersion?.status === DocumentStatus.PENDING_REVIEW && targetVersion?.workflow !== TranslationWorkflow.AI && (
         <Button
           size="sm"
           onClick={handleToggleWaitingForFinalLabel}

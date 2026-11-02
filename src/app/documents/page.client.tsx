@@ -487,7 +487,13 @@ export default function DocumentsClient({
           <Card className="mt-4 p-4 bg-muted/50">
             <h4 className="text-sm font-semibold text-foreground mb-3">Legend</h4>
             <div className="flex flex-wrap gap-6 text-sm">
-              {[...DOCUMENT_STATUS_SEQUENCE, null].map((status) => {
+              {[
+                ...DOCUMENT_STATUS_SEQUENCE,
+                DocumentStatus.AI_TRANSLATING,
+                DocumentStatus.AI_PREPARING_AUDIO,
+                DocumentStatus.AUDIO_REVIEW,
+                null,
+              ].map((status) => {
                 const config = status ? getDocumentStatusConfig(status) : NO_STATUS;
                 const Icon = config.icon;
 

@@ -1,7 +1,7 @@
 import prisma from '@/lib/db';
 import { userBrief } from '@/domain/user/user.select';
 import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
-import { MAX_AI_ATTEMPTS } from './ai-workflow.rules';
+import { AI_USER_ID, MAX_AI_ATTEMPTS } from './ai-workflow.rules';
 import type { AiStepVersion } from './ai-workflow.service';
 
 export async function loadAiStepVersion(versionId: string): Promise<AiStepVersion | null> {
@@ -116,6 +116,8 @@ export async function startAiWorkflowForVersions(versionIds: string[]): Promise<
       data: {
         workflow: TranslationWorkflow.AI,
         status: DocumentStatus.AI_TRANSLATING,
+        // The AI is the translator, so lists show who wrote the draft.
+        userId: AI_USER_ID,
         aiAttempts: 0,
         aiError: null,
       },

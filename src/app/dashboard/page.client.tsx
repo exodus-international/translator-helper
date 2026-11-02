@@ -32,7 +32,7 @@ import {
 import { capture } from '@/lib/analytics';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus, DocumentType } from '@/generated/prisma/enums';
+import { DocumentStatus, DocumentType, TranslationWorkflow } from '@/generated/prisma/enums';
 import { ArrowRight, ClipboardList, Eye, FolderOpen, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -43,6 +43,7 @@ import { resolveDeployLanguageFilter } from './deploy-language-filter';
 type VersionWithDetails = {
   id: string;
   status: DocumentStatus;
+  workflow?: TranslationWorkflow;
   updatedAt: string | Date;
   deadline: string | Date | null;
   document: {
@@ -176,7 +177,7 @@ function PersonCell({ person, isYou }: { person: Person | null; isYou?: boolean 
  */
 function isActionable(role: WorkItem['role'], status: DocumentStatus): boolean {
   if (role === 'Reviewer') {
-    return status === DocumentStatus.PENDING_REVIEW;
+    return status === DocumentStatus.PENDING_REVIEW || status === DocumentStatus.AUDIO_REVIEW;
   }
   return status === DocumentStatus.PENDING_TRANSLATION || status === DocumentStatus.IN_PROGRESS;
 }
@@ -215,7 +216,9 @@ function buildWorkItems(versions: VersionWithDetails[], userId: string): WorkIte
       const key = `${v.document.id}:${v.language.id}`;
       items.push(toWorkItem(v, 'Translator', key, userId));
     }
-    if (v.reviewer?.id === userId) {
+    // An AI-workflow version reaches here only while it waits on the user's
+    // review, with nobody assigned, so it is review work for them.
+    if (v.reviewer?.id === userId || (v.workflow === TranslationWorkflow.AI && v.user?.id !== userId)) {
       const key = `${v.document.id}:${v.language.id}:reviewer`;
       items.push(toWorkItem(v, 'Reviewer', key, userId));
     }
