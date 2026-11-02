@@ -1,5 +1,6 @@
 import prisma from '@/lib/db';
 import { Role, TShirtSize } from '@/generated/prisma/enums';
+import { AI_USER_ID } from '@/domain/ai-workflow/ai-workflow.rules';
 
 interface ProfileData {
   name?: string;
@@ -94,6 +95,8 @@ export async function isUserOnboarded(userId: string): Promise<boolean> {
 export async function listUsers() {
   const [users, lastSessions, lastDocumentEdits] = await Promise.all([
     prisma.user.findMany({
+      // The AI workflow's author is a row, not a person: nobody manages it.
+      where: { id: { not: AI_USER_ID } },
       include: {
         languages: {
           include: {
