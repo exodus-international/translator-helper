@@ -15,7 +15,7 @@ Feature: AI workflow
     Given Croatian uses the AI workflow, deploying to "translations/hr"
     And I open "Day 3 - Fasting and Freedom" in Croatian
     When I hand the document to the AI workflow
-    Then its status should become "PENDING_REVIEW"
+    Then the AI's draft should show up without a reload
     And the feedback should mention "AI STUB: not sure about this word."
     And approving the text should wait for the open comments
     When I dismiss the comment mentioning "AI STUB"
