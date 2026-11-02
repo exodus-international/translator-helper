@@ -129,14 +129,18 @@ export async function startAiWorkflowForDocument(documentId: string): Promise<st
   return startAiWorkflowForVersions(candidates.map((candidate) => candidate.id));
 }
 
-/** Moves the given untouched versions into the AI workflow. Returns the ids that moved. */
+/**
+ * Moves the given versions into the AI workflow, as long as they are still
+ * waiting to be started. Returns the ids that moved. A translator assigned to
+ * one that never started is replaced by the AI.
+ */
 export async function startAiWorkflowForVersions(versionIds: string[]): Promise<string[]> {
   if (versionIds.length === 0) return [];
   await ensureAiUser();
   const started: string[] = [];
   for (const id of versionIds) {
     const { count } = await prisma.documentVersion.updateMany({
-      where: { id, status: DocumentStatus.PENDING_TRANSLATION, userId: null },
+      where: { id, status: DocumentStatus.PENDING_TRANSLATION },
       data: {
         workflow: TranslationWorkflow.AI,
         status: DocumentStatus.AI_TRANSLATING,

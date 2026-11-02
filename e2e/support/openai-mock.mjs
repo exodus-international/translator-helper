@@ -13,6 +13,10 @@
  * one `resolve_passages` call for John 3:16; once a tool result is in the
  * conversation it gets a short final answer. Requests without tools are
  * answered exactly as before.
+ *
+ * A request that asks for structured output gets JSON in the shape it named:
+ * the AI workflow's draft with one note on it, or the audio text it was sent,
+ * unchanged.
  */
 import { createServer } from 'node:http';
 
@@ -49,6 +53,28 @@ function chatReply(body) {
   };
 }
 
+/** The note the AI workflow's draft carries, on a word that is in the stub. */
+export const STUB_NOTE = 'AI STUB: not sure about this word.';
+
+function replyFor(request) {
+  const schema = request?.response_format?.json_schema?.name;
+  if (schema === 'translation_with_notes') {
+    // The source itself, so the draft keeps every heading and link and the
+    // automatic deploy's checks pass. The note sits on its first line of text.
+    const prompt = request.messages?.at(-1)?.content ?? '';
+    const source = prompt.split('Source content:\n\n')[1] ?? STUB_TRANSLATION;
+    const quote = source.split('\n').find((line) => line.trim() && !line.startsWith('---') && !line.includes(':')) ?? source;
+    return JSON.stringify({
+      translation: source,
+      notes: [{ quote: quote.trim(), comment: STUB_NOTE, suggestion: '' }],
+    });
+  }
+  if (schema === 'audio_text') {
+    return JSON.stringify({ ssml: request.messages?.at(-1)?.content ?? '' });
+  }
+  return STUB_TRANSLATION;
+}
+
 const server = createServer((req, res) => {
   // Playwright probes the port with a GET before the suite starts.
   if (req.method !== 'POST') {
@@ -74,7 +100,7 @@ const server = createServer((req, res) => {
     }
     res.end(
       JSON.stringify({
-        choices: [{ message: { content: STUB_TRANSLATION } }],
+        choices: [{ message: { content: replyFor(body) } }],
       }),
     );
   });
