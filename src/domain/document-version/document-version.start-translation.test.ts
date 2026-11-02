@@ -1,9 +1,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import { createStartTranslation, type StartTranslationDeps } from './document-version.start-translation';
 
-type Version = { id: string; userId: string | null; status: DocumentStatus; language: { name: string } };
+type Version = {
+  id: string;
+  userId: string | null;
+  status: DocumentStatus;
+  workflow?: TranslationWorkflow;
+  language: { name: string };
+};
 type Call = { fn: string; args: unknown[] };
 
 const slovak = { name: 'Slovak' };
@@ -30,6 +36,19 @@ function fakeDeps(existing: Version | null) {
 const input = { documentId: 'doc-1', languageId: 'lang-sk', content: '', actorId: 'me' };
 
 describe('startTranslation', () => {
+  it('refuses an AI-workflow version, which nobody claims', async () => {
+    const drafted: Version = {
+      id: 'version-1',
+      userId: 'ai',
+      status: DocumentStatus.PENDING_REVIEW,
+      workflow: TranslationWorkflow.AI,
+      language: slovak,
+    };
+    const { startTranslation, calls } = fakeDeps(drafted);
+    await assert.rejects(startTranslation(input), /AI workflow/);
+    assert.deepEqual(calls, []);
+  });
+
   it('creates the first version in the language, in progress and assigned to the starter', async () => {
     const { startTranslation, calls } = fakeDeps(null);
     const version = await startTranslation(input);

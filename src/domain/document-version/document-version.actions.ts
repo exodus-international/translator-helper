@@ -5,9 +5,8 @@ import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
-import { isGitHubConfigured } from '@/lib/github-config';
+import { changeStatus } from './document-version.change-status';
 import {
-  createStatusChange,
   involvesDeployed,
   toStatusChangeRefusal,
   type StatusChangeRefusal,
@@ -20,7 +19,6 @@ import {
   notifyTranslatorAssignment,
 } from '../notification/notification.service';
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
-import { countOpenSuggestions } from '../suggestion/suggestion.repository';
 import { assertCanDeleteDocumentVersion, assertCanEditDocumentVersionContent } from './document-version.permissions';
 import { validateTransition } from './document-version.transitions';
 import { getDocumentById } from '../document/document.repository';
@@ -242,30 +240,6 @@ export async function deleteDocumentVersionAction(id: string) {
   await assertCanDeleteDocumentVersion(id, user);
   return await deleteDocumentVersion(id);
 }
-
-/**
- * The status change as the app wires it: real repositories, the GitHub and
- * audio services loaded on demand so a page that never deploys never loads
- * octokit, and the document page revalidated when something it shows moved.
- */
-const changeStatus = createStatusChange({
-  countOpenSuggestions,
-  updateStatus: updateDocumentVersionStatus,
-  log: createActivityLog,
-  notify: notifyStatusChange,
-  github: {
-    isConfigured: () => isGitHubConfigured(),
-    deploy: async (versionId) => {
-      const { deployToGitHub } = await import('../github/github.service');
-      return deployToGitHub(versionId);
-    },
-  },
-  startAudio: async (versionId, userId) => {
-    const { startGeneration } = await import('../audio/audio.service');
-    return startGeneration(versionId, userId);
-  },
-  revalidateDocumentPage: () => revalidatePath('/documents/[project]/[slug]/[lang]', 'page'),
-});
 
 export async function updateDocumentVersionStatusAction(
   versionId: string,

@@ -141,3 +141,28 @@ function yamlError(text: string): string | null {
     return error instanceof Error ? error.message.split('\n')[0] : String(error);
   }
 }
+
+/**
+ * Why the AI's audio text cannot be used as it is, or nothing when it can.
+ *
+ * The AI is asked only to take out what a narrator should not read. Anything
+ * that suggests it did more is refused and the step retried: SSML that does
+ * not hold together, a different voice, or a pause gone missing. A pause is
+ * the one thing an author placed on purpose that the AI could quietly drop.
+ */
+export function audioTextProblems(input: {
+  derived: string;
+  prepared: string;
+  validate: (ssml: string) => { message: string }[];
+  voiceOf: (ssml: string) => string | null;
+}): DeployProblem[] {
+  const problems: DeployProblem[] = input.validate(input.prepared).map(({ message }) => ({ message }));
+  if (input.voiceOf(input.prepared) !== input.voiceOf(input.derived)) {
+    problems.push({ message: 'The AI changed the voice of the audio text' });
+  }
+  const breaks = (ssml: string) => (ssml.match(/<break\b/g) ?? []).length;
+  if (breaks(input.prepared) !== breaks(input.derived)) {
+    problems.push({ message: 'The AI added or removed pauses in the audio text' });
+  }
+  return problems;
+}

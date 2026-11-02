@@ -1,7 +1,7 @@
 import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { Prisma } from '@/generated/prisma/client';
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 
 /**
  * The shape the assignment lists render: who, which document, which language,
@@ -156,7 +156,9 @@ export async function updateDocumentVersion(id: string, content: string, userId:
     where: { id },
     data: {
       content,
-      userId,
+      // The last editor becomes the translator, except in the AI workflow:
+      // there the AI wrote the draft and every person on it is a reviewer.
+      ...(current.workflow === TranslationWorkflow.AI ? {} : { userId }),
       version: current.version + 1,
       updatedAt: new Date(),
     },

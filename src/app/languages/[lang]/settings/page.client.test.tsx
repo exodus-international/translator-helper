@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createTestRouter } from '../../../../../tests/next-router';
+import { TranslationWorkflow } from '@/generated/prisma/enums';
 import LanguageSettingsClient from './page.client';
 
 /**
@@ -17,6 +18,7 @@ const brandNew = {
   code: 'hr',
   name: 'Croatian',
   isSource: false,
+  workflow: TranslationWorkflow.MANUAL as TranslationWorkflow,
   branchName: null as string | null,
   audioProvider: null as 'AZURE_SPEECH' | null,
   audioVoice: null as string | null,

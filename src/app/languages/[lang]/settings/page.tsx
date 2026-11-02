@@ -43,6 +43,7 @@ export default async function LanguageSettingsPage({ params }: { params: Promise
         code: language.code,
         name: language.name,
         isSource: language.isSource,
+        workflow: language.workflow,
         branchName: language.branchName,
         audioProvider: language.audioProvider,
         audioVoice: language.audioVoice,
