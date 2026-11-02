@@ -17,7 +17,7 @@ import { parseTranslationWithNotes, type TranslationWithNotes } from './ai-workf
  * output, which is right for the text itself; the notes travel beside it in
  * the JSON, so the translation stays exactly as clean as before.
  */
-export const REVIEW_NOTES_INSTRUCTIONS = `Review notes:
+const REVIEW_NOTES_INSTRUCTIONS = `Review notes:
 Two people will review your translation. Help them focus. Where you are unsure of a term, a theological nuance, an idiom, a name, or a biblical reference, or where the source is ambiguous, add a note.
 - "quote" is the exact passage of YOUR TRANSLATION the note is about, copied character for character, short (a few words to one sentence), so it can be found in the text.
 - "comment" says what you are unsure of, in English, in one or two sentences.
@@ -61,7 +61,7 @@ export async function translateWithNotes(params: TranslateWithChatGPTParams): Pr
   return parseTranslationWithNotes(raw);
 }
 
-export const AUDIO_TEXT_PROMPT = `You prepare SSML for a text-to-speech narrator. You receive SSML built from a written {language} document. Remove only what a listener should not hear read aloud:
+const AUDIO_TEXT_PROMPT = `You prepare SSML for a text-to-speech narrator. You receive SSML built from a written {language} document. Remove only what a listener should not hear read aloud:
 - reference marks, footnote numbers and markers such as [1], *, †
 - bare URLs, file names, image captions and alt text that slipped through
 - emojis, decorative symbols and separators
