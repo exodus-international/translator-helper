@@ -4,8 +4,9 @@ import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { type SessionUser } from '@/lib/session';
-import { DocumentStatus, Role } from '@/generated/prisma/enums';
+import { DocumentStatus, Role, TranslationWorkflow } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { changeStatus } from './document-version.change-status';
 import {
   involvesDeployed,
@@ -231,7 +232,7 @@ export async function submitForReviewAction(input: unknown) {
     await authorize('admin');
   }
 
-  validateTransition(existingVersion.status, DocumentStatus.PENDING_REVIEW);
+  validateTransition(existingVersion.status, DocumentStatus.PENDING_REVIEW, { workflow: existingVersion.workflow });
 
   const version = await updateDocumentVersionStatus(
     validated.versionId,
@@ -288,7 +289,16 @@ export async function updateDocumentVersionStatusAction(
   }
 
   try {
-    return await changeStatus({ version: existingVersion, to: status, actorId: user.id });
+    const result = await changeStatus({ version: existingVersion, to: status, actorId: user.id });
+    // Approving the audio text is the last thing a person does in the AI
+    // workflow; the deploy that follows runs after this response.
+    if (existingVersion.workflow === TranslationWorkflow.AI && status === DocumentStatus.APPROVED) {
+      after(async () => {
+        const { runAiSteps } = await import('../ai-workflow/ai-workflow.runtime');
+        await runAiSteps([versionId]);
+      });
+    }
+    return result;
   } catch (error) {
     // Someone else moved the version after this page loaded. Tell the client
     // where it is now instead of failing the request.

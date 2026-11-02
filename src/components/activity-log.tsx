@@ -22,6 +22,8 @@ import {
   Rocket,
   RotateCcw,
   Send,
+  ThumbsDown,
+  ThumbsUp,
   Trash2,
   UserPlus,
   Volume2,
@@ -80,6 +82,9 @@ const ACTION_MAP: Record<string, ActionConfig> = {
   created_suggestion: { label: 'Created suggestion', icon: MessageSquarePlus, colorClass: 'text-info' },
   edited_suggestion: { label: 'Edited suggestion', icon: PenLine, colorClass: 'text-muted-foreground' },
   deleted_suggestion: { label: 'Deleted suggestion', icon: Trash2, colorClass: 'text-destructive' },
+  text_approved: { label: 'Approved the text', icon: ThumbsUp, colorClass: 'text-success' },
+  text_approval_withdrawn: { label: 'Withdrew text approval', icon: ThumbsDown, colorClass: 'text-muted-foreground' },
+  ai_step_failed: { label: 'AI step failed', icon: AlertTriangle, colorClass: 'text-destructive' },
 };
 
 const DEFAULT_CONFIG: ActionConfig = {
@@ -111,6 +116,9 @@ function getStatusLabel(status: string): string {
     PENDING_REVIEW: 'Pending Review',
     APPROVED: 'Approved',
     DEPLOYED: 'Deployed',
+    AI_TRANSLATING: 'AI Translating',
+    AI_PREPARING_AUDIO: 'AI Preparing Audio',
+    AUDIO_REVIEW: 'Audio Review',
   };
   return statusLabels[status] || status;
 }
@@ -139,6 +147,7 @@ function getDetailText(action: string, details: Record<string, any> | null): str
       return details.characters ? `${details.characters} characters` : null;
     case 'github_deploy_failed':
     case 'audio_generation_failed':
+    case 'ai_step_failed':
       return details.error ? (details.error.length > 60 ? details.error.slice(0, 60) + '...' : details.error) : null;
     case 'created_suggestion':
     case 'deleted_suggestion':
