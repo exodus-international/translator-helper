@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractTextAtRange } from '@/lib/text-range';
-import { deployProblems, locateQuote, parseTranslationWithNotes } from './ai-workflow.rules';
+import { audioTextProblems, deployProblems, locateQuote, parseTranslationWithNotes } from './ai-workflow.rules';
 
 describe('parseTranslationWithNotes', () => {
   it('reads the translation and its notes', () => {
@@ -88,5 +88,35 @@ describe('deployProblems', () => {
 
   it('passes a YAML file that parses', () => {
     assert.deepEqual(deployProblems({ content: 'a:\n  - 1\nb: text', filename: 'disciplines.yaml' }), []);
+  });
+});
+
+describe('audioTextProblems', () => {
+  const derived = '<speak><voice name="cs-CZ-AntoninNeural">Den 1 [ref] <break time="1000ms"/> Text.</voice></speak>';
+  const check = (prepared: string, validate = () => [] as { message: string }[]) =>
+    audioTextProblems({
+      derived,
+      prepared,
+      validate,
+      voiceOf: (ssml) => /name="([^"]+)"/.exec(ssml)?.[1] ?? null,
+    });
+
+  it('accepts text with a marker taken out', () => {
+    assert.deepEqual(check('<speak><voice name="cs-CZ-AntoninNeural">Den 1 <break time="1000ms"/> Text.</voice></speak>'), []);
+  });
+
+  it('refuses a changed voice', () => {
+    const problems = check('<speak><voice name="cs-CZ-VlastaNeural">Den 1 <break time="1000ms"/> Text.</voice></speak>');
+    assert.match(problems[0].message, /voice/);
+  });
+
+  it('refuses a dropped pause', () => {
+    const problems = check('<speak><voice name="cs-CZ-AntoninNeural">Den 1 Text.</voice></speak>');
+    assert.match(problems[0].message, /pauses/);
+  });
+
+  it('passes on what the SSML check finds', () => {
+    const problems = check(derived, () => [{ message: 'Unclosed <voice>' }]);
+    assert.deepEqual(problems, [{ message: 'Unclosed <voice>' }]);
   });
 });

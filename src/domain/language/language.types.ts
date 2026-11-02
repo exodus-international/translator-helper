@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AudioProvider, AudioQuality } from '@/generated/prisma/enums';
+import { AudioProvider, AudioQuality, TranslationWorkflow } from '@/generated/prisma/enums';
 import { PAUSE_RANGE_MS, PITCH_RANGE, RATE_RANGE } from '@/domain/audio/audio.narration';
 import { PREVIEW_TEXT_MAX_LENGTH } from '@/domain/audio/audio.preview';
 
@@ -101,6 +101,8 @@ export const updateLanguageSettingsSchema = z
     audioSentencePauseMs: audioPauseMs,
     audioCommaPauseMs: audioPauseMs,
     audioQuality,
+    /** Left out, the language keeps the workflow it has. */
+    workflow: z.enum(TranslationWorkflow).optional(),
   })
   .transform((v) => ({ ...v, audioVoice: v.audioVoice || null }))
   .refine((v) => !v.audioProvider || !!v.audioVoice, { message: 'A voice is required when a provider is selected' });

@@ -61,7 +61,17 @@ export function buildTranslationMessages({
   ];
 }
 
-export async function translateWithChatGPT(params: TranslateWithChatGPTParams): Promise<string> {
+type ChatMessage = { role: 'system' | 'user'; content: string };
+
+/**
+ * One chat-completion request to the configured model, returning the reply's
+ * text. With `jsonSchema` the model is held to that shape through structured
+ * output, and the reply is the JSON text.
+ */
+export async function requestChatCompletion(
+  messages: ChatMessage[],
+  options: { jsonSchema?: { name: string; schema: Record<string, unknown> } } = {},
+): Promise<string> {
   const apiKey = process.env.CHATGPT_API;
   const endpoint = process.env.CHATGPT_API_BASE_URL?.replace(/\/$/, '') || 'https://api.openai.com/v1/chat/completions';
   const model = process.env.CHATGPT_MODEL || 'gpt-4o-mini';
@@ -72,8 +82,14 @@ export async function translateWithChatGPT(params: TranslateWithChatGPTParams): 
 
   const body = {
     model,
-    messages: buildTranslationMessages(params),
+    messages,
     ...(model.includes('gpt-5') ? { reasoning_effort: 'low' as const } : { temperature: 0.2 }),
+    ...(options.jsonSchema && {
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: options.jsonSchema.name, strict: true, schema: options.jsonSchema.schema },
+      },
+    }),
   };
 
   const response = await fetch(endpoint, {
@@ -94,7 +110,11 @@ export async function translateWithChatGPT(params: TranslateWithChatGPTParams): 
     choices?: Array<{ message?: { content?: string } }>;
   };
 
-  const rawContent = payload.choices?.[0]?.message?.content?.trim() || '';
+  return payload.choices?.[0]?.message?.content?.trim() || '';
+}
+
+export async function translateWithChatGPT(params: TranslateWithChatGPTParams): Promise<string> {
+  const rawContent = await requestChatCompletion(buildTranslationMessages(params) as ChatMessage[]);
   // Only YAML output should be unwrapped — a legitimate Markdown doc may itself
   // be a single fenced code block, which stripping would corrupt.
   const translatedContent = promptFormatFor(params.originalFilename) === 'yaml' ? stripWrappingCodeFence(rawContent) : rawContent;

@@ -63,6 +63,9 @@ export async function updateLanguageSettingsAction(id: string, input: unknown) {
     });
   }
 
+  // Leaving the AI workflow mid-flight would strand nothing: every version
+  // keeps the workflow it started in. Only new uploads follow the switch.
+
   if (!validated.branchName) {
     throw new Error('A GitHub branch is required: without one, every deploy of this language fails.');
   }

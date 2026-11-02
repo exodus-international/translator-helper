@@ -4,6 +4,8 @@ import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { DocumentStatus, DocumentType } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
+import { startAiWorkflowForDocument } from '../ai-workflow/ai-workflow.repository';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import {
   createDocumentVersion,
@@ -86,6 +88,17 @@ export async function createDocumentAction(input: unknown) {
     action: 'created',
     details: { title: document.title, slug: document.slug },
   });
+
+  // Languages in the AI workflow get their draft from the AI. The model takes
+  // a while per language, so it runs after the response; the scheduled sweep
+  // picks up anything this run does not finish.
+  const aiVersionIds = await startAiWorkflowForDocument(document.id);
+  if (aiVersionIds.length > 0) {
+    after(async () => {
+      const { runAiSteps } = await import('../ai-workflow/ai-workflow.runtime');
+      await runAiSteps(aiVersionIds);
+    });
+  }
 
   return document;
 }

@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AudioProvider, AudioQuality } from '@/generated/prisma/enums';
+import { AudioProvider, AudioQuality, TranslationWorkflow } from '@/generated/prisma/enums';
 import { DEFAULT_AUDIO_QUALITY, DEFAULT_NARRATION } from '@/domain/audio/audio.narration';
 import type { LanguageDeletionPlan } from '@/domain/language/language-delete';
 import { languageHealth } from '@/domain/language/language-health';
@@ -41,6 +41,7 @@ interface LanguageSettingsClientProps {
     code: string;
     name: string;
     isSource: boolean;
+    workflow: TranslationWorkflow;
     branchName: string | null;
     audioProvider: AudioProvider | null;
     audioVoice: string | null;
@@ -60,6 +61,7 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
   const router = useRouter();
   const [name, setName] = useState(language.name);
   const [branchName, setBranchName] = useState(language.branchName ?? '');
+  const [workflow, setWorkflow] = useState<TranslationWorkflow>(language.workflow);
   const [audioProvider, setAudioProvider] = useState<AudioProvider | 'NONE'>(language.audioProvider ?? 'NONE');
   const [audioVoice, setAudioVoice] = useState(language.audioVoice ?? '');
   const [audioRate, setAudioRate] = useState(language.audioRate ?? '');
@@ -110,6 +112,7 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
     audioSentencePauseMs: noAudio ? null : sentencePause.trim() || null,
     audioCommaPauseMs: noAudio ? null : commaPause.trim() || null,
     audioQuality: noAudio || quality === DEFAULT_AUDIO_QUALITY ? null : quality,
+    workflow,
   };
 
   // The page saves itself: every field here is a setting, not a draft, and a
@@ -227,6 +230,33 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
 
             </CardContent>
           </Card>
+
+          {!language.isSource && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Workflow</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Label htmlFor="language-workflow">How new documents are translated</Label>
+                <Select value={workflow} onValueChange={(value) => setWorkflow(value as TranslationWorkflow)}>
+                  <SelectTrigger id="language-workflow" className="mt-1 sm:w-72">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={TranslationWorkflow.MANUAL}>Manual: a translator drafts</SelectItem>
+                    <SelectItem value={TranslationWorkflow.AI}>AI: the AI drafts, the team reviews</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">
+                  {workflow === TranslationWorkflow.AI
+                    ? 'Every uploaded document is translated by the AI, with comments where it is unsure. Two people from the team approve the text, the AI prepares the audio text, one person approves that, and the document deploys and merges on its own once the checks pass.'
+                    : 'A translator starts each document, a reviewer approves it, and a manager deploys it.'}{' '}
+                  Changing this affects documents uploaded from now on. Documents already in progress keep the workflow
+                  they started in.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {!language.isSource && (
             <Card>

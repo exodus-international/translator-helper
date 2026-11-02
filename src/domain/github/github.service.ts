@@ -258,3 +258,57 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
   console.log(`${LOG_PREFIX} ========== GitHub deploy complete ==========`);
   return { prUrl: pr.url };
 }
+
+/**
+ * Asks GitHub to merge the pull request a version was last deployed in, once
+ * the content repository's required checks pass. The checks are GitHub's
+ * business: auto-merge waits for them, and a failing check leaves the pull
+ * request open for a person.
+ *
+ * GitHub refuses to turn auto-merge on for a pull request that can already be
+ * merged, so that case merges it straight away instead. The repository must
+ * allow auto-merge, and its main branch must require status checks, or the
+ * request fails and the version reports it.
+ */
+export async function enableAutoMerge(documentVersionId: string): Promise<void> {
+  const commit = await prisma.gitHubCommit.findFirst({
+    where: { documentVersionId, prNumber: { not: null } },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!commit?.prNumber) {
+    throw new Error('The version has no pull request to merge');
+  }
+
+  const config = getGitHubConfig();
+  const octokit = await getOctokit();
+  const { data: pr } = await octokit.rest.pulls.get({
+    owner: config.repoOwner,
+    repo: config.repoName,
+    pull_number: commit.prNumber,
+  });
+  if (pr.merged || pr.state !== 'open') {
+    console.log(`${LOG_PREFIX} PR #${pr.number} is ${pr.merged ? 'already merged' : pr.state}; nothing to merge`);
+    return;
+  }
+
+  const mergeMethod = (process.env.GITHUB_AUTO_MERGE_METHOD || 'MERGE').toUpperCase();
+  try {
+    await octokit.graphql(
+      `mutation($id: ID!, $method: PullRequestMergeMethod!) {
+        enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $method }) { clientMutationId }
+      }`,
+      { id: pr.node_id, method: mergeMethod },
+    );
+    console.log(`${LOG_PREFIX} Auto-merge enabled on PR #${pr.number}`);
+  } catch (error: any) {
+    // "Pull request is in clean status": every check has already passed.
+    if (!/clean status/i.test(error?.message ?? '')) throw error;
+    console.log(`${LOG_PREFIX} PR #${pr.number} is already mergeable; merging now`);
+    await octokit.rest.pulls.merge({
+      owner: config.repoOwner,
+      repo: config.repoName,
+      pull_number: pr.number,
+      merge_method: mergeMethod.toLowerCase() as 'merge' | 'squash' | 'rebase',
+    });
+  }
+}

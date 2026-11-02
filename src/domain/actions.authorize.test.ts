@@ -28,6 +28,17 @@ import ts from 'typescript';
  * becomes `project:reviewer|translator`.
  */
 const EXPECTED: Record<string, Record<string, string[]>> = {
+  'ai-workflow/ai-workflow.actions.ts': {
+    // Every member of the language reviews in the AI workflow, translators
+    // included, because the AI is the translator.
+    approveTextAction: ['authenticated', 'language:member'],
+    withdrawTextApprovalAction: ['authenticated', 'language:member'],
+    getTextApprovalsAction: ['authenticated', 'language:member'],
+    // Retrying a failed step and starting one by hand spend model calls and
+    // can end in a deploy, so they belong to the language's manager.
+    retryAiStepAction: ['authenticated', 'language:manager'],
+    startAiTranslationAction: ['authenticated', 'language:manager'],
+  },
   'announcement/announcement.actions.ts': {
     getVisibleAnnouncementsAction: ['authenticated'],
     dismissAnnouncementAction: ['authenticated'],

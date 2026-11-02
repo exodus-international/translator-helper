@@ -1,4 +1,4 @@
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 
 /**
  * Starting a translation: the "Start translation" control, apart from who
@@ -17,6 +17,7 @@ interface ExistingVersion {
   id: string;
   userId: string | null;
   status: DocumentStatus;
+  workflow?: TranslationWorkflow;
 }
 
 export interface StartTranslationDeps<Version extends { language: { name: string } }> {
@@ -51,6 +52,11 @@ export function createStartTranslation<Version extends { language: { name: strin
     const existing = await deps.findVersion(documentId, languageId);
 
     if (existing) {
+      // The AI drafts these, and nobody takes one over: the team reviews it.
+      if (existing.workflow === TranslationWorkflow.AI) {
+        throw new Error('This document is translated by the AI workflow, so there is nothing to start');
+      }
+
       // The version carries the assignment: a translator set on it reserves
       // the document, an empty one leaves it open to the whole language team.
       if (existing.userId && existing.userId !== actorId) {
