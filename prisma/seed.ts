@@ -4,13 +4,23 @@ import { auth } from '@/lib/auth';
 import {
   AudioProvider,
   DocumentStatus,
+  DocumentType,
   GitHubPRStatus,
   InvitationStatus,
   PrismaClient,
   ProjectRole,
+  SuggestionStatus,
+  TranslationWorkflow,
 } from '../src/generated/prisma/client';
 
 import { CONTENT_BY_LANGUAGE, ENGLISH_CONTENT } from './seed-data/content';
+import {
+  AI_DEMO_CZECH,
+  AI_DEMO_CZECH_VERSION,
+  AI_DEMO_DOCUMENT,
+  AI_DEMO_ENGLISH,
+  AI_DEMO_NOTES,
+} from './seed-data/ai-demo';
 import {
   COMMENTS,
   DOCUMENT_ASSIGNMENTS,
@@ -25,6 +35,9 @@ import {
   daysAgo,
   daysFromNow,
 } from './seed-data/datasets';
+
+/** The AI workflow's author; the same id as AI_USER_ID in the app. */
+const AI_USER_ID = '00000000-0000-4000-8000-00000000a1a1';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -61,7 +74,7 @@ async function cleanup() {
   // cleanup above just deleted with every other user.
   await prisma.user.create({
     data: {
-      id: '00000000-0000-4000-8000-00000000a1a1',
+      id: AI_USER_ID,
       email: 'ai-translator@translation-helper.invalid',
       name: 'AI Translator',
       onboarded: true,
@@ -85,6 +98,7 @@ async function seedLanguages() {
         branchName: lang.branchName ?? null,
         translationInstructions: lang.translationInstructions ?? null,
         isSource: lang.isSource ?? false,
+        workflow: lang.workflow ?? TranslationWorkflow.MANUAL,
       },
       create: lang,
     });
@@ -417,6 +431,69 @@ async function seedSuggestions(
 }
 
 // ---------------------------------------------------------------------------
+// 10b. AI workflow demo
+// ---------------------------------------------------------------------------
+
+/**
+ * One document the AI drafted into Czech, waiting for the team's two
+ * approvals, with the AI's notes on it. A stable page to show the AI workflow
+ * on: /documents/advent2025/<slug>/cs.
+ */
+async function seedAiDemo(projects: Record<string, string>, langs: Record<string, string>, users: Record<string, string>) {
+  console.log('\n--- AI workflow demo ---');
+
+  const document = await prisma.document.create({
+    data: {
+      slug: AI_DEMO_DOCUMENT.slug,
+      title: AI_DEMO_DOCUMENT.title,
+      type: DocumentType.DAY,
+      labels: [],
+      originalFilename: AI_DEMO_DOCUMENT.originalFilename,
+      sourceProjectId: projects[AI_DEMO_DOCUMENT.project],
+    },
+  });
+
+  await prisma.documentVersion.create({
+    data: {
+      documentId: document.id,
+      languageId: langs.en,
+      content: AI_DEMO_ENGLISH,
+      status: DocumentStatus.APPROVED,
+      version: 1,
+      userId: users.admin1,
+      reviewerId: users.admin1,
+    },
+  });
+
+  const czech = await prisma.documentVersion.create({
+    data: {
+      documentId: document.id,
+      languageId: langs.cs,
+      content: AI_DEMO_CZECH,
+      status: DocumentStatus.PENDING_REVIEW,
+      workflow: TranslationWorkflow.AI,
+      version: AI_DEMO_CZECH_VERSION,
+      userId: AI_USER_ID,
+    },
+  });
+
+  for (const note of AI_DEMO_NOTES) {
+    await prisma.suggestion.create({
+      data: {
+        ...note,
+        documentVersionId: czech.id,
+        userId: AI_USER_ID,
+        status: SuggestionStatus.OPEN,
+        version: AI_DEMO_CZECH_VERSION,
+      },
+    });
+  }
+
+  console.log(`${AI_DEMO_DOCUMENT.title}: Czech AI draft with ${AI_DEMO_NOTES.length} notes`);
+  console.log(`  /documents/advent2025/${AI_DEMO_DOCUMENT.slug}/cs`);
+}
+
+// ---------------------------------------------------------------------------
 // 11. Activity Logs
 // ---------------------------------------------------------------------------
 
@@ -647,6 +724,7 @@ async function main() {
   const versions = await seedDocumentVersions(docs, langs, users);
   await seedDocumentAssignments(docs, langs, users);
   await seedSuggestions(versions, users);
+  await seedAiDemo(projects, langs, users);
   await seedActivityLogs(versions, users);
   await seedComments(versions, users);
   await seedLanguageScenarios(langs, users);
