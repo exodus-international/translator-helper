@@ -421,6 +421,9 @@ async function seedActivityLogs(
     [DocumentStatus.PENDING_REVIEW]: ['created_translation', 'started_translation', 'edited', 'submitted_for_review'],
     [DocumentStatus.APPROVED]: ['created_translation', 'started_translation', 'edited', 'submitted_for_review', 'approved'],
     [DocumentStatus.DEPLOYED]: ['created_translation', 'started_translation', 'edited', 'submitted_for_review', 'approved', 'deployed'],
+    [DocumentStatus.AI_TRANSLATING]: [],
+    [DocumentStatus.AI_PREPARING_AUDIO]: [],
+    [DocumentStatus.AUDIO_REVIEW]: [],
   };
 
   let count = 0;

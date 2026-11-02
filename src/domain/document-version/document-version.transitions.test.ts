@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DocumentStatus } from '@/generated/prisma/enums';
-import { StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
+import { allowedTransitions, StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
 
 describe('validateTransition', () => {
   describe('valid forward transitions', () => {
@@ -143,5 +143,88 @@ describe('StatusTransitionRefusedError', () => {
       () => validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED),
       (error) => error instanceof Error && !(error instanceof StatusTransitionRefusedError),
     );
+  });
+});
+
+describe('the AI workflow', () => {
+  const AI = TranslationWorkflow.AI;
+  const system = { workflow: AI, by: 'system' as const, openSuggestionsCount: 0 };
+  const person = { workflow: AI, by: 'person' as const, openSuggestionsCount: 0 };
+
+  it('walks from the AI draft to deployed when the app makes every move', () => {
+    const path = [
+      DocumentStatus.PENDING_TRANSLATION,
+      DocumentStatus.AI_TRANSLATING,
+      DocumentStatus.PENDING_REVIEW,
+      DocumentStatus.AI_PREPARING_AUDIO,
+      DocumentStatus.AUDIO_REVIEW,
+      DocumentStatus.APPROVED,
+      DocumentStatus.DEPLOYED,
+    ];
+    for (let i = 1; i < path.length; i++) {
+      assert.doesNotThrow(() => validateTransition(path[i - 1], path[i], system), `${path[i - 1]} → ${path[i]}`);
+    }
+  });
+
+  it('skips the audio steps when the document gets no audio', () => {
+    assert.doesNotThrow(() => validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED, system));
+  });
+
+  it('lets a person approve the audio text and deploy, and nothing else', () => {
+    assert.deepEqual(allowedTransitions(DocumentStatus.AUDIO_REVIEW, AI, 'person'), [DocumentStatus.APPROVED]);
+    assert.deepEqual(allowedTransitions(DocumentStatus.APPROVED, AI, 'person'), [DocumentStatus.DEPLOYED]);
+    assert.deepEqual(allowedTransitions(DocumentStatus.DEPLOYED, AI, 'person'), [DocumentStatus.APPROVED]);
+    for (const status of [
+      DocumentStatus.PENDING_TRANSLATION,
+      DocumentStatus.AI_TRANSLATING,
+      DocumentStatus.PENDING_REVIEW,
+      DocumentStatus.AI_PREPARING_AUDIO,
+    ]) {
+      assert.deepEqual(allowedTransitions(status, AI, 'person'), [], status);
+    }
+  });
+
+  it('refuses a person moving text review on by hand, since that takes two approvals', () => {
+    assert.throws(
+      () => validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.AI_PREPARING_AUDIO, person),
+      (error) => error instanceof StatusTransitionRefusedError && error.reason === 'not_allowed',
+    );
+  });
+
+  it('never goes back to an earlier step, not even for the app', () => {
+    assert.throws(() => validateTransition(DocumentStatus.AUDIO_REVIEW, DocumentStatus.PENDING_REVIEW, system));
+    assert.throws(() => validateTransition(DocumentStatus.APPROVED, DocumentStatus.AUDIO_REVIEW, system));
+    assert.throws(() => validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.IN_PROGRESS, system));
+  });
+
+  it('has no manual-workflow statuses in it', () => {
+    assert.throws(() => validateTransition(DocumentStatus.PENDING_TRANSLATION, DocumentStatus.IN_PROGRESS, person));
+    assert.throws(() => validateTransition(DocumentStatus.PENDING_TRANSLATION, DocumentStatus.IN_PROGRESS, system));
+  });
+
+  it('holds the text review until the AI comments are resolved', () => {
+    assert.throws(
+      () =>
+        validateTransition(DocumentStatus.PENDING_REVIEW, DocumentStatus.AI_PREPARING_AUDIO, {
+          ...system,
+          openSuggestionsCount: 2,
+        }),
+      (error) => error instanceof StatusTransitionRefusedError && error.reason === 'open_suggestions',
+    );
+  });
+
+  it('holds the audio approval on open suggestions too', () => {
+    assert.throws(
+      () => validateTransition(DocumentStatus.AUDIO_REVIEW, DocumentStatus.APPROVED, { ...person, openSuggestionsCount: 1 }),
+      { message: /open suggestions/ },
+    );
+  });
+});
+
+describe('the manual workflow knows nothing of the AI statuses', () => {
+  it('refuses to enter or leave them', () => {
+    assert.throws(() => validateTransition(DocumentStatus.PENDING_TRANSLATION, DocumentStatus.AI_TRANSLATING));
+    assert.throws(() => validateTransition(DocumentStatus.AUDIO_REVIEW, DocumentStatus.APPROVED, { openSuggestionsCount: 0 }));
+    assert.deepEqual(allowedTransitions(DocumentStatus.AI_TRANSLATING), []);
   });
 });

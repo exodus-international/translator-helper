@@ -1,6 +1,6 @@
 import { DocumentStatus } from '@/generated/prisma/enums';
 import type { LucideIcon } from 'lucide-react';
-import { AlertCircle, CheckCircle2, Circle, Clock3, PenLine, Rocket } from 'lucide-react';
+import { AlertCircle, AudioLines, CheckCircle2, Circle, Clock3, PenLine, Rocket, Sparkles } from 'lucide-react';
 
 // fallow-ignore-next-line unused-type
 export type DocumentStatusKey = DocumentStatus | 'NO_STATUS';
@@ -33,7 +33,7 @@ export interface DocumentStatusConfig {
   };
 }
 
-export const DOCUMENT_STATUS_SEQUENCE: DocumentStatus[] = [
+export const DOCUMENT_STATUS_SEQUENCE: BoardStatus[] = [
   DocumentStatus.PENDING_TRANSLATION,
   DocumentStatus.IN_PROGRESS,
   DocumentStatus.PENDING_REVIEW,
@@ -102,7 +102,68 @@ export const DOCUMENT_STATUS_CONFIGS: Record<DocumentStatus, DocumentStatusConfi
       badgeClass: 'border border-hue-violet/25 bg-hue-violet/10 text-hue-violet',
     },
   },
+  // The AI workflow's own steps take the colour of the step they stand in for
+  // on boards and steppers, so a column never mixes colours that mean the same.
+  [DocumentStatus.AI_TRANSLATING]: {
+    status: DocumentStatus.AI_TRANSLATING,
+    name: 'AI Translating',
+    icon: Sparkles,
+    color: {
+      hex: '#0063ed',
+      textClass: 'text-hue-blue',
+      indicatorClass: '!border-hue-blue !bg-hue-blue !text-background',
+      indicatorInactiveClass: '!border-hue-blue/25 !bg-hue-blue/10 !text-hue-blue/60',
+      badgeClass: 'border border-hue-blue/25 bg-hue-blue/10 text-hue-blue',
+    },
+  },
+  [DocumentStatus.AI_PREPARING_AUDIO]: {
+    status: DocumentStatus.AI_PREPARING_AUDIO,
+    name: 'AI Preparing Audio',
+    icon: Sparkles,
+    color: {
+      hex: '#FACC15',
+      textClass: 'text-hue-amber',
+      indicatorClass: '!border-hue-amber !bg-hue-amber !text-background',
+      indicatorInactiveClass: '!border-hue-amber/25 !bg-hue-amber/10 !text-hue-amber/60',
+      badgeClass: 'border border-hue-amber/25 bg-hue-amber/10 text-hue-amber',
+    },
+  },
+  [DocumentStatus.AUDIO_REVIEW]: {
+    status: DocumentStatus.AUDIO_REVIEW,
+    name: 'Audio Review',
+    icon: AudioLines,
+    color: {
+      hex: '#FACC15',
+      textClass: 'text-hue-amber',
+      indicatorClass: '!border-hue-amber !bg-hue-amber !text-background',
+      indicatorInactiveClass: '!border-hue-amber/25 !bg-hue-amber/10 !text-hue-amber/60',
+      badgeClass: 'border border-hue-amber/25 bg-hue-amber/10 text-hue-amber',
+    },
+  },
 };
+
+/**
+ * The step of DOCUMENT_STATUS_SEQUENCE a status is shown under on boards,
+ * steppers and counts. The AI workflow's own statuses fold into the step they
+ * stand in for: the AI drafting is "in progress", and everything between the
+ * draft and approval is review.
+ */
+export type BoardStatus = Exclude<
+  DocumentStatus,
+  typeof DocumentStatus.AI_TRANSLATING | typeof DocumentStatus.AI_PREPARING_AUDIO | typeof DocumentStatus.AUDIO_REVIEW
+>;
+
+export function boardStatus(status: DocumentStatus): BoardStatus {
+  switch (status) {
+    case DocumentStatus.AI_TRANSLATING:
+      return DocumentStatus.IN_PROGRESS;
+    case DocumentStatus.AI_PREPARING_AUDIO:
+    case DocumentStatus.AUDIO_REVIEW:
+      return DocumentStatus.PENDING_REVIEW;
+    default:
+      return status;
+  }
+}
 
 const NO_STATUS_CONFIG: DocumentStatusConfig = {
   status: 'NO_STATUS',
@@ -138,7 +199,7 @@ export function getStepForDocumentStatus(status?: DocumentStatus | DocumentStatu
     return 1;
   }
 
-  return STATUS_STEP_INDEX[status] ?? 1;
+  return STATUS_STEP_INDEX[boardStatus(status)] ?? 1;
 }
 
 export const NO_STATUS = NO_STATUS_CONFIG;
