@@ -146,6 +146,22 @@ describe('rollUpLanguageProgress', () => {
     });
   });
 
+  it('counts the AI workflow steps under the step they stand in for', () => {
+    const progress = rollUpLanguageProgress([
+      doc(EXODUS, DocumentStatus.AI_TRANSLATING),
+      doc(EXODUS, DocumentStatus.AI_PREPARING_AUDIO),
+      doc(ADVENT, DocumentStatus.AUDIO_REVIEW),
+    ]);
+
+    assert.deepEqual(progress.byStatus, {
+      PENDING_TRANSLATION: 0,
+      IN_PROGRESS: 1,
+      PENDING_REVIEW: 2,
+      APPROVED: 0,
+      DEPLOYED: 0,
+    });
+  });
+
   it('reports zero rather than dividing by nothing for a language with no work', () => {
     const progress = rollUpLanguageProgress([]);
 

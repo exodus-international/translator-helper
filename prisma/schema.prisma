@@ -44,6 +44,21 @@ enum DocumentStatus {
   PENDING_REVIEW
   APPROVED
   DEPLOYED
+  // AI workflow only. The AI is writing the first draft.
+  AI_TRANSLATING
+  // AI workflow only. The AI is turning the approved text into the audio text.
+  AI_PREPARING_AUDIO
+  // AI workflow only. A reviewer checks the audio text the AI prepared.
+  AUDIO_REVIEW
+}
+
+/// How a language's documents move from source to deploy.
+enum TranslationWorkflow {
+  /// A translator drafts, a reviewer approves, a manager deploys.
+  MANUAL
+  /// The AI drafts, two reviewers approve the text, the AI prepares the audio
+  /// text, one reviewer approves it, and the app deploys on its own.
+  AI
 }
 
 enum SuggestionType {
@@ -161,6 +176,7 @@ model User {
   notifications          Notification[]
   notificationsCaused    Notification[]           @relation("NotificationActor")
   notificationPrefs      NotificationPreference[]
+  reviewApprovals        ReviewApproval[]
 
   @@map("user")
 }
@@ -224,6 +240,9 @@ model Language {
   /// Documents are authored in the source language and translated out of it.
   /// Read by listTargetLanguages() instead of comparing `code` to "en".
   isSource                Boolean              @default(false)
+  /// The workflow new versions in this language start in. Changing it never
+  /// moves a version that already exists; each version keeps its own.
+  workflow                TranslationWorkflow  @default(MANUAL)
   audioProvider           AudioProvider?
   audioVoice              String? // provider voice id, e.g. "cs-CZ-AntoninNeural"
   /// Narration speaking rate as a factor, e.g. "0.85". Null uses the app default.
@@ -315,18 +334,18 @@ model Document {
 }
 
 model DocumentVersion {
-  id             String         @id @default(uuid())
+  id             String              @id @default(uuid())
   documentId     String
-  document       Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document       Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
   languageId     String
-  language       Language       @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  content        String         @db.Text // Markdown content
-  status         DocumentStatus @default(PENDING_TRANSLATION)
-  version        Int            @default(1)
+  language       Language            @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  content        String              @db.Text // Markdown content
+  status         DocumentStatus      @default(PENDING_TRANSLATION)
+  version        Int                 @default(1)
   userId         String?
-  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   reviewerId     String?
-  reviewer       User?          @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewer       User?               @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
   // Assignment lives here rather than in a separate record, so a document's
   // translator, reviewer, deadline and status can never drift apart.
   deadline       DateTime?
@@ -334,18 +353,26 @@ model DocumentVersion {
   // version waits for review.
   reviewDeadline DateTime?
   assignedById   String?
-  assignedBy     User?          @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedBy     User?               @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
   assignedAt     DateTime?
   // Hand-edited SSML for the speech provider, sent verbatim in place of the
   // script derived from `content`. Null means "derive it", which is what every
   // version does until someone edits the Audio text tab.
-  audioSsml      String?        @db.Text
+  audioSsml      String?             @db.Text
   // Fingerprint of the SSML that would have been derived when `audioSsml` was
   // saved. Comparing it against a fresh derivation is how an edited transcript
   // learns that the words moved on without it.
   audioSsmlBase  String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  // Copied from the language when the version is created, so switching a
+  // language's workflow never strands a version halfway through the other one.
+  workflow       TranslationWorkflow @default(MANUAL)
+  // The last error from an AI step, cleared when the step succeeds. Together
+  // with `aiAttempts` it is how the sweep knows when to stop retrying.
+  aiError        String?             @db.Text
+  aiAttempts     Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  approvals      ReviewApproval[]
   comments       Comment[]
   activityLogs   ActivityLog[]
   suggestions    Suggestion[]
@@ -361,6 +388,21 @@ model DocumentVersion {
   @@index([languageId])
   @@index([status])
   @@map("document_version")
+}
+
+/// A reviewer's thumbs-up on the text of an AI-workflow version. It stays
+/// valid when the text is edited afterwards: the team decided an approval
+/// covers the version, not one exact wording.
+model ReviewApproval {
+  id                String          @id @default(uuid())
+  documentVersionId String
+  documentVersion   DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+
+  @@unique([documentVersionId, userId])
+  @@map("review_approval")
 }
 
 model Comment {

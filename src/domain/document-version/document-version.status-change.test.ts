@@ -56,10 +56,12 @@ describe('the two decisions the action asks before it loads anything', () => {
     assert.equal(involvesDeployed(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED), false);
   });
 
-  it('guards approval and deployment on open suggestions, and nothing else', () => {
+  it('guards approval, deployment and leaving AI text review on open suggestions, and nothing else', () => {
     assert.equal(guardedByOpenSuggestions(DocumentStatus.APPROVED), true);
     assert.equal(guardedByOpenSuggestions(DocumentStatus.DEPLOYED), true);
+    assert.equal(guardedByOpenSuggestions(DocumentStatus.AI_PREPARING_AUDIO), true);
     assert.equal(guardedByOpenSuggestions(DocumentStatus.PENDING_REVIEW), false);
+    assert.equal(guardedByOpenSuggestions(DocumentStatus.AUDIO_REVIEW), false);
   });
 });
 

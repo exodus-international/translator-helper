@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 import { cleanup, render, screen } from '@testing-library/react';
-import { Role } from '@/generated/prisma/enums';
+import { Role, TranslationWorkflow } from '@/generated/prisma/enums';
 import type { Language } from '@/generated/prisma/client';
 import ProjectKanbanBoard, { type ProjectKanbanBoardLoaders } from './project-kanban-board';
 
@@ -22,6 +22,7 @@ const croatian: Language = {
   translationInstructions: null,
   branchName: null,
   isSource: false,
+  workflow: TranslationWorkflow.MANUAL,
   audioProvider: null,
   audioVoice: null,
   audioRate: null,

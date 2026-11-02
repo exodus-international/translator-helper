@@ -1,8 +1,15 @@
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
 import { DeploySkippedError } from '../github/github.errors';
 import { refuse, type Refusal } from '@/lib/action-refusal';
-import { StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
+import {
+  guardedByOpenSuggestions,
+  StatusTransitionRefusedError,
+  validateTransition,
+  type TransitionActor,
+} from './document-version.transitions';
+
+export { guardedByOpenSuggestions };
 
 /**
  * What one status change does, apart from who may ask for it.
@@ -22,6 +29,8 @@ import { StatusTransitionRefusedError, validateTransition } from './document-ver
 interface StatusChangeVersion {
   id: string;
   status: DocumentStatus;
+  /** MANUAL when left out. */
+  workflow?: TranslationWorkflow;
 }
 
 export interface GitHubOutcome {
@@ -76,25 +85,21 @@ export function involvesDeployed(from: DocumentStatus, to: DocumentStatus): bool
   return from === DocumentStatus.DEPLOYED || to === DocumentStatus.DEPLOYED;
 }
 
-/** Whether entering `to` is refused while a suggestion is still open. */
-export function guardedByOpenSuggestions(to: DocumentStatus): boolean {
-  return to === DocumentStatus.APPROVED || to === DocumentStatus.DEPLOYED;
-}
-
 export function createStatusChange<Version>(deps: StatusChangeDeps<Version>) {
   return async function changeStatus(input: {
     version: StatusChangeVersion;
     to: DocumentStatus;
     actorId: string;
+    /** 'person' when left out; the AI workflow's own moves pass 'system'. */
+    by?: TransitionActor;
   }): Promise<StatusChangeResult<Version>> {
-    const { version: existing, to, actorId } = input;
+    const { version: existing, to, actorId, by } = input;
+    const workflow = existing.workflow ?? TranslationWorkflow.MANUAL;
 
-    if (guardedByOpenSuggestions(to)) {
-      const openSuggestionsCount = await deps.countOpenSuggestions(existing.id);
-      validateTransition(existing.status, to, { openSuggestionsCount });
-    } else {
-      validateTransition(existing.status, to);
-    }
+    const openSuggestionsCount = guardedByOpenSuggestions(to)
+      ? await deps.countOpenSuggestions(existing.id)
+      : undefined;
+    validateTransition(existing.status, to, { openSuggestionsCount, workflow, by });
 
     const version = await deps.updateStatus(existing.id, to);
 

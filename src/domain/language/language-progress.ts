@@ -1,3 +1,4 @@
+import { boardStatus, type BoardStatus } from '@/constants/document-status';
 import { DocumentStatus, SourceProjectStatus } from '@/generated/prisma/enums';
 
 /**
@@ -56,7 +57,7 @@ export interface LanguageProgress {
   deployed: number;
   documents: number;
   percent: number;
-  byStatus: Record<DocumentStatus, number>;
+  byStatus: Record<BoardStatus, number>;
   projects: LanguageProjectProgress[];
   lifetime: LanguageLifetime;
   /**
@@ -68,7 +69,7 @@ export interface LanguageProgress {
   missingVersions: number;
 }
 
-const EMPTY_STATUS_COUNTS = (): Record<DocumentStatus, number> => ({
+const EMPTY_STATUS_COUNTS = (): Record<BoardStatus, number> => ({
   [DocumentStatus.PENDING_TRANSLATION]: 0,
   [DocumentStatus.IN_PROGRESS]: 0,
   [DocumentStatus.PENDING_REVIEW]: 0,
@@ -85,7 +86,9 @@ export function rollUpLanguageProgress(rows: LanguageDocumentRow[]): LanguagePro
 
   for (const row of rows) {
     // A document nobody has started is untranslated work, not absent work.
-    const status = row.status ?? DocumentStatus.PENDING_TRANSLATION;
+    // AI-workflow steps count under the step they stand in for, so the page's
+    // five buckets still add up to every document.
+    const status = boardStatus(row.status ?? DocumentStatus.PENDING_TRANSLATION);
     const isActive = row.projectStatus === SourceProjectStatus.ACTIVE;
 
     // Scoped to active projects like everything it is shown beside: the page

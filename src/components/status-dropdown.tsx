@@ -6,23 +6,37 @@ import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/d
 import { useDeployConfirm } from '@/components/deploy-confirm';
 import { withStatusChangeFeedback } from '@/components/status-change-feedback';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
-import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
+import { allowedTransitions } from '@/domain/document-version/document-version.transitions';
 import { useStatusTransitionPending, useStatusTransitionStore } from '@/lib/stores/status-transition';
 import { SessionUser } from '@/lib/session';
 import { isRefusal } from '@/lib/action-refusal';
 import { cn } from '@/lib/utils';
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import { Menu as DropdownMenuPrimitive } from '@base-ui/react/menu';
 import { AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { toast } from 'sonner';
 
+/** Every status in the order the two workflows pass through them, to tell forward from back. */
+const STATUS_ORDER: DocumentStatus[] = [
+  DocumentStatus.PENDING_TRANSLATION,
+  DocumentStatus.IN_PROGRESS,
+  DocumentStatus.AI_TRANSLATING,
+  DocumentStatus.PENDING_REVIEW,
+  DocumentStatus.AI_PREPARING_AUDIO,
+  DocumentStatus.AUDIO_REVIEW,
+  DocumentStatus.APPROVED,
+  DocumentStatus.DEPLOYED,
+];
+
 /** Shown wherever deploying is refused, so the reason is the same everywhere. */
 const DEPLOY_DENIED = 'Only this language\u2019s manager or an administrator can deploy';
 
 interface StatusDropdownProps {
   currentStatus: DocumentStatus | null;
+  /** The version's own workflow; MANUAL when left out. */
+  workflow?: TranslationWorkflow;
   versionId: string;
   user: SessionUser;
   /**
@@ -50,6 +64,7 @@ interface StatusDropdownProps {
 
 export function StatusDropdown({
   currentStatus,
+  workflow = TranslationWorkflow.MANUAL,
   versionId,
   user,
   canDeploy,
@@ -87,7 +102,7 @@ export function StatusDropdown({
 
   // Filter available statuses based on permissions and allowedStatuses prop
   const availableStatuses = React.useMemo(() => {
-    let statuses = DOCUMENT_STATUS_SEQUENCE;
+    let statuses: DocumentStatus[] = workflow === TranslationWorkflow.MANUAL ? DOCUMENT_STATUS_SEQUENCE : STATUS_ORDER;
 
     // Filter by allowedStatuses if provided
     if (allowedStatuses) {
@@ -101,17 +116,17 @@ export function StatusDropdown({
 
     // Restrict to valid transitions from the current status
     if (currentStatus) {
-      const validTargets = VALID_TRANSITIONS[currentStatus] || [];
+      const validTargets = allowedTransitions(currentStatus, workflow) || [];
       statuses = statuses.filter((s) => validTargets.includes(s));
     }
 
     return statuses;
-  }, [allowedStatuses, canDeploy, currentStatus]);
+  }, [allowedStatuses, canDeploy, currentStatus, workflow]);
 
   const forwardLabels: Partial<Record<DocumentStatus, string>> = {
     [DocumentStatus.IN_PROGRESS]: 'Start translation',
     [DocumentStatus.PENDING_REVIEW]: 'Give me feedback',
-    [DocumentStatus.APPROVED]: 'Approve',
+    [DocumentStatus.APPROVED]: currentStatus === DocumentStatus.AUDIO_REVIEW ? 'Approve audio text' : 'Approve',
     [DocumentStatus.DEPLOYED]: 'Deploy',
   };
 
@@ -124,8 +139,8 @@ export function StatusDropdown({
 
   const getTransitionLabel = (from: DocumentStatus | null | undefined, to: DocumentStatus) => {
     if (from) {
-      const fromIndex = DOCUMENT_STATUS_SEQUENCE.indexOf(from);
-      const toIndex = DOCUMENT_STATUS_SEQUENCE.indexOf(to);
+      const fromIndex = STATUS_ORDER.indexOf(from);
+      const toIndex = STATUS_ORDER.indexOf(to);
       if (fromIndex !== -1 && toIndex !== -1 && toIndex < fromIndex) {
         return backwardLabels[to] ?? 'Move back';
       }
@@ -205,7 +220,14 @@ export function StatusDropdown({
       // does, and carrying the status inside that name, gives screen readers
       // "Document status: Texts in Review" instead of a bare badge.
       aria-label={`Document status: ${currentStatusConfig.name}`}
-      disabled={disabled || loading || !canChangeStatus || translatorCannotChangeDeployedDocumentStatus}
+      disabled={
+        disabled ||
+        loading ||
+        !canChangeStatus ||
+        translatorCannotChangeDeployedDocumentStatus ||
+        // The AI workflow has steps only the app moves on from.
+        availableStatuses.length === 0
+      }
       className={cn(
         'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
         currentStatusConfig.color.badgeClass,

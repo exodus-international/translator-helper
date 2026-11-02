@@ -282,6 +282,7 @@ function EditorViewer({
               // beside language, translator and reviewer — not in the toolbar.
               <StatusDropdown
                 currentStatus={targetVersion.status}
+                workflow={targetVersion.workflow}
                 versionId={targetVersion.id}
                 user={user}
                 canDeploy={canDeploy}
