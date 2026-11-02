@@ -189,6 +189,20 @@ export async function updateDocumentVersionStatus(id: string, status: DocumentSt
 }
 
 /**
+ * Moves the version from `from` to `to`, and only from `from`. Two requests
+ * that both read the old status would otherwise both write the new one, and
+ * both log and notify; the loser gets null and is refused instead.
+ */
+export async function moveDocumentVersionStatus(id: string, from: DocumentStatus, to: DocumentStatus) {
+  const { count } = await prisma.documentVersion.updateMany({ where: { id, status: from }, data: { status: to } });
+  if (count === 0) return null;
+  return prisma.documentVersion.findUniqueOrThrow({
+    where: { id },
+    include: { document: true, language: true, user: userBrief, reviewer: userBrief },
+  });
+}
+
+/**
  * Gives the version to `userId` and moves it to IN_PROGRESS, whatever its
  * status was. Only starting a translation does this; every other status move
  * goes through the workflow's transition rules.

@@ -10,9 +10,11 @@ Settings, Workflow.
   deploys and merges on its own.
 
 Switching a language changes only what happens to documents uploaded from then
-on. Each version copies the workflow from its language when it is created and
-keeps it, so a version never ends up halfway through the other workflow. A
-person cannot move a version from one workflow to the other.
+on. A version joins the AI workflow when the upload, or a manager, hands it to
+the AI, and it stays there, so a version never ends up halfway through the
+other workflow. A person cannot move a version back to the manual workflow.
+Versions created any other way (a language added to a project later, an
+assignment) start in the manual workflow and wait for the manager.
 
 ## The steps
 

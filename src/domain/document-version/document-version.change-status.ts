@@ -3,7 +3,7 @@ import { isGitHubConfigured } from '@/lib/github-config';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { notifyStatusChange } from '../notification/notification.service';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
-import { updateDocumentVersionStatus } from './document-version.repository';
+import { moveDocumentVersionStatus } from './document-version.repository';
 import { createStatusChange } from './document-version.status-change';
 
 /**
@@ -16,7 +16,7 @@ import { createStatusChange } from './document-version.status-change';
  */
 export const changeStatus = createStatusChange({
   countOpenSuggestions,
-  updateStatus: updateDocumentVersionStatus,
+  updateStatus: (versionId, status, from) => moveDocumentVersionStatus(versionId, from, status),
   log: createActivityLog,
   notify: notifyStatusChange,
   github: {

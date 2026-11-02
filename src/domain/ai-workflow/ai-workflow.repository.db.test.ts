@@ -69,6 +69,16 @@ describe('the AI workflow repository', () => {
     assert.equal(await claimAiStep(versionId, DocumentStatus.AI_TRANSLATING, 0), true);
     assert.equal(await claimAiStep(versionId, DocumentStatus.AI_TRANSLATING, 0), false, 'the second runner loses');
     assert.equal(await claimAiStep(versionId, DocumentStatus.AI_PREPARING_AUDIO, 1), false, 'the status must match');
+    assert.equal(
+      await claimAiStep(versionId, DocumentStatus.AI_TRANSLATING, 1),
+      false,
+      'a sweep that read the bumped attempts cannot take a step still running',
+    );
+    assert.equal(
+      await claimAiStep(versionId, DocumentStatus.AI_TRANSLATING, 1, new Date(Date.now() + 11 * 60_000)),
+      true,
+      'a step untouched for ten minutes is free to take',
+    );
     await releaseAiStep(versionId, 0);
     const version = await prisma.documentVersion.findUniqueOrThrow({ where: { id: versionId } });
     assert.equal(version.aiAttempts, 0);

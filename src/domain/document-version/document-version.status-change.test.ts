@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { DeploySkippedError } from '../github/github.errors';
+import { StatusTransitionRefusedError } from './document-version.transitions';
 import {
   createStatusChange,
   guardedByOpenSuggestions,
@@ -66,6 +67,15 @@ describe('the two decisions the action asks before it loads anything', () => {
 });
 
 describe('changeStatus', () => {
+  it('refuses when someone else moved the version after it was read', async () => {
+    const { changeStatus, calls } = fakeDeps({ updateStatus: async () => null });
+    await assert.rejects(
+      changeStatus({ version: version(DocumentStatus.PENDING_TRANSLATION), to: DocumentStatus.IN_PROGRESS, actorId: 'u' }),
+      (error) => error instanceof StatusTransitionRefusedError && error.reason === 'not_allowed',
+    );
+    assert.deepEqual(calls, []);
+  });
+
   it('moves the version, logs it and tells the people involved, in that order', async () => {
     const { changeStatus, calls } = fakeDeps();
     const result = await changeStatus({

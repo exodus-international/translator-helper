@@ -139,7 +139,7 @@ export function AiWorkflowPanel({ user, canManage }: { user: SessionUser; canMan
             <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             <span>{aiError}</span>
           </p>
-          {canManage && status !== DocumentStatus.DEPLOYED && (
+          {canManage && (
             <Button size="sm" variant="outline" onClick={handleRetry} disabled={busy}>
               <RotateCcw />
               Retry

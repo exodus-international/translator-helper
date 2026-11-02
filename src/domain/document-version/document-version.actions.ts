@@ -292,7 +292,11 @@ export async function updateDocumentVersionStatusAction(
     const result = await changeStatus({ version: existingVersion, to: status, actorId: user.id });
     // Approving the audio text is the last thing a person does in the AI
     // workflow; the deploy that follows runs after this response.
-    if (existingVersion.workflow === TranslationWorkflow.AI && status === DocumentStatus.APPROVED) {
+    if (
+      existingVersion.workflow === TranslationWorkflow.AI &&
+      existingVersion.status === DocumentStatus.AUDIO_REVIEW &&
+      status === DocumentStatus.APPROVED
+    ) {
       after(async () => {
         const { runAiSteps } = await import('../ai-workflow/ai-workflow.runtime');
         await runAiSteps([versionId]);

@@ -63,7 +63,8 @@ export function toStatusChangeRefusal(error: unknown, currentStatus: DocumentSta
 
 export interface StatusChangeDeps<Version> {
   countOpenSuggestions: (versionId: string) => Promise<number>;
-  updateStatus: (versionId: string, status: DocumentStatus) => Promise<Version>;
+  /** Moves the version only if it is still at `from`; null when someone else moved it first. */
+  updateStatus: (versionId: string, status: DocumentStatus, from: DocumentStatus) => Promise<Version | null>;
   log: (entry: {
     documentVersionId: string;
     userId: string;
@@ -101,7 +102,10 @@ export function createStatusChange<Version>(deps: StatusChangeDeps<Version>) {
       : undefined;
     validateTransition(existing.status, to, { openSuggestionsCount, workflow, by });
 
-    const version = await deps.updateStatus(existing.id, to);
+    const version = await deps.updateStatus(existing.id, to, existing.status);
+    if (!version) {
+      throw new StatusTransitionRefusedError(`The version is no longer ${existing.status}`, 'not_allowed');
+    }
 
     await deps.log({ documentVersionId: existing.id, userId: actorId, action: 'status_updated', details: { status: to } });
     await deps.notify({ versionId: existing.id, actorId, from: existing.status, to });

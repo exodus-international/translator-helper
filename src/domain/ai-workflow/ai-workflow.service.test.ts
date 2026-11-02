@@ -48,6 +48,9 @@ function fakeDeps(initial: AiStepVersion | null, overrides: Partial<AiWorkflowDe
       record('saveDraft', content);
       return { version: 2 };
     },
+    clearAiNotes: async () => record('clearAiNotes'),
+    hasDeployed: async () => false,
+    redeploy: async () => record('redeploy'),
     createNote: async (note) => record('createNote', note),
     countOpenSuggestions: async () => 0,
     addApproval: async (_id, userId) => {
@@ -159,6 +162,22 @@ describe('approveText', () => {
   });
 });
 
+describe('approveText when a comment opens meanwhile', () => {
+  it('takes the approval back and refuses, so approving again moves the text on', async () => {
+    const { workflow, calls, approvals } = fakeDeps(null, {
+      changeStatus: async () => {
+        throw new StatusTransitionRefusedError('open', 'open_suggestions');
+      },
+    });
+    await workflow.approveText({ version: inReview, userId: 'anna' });
+    const result = await workflow.approveText({ version: inReview, userId: 'ben' });
+    assert.ok(isRefusal(result));
+    assert.equal(result.refused.reason, 'open_suggestions');
+    assert.deepEqual([...approvals], ['anna']);
+    assert.ok(fns(calls).includes('removeApproval'));
+  });
+});
+
 describe('withdrawApproval', () => {
   it('takes the approval back while the text is in review', async () => {
     const { workflow } = fakeDeps(null);
@@ -180,7 +199,15 @@ describe('runStep: drafting', () => {
   it('saves the draft, turns notes into comments and hands it to review', async () => {
     const { workflow, calls } = fakeDeps(aiVersion(DocumentStatus.AI_TRANSLATING));
     assert.equal(await workflow.runStep('version-1'), 'done');
-    assert.deepEqual(fns(calls), ['claim', 'saveDraft', 'createNote', 'createNote', 'changeStatus', 'succeed']);
+    assert.deepEqual(fns(calls), [
+      'claim',
+      'saveDraft',
+      'clearAiNotes',
+      'createNote',
+      'createNote',
+      'changeStatus',
+      'succeed',
+    ]);
     assert.deepEqual(calls.find((call) => call.fn === 'changeStatus')?.args, [DocumentStatus.PENDING_REVIEW, AI_USER_ID]);
   });
 
@@ -273,6 +300,12 @@ describe('runStep: audio text', () => {
 });
 
 describe('runStep: automatic deploy', () => {
+  it('leaves a version moved back from deployed for a person to deploy again', async () => {
+    const { workflow, calls } = fakeDeps(aiVersion(DocumentStatus.APPROVED), { hasDeployed: async () => true });
+    assert.equal(await workflow.runStep('version-1'), 'skipped');
+    assert.deepEqual(calls, []);
+  });
+
   it('deploys and turns on automatic merge', async () => {
     const { workflow, calls } = fakeDeps(aiVersion(DocumentStatus.APPROVED));
     assert.equal(await workflow.runStep('version-1'), 'done');
@@ -335,5 +368,29 @@ describe('runStep: automatic deploy', () => {
     const [message, final] = calls.find((call) => call.fn === 'fail')!.args;
     assert.match(message as string, /automatic merge could not be turned on: Auto merge is not allowed/);
     assert.equal(final, true);
+  });
+});
+
+describe('retryDeploy', () => {
+  it('opens the pull request again, turns on merge and clears the error', async () => {
+    const { workflow, calls } = fakeDeps(aiVersion(DocumentStatus.DEPLOYED));
+    assert.equal(await workflow.retryDeploy('version-1'), 'done');
+    assert.deepEqual(fns(calls), ['redeploy', 'enableAutoMerge', 'succeed']);
+  });
+
+  it('records GitHub failing again for a person', async () => {
+    const { workflow, calls } = fakeDeps(aiVersion(DocumentStatus.DEPLOYED), {
+      enableAutoMerge: async () => {
+        throw new Error('Auto merge is not allowed for this repository');
+      },
+    });
+    assert.equal(await workflow.retryDeploy('version-1'), 'failed');
+    assert.deepEqual(calls.find((call) => call.fn === 'fail')?.args, ['Auto merge is not allowed for this repository', true]);
+  });
+
+  it('does nothing to a version that is not deployed', async () => {
+    const { workflow, calls } = fakeDeps(aiVersion(DocumentStatus.APPROVED));
+    assert.equal(await workflow.retryDeploy('version-1'), 'skipped');
+    assert.deepEqual(calls, []);
   });
 });

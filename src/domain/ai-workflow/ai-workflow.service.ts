@@ -53,6 +53,12 @@ export interface AiWorkflowDeps {
   succeed: (versionId: string) => Promise<void>;
   fail: (versionId: string, message: string, opts?: { final?: boolean }) => Promise<void>;
   saveDraft: (versionId: string, content: string) => Promise<{ version: number }>;
+  /** Removes the open notes an earlier, failed run of the draft step left. */
+  clearAiNotes: (versionId: string) => Promise<void>;
+  /** Whether the version was ever committed to GitHub; an undone deploy is redone by hand. */
+  hasDeployed: (versionId: string) => Promise<boolean>;
+  /** Commits the version and opens or updates its pull request again. */
+  redeploy: (versionId: string) => Promise<void>;
   createNote: (note: {
     documentVersionId: string;
     type: SuggestionType;
@@ -140,10 +146,17 @@ export function createAiWorkflow(deps: AiWorkflowDeps) {
     try {
       await deps.changeStatus({ version, to, actorId: userId, by: 'system' });
     } catch (error) {
+      if (!(error instanceof StatusTransitionRefusedError)) throw error;
       // Two people approving at once both count to two; the second move is
       // refused because the first already happened, which is fine.
-      if (error instanceof StatusTransitionRefusedError && error.reason === 'not_allowed') return { approverIds };
-      throw error;
+      if (error.reason === 'not_allowed') return { approverIds };
+      // A comment opened between the check above and the move. Take this
+      // approval back, so approving again once it is resolved moves the text
+      // on instead of leaving two approvals and nothing to press.
+      await deps.removeApproval(version.id, userId);
+      return refuse('Someone opened a comment meanwhile. Resolve it, then approve again.', {
+        reason: 'open_suggestions',
+      });
     }
     return { approverIds, advancedTo: to };
   }
@@ -170,6 +183,9 @@ export function createAiWorkflow(deps: AiWorkflowDeps) {
       return 'skipped';
     }
     if (version.aiAttempts >= MAX_AI_ATTEMPTS) return 'skipped';
+    // Moved back from DEPLOYED: undoing a deploy is a person's decision, and
+    // so is doing it again.
+    if (version.status === DocumentStatus.APPROVED && (await deps.hasDeployed(version.id))) return 'skipped';
     if (!(await deps.claim(version.id, version.status, version.aiAttempts))) return 'skipped';
 
     try {
@@ -218,6 +234,7 @@ export function createAiWorkflow(deps: AiWorkflowDeps) {
     });
 
     const saved = await deps.saveDraft(version.id, result.translation);
+    await deps.clearAiNotes(version.id);
     for (const note of result.notes) {
       const range = locateQuote(result.translation, note.quote);
       await deps.createNote({
@@ -290,7 +307,35 @@ export function createAiWorkflow(deps: AiWorkflowDeps) {
     return 'done';
   }
 
-  return { approveText, withdrawApproval, runStep };
+  /**
+   * Finishes a deploy that reached DEPLOYED but failed at GitHub: the pull
+   * request or the automatic merge. The status already says deployed, so
+   * this is not a step the sweep runs; the manager's Retry calls it.
+   */
+  async function retryDeploy(versionId: string): Promise<StepOutcome> {
+    const version = await deps.loadVersion(versionId);
+    if (!version || version.workflow !== TranslationWorkflow.AI || version.status !== DocumentStatus.DEPLOYED) {
+      return 'skipped';
+    }
+    try {
+      await deps.redeploy(version.id);
+      await deps.enableAutoMerge(version.id);
+      await deps.succeed(version.id);
+      return 'done';
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await deps.fail(version.id, message, { final: true });
+      await deps.log({
+        documentVersionId: version.id,
+        userId: AI_USER_ID,
+        action: 'ai_step_failed',
+        details: { status: version.status, error: message },
+      });
+      return 'failed';
+    }
+  }
+
+  return { approveText, withdrawApproval, runStep, retryDeploy };
 }
 
 /** A failure retrying cannot fix. Recorded as final, so the sweep leaves it for a person. */
