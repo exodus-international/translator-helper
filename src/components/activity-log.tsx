@@ -23,6 +23,8 @@ import {
   Rocket,
   RotateCcw,
   Send,
+  ThumbsDown,
+  ThumbsUp,
   Trash2,
   UserPlus,
   Volume2,
@@ -81,6 +83,9 @@ const ACTION_MAP: Record<string, ActionConfig> = {
   created_suggestion: { label: 'Created suggestion', icon: MessageSquarePlus, colorClass: 'text-info' },
   edited_suggestion: { label: 'Edited suggestion', icon: PenLine, colorClass: 'text-muted-foreground' },
   deleted_suggestion: { label: 'Deleted suggestion', icon: Trash2, colorClass: 'text-destructive' },
+  text_approved: { label: 'Approved the text', icon: ThumbsUp, colorClass: 'text-success' },
+  text_approval_withdrawn: { label: 'Withdrew text approval', icon: ThumbsDown, colorClass: 'text-muted-foreground' },
+  ai_step_failed: { label: 'AI step failed', icon: AlertTriangle, colorClass: 'text-destructive' },
 };
 
 const DEFAULT_CONFIG: ActionConfig = {

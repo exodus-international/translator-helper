@@ -16,6 +16,9 @@ function getStatusLabel(status: string): string {
     PENDING_REVIEW: 'Pending Review',
     APPROVED: 'Approved',
     DEPLOYED: 'Deployed',
+    AI_TRANSLATING: 'AI Translating',
+    AI_PREPARING_AUDIO: 'AI Preparing Audio',
+    AUDIO_REVIEW: 'Audio Review',
   };
   return statusLabels[status] || status;
 }
@@ -50,6 +53,7 @@ export function getDetailText(action: string, details: Record<string, any> | nul
       return null;
     case 'github_deploy_failed':
     case 'audio_generation_failed':
+    case 'ai_step_failed':
       return details.error ? truncate(details.error) : null;
     case 'created_suggestion':
     case 'deleted_suggestion':
