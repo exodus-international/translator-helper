@@ -79,6 +79,18 @@ Then('its status should become {string}', async ({ page }, status: string) => {
     .toBe(expected);
 });
 
+/**
+ * Someone watching the page while the AI translates sees the draft arrive:
+ * the panel refreshes the page every ten seconds, and the editor remounts
+ * when the status moves. No reload here, so a stale editor fails the step.
+ */
+Then("the AI's draft should show up without a reload", async ({ page }) => {
+  await expect.poll(() => currentStatus(page), { timeout: 45_000, intervals: [1_000] }).toBe(
+    statusName('PENDING_REVIEW' as DocumentStatus),
+  );
+  await expect(aiPanel(page)).toContainText('of 2 approvals');
+});
+
 function aiPanel(page: import('@playwright/test').Page) {
   return page.getByRole('region', { name: 'AI workflow' });
 }

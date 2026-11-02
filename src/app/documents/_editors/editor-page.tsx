@@ -4,7 +4,7 @@ import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
 import { isDraftPhase } from '@/lib/document-status';
 import { SessionUser } from '@/lib/session';
-import { Role } from '@/generated/prisma/enums';
+import { Role, TranslationWorkflow } from '@/generated/prisma/enums';
 import { canChangeLanguageStatus, canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { EDITOR_SIDEBAR_COOKIE_NAME, parseSidebarState } from '@/lib/sidebar-cookie';
@@ -71,9 +71,18 @@ export async function DocumentEditorPage({
   const storedSidebarState = parseSidebarState((await cookies()).get(EDITOR_SIDEBAR_COOKIE_NAME)?.value);
 
   if (targetVersion && !isDraftPhase(targetVersion.status)) {
+    // The editor's store reads the version once, when it mounts. In the AI
+    // workflow the app moves the version on its own (a finished draft, the
+    // audio text, the deploy), and the panel's polling only re-renders the
+    // page. Keying on the status remounts the editor when a step lands, so
+    // the new text shows without a reload. A manual version keeps one key, so
+    // a status change there never throws away what someone is typing.
+    const editorKey =
+      targetVersion.workflow === TranslationWorkflow.AI ? `ai:${targetVersion.status}` : 'manual';
     return (
       <SidebarStoredStateProvider cookieName={EDITOR_SIDEBAR_COOKIE_NAME} value={storedSidebarState}>
         <ReviewClient
+          key={editorKey}
           document={document}
           sourceVersion={sourceVersion}
           targetVersion={targetVersion}
