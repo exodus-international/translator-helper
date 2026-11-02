@@ -3,7 +3,7 @@ import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 const NONE: DocumentStatus[] = [];
 
 /** The manual workflow: a translator drafts, a reviewer approves, a manager deploys. */
-export const VALID_TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
+const VALID_TRANSITIONS: Record<DocumentStatus, DocumentStatus[]> = {
   [DocumentStatus.PENDING_TRANSLATION]: [DocumentStatus.IN_PROGRESS],
   [DocumentStatus.IN_PROGRESS]: [DocumentStatus.PENDING_TRANSLATION, DocumentStatus.PENDING_REVIEW],
   [DocumentStatus.PENDING_REVIEW]: [DocumentStatus.IN_PROGRESS, DocumentStatus.APPROVED],

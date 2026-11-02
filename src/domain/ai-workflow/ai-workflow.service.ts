@@ -100,16 +100,16 @@ export interface AiWorkflowDeps {
 /** What a step run did, for the sweep's summary and the tests. */
 export type StepOutcome = 'done' | 'waiting' | 'failed' | 'skipped';
 
-export type ApprovalRefusal = Refusal<{ reason: 'not_in_text_review' | 'open_suggestions' }>;
+type ApprovalRefusal = Refusal<{ reason: 'not_in_text_review' | 'open_suggestions' }>;
 
-export interface ApprovalState {
+interface ApprovalState {
   approverIds: string[];
   /** Set when this approval moved the version on. */
   advancedTo?: DocumentStatus;
 }
 
 /** The statuses an AI step runs in. APPROVED is the automatic deploy. */
-export const AI_STEP_STATUSES: DocumentStatus[] = [
+const AI_STEP_STATUSES: DocumentStatus[] = [
   DocumentStatus.AI_TRANSLATING,
   DocumentStatus.AI_PREPARING_AUDIO,
   DocumentStatus.APPROVED,
