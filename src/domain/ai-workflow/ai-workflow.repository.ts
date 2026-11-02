@@ -1,8 +1,30 @@
 import prisma from '@/lib/db';
 import { userBrief } from '@/domain/user/user.select';
 import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
-import { AI_USER_ID, MAX_AI_ATTEMPTS } from './ai-workflow.rules';
+import { AI_USER_EMAIL, AI_USER_ID, MAX_AI_ATTEMPTS } from './ai-workflow.rules';
 import type { AiStepVersion } from './ai-workflow.service';
+
+let aiUserReady: Promise<unknown> | null = null;
+
+/**
+ * Makes sure the AI's user row exists. The migration creates it, but a
+ * database reseeded since (the seed empties the user table first) has lost
+ * it, and every draft, comment and log the AI writes points at it. Once per
+ * process is enough.
+ */
+export function ensureAiUser(): Promise<unknown> {
+  aiUserReady ??= prisma.user
+    .upsert({
+      where: { id: AI_USER_ID },
+      create: { id: AI_USER_ID, email: AI_USER_EMAIL, name: 'AI Translator', onboarded: true },
+      update: {},
+    })
+    .catch((error) => {
+      aiUserReady = null;
+      throw error;
+    });
+  return aiUserReady;
+}
 
 export async function loadAiStepVersion(versionId: string): Promise<AiStepVersion | null> {
   return prisma.documentVersion.findUnique({
@@ -109,6 +131,8 @@ export async function startAiWorkflowForDocument(documentId: string): Promise<st
 
 /** Moves the given untouched versions into the AI workflow. Returns the ids that moved. */
 export async function startAiWorkflowForVersions(versionIds: string[]): Promise<string[]> {
+  if (versionIds.length === 0) return [];
+  await ensureAiUser();
   const started: string[] = [];
   for (const id of versionIds) {
     const { count } = await prisma.documentVersion.updateMany({

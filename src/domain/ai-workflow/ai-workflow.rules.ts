@@ -10,6 +10,7 @@ import { lintDocument } from '@/lib/lint';
 
 /** The user every AI-written draft, comment and audio text is attributed to. Seeded by migration. */
 export const AI_USER_ID = '00000000-0000-4000-8000-00000000a1a1';
+export const AI_USER_EMAIL = 'ai-translator@translation-helper.invalid';
 
 /** Thumbs-up from this many different people move the text out of review. */
 export const REQUIRED_TEXT_APPROVALS = 2;

@@ -56,6 +56,17 @@ async function cleanup() {
     prisma.user.deleteMany(),
   ]);
   console.log(`Deleted ${counts.reduce((s, c) => s + c.count, 0)} records total`);
+
+  // The AI workflow's author, which the ai_workflow migration created and the
+  // cleanup above just deleted with every other user.
+  await prisma.user.create({
+    data: {
+      id: '00000000-0000-4000-8000-00000000a1a1',
+      email: 'ai-translator@translation-helper.invalid',
+      name: 'AI Translator',
+      onboarded: true,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
