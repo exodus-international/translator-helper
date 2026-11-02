@@ -12,6 +12,7 @@ import {
   addReviewApproval,
   claimAiStep,
   clearAiStep,
+  ensureAiUser,
   failAiStep,
   findDueAiSteps,
   listReviewApprovals,
@@ -94,6 +95,8 @@ export const aiWorkflow = createAiWorkflow({
  */
 export async function runAiSteps(versionIds: string[]): Promise<Record<StepOutcome, number>> {
   const tally: Record<StepOutcome, number> = { done: 0, waiting: 0, failed: 0, skipped: 0 };
+  if (versionIds.length === 0) return tally;
+  await ensureAiUser();
   for (const id of versionIds) {
     try {
       let outcome = await aiWorkflow.runStep(id);
