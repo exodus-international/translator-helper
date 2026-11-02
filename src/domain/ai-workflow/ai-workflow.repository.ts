@@ -1,6 +1,6 @@
 import prisma from '@/lib/db';
 import { userBrief } from '@/domain/user/user.select';
-import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
+import { DocumentStatus, SuggestionStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import { AI_USER_EMAIL, AI_USER_ID, MAX_AI_ATTEMPTS } from './ai-workflow.rules';
 import type { AiStepVersion } from './ai-workflow.service';
 
@@ -52,14 +52,31 @@ export async function loadSourceText(documentId: string): Promise<{ content: str
   return source ? { content: source.content, languageName: source.language.name } : null;
 }
 
+/** How long a claimed step may run before the sweep assumes its runner died. */
+const STEP_TIMEOUT_MS = 10 * 60_000;
+
 /**
  * `updateMany`, not `update`, because the row count is the lock: only one
  * caller moves the attempts from the value it read, and the status must still
  * be the one the step runs in.
+ *
+ * Attempts above zero mean a runner claimed the step. That claim is a lease:
+ * nobody else may take it until it has gone untouched for STEP_TIMEOUT_MS,
+ * so a sweep that reads the bumped attempts cannot claim a step still running.
  */
-export async function claimAiStep(versionId: string, status: DocumentStatus, expectedAttempts: number): Promise<boolean> {
+export async function claimAiStep(
+  versionId: string,
+  status: DocumentStatus,
+  expectedAttempts: number,
+  now = new Date(),
+): Promise<boolean> {
   const { count } = await prisma.documentVersion.updateMany({
-    where: { id: versionId, status, aiAttempts: expectedAttempts },
+    where: {
+      id: versionId,
+      status,
+      aiAttempts: expectedAttempts,
+      ...(expectedAttempts > 0 ? { updatedAt: { lt: new Date(now.getTime() - STEP_TIMEOUT_MS) } } : {}),
+    },
     data: { aiAttempts: expectedAttempts + 1 },
   });
   return count > 0;
@@ -100,6 +117,22 @@ export async function addReviewApproval(versionId: string, userId: string) {
 
 export async function removeReviewApproval(versionId: string, userId: string) {
   await prisma.reviewApproval.deleteMany({ where: { documentVersionId: versionId, userId } });
+}
+
+/** Whether the version has ever been committed to GitHub. */
+export async function hasGitHubCommit(versionId: string): Promise<boolean> {
+  return (await prisma.gitHubCommit.count({ where: { documentVersionId: versionId } })) > 0;
+}
+
+/**
+ * Removes the open comments the AI left on a version, before a retried draft
+ * adds its own. Left in place they would point at the earlier draft and block
+ * approval twice over.
+ */
+export async function deleteOpenAiNotes(versionId: string) {
+  await prisma.suggestion.deleteMany({
+    where: { documentVersionId: versionId, userId: AI_USER_ID, status: SuggestionStatus.OPEN },
+  });
 }
 
 export async function listReviewApprovals(versionId: string) {
@@ -154,9 +187,6 @@ export async function startAiWorkflowForVersions(versionIds: string[]): Promise<
   }
   return started;
 }
-
-/** How long a claimed step may run before the sweep assumes its runner died. */
-const STEP_TIMEOUT_MS = 10 * 60_000;
 
 /**
  * The AI-workflow versions with a step to run: never claimed, or claimed long

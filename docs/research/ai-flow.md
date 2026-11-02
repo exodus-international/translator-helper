@@ -4,7 +4,7 @@ Větev `feat/ai-flow`, stav k 2026-11-02. Původní rešerše proveditelnosti je
 
 ## Co je hotové
 
-- Přepínač na jazyce: Languages, jazyk, Settings, karta Workflow (Manual / AI). Platí jen pro nově nahrané dokumenty. Každá verze si workflow zkopíruje při vzniku, takže přepnutí nikdy nerozbije rozpracovaný dokument.
+- Přepínač na jazyce: Languages, jazyk, Settings, karta Workflow (Manual / AI). Platí jen pro nově nahrané dokumenty. Verze přejde do AI flow při nahrání (nebo když ji tam pošle manager) a už v něm zůstane, takže přepnutí nikdy nerozbije rozpracovaný dokument.
 - Nahrání anglického dokumentu pošle verze v AI jazycích AI. Překlad běží na pozadí po odeslání odpovědi. Kde si AI není jistá, založí komentář (nebo návrh změny, když má lepší znění) jako uživatel "AI Translator".
 - Review textu: všichni členové jazyka jsou revieweři, i translatoři. Tlačítko Approve text v panelu AI workflow. Dva různí lidé = posun dál. Palec platí i po pozdější úpravě textu (podle tvé odpovědi). Schválit nejde, dokud je otevřený jakýkoli komentář, včetně komentářů od AI.
 - AI připraví audio přepis (SSML ze záložky Audio text bez značek, které se nemají číst). Výstup se zahodí a krok zopakuje, když AI změní hlas nebo ztratí pauzu.

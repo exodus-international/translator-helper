@@ -12,9 +12,11 @@ import {
   addReviewApproval,
   claimAiStep,
   clearAiStep,
+  deleteOpenAiNotes,
   ensureAiUser,
   failAiStep,
   findDueAiSteps,
+  hasGitHubCommit,
   listReviewApprovals,
   loadAiStepVersion,
   loadSourceText,
@@ -36,6 +38,12 @@ export const aiWorkflow = createAiWorkflow({
   succeed: clearAiStep,
   fail: (versionId, message, opts) => failAiStep(versionId, message, opts?.final ?? false),
   saveDraft: saveAiDraft,
+  clearAiNotes: deleteOpenAiNotes,
+  hasDeployed: hasGitHubCommit,
+  redeploy: async (versionId) => {
+    const { deployToGitHub } = await import('../github/github.service');
+    await deployToGitHub(versionId);
+  },
   createNote: (note) =>
     createSuggestion({
       documentVersionId: note.documentVersionId,

@@ -86,6 +86,13 @@ export async function retryAiStepAction(versionId: string) {
   if (version.workflow !== TranslationWorkflow.AI || !version.aiError) {
     return refuse('There is no failed AI step to retry. The page now shows where the document is.');
   }
+  if (version.status === DocumentStatus.DEPLOYED) {
+    // Deployed already, but GitHub failed: finish the pull request and the
+    // merge now, so the panel shows the outcome when the page reloads.
+    const outcome = await aiWorkflow.retryDeploy(version.id);
+    revalidateDocumentPage();
+    return outcome === 'done' ? { retried: true as const } : refuse('GitHub failed again. The panel shows why.');
+  }
   await clearAiStep(version.id);
   runAfterResponse([version.id]);
   revalidateDocumentPage();
