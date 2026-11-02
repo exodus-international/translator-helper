@@ -385,6 +385,17 @@ The complete lifecycle of a document from creation to deployment:
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
+### The AI workflow
+
+A language set to the AI workflow skips the translator. When a document is
+uploaded, the AI drafts it and leaves a comment wherever it is unsure. Everyone
+on the language team then reviews: resolve the comments, edit what needs
+editing, and press **Approve text** in the AI workflow panel on the right. Two
+approvals from two different people move the document on. The AI prepares the
+audio text, one person checks it in the **Audio text** tab and chooses
+**Approve audio text** in the status menu, and the document deploys and merges
+on its own. See [AI_WORKFLOW.md](AI_WORKFLOW.md) for the details and the setup.
+
 ---
 
 ## Roles and Permissions
