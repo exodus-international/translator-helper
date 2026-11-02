@@ -294,10 +294,11 @@ export async function enableAutoMerge(documentVersionId: string): Promise<void> 
   const mergeMethod = (process.env.GITHUB_AUTO_MERGE_METHOD || 'MERGE').toUpperCase();
   try {
     await octokit.graphql(
-      `mutation($id: ID!, $method: PullRequestMergeMethod!) {
-        enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $method }) { clientMutationId }
+      // Not `$method`: octokit reserves `method` for the HTTP verb and refuses it as a variable.
+      `mutation($id: ID!, $mergeMethod: PullRequestMergeMethod!) {
+        enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: $mergeMethod }) { clientMutationId }
       }`,
-      { id: pr.node_id, method: mergeMethod },
+      { id: pr.node_id, mergeMethod },
     );
     console.log(`${LOG_PREFIX} Auto-merge enabled on PR #${pr.number}`);
   } catch (error: any) {

@@ -26,6 +26,9 @@ const SEEDED = [
   // the admin; Slovak only shows a translator what is not offered.
   { title: 'Day 2 - Discipline of Prayer', projectSlug: 'exodus90', slug: 'ex90-day-2', languageCode: 'cs' },
   { title: 'Day 1 - The Call', projectSlug: 'exodus90', slug: 'ex90-day-1', languageCode: 'sk' },
+  // Waiting to be started, in a language the admin and the reviewer both
+  // review; the AI workflow scenario hands it to the AI.
+  { title: 'Day 3 - Fasting and Freedom', projectSlug: 'exodus90', slug: 'ex90-day-3', languageCode: 'hr' },
 ] as const;
 
 const LANGUAGE_CODES: Record<string, string> = {

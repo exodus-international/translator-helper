@@ -25,7 +25,9 @@ import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analyt
 import { isTranslationStarted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
+import { startAiTranslationAction } from '@/domain/ai-workflow/ai-workflow.actions';
+import { isRefusal } from '@/lib/action-refusal';
 import { useEditorStore } from '@/lib/stores/editor-provider';
 import { Loader2, Maximize2, Minimize2, Sparkles, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -112,7 +114,7 @@ export default function TranslateClient({
       translationPreviewEmptyText="*No content yet...*"
       hideDetails
       autoSaveDelayMs={3000}
-      sidebarActions={<TranslateWorkflowActions user={user} targetLanguageId={targetLanguageId} />}
+      sidebarActions={<TranslateWorkflowActions user={user} targetLanguageId={targetLanguageId} canManage={canDeploy} />}
       sidebarSummary={
         initialTargetVersion ? (
           <>
@@ -282,7 +284,16 @@ function TranslatePanelActions({ zenMode, setZenMode }: { zenMode: boolean; setZ
 // beside the fields they move: submit to review, delete the version.
 // ──────────────────────────────────────────────────────────────────────
 
-function TranslateWorkflowActions({ user, targetLanguageId }: { user: SessionUser; targetLanguageId: string }) {
+function TranslateWorkflowActions({
+  user,
+  targetLanguageId,
+  canManage,
+}: {
+  user: SessionUser;
+  targetLanguageId: string;
+  /** The language's manager or an administrator. */
+  canManage: boolean;
+}) {
   const router = useRouter();
   const targetVersion = useEditorStore((s) => s.targetVersion);
   const setTargetVersion = useEditorStore((s) => s.setTargetVersion);
@@ -291,6 +302,7 @@ function TranslateWorkflowActions({ user, targetLanguageId }: { user: SessionUse
   const translateWithAi = useEditorStore((s) => s.translateWithAi);
   const aiTranslating = useEditorStore((s) => s.isLoading('aiTranslate'));
   const [deleting, setDeleting] = useState(false);
+  const [handingToAi, setHandingToAi] = useState(false);
 
   const handleDeleteTranslation = async () => {
     if (!targetVersion) return;
@@ -317,11 +329,41 @@ function TranslateWorkflowActions({ user, targetLanguageId }: { user: SessionUse
     );
   }
 
-  const busy = deleting || isAnyLoading;
+  const busy = deleting || handingToAi || isAnyLoading;
   const canDelete = targetVersion.status === DocumentStatus.PENDING_TRANSLATION && isAdminClient(user);
+  // A document uploaded before its language switched to the AI workflow
+  // waits here; its manager can hand it over.
+  const canHandToAi =
+    canManage &&
+    targetVersion.status === DocumentStatus.PENDING_TRANSLATION &&
+    targetVersion.language?.workflow === TranslationWorkflow.AI;
+
+  const handleHandToAi = async () => {
+    setHandingToAi(true);
+    try {
+      const result = await startAiTranslationAction(targetVersion.id);
+      if (isRefusal(result)) {
+        toast.warning(result.refused.message);
+      } else {
+        capture('ai_translation_started', { documentVersionId: targetVersion.id });
+        toast.success('Handed to the AI. The draft appears here when it is done.');
+      }
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to hand the document to the AI');
+    } finally {
+      setHandingToAi(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+      {canHandToAi && (
+        <Button size="sm" className="w-full justify-start" onClick={handleHandToAi} disabled={busy}>
+          {handingToAi ? <Loader2 className="animate-spin" /> : <Sparkles />}
+          Hand to the AI workflow
+        </Button>
+      )}
       <Button variant="outline" size="sm" className="w-full justify-start" onClick={translateWithAi} disabled={busy}>
         {aiTranslating ? <Loader2 className="animate-spin" /> : <Sparkles />}
         {aiTranslating ? 'Translating…' : 'AI translate'}

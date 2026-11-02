@@ -35,6 +35,11 @@ const QUALITY_LABELS: Record<AudioQuality, string> = {
   [AudioQuality.HIGH]: '48 kHz, 192 kbps',
 };
 
+const WORKFLOW_LABELS: Record<TranslationWorkflow, string> = {
+  [TranslationWorkflow.MANUAL]: 'Manual: a translator drafts',
+  [TranslationWorkflow.AI]: 'AI: the AI drafts, the team reviews',
+};
+
 interface LanguageSettingsClientProps {
   language: {
     id: string;
@@ -238,13 +243,17 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
               </CardHeader>
               <CardContent className="space-y-2">
                 <Label htmlFor="language-workflow">How new documents are translated</Label>
-                <Select value={workflow} onValueChange={(value) => setWorkflow(value as TranslationWorkflow)}>
+                <Select
+                  value={workflow}
+                  onValueChange={(value) => setWorkflow(value as TranslationWorkflow)}
+                  items={WORKFLOW_LABELS}
+                >
                   <SelectTrigger id="language-workflow" className="mt-1 sm:w-72">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={TranslationWorkflow.MANUAL}>Manual: a translator drafts</SelectItem>
-                    <SelectItem value={TranslationWorkflow.AI}>AI: the AI drafts, the team reviews</SelectItem>
+                    <SelectItem value={TranslationWorkflow.MANUAL}>{WORKFLOW_LABELS[TranslationWorkflow.MANUAL]}</SelectItem>
+                    <SelectItem value={TranslationWorkflow.AI}>{WORKFLOW_LABELS[TranslationWorkflow.AI]}</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-muted-foreground text-xs">

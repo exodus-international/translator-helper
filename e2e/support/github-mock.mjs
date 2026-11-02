@@ -9,7 +9,8 @@
  *
  * It answers the sequence `deployToGitHub` makes: an installation token, a
  * branch check, a look for the existing file, the commit, a look for an open
- * pull request, and the pull request itself. Anything else is a 404 with a
+ * pull request, and the pull request itself. The AI workflow then reads the
+ * pull request back and turns on auto-merge through GraphQL. Anything else is a 404 with a
  * log line, so a new call in the service shows up as a failed deploy rather
  * than a hang.
  *
@@ -62,6 +63,19 @@ const ROUTES = [
     path: /^\/repos\/[^/]+\/[^/]+\/pulls\/\d+$/,
     status: 200,
     body: () => ({ number: PR_NUMBER, html_url: PR_URL }),
+  },
+  {
+    method: 'GET',
+    path: /^\/repos\/[^/]+\/[^/]+\/pulls\/\d+$/,
+    status: 200,
+    body: () => ({ number: PR_NUMBER, html_url: PR_URL, node_id: 'PR_stub', state: 'open', merged: false }),
+  },
+  // enablePullRequestAutoMerge, the only GraphQL call the app makes.
+  {
+    method: 'POST',
+    path: /^\/graphql$/,
+    status: 200,
+    body: () => ({ data: { enablePullRequestAutoMerge: { clientMutationId: null } } }),
   },
 ];
 
