@@ -6,6 +6,7 @@ import {
   SourceProjectStatus,
   SuggestionStatus,
   SuggestionType,
+  TranslationWorkflow,
 } from '../../src/generated/prisma/client';
 
 // ---------------------------------------------------------------------------
@@ -39,6 +40,9 @@ export const LANGUAGES = [
     branchName: 'translations/cs',
     translationInstructions:
       'Use formal Czech (vykani). Maintain paragraph structure and Markdown formatting. Keep Scripture references in the standard CEP format.',
+    // The Czech team is the one moving to the AI workflow, so a fresh
+    // database shows it there; the other languages stay manual.
+    workflow: TranslationWorkflow.AI,
   },
   {
     code: 'sk',
