@@ -7,6 +7,7 @@ import {
   NotificationType,
   ProjectRole,
   SuggestionType,
+  TranslationWorkflow,
 } from '@/generated/prisma/enums';
 import { wantsEmail } from './notification.catalog';
 import { effectiveDueAt, formatDueDate, reminderFor } from './notification.deadlines';
@@ -87,6 +88,7 @@ async function loadVersion(versionId: string) {
     select: {
       id: true,
       status: true,
+      workflow: true,
       userId: true,
       reviewerId: true,
       assignedById: true,
@@ -138,6 +140,15 @@ async function languageManagers(languageIds: string[]): Promise<Map<string, stri
     byLanguage.set(row.languageId, [...(byLanguage.get(row.languageId) ?? []), row.userId]);
   }
   return byLanguage;
+}
+
+/** Everyone on a language's team, whatever their role. */
+async function languageMembers(languageId: string): Promise<string[]> {
+  const rows = await prisma.userLanguage.findMany({
+    where: { languageId, user: { banned: false } },
+    select: { userId: true },
+  });
+  return rows.map((row) => row.userId);
 }
 
 function truncate(text: string, max = 160): string {
@@ -295,6 +306,24 @@ export async function notifyStatusChange(input: {
     const actorName = await nameOf(input.actorId);
     const base = { documentVersionId: version.id, actorId: input.actorId, url: versionUrl(version) };
 
+    // In the AI workflow the whole team reviews and nobody is the translator,
+    // so the people told are the team, at the two steps that wait for them.
+    if (version.workflow === TranslationWorkflow.AI) {
+      const step =
+        input.to === DocumentStatus.PENDING_REVIEW
+          ? { title: `The AI draft of ${workName(version)} is ready for review`, body: 'It moves on after two approvals.' }
+          : input.to === DocumentStatus.AUDIO_REVIEW
+            ? { title: `The audio text of ${workName(version)} is ready for review`, body: 'One approval sends it to deploy.' }
+            : null;
+      if (!step) return [];
+      return (await languageMembers(version.languageId)).map((userId) => ({
+        ...base,
+        userId,
+        type: NotificationType.REVIEW_REQUESTED,
+        ...step,
+      }));
+    }
+
     if (input.to === DocumentStatus.PENDING_REVIEW && input.from !== DocumentStatus.APPROVED) {
       if (version.reviewerId) {
         const reviewDue = reviewDueDate(version);
@@ -405,6 +434,7 @@ export async function notifySuggestionReply(input: { suggestionId: string; actor
 const deadlineSelect = {
   id: true,
   status: true,
+  workflow: true,
   userId: true,
   reviewerId: true,
   assignedById: true,

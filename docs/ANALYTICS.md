@@ -142,3 +142,15 @@ Fired from client handlers only (the status dropdown and the audio card), never 
 | `audio_playback_started` | The inline player started playing (once per page view) | `documentVersionId`, `provider`, `voice` |
 | `audio_url_copied` | Copy URL pressed | `documentVersionId` |
 | `audio_generation_failed` | The card observed a failed generation, or approval reported one | `documentVersionId`, `kind` (`configuration`, `content`, `provider`, `unknown`) |
+
+### AI workflow events
+Fired from the AI workflow panel in the review editor. The steps the app runs
+on its own (drafting, the audio text, the automatic deploy) are not client
+events; the activity log records them as `ai_step_failed` when they fail.
+
+| Event | When | Properties |
+|---|---|---|
+| `ai_text_approved` | A reviewer gave the AI draft a thumbs-up | `documentVersionId`, `advanced` (true when it was the approval that moved the text on) |
+| `ai_text_approval_withdrawn` | A reviewer took their thumbs-up back | `documentVersionId` |
+| `ai_step_retried` | A manager pressed Retry on a failed AI step | `documentVersionId`, `status` |
+| `ai_translation_started` | A manager handed a waiting document to the AI by hand | `documentVersionId` |

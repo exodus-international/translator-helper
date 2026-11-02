@@ -17,6 +17,7 @@ export const assignmentSelect = {
   documentId: true,
   languageId: true,
   status: true,
+  workflow: true,
   version: true,
   deadline: true,
   assignedAt: true,
@@ -271,8 +272,23 @@ export async function getDocumentVersionLanguage(id: string): Promise<{ language
 export async function getWorkVersionsForUser(userId: string): Promise<VersionAssignment[]> {
   return prisma.documentVersion.findMany({
     where: {
-      status: { notIn: [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED] },
-      OR: [{ userId }, { reviewerId: userId }],
+      OR: [
+        {
+          status: { notIn: [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED] },
+          OR: [{ userId }, { reviewerId: userId }],
+        },
+        // In the AI workflow nobody is assigned: the whole team reviews. The
+        // text waits on everyone who has not approved it yet, the audio text
+        // on everyone.
+        {
+          workflow: TranslationWorkflow.AI,
+          language: { users: { some: { userId } } },
+          OR: [
+            { status: DocumentStatus.PENDING_REVIEW, approvals: { none: { userId } } },
+            { status: DocumentStatus.AUDIO_REVIEW },
+          ],
+        },
+      ],
     },
     select: assignmentSelect,
     orderBy: {

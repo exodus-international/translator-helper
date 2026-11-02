@@ -44,6 +44,7 @@ const documentListSelect = {
       documentId: true,
       languageId: true,
       status: true,
+      workflow: true,
       version: true,
       deadline: true,
       assignedAt: true,

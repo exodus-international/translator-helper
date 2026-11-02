@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
-import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
+import { boardStatus, DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import {
   DocumentTypeFilterValue,
   matchesDocumentTypeFilter,
@@ -42,7 +42,8 @@ import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { toast } from 'sonner';
 import type { Language } from '@/generated/prisma/client';
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
+import { allowedTransitions } from '@/domain/document-version/document-version.transitions';
 import { FileCheck, FileText, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useState } from 'react';
@@ -113,7 +114,8 @@ type KanbanColumn = {
 const getColumnForStatus = (status: DocumentStatus | null | undefined, hasVersion: boolean): string => {
   if (!hasVersion || !status) return 'pending';
 
-  switch (status) {
+  // The AI workflow's own steps sit in the column they stand in for.
+  switch (boardStatus(status)) {
     case DocumentStatus.PENDING_TRANSLATION:
       return 'pending';
     case DocumentStatus.IN_PROGRESS:
@@ -449,6 +451,18 @@ export default function ProjectKanbanBoard({
         const versionId = hasVersion ? doc.versions[0].id : null;
 
         if (newStatus && versionId) {
+          // The AI workflow moves its documents itself; a person only approves
+          // the audio text and deploys. Anything else would be refused anyway.
+          const version = doc.versions[0];
+          if (
+            version.workflow === TranslationWorkflow.AI &&
+            !allowedTransitions(version.status, TranslationWorkflow.AI).includes(newStatus)
+          ) {
+            toast.warning('This document is in the AI workflow, which moves it on its own');
+            await loadDocuments();
+            continue;
+          }
+
           // Refused here rather than by the server after the drop: the card
           // would otherwise land in the column, fail, and spring back.
           const leavingDeployed = getStatusForColumn(oldCard.column) === DocumentStatus.DEPLOYED;

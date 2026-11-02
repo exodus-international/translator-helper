@@ -128,7 +128,8 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
   },
   'suggestion/suggestion.actions.ts': {
     getSuggestionsByDocumentVersionAction: ['authenticated'],
-    createSuggestionAction: ['authenticated', 'project:reviewer', 'admin'],
+    // Any member on an AI-workflow version, where everyone reviews.
+    createSuggestionAction: ['authenticated', 'project:member', 'project:reviewer', 'admin'],
     applySuggestionAction: ['authenticated', 'project:translator', 'admin'],
     dismissSuggestionAction: ['authenticated', 'project:translator', 'admin'],
     reopenSuggestionAction: ['authenticated', 'project:reviewer|translator', 'admin'],

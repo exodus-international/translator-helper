@@ -1,7 +1,7 @@
 'use server';
 
 import { authorize } from '@/lib/authorize';
-import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
+import { SuggestionStatus, SuggestionType, TranslationWorkflow } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
@@ -38,9 +38,12 @@ export async function createSuggestionAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = createSuggestionSchema.parse(input);
 
-  const { translationProject } = await resolveTranslationProject(validated.documentVersionId);
+  const { version, translationProject } = await resolveTranslationProject(validated.documentVersionId);
 
-  if (translationProject) {
+  if (translationProject && version.workflow === TranslationWorkflow.AI) {
+    // The AI is the translator there, so everyone on the team reviews.
+    await authorize({ project: translationProject.id, role: 'member' });
+  } else if (translationProject) {
     await authorize({ project: translationProject.id, role: 'reviewer' });
   } else {
     await authorize('admin');
