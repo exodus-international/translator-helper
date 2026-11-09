@@ -51,3 +51,8 @@ export const updateDocumentSchema = z
   })
   .superRefine(refineFilenameForType);
 
+
+export const toggleDocumentLabelSchema = z.object({
+  documentId: z.string().uuid(),
+  label: z.string().trim().min(1).max(100),
+});

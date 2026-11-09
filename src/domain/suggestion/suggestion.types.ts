@@ -43,6 +43,19 @@ export const createSuggestionReplySchema = z.object({
   content: z.string().min(1),
 });
 
+export const suggestionFiltersSchema = z
+  .object({
+    status: z.union([z.nativeEnum(SuggestionStatus), z.literal('ALL')]).optional(),
+    type: z.union([z.nativeEnum(SuggestionType), z.literal('ALL')]).optional(),
+    userId: z.string().min(1).max(100).optional(),
+  })
+  .strict();
+
+export const getSuggestionsSchema = z.object({
+  documentVersionId: z.string().uuid(),
+  filters: suggestionFiltersSchema.optional(),
+});
+
 export interface SuggestionFilters {
   status?: SuggestionStatus | 'ALL';
   type?: SuggestionType | 'ALL';
