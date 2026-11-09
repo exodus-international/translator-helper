@@ -52,9 +52,13 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     assignTranslatorToVersionAction: ['project:manager'],
     getWorkVersionsForUserAction: ['authenticated'],
     listVersionsForTranslationProjectAction: ['project:member'],
+    // Then assertCanEditDocumentVersionContent: translator in the language, and
+    // no edits to APPROVED or DEPLOYED text except by an administrator.
     updateDocumentVersionAction: ['authenticated'],
     // Member of the project when there is one, administrator otherwise.
     submitForReviewAction: ['authenticated', 'project:member', 'admin'],
+    // Then assertCanDeleteDocumentVersion: the edit rule for drafts, the
+    // language's manager once the version is in review or later.
     deleteDocumentVersionAction: ['authenticated'],
     // Anyone on the language team moves a version, not only its translator;
     // the language's manager as well when the move enters or leaves DEPLOYED.
@@ -75,6 +79,7 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     toggleDocumentLabelAction: ['authenticated'],
   },
   'github/github.actions.ts': {
+    // Then assertDeployableStatus: only APPROVED or DEPLOYED versions.
     deployToGitHubAction: ['language:manager'],
     getGitHubCommitsForVersionAction: ['authenticated'],
   },
