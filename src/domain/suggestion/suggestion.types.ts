@@ -43,7 +43,7 @@ export const createSuggestionReplySchema = z.object({
   content: z.string().min(1),
 });
 
-export const suggestionFiltersSchema = z
+const suggestionFiltersSchema = z
   .object({
     status: z.union([z.nativeEnum(SuggestionStatus), z.literal('ALL')]).optional(),
     type: z.union([z.nativeEnum(SuggestionType), z.literal('ALL')]).optional(),
