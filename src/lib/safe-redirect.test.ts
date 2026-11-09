@@ -17,6 +17,21 @@ describe('safeRedirectPath', () => {
     assert.equal(safeRedirectPath('//evil.example'), '/dashboard');
     assert.equal(safeRedirectPath('/\\evil.example'), '/dashboard');
   });
+
+  it('refuses control characters that URL parsers strip, which turn a path into an off-site URL', () => {
+    assert.equal(safeRedirectPath('/\t/evil.com'), '/dashboard');
+    assert.equal(safeRedirectPath('/\n/evil.com'), '/dashboard');
+    assert.equal(safeRedirectPath('/\t\\evil.com'), '/dashboard');
+  });
+
+  it('keeps valid paths that have a query string and a hash', () => {
+    assert.equal(
+      safeRedirectPath('/documents/exodus90/day-1/cs?tab=audio#x'),
+      '/documents/exodus90/day-1/cs?tab=audio#x',
+    );
+    assert.equal(safeRedirectPath('/dashboard'), '/dashboard');
+    assert.equal(safeRedirectPath('/documents/sml/day-3/hr?thread=abc'), '/documents/sml/day-3/hr?thread=abc');
+  });
 });
 
 describe('loginPath', () => {

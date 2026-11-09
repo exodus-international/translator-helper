@@ -5,6 +5,14 @@
  */
 export function safeRedirectPath(from: string | null | undefined, fallback = '/dashboard'): string {
   if (!from || !from.startsWith('/') || from.startsWith('//') || from.startsWith('/\\')) return fallback;
+  // URL parsers strip tabs and newlines and treat backslashes as slashes, so
+  // `/\t/evil.example` would parse as a protocol-relative URL. Refuse them outright.
+  for (let i = 0; i < from.length; i++) {
+    const code = from.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f || from[i] === '\\') return fallback;
+  }
+  // Confirm the path stays on this site once parsed, against a dummy origin.
+  if (new URL(from, 'http://internal.invalid').origin !== 'http://internal.invalid') return fallback;
   return from;
 }
 
