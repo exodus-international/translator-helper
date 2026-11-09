@@ -178,6 +178,20 @@ GITHUB_REPO_NAME=repo-name
 
 Each language needs a **branch name** configured in the language settings.
 
+Deploying commits the translation to its language branch and opens a pull request into `main`. To
+have each deploy merge its pull request straight away, so deploying publishes, also set:
+
+```
+GITHUB_MERGE_ON_DEPLOY=true
+```
+
+The pull request is merged with a merge commit, never a squash or rebase, because the language
+branch lives on after the merge. If the content repository deletes head branches on merge, the next
+deploy recreates the language branch from `main`. A merge GitHub refuses, for example over a
+required review or status check or a conflict, leaves the pull request open and the deploy still
+counts: the deployer sees why, and someone merges it on GitHub. Required checks or reviews on
+`main` block every merge, so a repository that has them needs the GitHub App on its bypass list.
+
 #### Deployer-Specific Dashboard
 
 Your dashboard additionally shows:

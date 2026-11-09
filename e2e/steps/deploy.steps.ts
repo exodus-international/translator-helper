@@ -16,9 +16,13 @@ When('I deploy the translation', async ({ page }) => {
   }
 });
 
-Then('I should see that the pull request was created', async ({ page }) => {
+Then('I should see that the pull request was merged', async ({ page }) => {
   // Reported as a toast once the server action returns with the PR.
-  await expect(page.getByText('GitHub PR created successfully')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Deployed and merged into main')).toBeVisible({ timeout: 30_000 });
+});
+
+Then('the pull request should show as merged', async ({ page }) => {
+  await expect(page.getByText('MERGED', { exact: true }).first()).toBeVisible();
 });
 
 Then('the document should link to pull request {int}', async ({ page }, number: number) => {

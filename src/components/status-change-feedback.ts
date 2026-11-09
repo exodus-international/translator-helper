@@ -79,11 +79,19 @@ export async function withStatusChangeFeedback(
   }
 
   if (result.github?.status === 'success') {
-    const prUrl = result.github.prUrl;
-    deps.toast.success(prUrl ? 'GitHub PR created successfully' : 'Deployed to GitHub successfully', {
-      action: prUrl ? { label: 'Open PR', onClick: () => deps.open(prUrl) } : undefined,
-      duration: 8000,
-    });
+    const { prUrl, merged, mergeError } = result.github;
+    const action = prUrl ? { label: 'Open PR', onClick: () => deps.open(prUrl) } : undefined;
+    if (merged === false) {
+      // Deployed, but the pull request is still open, so nothing is live yet.
+      deps.toast.error(`GitHub PR opened but not merged: ${mergeError}`, { action, duration: 10000 });
+    } else if (merged) {
+      deps.toast.success('Deployed and merged into main', { action, duration: 8000 });
+    } else {
+      deps.toast.success(prUrl ? 'GitHub PR created successfully' : 'Deployed to GitHub successfully', {
+        action,
+        duration: 8000,
+      });
+    }
   } else if (result.github?.status === 'failed') {
     deps.toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
   }

@@ -9,7 +9,7 @@
  *
  * It answers the sequence `deployToGitHub` makes: an installation token, a
  * branch check, a look for the existing file, the commit, a look for an open
- * pull request, and the pull request itself. Anything else is a 404 with a
+ * pull request, the pull request itself, and its merge. Anything else is a 404 with a
  * log line, so a new call in the service shows up as a failed deploy rather
  * than a hang.
  *
@@ -22,6 +22,7 @@ const PORT = Number(process.env.GITHUB_MOCK_PORT || 3198);
 const PR_NUMBER = 42;
 const PR_URL = `https://github.example/stub/content/pull/${PR_NUMBER}`;
 const COMMIT_SHA = '0123456789abcdef0123456789abcdef01234567';
+const MERGE_SHA = '89abcdef0123456789abcdef0123456789abcdef';
 
 const ROUTES = [
   {
@@ -56,6 +57,12 @@ const ROUTES = [
     path: /^\/repos\/[^/]+\/[^/]+\/pulls$/,
     status: 201,
     body: () => ({ number: PR_NUMBER, html_url: PR_URL }),
+  },
+  {
+    method: 'PUT',
+    path: /^\/repos\/[^/]+\/[^/]+\/pulls\/\d+\/merge$/,
+    status: 200,
+    body: () => ({ sha: MERGE_SHA, merged: true, message: 'Pull Request successfully merged' }),
   },
   {
     method: 'PATCH',
