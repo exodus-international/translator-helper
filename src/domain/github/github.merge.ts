@@ -11,6 +11,8 @@ export interface MergeDeps {
    * Throws GitHub's error, with its HTTP `status`, when it will not.
    */
   merge: (headSha: string) => Promise<{ sha: string }>;
+  /** The merge commit if the pull request is already merged, else null. */
+  mergedSha: () => Promise<string | null>;
   wait: (ms: number) => Promise<void>;
 }
 
@@ -31,11 +33,24 @@ export const SUPERSEDED_REASON = 'Another deploy pushed to the branch before thi
  * second deploy for the same language pushed in between, GitHub answers 409
  * and this one stands down, because the second deploy's merge includes it.
  *
+ * Before giving up it asks whether the pull request is merged after all: a
+ * concurrent deploy may have merged it, this commit included, before this
+ * one tried, and GitHub then refuses to merge it again.
+ *
  * Never throws. A merge that does not happen leaves the pull request open,
  * which is where a deploy stood before merging existed, so the caller reports
  * it rather than failing the deploy.
  */
 export async function mergePullRequest(deps: MergeDeps, headSha: string): Promise<MergeOutcome> {
+  const outcome = await attemptMerge(deps, headSha);
+  if (outcome.merged) return outcome;
+
+  const mergedSha = await deps.mergedSha().catch(() => null);
+  return mergedSha ? { merged: true, sha: mergedSha } : outcome;
+}
+
+/** Tries the merge, retrying while GitHub is still checking the pull request. */
+async function attemptMerge(deps: MergeDeps, headSha: string): Promise<MergeOutcome> {
   for (let attempt = 0; ; attempt++) {
     try {
       const { sha } = await deps.merge(headSha);

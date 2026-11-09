@@ -112,6 +112,14 @@ async function mergeDeployPullRequest(params: {
         });
         return { sha: data.sha };
       },
+      mergedSha: async () => {
+        const { data } = await octokit.rest.pulls.get({
+          owner: config.repoOwner,
+          repo: config.repoName,
+          pull_number: params.prNumber,
+        });
+        return data.merged ? data.merge_commit_sha : null;
+      },
       wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     },
     params.headSha,
@@ -324,11 +332,9 @@ export async function deployToGitHub(documentVersionId: string): Promise<DeployR
 
   const pr = await findOrCreatePullRequest(language.branchName, prTitle, prBody);
 
-  const merge = mergeOnDeploy
-    ? await mergeDeployPullRequest({ prNumber: pr.number, headSha: commitSha, title: prTitle })
-    : undefined;
-
-  // Save to database
+  // Saved before merging, so that whichever deploy's merge publishes this
+  // commit finds the row when it marks the pull request merged. Saved after,
+  // a concurrent deploy could merge in between and leave this row OPEN.
   console.log(`${LOG_PREFIX} Saving GitHubCommit record to database`);
   await createGitHubCommit({
     documentVersionId,
@@ -337,12 +343,16 @@ export async function deployToGitHub(documentVersionId: string): Promise<DeployR
     filePath,
     prNumber: pr.number,
     prUrl: pr.url,
-    prStatus: merge?.merged ? GitHubPRStatus.MERGED : GitHubPRStatus.OPEN,
+    prStatus: GitHubPRStatus.OPEN,
   });
 
-  // The merge took every earlier deploy still waiting in this pull request
-  // with it. The webhook says so too, but it can land before the row above
-  // exists, or not at all where no webhook is set up.
+  const merge = mergeOnDeploy
+    ? await mergeDeployPullRequest({ prNumber: pr.number, headSha: commitSha, title: prTitle })
+    : undefined;
+
+  // The merge took this deploy and every earlier one still waiting in the
+  // pull request with it. The webhook says so too, but not where no webhook
+  // is set up.
   if (merge?.merged) {
     await markPullRequestMerged(pr.number);
   }

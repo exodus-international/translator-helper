@@ -7,7 +7,7 @@ function httpError(status: number, message: string) {
   return Object.assign(new Error(message), { status });
 }
 
-function fakeDeps(answers: Array<{ sha: string } | Error>) {
+function fakeDeps(answers: Array<{ sha: string } | Error>, mergedSha: () => Promise<string | null> = async () => null) {
   const merged: string[] = [];
   const waited: number[] = [];
   const deps: MergeDeps = {
@@ -18,6 +18,7 @@ function fakeDeps(answers: Array<{ sha: string } | Error>) {
       if (answer instanceof Error) throw answer;
       return answer;
     },
+    mergedSha,
     wait: async (ms) => {
       waited.push(ms);
     },
@@ -60,5 +61,23 @@ describe('mergePullRequest', () => {
     const { deps, merged } = fakeDeps([httpError(500, 'Server Error')]);
     assert.deepEqual(await mergePullRequest(deps, 'head-sha'), { merged: false, reason: 'Server Error' });
     assert.equal(merged.length, 1);
+  });
+
+  it('counts a pull request another deploy already merged as merged', async () => {
+    const refusal = httpError(405, 'Pull Request is not mergeable');
+    const { deps } = fakeDeps([refusal, refusal, refusal], async () => 'their-merge-sha');
+    assert.deepEqual(await mergePullRequest(deps, 'head-sha'), { merged: true, sha: 'their-merge-sha' });
+  });
+
+  it('counts a superseded deploy as merged once the other deploy has merged', async () => {
+    const { deps } = fakeDeps([httpError(409, 'Head branch was modified')], async () => 'their-merge-sha');
+    assert.deepEqual(await mergePullRequest(deps, 'head-sha'), { merged: true, sha: 'their-merge-sha' });
+  });
+
+  it('keeps the merge failure when checking the pull request fails too', async () => {
+    const { deps } = fakeDeps([httpError(500, 'Server Error')], async () => {
+      throw new Error('network down');
+    });
+    assert.deepEqual(await mergePullRequest(deps, 'head-sha'), { merged: false, reason: 'Server Error' });
   });
 });
