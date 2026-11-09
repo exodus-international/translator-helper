@@ -5,6 +5,7 @@ import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
+import { assertCanEditDocumentVersionContent } from '../document-version/document-version.permissions';
 import { resolveTranslationProject } from '../document-version/resolve-translation-project';
 import { createApplySuggestion, refuseClosedSuggestion } from './suggestion.apply';
 import { notifySuggestionAdded, notifySuggestionReply } from '../notification/notification.service';
@@ -118,6 +119,10 @@ export async function applySuggestionAction(input: unknown) {
     await authorize('admin');
   }
 
+  // Applying rewrites the version's text, so it answers to the same rule as
+  // editing it: no changes to APPROVED or DEPLOYED text except by an admin.
+  await assertCanEditDocumentVersionContent(suggestion.documentVersionId, user);
+
   return applySuggestion({
     suggestion,
     versionId: suggestion.documentVersionId,
@@ -211,6 +216,11 @@ export async function reopenSuggestionAction(input: unknown) {
     const revertedContent = currentContent.replace(suggestion.proposedText, suggestion.originalText);
 
     if (revertedContent !== currentContent) {
+      // Reverting rewrites the version's text: the edit rule applies, so
+      // approved or deployed text stays as it is. A reopen that writes no
+      // text is not frozen.
+      await assertCanEditDocumentVersionContent(suggestion.documentVersionId, user);
+
       const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, revertedContent, user.id);
 
       // Clear originalText and set status to OPEN
