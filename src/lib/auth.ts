@@ -75,5 +75,8 @@ export const auth = betterAuth({
   // incoming request, which breaks redirect/callback URLs behind proxies and
   // logs a warning on every cold start.
   baseURL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-  trustedOrigins: ['http://localhost:3000', process.env.NEXT_PUBLIC_APP_URL || ''],
+  trustedOrigins: [
+    process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : '',
+    process.env.NEXT_PUBLIC_APP_URL || '',
+  ].filter(Boolean),
 });
