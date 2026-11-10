@@ -14,6 +14,7 @@ import {
   createSuggestionSchema,
   dismissSuggestionSchema,
   editSuggestionSchema,
+  getSuggestionsSchema,
   reopenSuggestionSchema,
 } from './suggestion.types';
 import {
@@ -29,9 +30,10 @@ function truncate(text: string, max = 80) {
   return text.length > max ? text.slice(0, max) + '…' : text;
 }
 
-export async function getSuggestionsByDocumentVersionAction(documentVersionId: string, filters?: any) {
+export async function getSuggestionsByDocumentVersionAction(documentVersionId: unknown, filters?: unknown) {
   await authorize('authenticated');
-  return await getSuggestionsByDocumentVersion(documentVersionId, filters);
+  const validated = getSuggestionsSchema.parse({ documentVersionId, filters });
+  return await getSuggestionsByDocumentVersion(validated.documentVersionId, validated.filters);
 }
 
 export async function createSuggestionAction(input: unknown) {
@@ -264,6 +266,15 @@ export async function editSuggestionAction(input: unknown) {
     throw new Error('Forbidden: You can only edit your own suggestions');
   }
 
+  const { translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
+
+  // Writing on a suggestion needs a seat on the language the version is in.
+  if (translationProject) {
+    await authorize({ project: translationProject.id, role: 'member' });
+  } else {
+    await authorize('admin');
+  }
+
   if (suggestion.status !== SuggestionStatus.OPEN) {
     return refuseClosedSuggestion();
   }
@@ -300,6 +311,15 @@ export async function createSuggestionReplyAction(input: unknown) {
   const suggestion = await getSuggestionById(validated.suggestionId);
   if (!suggestion) {
     throw new Error('Suggestion not found');
+  }
+
+  const { translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
+
+  // Writing on a suggestion needs a seat on the language the version is in.
+  if (translationProject) {
+    await authorize({ project: translationProject.id, role: 'member' });
+  } else {
+    await authorize('admin');
   }
 
   const reply = await createSuggestionReply({

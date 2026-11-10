@@ -70,8 +70,9 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     deleteDocumentActionVoid: ['admin'],
     listDocumentsOverviewAction: ['admin'],
     getDashboardDocumentsAction: ['authenticated'],
-    // Open to every signed-in person on purpose: reviewers relabel documents
-    // they do not otherwise edit.
+    // Reviewers relabel documents they do not otherwise edit, so no role is
+    // asked for; admins or members of a team on the document's source project
+    // pass canAccessSourceProject, checked against the row.
     toggleDocumentLabelAction: ['authenticated'],
   },
   'github/github.actions.ts': {
@@ -121,9 +122,9 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     applySuggestionAction: ['authenticated', 'project:translator', 'admin'],
     dismissSuggestionAction: ['authenticated', 'project:translator', 'admin'],
     reopenSuggestionAction: ['authenticated', 'project:reviewer|translator', 'admin'],
-    // The author only, checked against the row.
-    editSuggestionAction: ['authenticated'],
-    createSuggestionReplyAction: ['authenticated'],
+    // The author only, checked against the row, and still on the language.
+    editSuggestionAction: ['authenticated', 'project:member', 'admin'],
+    createSuggestionReplyAction: ['authenticated', 'project:member', 'admin'],
   },
   'translation-project/translation-project.actions.ts': {
     listTranslationProjectsAction: ['authenticated'],
