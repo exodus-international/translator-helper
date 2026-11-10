@@ -5,7 +5,7 @@ import { Role } from '@/generated/prisma/enums';
 import { canManageSourceProject } from '@/lib/permissions';
 import { listTargetLanguages } from '../language/language.repository';
 import { createTranslationProject } from '../translation-project/translation-project.repository';
-import { createSourceProjectSchema, updateSourceProjectSchema } from './source-project.types';
+import { createSourceProjectSchema, updateSourceProjectSchema, updatesAdminOnlyFields } from './source-project.types';
 import { rethrowUniqueViolation } from './source-project.errors';
 import {
   countSourceProjects,
@@ -106,13 +106,8 @@ export async function updateSourceProjectAction(id: string, input: unknown) {
       throw new Error('Forbidden: Only deployers and project managers can manage source projects');
     }
 
-    // Project managers can only update status, not name, description or audio settings
-    if (
-      validated.name !== undefined ||
-      validated.description !== undefined ||
-      validated.audioDocumentTypes !== undefined ||
-      validated.acronym !== undefined
-    ) {
+    // Project managers can only update status; every other field is shared by all languages
+    if (updatesAdminOnlyFields(validated)) {
       throw new Error('Forbidden: Project managers can only update project status');
     }
   }
