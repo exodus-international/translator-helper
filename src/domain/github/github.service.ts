@@ -4,8 +4,9 @@ import { getGitHubConfig } from '@/lib/github-config';
 import { GitHubPRStatus } from '@/generated/prisma/enums';
 import { App, Octokit } from 'octokit';
 import { resolveFilePath } from './github.paths';
-import { createGitHubCommit } from './github.repository';
+import { createGitHubCommit, markPullRequestMerged } from './github.repository';
 import { DeploySkippedError } from './github.errors';
+import { mergePullRequest, type MergeOutcome } from './github.merge';
 
 const LOG_PREFIX = '[GitHub]';
 
@@ -53,6 +54,83 @@ async function verifyBranchExists(branch: string): Promise<boolean> {
     console.error(`${LOG_PREFIX} Error checking branch "${branch}":`, error.message);
     throw error;
   }
+}
+
+/**
+ * Makes the language branch again from main.
+ *
+ * Only a deploy that merges calls this: if the content repository deletes
+ * head branches on merge, the first merge takes the language branch with it,
+ * and every deploy after it would fail on a branch that no longer exists.
+ * Main already holds everything the old branch carried, so a branch cut from
+ * it loses nothing.
+ */
+async function createBranchFromMain(branch: string): Promise<void> {
+  const config = getGitHubConfig();
+  const octokit = await getOctokit();
+
+  const { data: main } = await octokit.rest.repos.getBranch({
+    owner: config.repoOwner,
+    repo: config.repoName,
+    branch: 'main',
+  });
+  console.log(`${LOG_PREFIX} Creating branch "${branch}" from main (sha: ${main.commit.sha.substring(0, 7)})`);
+  await octokit.rest.git.createRef({
+    owner: config.repoOwner,
+    repo: config.repoName,
+    ref: `refs/heads/${branch}`,
+    sha: main.commit.sha,
+  });
+}
+
+/**
+ * Merges the deploy's pull request into main with a merge commit.
+ *
+ * Never a squash or a rebase: the language branch outlives the merge, and
+ * either would put new commits on main that the branch does not have, so the
+ * next pull request would carry this deploy's commits again.
+ */
+async function mergeDeployPullRequest(params: {
+  prNumber: number;
+  headSha: string;
+  title: string;
+}): Promise<MergeOutcome> {
+  const config = getGitHubConfig();
+  const octokit = await getOctokit();
+
+  console.log(`${LOG_PREFIX} Merging PR #${params.prNumber} at ${params.headSha.substring(0, 7)}`);
+  const outcome = await mergePullRequest(
+    {
+      merge: async (sha) => {
+        const { data } = await octokit.rest.pulls.merge({
+          owner: config.repoOwner,
+          repo: config.repoName,
+          pull_number: params.prNumber,
+          sha,
+          merge_method: 'merge',
+          commit_title: `${params.title} (#${params.prNumber})`,
+        });
+        return { sha: data.sha };
+      },
+      mergedSha: async () => {
+        const { data } = await octokit.rest.pulls.get({
+          owner: config.repoOwner,
+          repo: config.repoName,
+          pull_number: params.prNumber,
+        });
+        return data.merged ? data.merge_commit_sha : null;
+      },
+      wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    },
+    params.headSha,
+  );
+
+  if (outcome.merged) {
+    console.log(`${LOG_PREFIX} PR #${params.prNumber} merged (sha: ${outcome.sha.substring(0, 7)})`);
+  } else {
+    console.warn(`${LOG_PREFIX} PR #${params.prNumber} left open: ${outcome.reason}`);
+  }
+  return outcome;
 }
 
 async function commitFileToRepo(params: {
@@ -151,7 +229,13 @@ async function findOrCreatePullRequest(
   return { number: data.number, url: data.html_url };
 }
 
-export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl: string }> {
+export interface DeployResult {
+  prUrl: string;
+  /** Only when merging on deploy is on; absent means the pull request was left open by design. */
+  merge?: MergeOutcome;
+}
+
+export async function deployToGitHub(documentVersionId: string): Promise<DeployResult> {
   console.log(`${LOG_PREFIX} ========== Starting GitHub deploy ==========`);
   console.log(`${LOG_PREFIX} Document version ID: ${documentVersionId}`);
 
@@ -200,10 +284,15 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     throw new Error(`Document "${document.title}" does not have a type set`);
   }
 
+  const { mergeOnDeploy } = getGitHubConfig();
+
   // Verify branch exists
   const branchExists = await verifyBranchExists(language.branchName);
   if (!branchExists) {
-    throw new Error(`Branch "${language.branchName}" does not exist in the repository`);
+    if (!mergeOnDeploy) {
+      throw new Error(`Branch "${language.branchName}" does not exist in the repository`);
+    }
+    await createBranchFromMain(language.branchName);
   }
 
   // Resolve file path
@@ -243,7 +332,9 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
 
   const pr = await findOrCreatePullRequest(language.branchName, prTitle, prBody);
 
-  // Save to database
+  // Saved before merging, so that whichever deploy's merge publishes this
+  // commit finds the row when it marks the pull request merged. Saved after,
+  // a concurrent deploy could merge in between and leave this row OPEN.
   console.log(`${LOG_PREFIX} Saving GitHubCommit record to database`);
   await createGitHubCommit({
     documentVersionId,
@@ -255,6 +346,17 @@ export async function deployToGitHub(documentVersionId: string): Promise<{ prUrl
     prStatus: GitHubPRStatus.OPEN,
   });
 
+  const merge = mergeOnDeploy
+    ? await mergeDeployPullRequest({ prNumber: pr.number, headSha: commitSha, title: prTitle })
+    : undefined;
+
+  // The merge took this deploy and every earlier one still waiting in the
+  // pull request with it. The webhook says so too, but not where no webhook
+  // is set up.
+  if (merge?.merged) {
+    await markPullRequestMerged(pr.number);
+  }
+
   console.log(`${LOG_PREFIX} ========== GitHub deploy complete ==========`);
-  return { prUrl: pr.url };
+  return { prUrl: pr.url, merge };
 }

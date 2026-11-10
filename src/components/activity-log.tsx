@@ -1,6 +1,7 @@
 'use client';
 
 import { GithubIcon } from '@/components/github-icon';
+import { getDetailText } from '@/components/activity-log-detail';
 import { UserAvatar } from '@/components/user-avatar';
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -104,76 +105,6 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString();
 }
 
-function getStatusLabel(status: string): string {
-  const statusLabels: Record<string, string> = {
-    PENDING_TRANSLATION: 'Pending Translation',
-    IN_PROGRESS: 'In Progress',
-    PENDING_REVIEW: 'Pending Review',
-    APPROVED: 'Approved',
-    DEPLOYED: 'Deployed',
-  };
-  return statusLabels[status] || status;
-}
-
-function getDetailText(action: string, details: Record<string, any> | null): string | null {
-  if (!details || Object.keys(details).length === 0) return null;
-
-  switch (action) {
-    case 'edited':
-      return null;
-    case 'status_updated':
-      return details.status ? `\u2192 ${getStatusLabel(details.status)}` : null;
-    case 'created':
-      return details.title || null;
-    case 'approved':
-    case 'requested_changes':
-      return details.hasComment ? 'with comment' : null;
-    case 'started_translation':
-    case 'created_translation':
-    case 'assigned_translation':
-      return details.language || null;
-    case 'audio_generation_started':
-    case 'audio_regeneration_requested':
-      return details.voice || null;
-    case 'audio_transcript_edited':
-      return details.characters ? `${details.characters} characters` : null;
-    case 'github_deploy_failed':
-    case 'audio_generation_failed':
-      return details.error ? (details.error.length > 60 ? details.error.slice(0, 60) + '...' : details.error) : null;
-    case 'created_suggestion':
-    case 'deleted_suggestion':
-    case 'dismissed_suggestion': {
-      const type = details.type === 'CHANGE' ? 'Change' : 'Comment';
-      const line = details.startLine
-        ? details.startLine === details.endLine
-          ? `L${details.startLine}`
-          : `L${details.startLine}-${details.endLine}`
-        : 'General';
-      const comment = details.comment ? `'${details.comment}'` : null;
-      return [type, line, comment].filter(Boolean).join(' · ');
-    }
-    case 'applied_suggestion': {
-      const type = details.type === 'CHANGE' ? 'Change' : 'Comment';
-      const range = details.range;
-      const line = range?.startLine
-        ? range.startLine === range.endLine
-          ? `L${range.startLine}`
-          : `L${range.startLine}-${range.endLine}`
-        : null;
-      return [type, line].filter(Boolean).join(' · ');
-    }
-    case 'reopened_suggestion': {
-      const type = details.type === 'CHANGE' ? 'Change' : 'Comment';
-      const reverted = details.reverted ? 'reverted' : null;
-      return [type, reverted].filter(Boolean).join(' · ');
-    }
-    case 'edited_suggestion': {
-      return details.comment ? `'${details.comment}'` : null;
-    }
-    default:
-      return null;
-  }
-}
 
 interface CollapsedEntry {
   entries: ActivityLogEntry[];
