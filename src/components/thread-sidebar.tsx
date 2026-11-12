@@ -128,7 +128,7 @@ export function ThreadSidebar({
           Feedback{openThreads.length > 0 ? ` (${openThreads.length} open)` : ''}
         </h3>
         {canCreateSuggestions && onCreateGeneralThread && (
-          <Button size="xs" variant="outline" onClick={() => setShowGeneralInput(!showGeneralInput)}>
+          <Button size="xs" className="max-md:h-11 max-md:px-3" variant="outline" onClick={() => setShowGeneralInput(!showGeneralInput)}>
             <MessageSquarePlus />
             General
           </Button>
@@ -152,11 +152,12 @@ export function ThreadSidebar({
             }}
           />
           <div className="mt-1.5 flex gap-1.5">
-            <Button size="xs" onClick={handleSubmitGeneralThread} disabled={!generalComment.trim()}>
+            <Button size="xs" className="max-md:h-11 max-md:px-3" onClick={handleSubmitGeneralThread} disabled={!generalComment.trim()}>
               Submit
             </Button>
             <Button
               size="xs"
+              className="max-md:h-11 max-md:px-3"
               variant="outline"
               onClick={() => {
                 setShowGeneralInput(false);

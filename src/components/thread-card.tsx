@@ -207,6 +207,7 @@ export function ThreadCard({
           {suggestion.type === SuggestionType.CHANGE && isAnchored && onApply && (
             <Button
               size="xs"
+              className="max-md:h-11 max-md:px-3"
               onClick={(e) => {
                 e.stopPropagation();
                 onApply(suggestion.id);
@@ -219,6 +220,7 @@ export function ThreadCard({
           {onDismiss && (
             <Button
               size="xs"
+              className="max-md:h-11 max-md:px-3"
               variant="outline"
               onClick={(e) => {
                 e.stopPropagation();
@@ -238,7 +240,7 @@ export function ThreadCard({
                 e.stopPropagation();
                 setIsEditing(true);
               }}
-              className="ml-auto"
+              className="ml-auto max-md:size-11"
             >
               <PencilLine />
             </Button>
@@ -251,6 +253,7 @@ export function ThreadCard({
         <div className="mt-2 flex gap-1.5">
           <Button
             size="xs"
+              className="max-md:h-11 max-md:px-3"
             variant="outline"
             onClick={(e) => {
               e.stopPropagation();
