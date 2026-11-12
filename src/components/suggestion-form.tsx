@@ -105,10 +105,10 @@ export function SuggestionForm({
       )}
 
       <div className="flex gap-2 justify-end">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="max-md:h-11">
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting || (type === SuggestionType.CHANGE && !proposedText.trim())}>
+        <Button type="submit" className="max-md:h-11" disabled={isSubmitting || (type === SuggestionType.CHANGE && !proposedText.trim())}>
           {isSubmitting ? 'Saving...' : 'Save'}
         </Button>
       </div>
