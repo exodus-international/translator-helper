@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { useToolbarPlacement, type SelectionBox } from '@/components/editor/toolbar-placement';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { MessageSquare, Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -23,6 +24,7 @@ export function SuggestionInlineToolbar({
   containerRef,
 }: SuggestionInlineToolbarProps) {
   const [isVisible, setIsVisible] = useState(true);
+  const isMobile = useIsMobile();
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   // Placed as the formatting toolbar is. It used to go 46px above a point just
@@ -52,6 +54,29 @@ export function SuggestionInlineToolbar({
   };
 
   if (!isVisible) return null;
+
+  // On a phone the OS draws its own menu over a touch selection, so a toolbar
+  // placed above the selection would fight it for the same spot. The actions
+  // dock to the bottom of the screen instead, sized for a thumb.
+  if (isMobile) {
+    return createPortal(
+      <div
+        role="toolbar"
+        aria-label="Selection actions"
+        className="fixed inset-x-0 bottom-0 z-50 flex gap-2 border-t bg-popover p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-popover-foreground shadow-lg"
+      >
+        <Button variant="outline" className="h-11 flex-1" onClick={() => { onComment(); setIsVisible(false); }}>
+          <MessageSquare data-icon="inline-start" />
+          Comment
+        </Button>
+        <Button className="h-11 flex-1" onClick={() => { onSuggestEdit(); setIsVisible(false); }}>
+          <Pencil data-icon="inline-start" />
+          Suggest edit
+        </Button>
+      </div>,
+      document.body,
+    );
+  }
 
   const toolbar = (
     <div

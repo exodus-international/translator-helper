@@ -263,3 +263,19 @@ test('a reviewer who may not edit is left in review whatever the handle asks', a
   ref.current?.enterTranslationEditMode();
   assert.equal(translationPane().hasAttribute('readonly'), true);
 });
+
+test('on a phone the translation pane opens the comments in one tap, with the open count on the button', async () => {
+  const desktopWidth = window.innerWidth;
+  Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 390 });
+  try {
+    render(<Harness variant="review" suggestions={[openChange]} currentUserId="user-other" canCreateSuggestions />);
+    const user = userEvent.setup();
+    const open = await screen.findByRole('button', { name: 'Open comments, 1 open' });
+    assert.equal(open.textContent, '1');
+    await user.click(open);
+    const feedback = await screen.findByRole('dialog');
+    assert.ok(within(feedback).getByRole('article', { name: 'Feedback from Ivan Horvat' }));
+  } finally {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: desktopWidth });
+  }
+});

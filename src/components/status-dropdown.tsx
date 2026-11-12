@@ -207,7 +207,7 @@ export function StatusDropdown({
       aria-label={`Document status: ${currentStatusConfig.name}`}
       disabled={disabled || loading || !canChangeStatus || translatorCannotChangeDeployedDocumentStatus}
       className={cn(
-        'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none',
+        'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none max-md:min-h-11',
         currentStatusConfig.color.badgeClass,
         'border',
         'hover:opacity-90',
@@ -261,7 +261,7 @@ export function StatusDropdown({
                 key={status}
                 disabled={isDisabled}
                 className={cn(
-                  'relative flex items-center gap-2 px-2 py-2 text-sm rounded-sm outline-none',
+                  'relative flex items-center gap-2 px-2 py-2 text-sm rounded-sm outline-none max-md:min-h-11',
                   isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-accent focus:bg-accent',
                   isCurrentStatus && 'bg-info/10 opacity-60',
                 )}
