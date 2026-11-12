@@ -403,21 +403,49 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // moves with the selection as the pane scrolls.
     useFollowSelection(toolbarPosition !== null, translationContainerRef, translationEditorRef, setToolbarPosition);
 
+    // Threads are anchored to editor lines, so a thread tapped while the pane
+    // shows Live or Audio text first switches the pane to its editor. Leaving
+    // Audio text asks before it drops an unsaved draft.
+    const showTranslationEditor = (proceed: () => void) => {
+      if (isYaml || translationRawVisible) {
+        proceed();
+        return;
+      }
+      if (variant === 'translate') {
+        setTranslateTab('edit');
+        proceed();
+        return;
+      }
+      if (reviewViewMode === 'audio') {
+        requestLeaveAudioText(() => {
+          setReviewViewMode('review');
+          proceed();
+        });
+        return;
+      }
+      setReviewViewMode('review');
+      proceed();
+    };
+
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
       setActiveThreadId(suggestion.id);
+      const needsLayout = isMobile || !(isYaml || translationRawVisible);
       if (isMobile) {
         // The thread list lives in the mobile Sheet; jump back to the
         // translation pane so the selected suggestion is actually visible.
         setOpenMobile(false);
         setMobilePane('translation');
-        // The pane was display:none until this render; reveal the lines once
-        // it is laid out, or the editor has no height to scroll in.
-        setTimeout(() => revealSuggestion(suggestion), 50);
-        onSuggestionClick?.(suggestion);
-        return;
       }
-      revealSuggestion(suggestion);
-      onSuggestionClick?.(suggestion);
+      showTranslationEditor(() => {
+        // A pane or editor that was hidden until this render has no height to
+        // scroll in yet; reveal the lines once it is laid out.
+        if (needsLayout) {
+          setTimeout(() => revealSuggestion(suggestion), 50);
+        } else {
+          revealSuggestion(suggestion);
+        }
+        onSuggestionClick?.(suggestion);
+      });
     };
 
     const revealSuggestion = (suggestion: SuggestionWithUser) => {
