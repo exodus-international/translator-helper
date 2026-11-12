@@ -53,7 +53,9 @@ export function PaneTabs<T extends string>({
 
   return (
     <Tabs value={value} onValueChange={(next) => onValueChange(next as T)}>
-      <TabsList className="h-8">
+      {/* Icons go on a phone: the header holds the tabs, copy and the comments
+          button in one row at 390px. */}
+      <TabsList className="h-8 max-md:[&_svg]:hidden">
         {tabs.map((tab) => (
           <TabsTrigger key={tab.value} value={tab.value}>
             {tab.icon}
