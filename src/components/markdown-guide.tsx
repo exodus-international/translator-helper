@@ -250,7 +250,7 @@ export function MarkdownGuide({ variant = 'icon' }: { variant?: 'icon' | 'button
 
   if (variant === 'button') {
     return (
-      <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" className="w-full justify-start max-md:h-11" onClick={() => setOpen(true)}>
         <BookOpen />
         Markdown guide
       </Button>
