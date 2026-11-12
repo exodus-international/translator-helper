@@ -198,7 +198,11 @@ export function ThreadCard({
 
       {/* Reply input */}
       {suggestion.status === SuggestionStatus.OPEN && onReply && (
-        <ThreadReplyInput onSubmit={(content) => onReply(suggestion.id, content)} />
+        // Typing a reply is not a tap on the thread: it must not jump to the
+        // passage, which on a phone also closes the sheet holding this card.
+        <div onClick={(e) => e.stopPropagation()}>
+          <ThreadReplyInput onSubmit={(content) => onReply(suggestion.id, content)} />
+        </div>
       )}
 
       {/* Actions */}
