@@ -224,3 +224,12 @@ test('translateWithChatGPT leaves a fully-fenced Markdown response intact', asyn
   // also when no filename is provided (defaults to Markdown handling)
   assert.equal(await translateReturning(fenced), fenced);
 });
+
+test('buildTranslationMessages puts the Scripture instructions just before the source', () => {
+  const [, user] = buildTranslationMessages({
+    ...promptBase,
+    sourceContent: 'Read {{bible:1}}.',
+    scripturePrompt: 'Scripture: keep {{bible:1}}.',
+  });
+  assert.ok(user.content.endsWith('Scripture: keep {{bible:1}}.\n\nSource content:\n\nRead {{bible:1}}.'));
+});
