@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { SuggestionFormSurface } from './suggestion-form-surface';
@@ -48,6 +48,32 @@ test('closing the bottom sheet asks to close the form, so a draft can be kept', 
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Close' }));
   assert.equal(asked, 1);
+});
+
+test('with the keyboard up the bottom sheet sits above it, inside what is still visible', async () => {
+  setWidth(390);
+  const listeners = new Set<() => void>();
+  const viewport = {
+    height: 844,
+    offsetTop: 0,
+    addEventListener: (_: string, fn: () => void) => listeners.add(fn),
+    removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
+  };
+  const innerHeight = window.innerHeight;
+  Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 844 });
+  Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+  try {
+    render(<Surface />);
+    const dialog = await screen.findByRole('dialog', { name: 'Comment' });
+    // The keyboard takes the bottom 300px; iOS leaves innerHeight as it was.
+    viewport.height = 544;
+    await act(async () => listeners.forEach((fn) => fn()));
+    assert.equal(dialog.style.bottom, '300px');
+    assert.equal(dialog.style.maxHeight, `${Math.round(544 * 0.85)}px`);
+  } finally {
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: undefined });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: innerHeight });
+  }
 });
 
 test('on a desktop the form stays the draggable floating window', async () => {
