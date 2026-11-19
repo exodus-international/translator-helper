@@ -22,10 +22,13 @@ export function OfficialText({ text, className }: { text: string; className?: st
   );
 }
 
-/** The translation's quotation against the official text: struck words go, underlined words come in. */
+/**
+ * The translation's quotation against the official text: struck words go,
+ * underlined words come in. Masked, as it shows the document's own words.
+ */
 export function WordDiff({ parts, className }: { parts: DiffPart[]; className?: string }) {
   return (
-    <p className={cn('text-[13px] leading-relaxed text-muted-foreground', className)} style={READER_FONT}>
+    <p className={cn('ph-mask text-[13px] leading-relaxed text-muted-foreground', className)} style={READER_FONT}>
       {parts.map((part, i) => (
         <span key={i}>
           {i > 0 && ' '}

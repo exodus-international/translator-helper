@@ -436,7 +436,7 @@ export function BibleChat({ translation, onInsert, compact = false }: BibleChatP
             turns.map((turn, i) =>
               turn.role === 'user' ? (
                 <div key={turn.id} className="flex justify-end">
-                  <p className="max-w-[85%] rounded-lg bg-muted px-3 py-2 text-sm whitespace-pre-wrap">{turn.content}</p>
+                  <p className="ph-mask max-w-[85%] rounded-lg bg-muted px-3 py-2 text-sm whitespace-pre-wrap">{turn.content}</p>
                 </div>
               ) : (
                 <AssistantMessage
