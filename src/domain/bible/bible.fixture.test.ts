@@ -122,3 +122,20 @@ describe('import files', () => {
     assert.equal(custom.languageCode, 'hr');
   });
 });
+
+describe('a Bible that lacks a book', () => {
+  it('says the book is missing from that Bible, not that the reference is wrong', async () => {
+    const file = parseTranslationFile(fixture('sar-hr.json'));
+    const declarations = parseDeclarationsFile(fixture('sar-hr.versification.json'));
+    const withoutJoel = prepareTranslation(
+      { ...file, books: file.books.filter((b) => b.usfm !== 'JOL') },
+      resolveMeta('sar-hr', {}),
+      { ...declarations, books: Object.fromEntries(Object.entries(declarations.books).filter(([usfm]) => usfm !== 'JOL')) },
+    );
+    const partial = memoryBible([source, withoutJoel]);
+    const r = await resolvePassage(partial, 'Joel 2:28', partial.findTranslation('hr')!, DEFAULT_INCLUDE);
+    assert.equal(r.status, 'book_not_in_translation');
+    assert.equal(r.text, undefined);
+    assert.equal((await resolvePassage(partial, 'John 3:16', partial.findTranslation('hr')!, DEFAULT_INCLUDE)).status, 'ok');
+  });
+});
