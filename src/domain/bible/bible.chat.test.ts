@@ -219,3 +219,71 @@ test('tool results are capped by count and size', () => {
   assert.equal(kept.length + omitted, 50);
   assert.ok(JSON.stringify(kept).length <= 4000 + kept.length);
 });
+
+test('a search shows the verses it found and sends them to the model', async () => {
+  const searched: unknown[] = [];
+  const bible = backend({
+    search: async (translation, query, book) => {
+      searched.push([translation, query, book]);
+      return { translation: 'sar-hr', passages: [john316] };
+    },
+  });
+  const { fetchFn, bodies } = scripted([
+    () => json(toolCall('s1', 'search_bible', { query: 'ljubio svijet', book: 'JHN' })),
+    () => json(answer('To je Iv 3,16.')),
+  ]);
+
+  const events = await collect(runBibleChat(ask('Where does it say God so loved the world?'), deps(fetchFn, bible)));
+
+  assert.deepEqual(searched, [['sar-hr', 'ljubio svijet', 'JHN']]);
+  assert.deepEqual(events[0], { type: 'tool', name: 'search_bible', args: { query: 'ljubio svijet', translation: 'sar-hr', book: 'JHN' } });
+  const passages = events.find((e) => e.type === 'passages') as Extract<ChatEvent, { type: 'passages' }>;
+  assert.equal(passages.passages[0]!.text, OFFICIAL);
+  const tool = (bodies[1]!.messages as Array<{ role: string; content: string }>).find((m) => m.role === 'tool')!;
+  assert.equal(JSON.parse(tool.content).passages[0].citation, 'Iv 3,16');
+});
+
+test('a search that finds nothing tells the model so', async () => {
+  const { fetchFn, bodies } = scripted([
+    () => json(toolCall('s1', 'search_bible', { query: 'nepostojeća riječ' })),
+    () => json(answer('Nema takvog retka.')),
+  ]);
+
+  const events = await collect(runBibleChat(ask('Find nepostojeća riječ'), deps(fetchFn, backend())));
+
+  assert.equal(events.some((e) => e.type === 'passages' && e.passages.length > 0), false);
+  const tool = (bodies[1]!.messages as Array<{ role: string; content: string }>).find((m) => m.role === 'tool')!;
+  assert.equal(JSON.parse(tool.content).note, 'No verse contains all of these words.');
+});
+
+test('a chapter goes to the model with verse numbers and to the UI as one passage', async () => {
+  const chapter: PassageResult = {
+    ...john316,
+    ref: 'JHN 3',
+    rendered: 'Iv 3',
+    text: 'Prvi redak. Drugi redak.',
+    verses: [
+      { id: 'JHN.3.1', chapter: 3, verse: 1, text: 'Prvi redak.' },
+      { id: 'JHN.3.2', chapter: 3, verse: 2, text: 'Drugi redak.' },
+    ],
+  };
+  const asked: unknown[] = [];
+  const bible = backend({
+    chapter: async (translation, book, n) => {
+      asked.push([translation, book, n]);
+      return { translation: 'sar-hr', passage: chapter };
+    },
+  });
+  const { fetchFn, bodies } = scripted([
+    () => json(toolCall('c1', 'get_chapter', { book: 'JHN', chapter: 3 })),
+    () => json(answer('Evo Ivana 3.')),
+  ]);
+
+  const events = await collect(runBibleChat(ask('Read John 3'), deps(fetchFn, bible)));
+
+  assert.deepEqual(asked, [['sar-hr', 'JHN', 3]]);
+  const passages = events.find((e) => e.type === 'passages') as Extract<ChatEvent, { type: 'passages' }>;
+  assert.equal(passages.passages[0]!.text, 'Prvi redak. Drugi redak.');
+  const tool = (bodies[1]!.messages as Array<{ role: string; content: string }>).find((m) => m.role === 'tool')!;
+  assert.equal(JSON.parse(tool.content).passages[0].text, '[1] Prvi redak. [2] Drugi redak.');
+});
