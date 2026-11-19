@@ -31,7 +31,16 @@ interface Summary {
  * RSV-CE: which resolve, and which do not and why. It only informs; the
  * document is created either way.
  */
-export function CitationSummary({ content, className }: { content: string; className?: string }) {
+export function CitationSummary({
+  content,
+  className,
+  check = checkReferences,
+}: {
+  content: string;
+  className?: string;
+  /** How the references are checked; the Bible's own check unless a test gives another. */
+  check?: (refs: string[]) => Promise<Map<string, ReferenceCheck>>;
+}) {
   const refs = useMemo(() => [...new Set(findCitations(content).map((c) => c.text))], [content]);
   const key = refs.join('\u0000');
   const [summary, setSummary] = useState<Summary>();
@@ -41,7 +50,7 @@ export function CitationSummary({ content, className }: { content: string; class
     let cancelled = false;
     const list = key.split('\u0000');
     const timer = setTimeout(() => {
-      checkReferences(list).then(
+      check(list).then(
         (found) => {
           if (cancelled) return;
           const checks = list.flatMap((ref) => (found.has(ref) ? [found.get(ref)!] : []));
@@ -54,7 +63,7 @@ export function CitationSummary({ content, className }: { content: string; class
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [key]);
+  }, [key, check]);
 
   if (!key) return null;
   const current = summary?.key === key ? summary : undefined;
