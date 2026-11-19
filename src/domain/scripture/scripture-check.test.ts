@@ -5,6 +5,7 @@ import { citationKey, findCitations } from './citations';
 import {
   buildCheckItems,
   fixAllNotationEdits,
+  missingVerseTagItem,
   needsAttention,
   notationEdit,
   quoteEdit,
@@ -158,4 +159,58 @@ test('verse_tag is checked against the main reading, under whatever heading it h
 test('verse_tag with no reading like its passage quotes nothing', () => {
   const [item] = check('---\nverse_tag: Jak 2,1-4\n---\n\n# Uvod\n\n*Nešto sasvim drugo.*\n');
   assert.equal(item.quote, null);
+});
+
+const ROMANS = ok('Romans 8:35-39', 'Rim 8,35-39', ['Tko će nas rastaviti od ljubavi Kristove?', 'Ali u svemu tome nadmoćno pobjeđujemo.']);
+const DAY = (tag: string) =>
+  [
+    '---',
+    'title: Pobjednički život',
+    tag,
+    'day: 29',
+    '---',
+    '',
+    '# Čitanje iz Poslanice svetoga Pavla apostola Rimljanima',
+    '',
+    '*Tko će nas rastaviti od ljubavi Kristove?',
+    'Ali u svemu tome slavno pobjeđujemo.*',
+    '',
+  ].join('\n');
+
+test("a translation with an empty verse_tag has its reading checked against the source's passage", () => {
+  const text = DAY('verse_tag:');
+  const item = missingVerseTagItem(text, ROMANS)!;
+  assert.equal(item.notation, 'missing-tag');
+  assert.equal(item.line, 3);
+  assert.equal(needsAttention(item), true);
+  assert.equal(item.quote?.kind, 'reading');
+  assert.deepEqual(
+    item.quote?.diff.filter((p) => p.type !== 'equal'),
+    [
+      { type: 'delete', text: 'slavno' },
+      { type: 'insert', text: 'nadmoćno' },
+    ],
+  );
+  assert.deepEqual(notationEdit(item), { from: 29, to: 39, insert: 'verse_tag: Rim 8,35-39', expected: 'verse_tag:' });
+  assert.deepEqual(fixAllNotationEdits([item]), []);
+  assert.deepEqual(sourceOnlyCitations(new Map([['Romans 8:35-39', ROMANS]]), [item]), []);
+});
+
+test('the verse_tag is written inside the quotes it has, or added when the line is missing', () => {
+  const quoted = DAY('verse_tag: ""');
+  const edit = notationEdit(missingVerseTagItem(quoted, ROMANS)!)!;
+  assert.equal(edit.insert, 'verse_tag: "Rim 8,35-39"');
+  assert.equal(quoted.slice(edit.from, edit.to), 'verse_tag: ""');
+
+  const none = DAY('hero: x');
+  const added = notationEdit(missingVerseTagItem(none, ROMANS)!)!;
+  assert.equal(added.from, added.to);
+  assert.equal(none.slice(0, added.from) + added.insert + none.slice(added.to), DAY('hero: x').replace('day: 29\n', 'day: 29\nverse_tag: Rim 8,35-39\n'));
+});
+
+test('a translation that has its verse_tag, or a passage the Bible lacks, adds nothing', () => {
+  assert.equal(missingVerseTagItem(DAY('verse_tag: Rim 8,35-39'), ROMANS), null);
+  assert.equal(missingVerseTagItem(DAY('verse_tag:'), null), null);
+  assert.equal(missingVerseTagItem(DAY('verse_tag:'), { ref: 'Romans 8:35-39', status: 'out_of_range', notes: [] }), null);
+  assert.equal(missingVerseTagItem('# Čitanje\n\n*Tekst.*\n', ROMANS), null);
 });

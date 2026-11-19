@@ -195,6 +195,13 @@ function CheckRow({
         <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">L{item.line}</span>
       </button>
 
+      {item.notation === 'missing-tag' && (
+        <p className="pl-3.5 text-[11px] leading-relaxed text-muted-foreground">
+          The source&rsquo;s reading is {item.rendered}
+          {item.quote ? ', and the reading below is checked against it.' : ', but no reading here is like it.'}
+        </p>
+      )}
+
       {item.notation === 'check-numbering' && (
         <p className="pl-3.5 text-[11px] leading-relaxed text-muted-foreground">{numberingNote(item, languageName)}</p>
       )}
@@ -208,7 +215,7 @@ function CheckRow({
           {canFixNotation && (
             <Button size="xs" variant="outline" onClick={() => onFixNotation(item)}>
               <Replace />
-              Fix notation
+              {item.notation === 'missing-tag' ? 'Set verse_tag' : 'Fix notation'}
             </Button>
           )}
           {canUseText && (

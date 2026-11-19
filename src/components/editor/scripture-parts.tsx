@@ -68,6 +68,13 @@ export function StatusBadge({ status }: { status: PassageStatus }) {
 export function itemVerdict(item: CheckItem): { tone: 'ok' | 'warn' | 'bad'; text: string } {
   if (item.notation === 'unresolved') return { tone: 'bad', text: STATUS_LABEL[item.status] };
   if (item.notation === 'check-numbering') return { tone: 'warn', text: 'Check the numbering' };
+  if (item.notation === 'missing-tag') {
+    const differs = item.quote && !item.quote.matches;
+    return {
+      tone: 'warn',
+      text: differs ? `Empty; reading differs (${Math.round(item.quote!.similarity * 100)}% match)` : 'Empty',
+    };
+  }
   if (item.quote && !item.quote.matches) {
     return { tone: 'warn', text: `Quote differs (${Math.round(item.quote.similarity * 100)}% match)` };
   }

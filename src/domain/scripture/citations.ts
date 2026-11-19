@@ -262,6 +262,24 @@ export function untaggedReading(source: string): { heading: string; text: string
   return { heading: lines[headings[0]].replace(/^#+\s*/, '').trim(), text: plainText(reading.text) };
 }
 
+/**
+ * Where a document's `verse_tag` is written: its whole `verse_tag:` line and
+ * the value on it, or, with no such line, an empty range at the start of the
+ * frontmatter's closing `---`. Null when the document has no frontmatter.
+ */
+export function verseTagLine(text: string): { from: number; to: number; line: string; value: string } | null {
+  const block = text.match(FRONTMATTER_BLOCK)?.[0];
+  if (!block) return null;
+  const match = /^verse_tag:[ \t]*(.*?)[ \t]*\r?$/m.exec(block);
+  if (match) {
+    const line = match[0].replace(/\r$/, '');
+    const value = match[1].replace(/^(["'])(.*)\1$/, '$2').trim();
+    return { from: match.index, to: match.index + line.length, line, value };
+  }
+  const close = block.lastIndexOf('\n---') + 1;
+  return { from: close, to: close, line: '', value: '' };
+}
+
 /** Whether the citation sits on the frontmatter's `verse_tag:` line. */
 export function isVerseTag(text: string, citation: Pick<Citation, 'from' | 'to'>): boolean {
   const frontmatter = text.match(FRONTMATTER_BLOCK)?.[0].length ?? 0;

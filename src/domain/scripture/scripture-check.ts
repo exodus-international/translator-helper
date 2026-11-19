@@ -9,6 +9,7 @@ import {
   isVerseTag,
   sameText,
   similarity,
+  verseTagLine,
   type Citation,
   type DiffPart,
   type QuotedText,
@@ -52,7 +53,9 @@ export type NotationState =
   /** Target notation, but the RSV-CE reading of its numbers renders differently. */
   | 'check-numbering'
   /** The Bible could not supply it (out of range, not mapped, …). */
-  | 'unresolved';
+  | 'unresolved'
+  /** `verse_tag` is empty; the source's reading says what it should be. */
+  | 'missing-tag';
 
 export interface QuoteCheck extends QuotedText {
   similarity: number;
@@ -76,6 +79,8 @@ export interface CheckItem {
   notes: string[];
   notation: NotationState;
   quote: QuoteCheck | null;
+  /** For `missing-tag`: the edit that writes the `verse_tag`. */
+  fix?: Edit;
 }
 
 export interface CheckInput {
@@ -138,6 +143,41 @@ export function buildCheckItems({ text, citations, results, sourceRendered }: Ch
   return items;
 }
 
+/**
+ * The day's reading in a translation whose `verse_tag` is empty, checked
+ * against the passage the source's reading is: the source's `verse_tag`, or
+ * the passage its reading's text was found as. A citation is what the check
+ * starts from, so without this a hand-made translation of a day with no
+ * `verse_tag` had its reading checked by nothing. Null when the translation
+ * has a `verse_tag` (its own citation is checked then), has no frontmatter,
+ * or its Bible cannot supply the passage.
+ */
+export function missingVerseTagItem(text: string, reading: PassageResult | null | undefined): CheckItem | null {
+  const passage = reading ?? undefined;
+  if (!isResolved(passage)) return null;
+  const slot = verseTagLine(text);
+  if (!slot || slot.value) return null;
+  const quoteMark = /^verse_tag:[ \t]*(["'])/.exec(slot.line)?.[1] ?? '';
+  const written = `verse_tag: ${quoteMark}${passage.rendered}${quoteMark}`;
+  const citation: Citation = { text: 'verse_tag', raw: slot.line, from: slot.from, to: slot.to, notation: 'target' };
+  const verses = (passage.verses ?? []).map((v) => v.text);
+  let line = 1;
+  for (let i = 0; i < slot.from; i++) if (text.charCodeAt(i) === 10) line++;
+  return {
+    id: `${slot.from}:verse_tag`,
+    citation,
+    line,
+    status: passage.status,
+    rendered: passage.rendered,
+    verses,
+    officialText: verses.length ? verses.join(' ') : passage.text,
+    notes: passage.notes ?? [],
+    notation: 'missing-tag',
+    quote: verses.length ? checkQuote(text, citation, verses, true) : null,
+    fix: { from: slot.from, to: slot.to, insert: slot.line ? written : `${written}\n`, expected: slot.line },
+  };
+}
+
 /** Below this a reading under a heading is some other text, not the `verse_tag` passage. */
 const MIN_SAME_PASSAGE = 0.6;
 
@@ -145,8 +185,8 @@ const MIN_SAME_PASSAGE = 0.6;
  * The text a citation quotes. For `verse_tag`, the day's main reading: the
  * reading under a heading that is most like the passage.
  */
-function quotedFor(text: string, citation: Citation, official: string): QuotedText | null {
-  if (!isVerseTag(text, citation)) return findQuotedText(text, citation);
+function quotedFor(text: string, citation: Citation, official: string, verseTag: boolean): QuotedText | null {
+  if (!verseTag) return findQuotedText(text, citation);
   let best: { quote: QuotedText; score: number } | null = null;
   for (const quote of headingReadings(text)) {
     const score = similarity(quote.plain, official);
@@ -155,9 +195,14 @@ function quotedFor(text: string, citation: Citation, official: string): QuotedTe
   return best?.quote ?? null;
 }
 
-function checkQuote(text: string, citation: Citation, verses: string[]): QuoteCheck | null {
+function checkQuote(
+  text: string,
+  citation: Citation,
+  verses: string[],
+  verseTag = isVerseTag(text, citation),
+): QuoteCheck | null {
   const official = verses.map((v) => v.replace(/\s+/g, ' ').trim()).join(' ');
-  const quote = quotedFor(text, citation, official);
+  const quote = quotedFor(text, citation, official, verseTag);
   if (!quote) return null;
   const matches = sameText(quote.plain, official);
   return {
@@ -178,7 +223,9 @@ export interface Edit {
 }
 
 export const notationEdit = (item: CheckItem): Edit | null =>
-  item.rendered && item.notation !== 'official' && item.notation !== 'unresolved'
+  item.notation === 'missing-tag'
+    ? (item.fix ?? null)
+    : item.rendered && item.notation !== 'official' && item.notation !== 'unresolved'
     ? { from: item.citation.from, to: item.citation.to, insert: item.rendered, expected: item.citation.raw }
     : null;
 

@@ -113,8 +113,12 @@ the AI and one warning says so.
   in one undo step. A citation already in the target's notation whose numbers
   would change (a psalm, say) is flagged to check, never rewritten, since it
   may already use the target's numbering. Citations the source has and the
-  translation lacks are listed too. **Ask the Bible** opens the chat beside
-  the editor; **Insert** puts a passage at the cursor.
+  translation lacks are listed too. A translation whose `verse_tag` is empty
+  (one made by hand, say) still has its reading checked: against the source's
+  `verse_tag`, or, when the source has none either, against the passage the
+  source's reading is found as by its text. **Set verse_tag** writes it in.
+  **Ask the Bible** opens the chat beside the editor; **Insert** puts a
+  passage at the cursor.
 - Reviewers get the same card. It changes the text only while the review can
   be edited; otherwise it only checks.
 - **New document**: under the content box, a summary of the citations found

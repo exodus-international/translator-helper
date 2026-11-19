@@ -4,7 +4,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import type { PassageResult } from '@/domain/bible/bible.types';
 import { findCitations } from '@/domain/scripture/citations';
-import { buildCheckItems, type CheckItem } from '@/domain/scripture/scripture-check';
+import { buildCheckItems, missingVerseTagItem, type CheckItem } from '@/domain/scripture/scripture-check';
 import { ScriptureCheck, type ScriptureCheckProps } from './scripture-check';
 
 /**
@@ -154,4 +154,19 @@ test('with nothing answered, the card does not say there are no citations', () =
   renderCheck({ items: [], unchecked: 1 });
   assert.equal(screen.queryByText('No citations yet'), null);
   assert.ok(screen.getByText('Citations not checked'));
+});
+
+test('an empty verse_tag is listed with the source reading, and offers to set it', async () => {
+  const day = '---\ntitle: Pobjednički život\nverse_tag:\n---\n\n# Čitanje\n\n*Tko će nas rastaviti od ljubavi?*\n';
+  const item = missingVerseTagItem(day, ok('Romans 8:35', 'Rim 8,35', ['Tko će nas rastaviti od ljubavi Kristove?']))!;
+  const calls = renderCheck({ items: [item] });
+
+  const [row] = within(screen.getByRole('list', { name: 'Citations' })).getAllByRole('listitem');
+  assert.match(row.textContent ?? '', /verse_tag.*Rim 8,35.*Empty; reading differs.*L3/);
+  assert.match(row.textContent ?? '', /source’s reading is Rim 8,35, and the reading below is checked against it/);
+  assert.match(row.querySelector('ins')?.textContent ?? '', /Kristove/);
+
+  await userEvent.click(within(row).getByRole('button', { name: 'Set verse_tag' }));
+  assert.deepEqual(calls.notation, [item]);
+  assert.equal(screen.queryByRole('button', { name: /Fix all notations/ }), null);
 });

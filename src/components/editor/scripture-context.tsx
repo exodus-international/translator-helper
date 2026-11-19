@@ -4,9 +4,9 @@ import type { EditorView } from '@codemirror/view';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { BibleTranslationDto } from '@/domain/bible/bible.service';
 import type { PassageResult } from '@/domain/bible/bible.types';
-import { citationKey, findCitations } from '@/domain/scripture/citations';
+import { citationKey, findCitations, isVerseTag, untaggedReading } from '@/domain/scripture/citations';
 import { isResolved } from '@/domain/scripture/scripture-check';
-import { bibleForLanguage, resolvePassages } from './scripture-client';
+import { bibleForLanguage, identifyReading, resolvePassage, resolvePassages } from './scripture-client';
 
 /**
  * What the Scripture tools in a translation editor share: the document's
@@ -30,6 +30,12 @@ export interface ScriptureHost {
   sourcePassages: ReadonlyMap<string, PassageResult>;
   /** The same, by `citationKey` of the target rendering. */
   sourceRendered: ReadonlyMap<string, PassageResult>;
+  /**
+   * The source's day reading in the target Bible: its `verse_tag` passage, or,
+   * when it has none, the passage its reading's text was found as. Null when
+   * there is none or it could not be found.
+   */
+  sourceReading: PassageResult | null;
   /** The translation's editor, while one is mounted. */
   view: EditorView | null;
   /** Called by the translation editor; returns the call that unregisters it. */
@@ -66,7 +72,11 @@ export function ScriptureProvider({
   const language = languageCode?.toLowerCase() ?? '';
   const [bibleState, setBibleState] = useState<{ language: string; bible: BibleTranslationDto | null; error: boolean }>();
   const [view, setView] = useState<EditorView | null>(null);
-  const [sourceState, setSourceState] = useState<{ key: string; passages: Map<string, PassageResult> }>();
+  const [sourceState, setSourceState] = useState<{
+    key: string;
+    passages: Map<string, PassageResult>;
+    reading: PassageResult | null;
+  }>();
 
   useEffect(() => {
     if (!language) return;
@@ -86,17 +96,28 @@ export function ScriptureProvider({
 
   useEffect(() => {
     if (!bible) return;
-    const refs = [...new Set(findCitations(sourceContent).map((c) => c.text))];
+    const citations = findCitations(sourceContent);
+    const refs = [...new Set(citations.map((c) => c.text))];
+    const tag = citations.find((c) => isVerseTag(sourceContent, c));
+    const untagged = tag ? null : untaggedReading(sourceContent);
     let cancelled = false;
-    resolvePassages(refs, bible.code).then((passages) => {
-      if (!cancelled) setSourceState({ key: `${bible.code}\u0000${sourceContent}`, passages });
-    });
+    (async () => {
+      const passages = await resolvePassages(refs, bible.code);
+      let reading = tag ? (passages.get(tag.text) ?? null) : null;
+      if (untagged) {
+        // A day with no verse_tag: its reading is found by its text, as the AI translation does.
+        const ref = await identifyReading(untagged.text).catch(() => null);
+        reading = ref ? ((await resolvePassage(ref, bible.code)) ?? null) : null;
+      }
+      if (!cancelled) setSourceState({ key: `${bible.code}\u0000${sourceContent}`, passages, reading });
+    })();
     return () => {
       cancelled = true;
     };
   }, [bible, sourceContent]);
 
   const sourcePassages = sourceState?.key === sourceKey ? sourceState.passages : EMPTY;
+  const sourceReading = sourceState?.key === sourceKey ? sourceState.reading : null;
   const sourceRendered = useMemo(() => {
     const out = new Map<string, PassageResult>();
     for (const result of sourcePassages.values()) {
@@ -119,12 +140,13 @@ export function ScriptureProvider({
       translation,
       sourcePassages,
       sourceRendered,
+      sourceReading,
       view,
       registerView,
       requestEditor,
       editable,
     }),
-    [language, languageName, bible, bibleState, translation, sourcePassages, sourceRendered, view, registerView, requestEditor, editable],
+    [language, languageName, bible, bibleState, translation, sourcePassages, sourceRendered, sourceReading, view, registerView, requestEditor, editable],
   );
 
   if (!language) return <>{children}</>;

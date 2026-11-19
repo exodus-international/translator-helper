@@ -10,6 +10,7 @@ import { findCitations } from '@/domain/scripture/citations';
 import {
   buildCheckItems,
   fixAllNotationEdits,
+  missingVerseTagItem,
   needsAttention,
   notationEdit,
   quoteEdit,
@@ -86,6 +87,7 @@ export function ScriptureCheckCard({ open, onOpenChange }: { open: boolean; onOp
   const bible = host?.bible;
   const translation = host?.translation;
   const sourceRendered = host?.sourceRendered;
+  const sourceReading = host?.sourceReading;
   const key = `${translation}\u0000${content}`;
 
   useEffect(() => {
@@ -101,9 +103,11 @@ export function ScriptureCheckCard({ open, onOpenChange }: { open: boolean; onOp
         // The cache has already reported it; the list shows what it has.
       }
       if (cancelled) return;
+      const untagged = missingVerseTagItem(content, sourceReading);
+      const items = buildCheckItems({ text: content, citations, results, sourceRendered });
       setAnalysis({
         key: `${translation}\u0000${content}`,
-        items: buildCheckItems({ text: content, citations, results, sourceRendered }),
+        items: untagged ? [untagged, ...items] : items,
         unchecked: refs.filter((ref) => !results.has(ref)).length,
       });
     }, CHECK_DELAY_MS);
@@ -111,7 +115,7 @@ export function ScriptureCheckCard({ open, onOpenChange }: { open: boolean; onOp
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [bible, translation, content, sourceRendered, attempt]);
+  }, [bible, translation, content, sourceRendered, sourceReading, attempt]);
 
   const items = useMemo(() => analysis?.items ?? [], [analysis]);
   const checking = !!bible && analysis?.key !== key;
