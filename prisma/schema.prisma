@@ -161,6 +161,7 @@ model User {
   notifications          Notification[]
   notificationsCaused    Notification[]           @relation("NotificationActor")
   notificationPrefs      NotificationPreference[]
+  bibleImports           BibleTranslation[]       @relation("BibleTranslationImports")
 
   @@map("user")
 }
@@ -608,4 +609,121 @@ model NotificationPreference {
 
   @@unique([userId, type])
   @@map("notification_preference")
+}
+
+enum BibleTranslationRole {
+  SOURCE
+  TARGET
+}
+
+/// A Bible translation imported from the bible-api normalized JSON. References
+/// are written against the one SOURCE translation (RSV-CE) and mapped into a
+/// TARGET by its declared versification. Linked to `Language` by `languageCode`.
+model BibleTranslation {
+  id                String                   @id @default(uuid())
+  code              String                   @unique // e.g. "sar-hr", "rsvce-en"
+  name              String
+  languageCode      String // matches Language.code, e.g. "hr"
+  languageName      String
+  role              BibleTranslationRole     @default(TARGET)
+  /// The translation a language key ("hr") resolves to. One per language, kept by the app.
+  isLanguageDefault Boolean                  @default(false)
+  bookCount         Int                      @default(0)
+  verseCount        Int                      @default(0)
+  importedAt        DateTime                 @default(now())
+  importedById      String?
+  importedBy        User?                    @relation("BibleTranslationImports", fields: [importedById], references: [id], onDelete: SetNull)
+  /// Bumped by every import and mapping edit; the in-memory index reloads when it moves.
+  updatedAt         DateTime                 @updatedAt
+  books             BibleBook[]
+  versification     BibleVersificationBook[]
+
+  @@index([languageCode])
+  @@map("bible_translation")
+}
+
+model BibleBook {
+  id                 String               @id @default(uuid())
+  translationId      String
+  translation        BibleTranslation     @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  usfm               String // e.g. "JHN"; Esther and Daniel are ESG and DAG internally
+  name               String
+  shortName          String
+  abbreviation       String
+  testament          String // "OT" | "NT"
+  order              Int
+  chapterCount       Int
+  verseCount         Int
+  /// Number of verse rows per chapter, index 0 = chapter 1.
+  chapterVerseCounts Int[]
+  verses             BibleVerse[]
+  headers            BibleSectionHeader[]
+
+  @@unique([translationId, usfm])
+  @@map("bible_book")
+}
+
+model BibleVerse {
+  id         String    @id @default(uuid())
+  bookId     String
+  book       BibleBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapter    Int
+  number     Int
+  /// Last verse number when the translation prints several verses as one ("20-21").
+  numberEnd  Int?
+  text       String    @db.Text
+  /// Lower case without diacritics, for search.
+  searchText String    @db.Text
+
+  @@unique([bookId, chapter, number])
+  @@map("bible_verse")
+}
+
+model BibleSectionHeader {
+  id          String    @id @default(uuid())
+  bookId      String
+  book        BibleBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapter     Int
+  beforeVerse Int
+  title       String
+
+  @@index([bookId, chapter])
+  @@map("bible_section_header")
+}
+
+/// A book whose versification against the source has been declared. A book
+/// with no row here resolves to versification_unmapped, never to identity.
+model BibleVersificationBook {
+  id            String              @id @default(uuid())
+  translationId String
+  translation   BibleTranslation    @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  usfm          String
+  /// A person compared the text side by side and confirmed the declaration.
+  reviewed      Boolean             @default(false)
+  note          String?             @db.Text
+  mappings      BibleVerseMapping[]
+
+  @@unique([translationId, usfm])
+  @@map("bible_versification_book")
+}
+
+/// Maps source verses to the target: `dst verse = src verse + offset` in
+/// `dstChapter`. A row without verses covers the whole chapter; `unmappable`
+/// chapters or ranges resolve to versification_unmapped. Most specific row wins.
+model BibleVerseMapping {
+  id           String                 @id @default(uuid())
+  bookId       String
+  book         BibleVersificationBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  srcChapter   Int
+  srcVerseFrom Int?
+  srcVerseTo   Int?
+  dstChapter   Int
+  offset       Int                    @default(0)
+  unmappable   Boolean                @default(false)
+  /// Rows are read in this order, as bible-api reads them by insertion: the first whole-chapter row wins.
+  position     Int                    @default(0)
+  createdAt    DateTime               @default(now())
+
+  @@index([bookId])
+  @@map("bible_verse_mapping")
 }

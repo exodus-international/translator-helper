@@ -2,7 +2,7 @@ import { parseFrontmatter } from '@/lib/frontmatter';
 
 /**
  * Scripture is never translated by the AI. Before the source goes to the model,
- * every Scripture reading and citation the Bible API can resolve is swapped for a
+ * every Scripture reading and citation the in-app Bible can resolve is swapped for a
  * placeholder (`{{bible:1}}`); after the model answers, each placeholder is filled
  * from the target language's Catholic Bible: a reading with its official text, a
  * citation as that Bible writes it (`Psalm 46:10` becomes `Ps 46,11` in Croatian,
@@ -14,13 +14,12 @@ import { parseFrontmatter } from '@/lib/frontmatter';
  * - a line holding only a citation (`<span …>James 5:11-13</span>`) followed by
  *   the italic text.
  *
- * What the API can't resolve stays in the source for the model to translate, and
- * comes back as a notice for the translator to check. The feature is off unless
- * BIBLE_API_URL and BIBLE_API_TOKEN are set.
+ * What the Bible can't resolve stays in the source for the model to translate,
+ * and comes back as a notice for the translator to check. The feature is on for
+ * every language with an imported Bible (see src/domain/bible).
  */
 
 const LOG_PREFIX = '[Scripture]';
-const TIMEOUT_MS = 10_000;
 const MAX_REFS = 200;
 const MAX_HINT_CHARS = 2_000;
 // How close the English reading is to the RSV-CE text of its citation. Below
@@ -99,7 +98,7 @@ export function findReadings(body: string, verseTag: string | null): Reading[] {
   return readings;
 }
 
-// ─── The Bible API ────────────────────────────────────────
+// ─── The Bible ────────────────────────────────────────────
 
 export interface PassageResult {
   ref: string;
@@ -115,26 +114,19 @@ type Resolved = PassageResult & { rendered: string; verses: Array<{ text: string
 const isResolved = (r: PassageResult | undefined): r is Resolved =>
   !!r && (r.status === 'ok' || r.status === 'partial') && !!r.rendered && !!r.verses?.length;
 
-function bibleApiConfig() {
-  const url = process.env.BIBLE_API_URL?.replace(/\/+$/, '');
-  const token = process.env.BIBLE_API_TOKEN;
-  return url && token ? { url, token } : null;
-}
+/**
+ * Resolves references into the language's Bible, with the RSV-CE side. Null when
+ * the language has no Bible. Throws when the Bible can't be read.
+ */
+export type PassageLookup = (refs: string[], languageCode: string) => Promise<Map<string, PassageResult> | null>;
 
-/** Throws when the API can't be reached or refuses the request. */
-async function fetchPassages(refs: string[], languageCode: string): Promise<Map<string, PassageResult>> {
-  const { url, token } = bibleApiConfig()!;
-  const response = await fetch(`${url}/v1/passages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ lang: languageCode, refs, include: { rendered: true, text: true, verses: true, source: true } }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    cache: 'no-store',
-  });
-  if (!response.ok) throw new Error(`Bible API answered ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  const { data } = (await response.json()) as { data: PassageResult[] };
-  return new Map(data.map((r) => [r.ref, r]));
-}
+const inAppBible: PassageLookup = async (refs, languageCode) => {
+  const { bibleForLanguage, resolvePassages } = await import('@/domain/bible/bible.service');
+  const bible = await bibleForLanguage(languageCode);
+  if (!bible) return null;
+  const { results } = await resolvePassages(refs, bible.code, { rendered: true, text: true, verses: true, source: true });
+  return new Map(results.map((r) => [r.ref, r]));
+};
 
 // ─── Text ─────────────────────────────────────────────────
 
@@ -189,16 +181,20 @@ const NOT_A_REFERENCE = new Set(['unparseable', 'unknown_book']);
 function unresolvedNotice(citation: string, result: PassageResult | undefined, what: string): string[] {
   if (result && NOT_A_REFERENCE.has(result.status)) return [];
   const why = result?.notes?.join(' ') || result?.status || 'no answer';
-  return [`${citation}: not in the Bible API (${why}) -- the AI translated the ${what}; check it against the official text.`];
+  return [`${citation}: not in the Bible (${why}) -- the AI translated the ${what}; check it against the official text.`];
 }
 
 /**
  * Swaps the source's resolvable Scripture for placeholders. Leaves the source
- * untouched when the feature is off or the API fails; the model then translates
- * the Scripture as before, and a notice says so.
+ * untouched when the language has no Bible or the Bible can't be read; the model
+ * then translates the Scripture as before, and a notice says so.
  */
-export async function prepareScripture(source: string, languageCode: string): Promise<PreparedScripture> {
-  if (!bibleApiConfig() || PLACEHOLDER.test(source)) return unchanged(source);
+export async function prepareScripture(
+  source: string,
+  languageCode: string,
+  lookup: PassageLookup = inAppBible,
+): Promise<PreparedScripture> {
+  if (PLACEHOLDER.test(source)) return unchanged(source);
 
   const frontmatter = source.match(FRONTMATTER)?.[0] ?? '';
   const lines = source.slice(frontmatter.length).split('\n');
@@ -211,15 +207,15 @@ export async function prepareScripture(source: string, languageCode: string): Pr
   const refs = [...new Set([...(verseTag ? [verseTag] : []), ...readings.map((r) => r.citation), ...inline])];
   if (refs.length === 0) return unchanged(source);
 
-  let results: Map<string, PassageResult>;
+  let results: Map<string, PassageResult> | null;
   try {
-    results = await fetchPassages(refs.slice(0, MAX_REFS), languageCode);
+    results = await lookup(refs.slice(0, MAX_REFS), languageCode);
   } catch (error) {
-    console.error(`${LOG_PREFIX} Bible API request failed:`, error instanceof Error ? error.message : error);
-    return unchanged(source, ['The Bible API could not be reached, so the AI translated the Scripture. Check it against the official text.']);
+    console.error(`${LOG_PREFIX} Bible lookup failed:`, error instanceof Error ? error.message : error);
+    return unchanged(source, ['The Bible could not be read, so the AI translated the Scripture. Check it against the official text.']);
   }
-  if ([...results.values()].every((r) => r.status === 'unknown_language')) {
-    return unchanged(source, [`The Bible API has no Bible for "${languageCode}", so the AI translated the Scripture.`]);
+  if (!results || [...results.values()].every((r) => r.status === 'unknown_language')) {
+    return unchanged(source, [`No Bible is imported for "${languageCode}", so the AI translated the Scripture.`]);
   }
 
   const notices: string[] = [];

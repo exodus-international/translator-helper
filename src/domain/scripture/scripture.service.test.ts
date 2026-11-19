@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyVerseTag, findReadings, prepareScripture, similarity, type PassageResult } from './scripture.service';
+import {
+  applyVerseTag,
+  findReadings,
+  prepareScripture,
+  similarity,
+  type PassageLookup,
+  type PassageResult,
+} from './scripture.service';
 
 const JAMES_EN = [
   'My brethren, show no partiality as you hold the faith of our Lord Jesus Christ, the Lord of glory.',
@@ -67,32 +74,18 @@ const API: Record<string, PassageResult> = {
   },
 };
 
-async function withBibleApi<T>(respond: (body: { lang: string; refs: string[] }) => Response, run: () => Promise<T>) {
-  const originalFetch = global.fetch;
-  const env = { url: process.env.BIBLE_API_URL, token: process.env.BIBLE_API_TOKEN };
-  process.env.BIBLE_API_URL = 'http://bible-api:3000/';
-  process.env.BIBLE_API_TOKEN = 'secret';
-  const calls: Array<{ url: string; init?: RequestInit }> = [];
-  global.fetch = (async (input: RequestInfo, init?: RequestInit) => {
-    calls.push({ url: String(input), init });
-    return respond(JSON.parse(String(init?.body)));
-  }) as typeof fetch;
-  try {
-    return { result: await run(), calls };
-  } finally {
-    global.fetch = originalFetch;
-    for (const [key, value] of [
-      ['BIBLE_API_URL', env.url],
-      ['BIBLE_API_TOKEN', env.token],
-    ] as const) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  }
+function bible(respond: (refs: string[], lang: string) => PassageResult[] | null) {
+  const calls: Array<{ refs: string[]; lang: string }> = [];
+  const lookup: PassageLookup = async (refs, lang) => {
+    calls.push({ refs, lang });
+    const results = respond(refs, lang);
+    return results && new Map(results.map((r) => [r.ref, r]));
+  };
+  return { lookup, calls };
 }
 
-const fromTable = (table: Record<string, PassageResult>) => (body: { refs: string[] }) =>
-  Response.json({ data: body.refs.map((ref) => table[ref] ?? { ref, status: 'unparseable', notes: [] }) });
+const fromTable = (table: Record<string, PassageResult>) =>
+  bible((refs) => refs.map((ref) => table[ref] ?? { ref, status: 'unparseable', notes: [] }));
 
 /** A stand-in for the model: "translates" by keeping the placeholders and the structure. */
 const model = (content: string) => content.replace('Brothers, welcome back.', 'Braćo, dobro došli natrag.');
@@ -122,15 +115,10 @@ test('similarity is 1 for the same words and falls with what is missing', () => 
 });
 
 test('prepareScripture swaps Scripture for placeholders and restores it from the Bible API', async () => {
-  const { result: scripture, calls } = await withBibleApi(fromTable(API), () => prepareScripture(day, 'hr'));
+  const { lookup, calls } = fromTable(API);
+  const scripture = await prepareScripture(day, 'hr', lookup);
 
-  assert.equal(calls[0].url, 'http://bible-api:3000/v1/passages');
-  assert.equal((calls[0].init?.headers as Record<string, string>).Authorization, 'Bearer secret');
-  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
-    lang: 'hr',
-    refs: ['James 2:1-4', 'Psalm 46:10', 'Psalm 13:1', 'At 5:30'],
-    include: { rendered: true, text: true, verses: true, source: true },
-  });
+  assert.deepEqual(calls, [{ lang: 'hr', refs: ['James 2:1-4', 'Psalm 46:10', 'Psalm 13:1', 'At 5:30'] }]);
 
   // The model never sees the reading or a resolved citation.
   assert.ok(!scripture.content.includes('My brethren'));
@@ -148,12 +136,13 @@ test('prepareScripture swaps Scripture for placeholders and restores it from the
   assert.ok(content.includes('Compare Psalm 13:1 and Ps 46,11.'));
   // Only the real reference that could not be mapped is worth a notice.
   assert.deepEqual(notices, [
-    'Psalm 13:1: not in the Bible API (PSA 13 has no mapping yet.) -- the AI translated the citation; check it against the official text.',
+    'Psalm 13:1: not in the Bible (PSA 13 has no mapping yet.) -- the AI translated the citation; check it against the official text.',
   ]);
 });
 
 test('prepareScripture keeps a one-paragraph reading as one paragraph and escapes Markdown', async () => {
-  const { result: scripture } = await withBibleApi(fromTable(API), () => prepareScripture(daily, 'hr'));
+  const { lookup } = fromTable(API);
+  const scripture = await prepareScripture(daily, 'hr', lookup);
   const { content, notices } = scripture.restore(scripture.content);
   assert.ok(content.includes('<span style="display:block;color:#CC0000;">Jak 5,11-13</span>\n\n*Evo, blaženima zovemo postojane. Trpi li tko među vama? Neka moli \\*.*\n'));
   assert.ok(content.includes('*My brothers, you must realise'));
@@ -162,14 +151,16 @@ test('prepareScripture keeps a one-paragraph reading as one paragraph and escape
 
 test('prepareScripture replaces a reading whole, elisions and plain paragraphs included', async () => {
   const elided = day.replace(`\n${JAMES_EN[1]}`, '*\n\n. . .\n\nAnd then:\n\n*' + JAMES_EN[1]);
-  const { result: scripture } = await withBibleApi(fromTable(API), () => prepareScripture(elided, 'hr'));
+  const { lookup } = fromTable(API);
+  const scripture = await prepareScripture(elided, 'hr', lookup);
   assert.ok(scripture.content.includes('# A Reading from the Letter of St. James\n\n{{bible:1}}\n\n# Reflection'));
   assert.ok(!scripture.content.includes('. . .'));
 });
 
 test('prepareScripture inserts the whole passage for a shortened reading and says so', async () => {
   const shortened = day.replace(`\n${JAMES_EN[2]}`, '');
-  const { result: scripture } = await withBibleApi(fromTable(API), () => prepareScripture(shortened, 'hr'));
+  const { lookup } = fromTable(API);
+  const scripture = await prepareScripture(shortened, 'hr', lookup);
   const { content, notices } = scripture.restore(scripture.content);
   assert.ok(content.includes(JAMES_HR.join('\n')));
   assert.ok(notices[0].startsWith('James 2:1-4: the English reading is shortened or from another translation.'));
@@ -177,7 +168,8 @@ test('prepareScripture inserts the whole passage for a shortened reading and say
 
 test('prepareScripture leaves a reading that is not the cited passage to the model', async () => {
   const other = day.replace(JAMES_EN.slice(1).join('\n'), 'Behold, how good and pleasant it is when brothers dwell in unity!');
-  const { result: scripture } = await withBibleApi(fromTable(API), () => prepareScripture(other, 'hr'));
+  const { lookup } = fromTable(API);
+  const scripture = await prepareScripture(other, 'hr', lookup);
   assert.ok(scripture.content.includes('My brethren, show no partiality'));
   const { content, notices } = scripture.restore(scripture.content);
   assert.ok(content.includes('verse_tag: Jak 2,1-4'));
@@ -185,7 +177,8 @@ test('prepareScripture leaves a reading that is not the cited passage to the mod
 });
 
 test('restore reports placeholders the model dropped and removes ones it made up', async () => {
-  const { result: scripture } = await withBibleApi(fromTable(API), () => prepareScripture(day, 'hr'));
+  const { lookup } = fromTable(API);
+  const scripture = await prepareScripture(day, 'hr', lookup);
   const output = scripture.content.replace('— {{bible:2}}', '— Psalam 46,10').replace('# Reflection', '# Reflection {{bible:9}}');
   const { content, notices } = scripture.restore(output);
   assert.ok(!content.includes('{{bible:'));
@@ -193,33 +186,32 @@ test('restore reports placeholders the model dropped and removes ones it made up
   assert.ok(notices.includes('The AI added Scripture placeholders that were not in the source; they were removed.'));
 });
 
-test('prepareScripture leaves Scripture to the model, with a notice, when the API fails', async () => {
-  const { result: scripture } = await withBibleApi(
-    () => new Response('{"error":{"code":"unauthorized"}}', { status: 401 }),
-    () => prepareScripture(day, 'hr'),
-  );
+test('prepareScripture leaves Scripture to the model, with a notice, when the Bible cannot be read', async () => {
+  const scripture = await prepareScripture(day, 'hr', async () => {
+    throw new Error('connection refused');
+  });
   assert.equal(scripture.content, day);
   assert.equal(scripture.prompt, '');
   assert.deepEqual(scripture.restore('draft'), {
     content: 'draft',
-    notices: ['The Bible API could not be reached, so the AI translated the Scripture. Check it against the official text.'],
+    notices: ['The Bible could not be read, so the AI translated the Scripture. Check it against the official text.'],
   });
 });
 
-test('prepareScripture says when the API has no Bible for the language', async () => {
-  const { result: scripture } = await withBibleApi(
-    (body) => Response.json({ data: body.refs.map((ref) => ({ ref, status: 'unknown_language', notes: [] })) }),
-    () => prepareScripture(day, 'lt'),
-  );
+test('prepareScripture says when the language has no Bible', async () => {
+  const scripture = await prepareScripture(day, 'lt', bible(() => null).lookup);
   assert.equal(scripture.content, day);
-  assert.deepEqual(scripture.restore('draft').notices, ['The Bible API has no Bible for "lt", so the AI translated the Scripture.']);
+  assert.deepEqual(scripture.restore('draft').notices, ['No Bible is imported for "lt", so the AI translated the Scripture.']);
 });
 
-test('prepareScripture does nothing when the API is not configured or the source has its own placeholders', async () => {
-  delete process.env.BIBLE_API_URL;
-  assert.deepEqual((await prepareScripture(day, 'hr')).restore('draft'), { content: 'draft', notices: [] });
-  const { result, calls } = await withBibleApi(fromTable(API), () => prepareScripture(`${day}\n{{bible:1}}`, 'hr'));
+test('prepareScripture does nothing when the source has its own placeholders or no Scripture', async () => {
+  const { lookup, calls } = fromTable(API);
+  const result = await prepareScripture(`${day}\n{{bible:1}}`, 'hr', lookup);
   assert.equal(result.prompt, '');
+  assert.deepEqual((await prepareScripture('---\ntitle: T\n---\n\nNo Scripture here.\n', 'hr', lookup)).restore('draft'), {
+    content: 'draft',
+    notices: [],
+  });
   assert.equal(calls.length, 0);
 });
 

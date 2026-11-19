@@ -17,7 +17,7 @@ export async function translateDocumentAction(input: unknown) {
     throw new Error('Target language not found');
   }
 
-  // Scripture comes from the Bible API, not the model: it is swapped for
+  // Scripture comes from the in-app Bible, not the model: it is swapped for
   // placeholders here and filled in from the target language's Bible after.
   const scripture =
     promptFormatFor(validated.originalFilename) === 'markdown'
