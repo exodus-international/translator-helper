@@ -2,6 +2,7 @@ import { Role } from '@/generated/prisma/enums';
 import { decodeUpload, importDeclarations, importTranslation, MAX_UPLOAD_BYTES } from '@/domain/bible/bible.import';
 import { BibleImportError } from '@/domain/bible/bible.repository';
 import { TRANSLATION_CODE } from '@/domain/bible/bible.types';
+import { readBody } from '@/lib/read-body';
 import { getCurrentUser } from '@/lib/session';
 
 /**
@@ -21,15 +22,16 @@ export async function POST(request: Request) {
   if (!user) return json({ error: 'Sign in again.' }, 401);
   if (user.role !== Role.ADMIN) return json({ error: 'Only admins can import Bibles.' }, 403);
 
-  const length = Number(request.headers.get('content-length') ?? 0);
-  if (length > 2 * MAX_UPLOAD_BYTES + 64 * 1024) return json({ error: 'The upload is too large.' }, 413);
-  if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) {
+  const contentType = request.headers.get('content-type') ?? '';
+  if (!contentType.startsWith('multipart/form-data')) {
     return json({ error: 'Send the files as a form.' }, 415);
   }
 
   let form: FormData;
   try {
-    form = await request.formData();
+    const body = await readBody(request, 2 * MAX_UPLOAD_BYTES + 64 * 1024);
+    if (!body) return json({ error: 'The upload is too large.' }, 413);
+    form = await new Response(body, { headers: { 'content-type': contentType } }).formData();
   } catch {
     return json({ error: 'The upload could not be read.' }, 400);
   }

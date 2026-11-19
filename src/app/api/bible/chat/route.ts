@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CHAT_LIMITS, runBibleChat, type ChatEvent } from '@/domain/bible/bible.chat';
+import { readBody } from '@/lib/read-body';
 import { getCurrentUser } from '@/lib/session';
 
 /**
@@ -67,12 +68,16 @@ export async function POST(request: Request) {
     });
   }
 
-  if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
-    return json({ error: 'The conversation is too long. Start a new one.' }, 413);
+  let body: Uint8Array<ArrayBuffer> | null;
+  try {
+    body = await readBody(request, MAX_BODY_BYTES);
+  } catch {
+    return json({ error: 'The request could not be read.' }, 400);
   }
+  if (!body) return json({ error: 'The conversation is too long. Start a new one.' }, 413);
   let raw: unknown;
   try {
-    raw = await request.json();
+    raw = JSON.parse(new TextDecoder().decode(body));
   } catch {
     return json({ error: 'The request could not be read.' }, 400);
   }
