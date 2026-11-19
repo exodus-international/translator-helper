@@ -31,6 +31,8 @@ const MAX_HINT_CHARS = 2_000;
 // a lectionary psalm numbered differently -- and is left to the model.
 const MIN_SIMILARITY = 0.9;
 const MIN_SAME_PASSAGE = 0.6;
+// A quotation is the whole passage when it has this share of the passage's words.
+const MIN_WHOLE_QUOTE = 0.95;
 
 // A book is one capitalised word, optionally numbered ("1 Corinthians", "I John")
 // or joined by "of" ("Song of Songs"), optionally abbreviated with a full stop.
@@ -238,7 +240,9 @@ export async function prepareScripture(
     const quote = findQuotedText(bodyText, { from: match.index, to: match.index + match[0].length });
     if (quote?.kind !== 'quote' || quotes.some((q) => quote.from < q.to && q.from < quote.to)) continue;
     const likeness = similarity(quote.plain, result.source.text);
-    if (likeness >= MIN_SIMILARITY) {
+    // Similar is not enough: a quotation that drops a clause still scores high,
+    // and filling it would add words the source left out.
+    if (likeness >= MIN_SIMILARITY && coverage(result.source.text, quote.plain) >= MIN_WHOLE_QUOTE) {
       const text = formatInlineQuote(result.verses.map((v) => v.text));
       quotes.push({ from: quote.from, to: quote.to, key: fill(text, `the quotation of ${result.rendered}`) });
     } else if (likeness >= MIN_SAME_PASSAGE || coverage(quote.plain, result.source.text) >= MIN_SIMILARITY) {

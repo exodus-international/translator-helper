@@ -254,6 +254,24 @@ test('prepareScripture swaps a quotation of the whole passage for the official t
   ]);
 });
 
+test('prepareScripture leaves a quotation that drops a clause to the model', async () => {
+  const { lookup } = fromTable({
+    'Matthew 11:28': {
+      ref: 'Matthew 11:28',
+      status: 'ok',
+      rendered: 'Mt 11,28',
+      verses: [{ text: 'Dođite k meni svi koji ste umorni i opterećeni i ja ću vas odmoriti.' }],
+      source: { text: 'Come to me, all who labor and are heavy laden, and I will give you rest.' },
+    },
+  });
+  const source = '"Come to me, all who labor and are heavy laden, and I will give rest." (Matthew 11:28)\n';
+  const scripture = await prepareScripture(source, 'hr', lookup);
+  assert.ok(scripture.content.includes('"Come to me, all who labor and are heavy laden, and I will give rest."'));
+  assert.deepEqual(scripture.restore(scripture.content).notices, [
+    'Matthew 11:28: the quotation beside it is shortened or from another translation, so the AI translated it -- check it against Mt 11,28.',
+  ]);
+});
+
 test('applyVerseTag sets verse_tag, keeping its quotes, and leaves the body alone', () => {
   assert.equal(applyVerseTag('---\nverse_tag: "Jakov 2:1-4"\n---\n', 'Jak 2,1-4'), '---\nverse_tag: "Jak 2,1-4"\n---\n');
   assert.equal(applyVerseTag('---\nverse_tag:\n---\n', 'Jak 2,1-4'), '---\nverse_tag: Jak 2,1-4\n---\n');
