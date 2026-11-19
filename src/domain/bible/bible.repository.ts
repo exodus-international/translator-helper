@@ -8,6 +8,8 @@ import type { MappingInput } from './bible.types';
 const VERSE_CHUNK = 2000;
 /** A full Bible is ~35k verses; the import runs in one transaction. */
 const IMPORT_TIMEOUT_MS = 10 * 60 * 1000;
+// Any constant both writers agree on; it names the lock, nothing else.
+const TRANSLATIONS_LOCK = 724_190_001;
 
 export class BibleImportError extends Error {}
 
@@ -135,6 +137,7 @@ export async function writeTranslation(prepared: PreparedTranslation, importedBy
   const { meta } = prepared;
   return prisma.$transaction(
     async (tx) => {
+      await lockTranslations(tx);
       const existing = await tx.bibleTranslation.findUnique({ where: { code: meta.code } });
       if (meta.role === 'source') {
         const other = await tx.bibleTranslation.findFirst({ where: { role: 'SOURCE', NOT: { code: meta.code } } });
@@ -209,6 +212,15 @@ export async function writeTranslation(prepared: PreparedTranslation, importedBy
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
+/**
+ * Holds until the transaction ends, so imports and default changes run one at
+ * a time: "one source" and "one default per language" are checked by reading
+ * first, which two writers at once would both pass.
+ */
+async function lockTranslations(tx: Tx) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${TRANSLATIONS_LOCK})`;
+}
+
 async function readDeclarations(tx: Tx, translationId: string): Promise<PreparedDeclaration[]> {
   const books = await tx.bibleVersificationBook.findMany({
     where: { translationId },
@@ -279,6 +291,7 @@ export async function deleteTranslation(code: string) {
 /** Makes this translation the one its language resolves to. */
 export async function setLanguageDefault(code: string) {
   return prisma.$transaction(async (tx) => {
+    await lockTranslations(tx);
     const t = await tx.bibleTranslation.findUniqueOrThrow({ where: { code } });
     await tx.bibleTranslation.updateMany({
       where: { languageCode: t.languageCode, NOT: { id: t.id } },
