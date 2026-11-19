@@ -215,6 +215,16 @@ test('prepareScripture does nothing when the source has its own placeholders or 
   assert.equal(calls.length, 0);
 });
 
+test('prepareScripture finds citations of one-chapter books', async () => {
+  const { lookup, calls } = fromTable({
+    'Jude 5': { ref: 'Jude 5', status: 'ok', rendered: 'Jd 5', verses: [{ text: 'Podsjetiti vas hoću.' }] },
+    'Philemon 4-7, 10': { ref: 'Philemon 4-7, 10', status: 'ok', rendered: 'Flm 4-7.10', verses: [{ text: 'Zahvaljujem.' }] },
+  });
+  const scripture = await prepareScripture('As Jude 5 and Philemon 4-7, 10 say. Day 9 at 5:30.\n', 'hr', lookup);
+  assert.deepEqual(calls[0].refs, ['Jude 5', 'Philemon 4-7, 10']);
+  assert.equal(scripture.restore(scripture.content).content, 'As Jd 5 and Flm 4-7.10 say. Day 9 at 5:30.\n');
+});
+
 test('applyVerseTag sets verse_tag, keeping its quotes, and leaves the body alone', () => {
   assert.equal(applyVerseTag('---\nverse_tag: "Jakov 2:1-4"\n---\n', 'Jak 2,1-4'), '---\nverse_tag: "Jak 2,1-4"\n---\n');
   assert.equal(applyVerseTag('---\nverse_tag:\n---\n', 'Jak 2,1-4'), '---\nverse_tag: Jak 2,1-4\n---\n');

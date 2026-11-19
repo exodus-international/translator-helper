@@ -38,7 +38,11 @@ const MIN_SAME_PASSAGE = 0.6;
 const BOOK = String.raw`(?:(?:[1-3]|I{1,3})\s?)?[A-Z][a-z]+\.?(?:\sof\s(?:the\s)?[A-Z][a-z]+)?`;
 const RANGE = String.raw`\d+(?::\d+)?[a-z]?(?:\s?[-–]\s?\d+(?::\d+)?[a-z]?)?`;
 // Further ranges ("6:1-6, 16-18", "8:28; 12:1-2"), unless the number starts another book ("2 Peter").
-const CITATION_SOURCE = String.raw`\b${BOOK}\s\d+:\d+[a-z]?(?:\s?[-–]\s?\d+(?::\d+)?[a-z]?)?(?:\s?[,;]\s?${RANGE}(?![\d:]|\s?[A-Z]))*`;
+// Books of one chapter are cited by verse alone ("Jude 5", "Philemon 4-7, 10"); only
+// these names, so a chapter and verse stay required everywhere else.
+const ONE_CHAPTER_BOOK = String.raw`(?:[23]\s?(?:John|Jn)|Jude|Obadiah|Obad|Philemon|Philem|Phlm)\.?`;
+const VERSES = String.raw`\d+[a-z]?(?:\s?[-–]\s?\d+[a-z]?)?`;
+const CITATION_SOURCE = String.raw`\b(?:${BOOK}\s\d+:\d+[a-z]?(?:\s?[-–]\s?\d+(?::\d+)?[a-z]?)?(?:\s?[,;]\s?${RANGE}(?![\d:]|\s?[A-Z]))*|${ONE_CHAPTER_BOOK}\s${VERSES}(?:,\s?${VERSES}(?![\d:]|\s?[A-Z]))*(?![\d:]))`;
 const CITATION = new RegExp(CITATION_SOURCE, 'g');
 const CITATION_ONLY = new RegExp(String.raw`^${CITATION_SOURCE}$`);
 

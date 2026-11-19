@@ -32,6 +32,20 @@ test('continental citations, diacritics and verse lists', () => {
   assert.deepEqual(texts('1Kor 13,4 i 2. Kor 5,17'), ['1Kor 13,4', '2. Kor 5,17']);
 });
 
+test('books of one chapter are cited by verse alone', () => {
+  assert.deepEqual(texts('Jd 5-13, Jude 5, 7 i Flm 4-7. 10'), ['Jd 5-13', 'Jude 5, 7', 'Flm 4-7. 10']);
+  assert.deepEqual(texts('3 Iv 2, 2Jn 5 and Ob 1.'), ['3 Iv 2', '2Jn 5', 'Ob 1']);
+  // Every other book still needs a chapter and a verse.
+  assert.deepEqual(texts('Iv 5 i Mt 5, Day 9'), []);
+});
+
+test('verse lists spaced after the full stop, up to the next citation or sentence', () => {
+  assert.deepEqual(texts('Dn 13,1-9. 15-18'), ['Dn 13,1-9. 15-18']);
+  assert.deepEqual(texts('Iv 3,16. 2 Kor 5,17'), ['Iv 3,16', '2 Kor 5,17']);
+  assert.deepEqual(texts('Mt 5,3. 6,1'), ['Mt 5,3']);
+  assert.deepEqual(texts('Rim 8,28. Znamo'), ['Rim 8,28']);
+});
+
 test('the notation says which numbering a citation is likely in', () => {
   const [en, eu] = findCitations('John 3:16 = Iv 3,16');
   assert.equal(en.notation, 'english');
