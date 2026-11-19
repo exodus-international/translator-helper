@@ -129,6 +129,13 @@ describe('house style rules', () => {
     assert.equal(ids(text, text).includes('frontmatter-key-translated'), false);
   });
 
+  it('accepts a key the source has, though the list does not know it', () => {
+    const source =
+      '---\ntitle: A\nverse_tag:\n\ndisciplines:\n  office_of_the_dead:\n    behavior: disable\n---\n\nBody\n';
+    const text = source.replace('verse_tag:', 'verse_tag: Rim 8,35-39');
+    assert.equal(ids(text, source).includes('frontmatter-key-translated'), false);
+  });
+
   it('still flags a translated key', () => {
     const text = '---\ntitle: A\nnazev: B\n---\n\nBody\n';
     const source = '---\ntitle: A\nhero: B\n---\n\nBody\n';

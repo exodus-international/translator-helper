@@ -62,11 +62,15 @@ const frontmatterKeyTranslated: LintRule = {
     if (!translation.present || !original.present) return [];
 
     const translationKeys = new Set(translation.entries.map((e) => e.key));
-    const missingFromTranslation = original.entries.map((e) => e.key).filter((key) => !translationKeys.has(key));
+    const sourceKeys = new Set(original.entries.map((e) => e.key));
+    const missingFromTranslation = [...sourceKeys].filter((key) => !translationKeys.has(key));
 
     const diagnostics: LintDiagnostic[] = [];
     for (const entry of translation.entries) {
-      if (KNOWN_FRONTMATTER_KEYS.includes(entry.key)) continue;
+      // A key the source has is the source's own, kept as it is, whether or
+      // not the list knows it: `disciplines:` on a day was reported as
+      // translated on every translation of that day.
+      if (KNOWN_FRONTMATTER_KEYS.includes(entry.key) || sourceKeys.has(entry.key)) continue;
 
       // When exactly one source key is unaccounted for, this unknown key is
       // probably it, translated -- probably enough to name in the message and
