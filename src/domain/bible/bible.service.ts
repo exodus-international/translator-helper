@@ -1,5 +1,5 @@
 import { BibleIndex, type IndexTranslation } from './bible.index';
-import { resolvePassage, unknownLanguage, validateReference } from './bible.passages';
+import { MAX_VERSES_PER_REF, resolvePassage, unknownLanguage, validateReference } from './bible.passages';
 import { searchKey } from './bible.prepare';
 import { bibleStamp, loadChapter, loadHeaders, loadSnapshot, searchVerses } from './bible.repository';
 import { DEFAULT_INCLUDE, type Include, type PassageResult, type ReferenceCheck } from './bible.types';
@@ -11,6 +11,8 @@ import { DEFAULT_INCLUDE, type Include, type PassageResult, type ReferenceCheck 
  */
 
 const STAMP_TTL_MS = 2000;
+/** Verses one resolve call may read across all its references. */
+const MAX_VERSES_PER_REQUEST = 2000;
 
 interface Cached {
   stamp: string;
@@ -59,7 +61,16 @@ export async function resolvePassages(
   if (!target) return { translation: null, results: refs.map((r) => unknownLanguage(r, translationKey)) };
   const inc = { ...DEFAULT_INCLUDE, ...include };
   const results: PassageResult[] = [];
-  for (const ref of refs) results.push(await resolvePassage(index, ref, target, inc));
+  let budget = MAX_VERSES_PER_REQUEST;
+  for (const ref of refs) {
+    if (budget <= 0) {
+      results.push({ ref, status: 'out_of_range', translation: target.code, notes: ['Too many verses in one request.'] });
+      continue;
+    }
+    const result = await resolvePassage(index, ref, target, inc);
+    budget -= result.verses?.length ?? (result.status === 'ok' || result.status === 'partial' ? MAX_VERSES_PER_REF : 0);
+    results.push(result);
+  }
   return { translation: target.code, results };
 }
 

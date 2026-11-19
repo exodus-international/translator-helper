@@ -18,6 +18,9 @@ import {
  * src/api/passages.ts.
  */
 
+/** Longest passage one reference may ask for: Ps 119 is 176 verses, a whole Gospel is not a citation. */
+export const MAX_VERSES_PER_REF = 300;
+
 class Miss {
   constructor(
     public status: Exclude<PassageStatus, 'ok' | 'partial'>,
@@ -152,6 +155,9 @@ function expand(index: BibleIndex, source: IndexTranslation, usfm: string, range
     }
   }
   if (out.addresses.length === 0) throw new Miss('out_of_range', out.notes.join(' ') || `Nothing to resolve in ${usfm}.`);
+  if (out.addresses.length > MAX_VERSES_PER_REF) {
+    throw new Miss('out_of_range', `The passage covers more than ${MAX_VERSES_PER_REF} verses; cite a shorter one.`);
+  }
   out.addresses.sort((a, b) => a.chapter - b.chapter || a.verse - b.verse);
   return out;
 }

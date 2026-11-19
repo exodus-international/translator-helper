@@ -158,4 +158,10 @@ describe('resolvePassage (bible-api data)', { skip }, async () => {
       ],
     )
   })
+  test('refuses a passage longer than a citation', async () => {
+    const r = await resolve('Ps 1-150', t('sar-hr'))
+    assert.equal(r.status, 'out_of_range')
+    assert.match(r.notes[0]!, /more than 300 verses/)
+    assert.equal((await resolve('Ps 119', t('sar-hr'))).status, 'ok')
+  })
 })
