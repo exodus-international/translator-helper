@@ -19,7 +19,7 @@ import {
  */
 
 /** Longest passage one reference may ask for: Ps 119 is 176 verses, a whole Gospel is not a citation. */
-export const MAX_VERSES_PER_REF = 300;
+const MAX_VERSES_PER_REF = 300;
 
 /**
  * Verses a caller may still read, shared by every reference of one request so

@@ -1,3 +1,5 @@
+// The browser side of bible.chat: same names on purpose.
+// fallow-ignore-file duplicate-export
 import type { ChatEvent, ChatMessage, ChatToolName } from '@/domain/bible/bible.chat';
 import type { BibleTranslationDto } from '@/domain/bible/bible.service';
 import type { PassageResult, PassageStatus } from '@/domain/bible/bible.types';

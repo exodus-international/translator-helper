@@ -1,5 +1,13 @@
 import { parseFrontmatter } from '@/lib/frontmatter';
-import { findQuotedText, formatInlineQuote, formatReading, readingAfter, similarity, type Reading } from './citations';
+import {
+  findQuotedText,
+  formatInlineQuote,
+  formatReading,
+  normalizeCitation,
+  readingAfter,
+  similarity,
+  type Reading,
+} from './citations';
 
 export { similarity, type Reading };
 
@@ -73,7 +81,6 @@ function coverage(part: string, whole: string): number {
   }
   return quoted.length ? found / quoted.length : 0;
 }
-const normalizeCitation = (c: string) => c.replace(/\s+/g, ' ').trim();
 
 // ─── Finding Scripture in the source ──────────────────────
 

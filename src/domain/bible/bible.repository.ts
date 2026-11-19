@@ -393,9 +393,3 @@ export async function listMappings(code: string, usfm: string) {
       }
     : null;
 }
-
-export async function translationImporters() {
-  return prisma.bibleTranslation.findMany({
-    select: { code: true, importedBy: { select: { name: true, email: true } } },
-  });
-}

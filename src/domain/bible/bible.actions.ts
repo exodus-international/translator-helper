@@ -16,10 +16,8 @@ import {
   bibleForLanguage,
   getChapter,
   invalidateBibleIndex,
-  listBooks,
   listTranslations,
   resolvePassages,
-  searchBible,
   validateReferences,
 } from './bible.service';
 import {
@@ -28,7 +26,6 @@ import {
   LANGUAGE_CODE,
   mappingInputSchema,
   resolvePassagesSchema,
-  searchSchema,
   translationCodeSchema,
   validateReferencesSchema,
 } from './bible.types';
@@ -72,20 +69,9 @@ export async function getBibleChapterAction(input: unknown) {
   return getChapter(translation, book, chapter);
 }
 
-export async function searchBibleAction(input: unknown) {
-  await authorize('authenticated');
-  const { translation, q, book, limit } = searchSchema.parse(input);
-  return searchBible(translation, q, { book, limit });
-}
-
 export async function listBibleTranslationsAction() {
   await authorize('authenticated');
   return listTranslations();
-}
-
-export async function listBibleBooksAction(translation: unknown) {
-  await authorize('authenticated');
-  return listBooks(z.string().trim().min(2).max(40).parse(translation));
 }
 
 /** The Bible a document language resolves to, or null when none is imported. */

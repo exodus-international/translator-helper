@@ -164,17 +164,6 @@ export const chapterSchemaInput = z.object({
   chapter: z.number().int().min(1).max(200),
 });
 
-export const searchSchema = z.object({
-  translation: z.string().trim().min(2).max(40),
-  q: z.string().trim().min(2).max(200),
-  book: z
-    .string()
-    .trim()
-    .regex(/^[0-9A-Za-z]{3}$/)
-    .optional(),
-  limit: z.number().int().min(1).max(100).optional(),
-});
-
 export const translationCodeSchema = z.object({ code: z.string().regex(TRANSLATION_CODE).max(40) });
 
 export const mappingInputSchema = z

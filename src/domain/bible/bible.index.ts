@@ -103,6 +103,8 @@ export class BibleIndex {
     return tr.role === 'source' || (this.declared.get(tr.id)?.has(usfm) ?? false);
   }
 
+  // Read by bible.service through the index instance, which the dead-code check cannot follow.
+  // fallow-ignore-next-line unused-class-member
   declarationOf(tr: IndexTranslation, usfm: string): DeclaredBook | undefined {
     return this.declared.get(tr.id)?.get(usfm);
   }

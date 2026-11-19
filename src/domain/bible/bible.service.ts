@@ -81,7 +81,7 @@ export async function bibleForLanguage(languageCode: string) {
   return tr && tr.language === languageCode.toLowerCase() ? translationDto(index, tr) : null;
 }
 
-export function translationDto(index: BibleIndex, t: IndexTranslation) {
+function translationDto(index: BibleIndex, t: IndexTranslation) {
   return {
     code: t.code,
     name: t.name,

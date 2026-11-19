@@ -14,7 +14,7 @@ export interface ReferenceFormat {
 const ENGLISH: ReferenceFormat = { bookSep: ' ', chapterVerseSep: ':', verseRangeSep: '-', rangeListSep: ', ', segmentSep: '; ' }
 const CONTINENTAL: ReferenceFormat = { ...ENGLISH, chapterVerseSep: ',', rangeListSep: '.' }
 
-export const REFERENCE_FORMATS: Record<string, ReferenceFormat> = {
+const REFERENCE_FORMATS: Record<string, ReferenceFormat> = {
   en: ENGLISH,
   hr: { ...CONTINENTAL, rangeListSep: '. ' },
   de: CONTINENTAL,

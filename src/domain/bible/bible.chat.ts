@@ -23,7 +23,7 @@ export const CHAT_LIMITS = {
   requestTimeoutMs: 45_000,
 } as const;
 
-export const TOOL_NAMES = ['resolve_passages', 'search_bible', 'get_chapter', 'list_translations'] as const;
+const TOOL_NAMES = ['resolve_passages', 'search_bible', 'get_chapter', 'list_translations'] as const;
 export type ChatToolName = (typeof TOOL_NAMES)[number];
 
 export type ChatEvent =
@@ -106,7 +106,7 @@ const translationProperty = {
     'Translation code ("sar-hr") or language code ("hr", "en" for RSV-CE). Leave out to use the translator\'s chosen Bible.',
 };
 
-export const CHAT_TOOLS = [
+const CHAT_TOOLS = [
   {
     type: 'function',
     function: {
@@ -174,7 +174,7 @@ export const CHAT_TOOLS = [
   },
 ];
 
-export function buildSystemPrompt(chosen: ChatTranslation | undefined, key: string): string {
+function buildSystemPrompt(chosen: ChatTranslation | undefined, key: string): string {
   const bible = chosen
     ? `The translator's chosen Bible is ${chosen.name} (code ${chosen.code}, ${chosen.languageName}). Tools use it unless you pass another translation.`
     : `The translator asked for the Bible "${key}", which is not imported. Tell them and offer the translations list_translations returns.`;

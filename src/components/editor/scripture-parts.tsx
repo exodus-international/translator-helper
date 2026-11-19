@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
  * than as editor chrome, the word diff, and the state of one citation.
  */
 
-export const READER_FONT = { fontFamily: 'var(--font-reader), ui-serif, Georgia, serif' } as const;
+const READER_FONT = { fontFamily: 'var(--font-reader), ui-serif, Georgia, serif' } as const;
 
 export function OfficialText({ text, className }: { text: string; className?: string }) {
   return (

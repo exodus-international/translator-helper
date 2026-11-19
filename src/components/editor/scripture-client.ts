@@ -1,5 +1,8 @@
 'use client';
 
+// The browser side of bible.service: same names on purpose.
+// fallow-ignore-file duplicate-export
+
 import {
   bibleForLanguageAction,
   resolvePassagesAction,

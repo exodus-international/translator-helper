@@ -59,10 +59,6 @@ export const TRANSLATIONS: TranslationDef[] = [
   },
 ]
 
-export function sourceTranslation(): TranslationDef {
-  return TRANSLATIONS.find((t) => t.role === 'source')!
-}
-
 /** Import metadata for a known bible-api translation code, in the app's field names. */
 export function catalogMeta(code: string) {
   const def = TRANSLATIONS.find((t) => t.code === code)

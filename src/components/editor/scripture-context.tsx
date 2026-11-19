@@ -130,8 +130,3 @@ export function ScriptureProvider({
   if (!language) return <>{children}</>;
   return <ScriptureContext.Provider value={value}>{children}</ScriptureContext.Provider>;
 }
-
-/** For tests and stories: a host with everything settled. */
-export function StaticScriptureProvider({ host, children }: { host: ScriptureHost; children: ReactNode }) {
-  return <ScriptureContext.Provider value={host}>{children}</ScriptureContext.Provider>;
-}
