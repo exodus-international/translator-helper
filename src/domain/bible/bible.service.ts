@@ -1,5 +1,5 @@
 import { BibleIndex, type IndexTranslation } from './bible.index';
-import { MAX_VERSES_PER_REF, resolvePassage, unknownLanguage, validateReference } from './bible.passages';
+import { resolvePassage, unknownLanguage, validateReference, VerseBudget } from './bible.passages';
 import { searchKey } from './bible.prepare';
 import { bibleStamp, loadChapter, loadHeaders, loadSnapshot, searchVerses } from './bible.repository';
 import { DEFAULT_INCLUDE, type Include, type PassageResult, type ReferenceCheck } from './bible.types';
@@ -60,24 +60,17 @@ export async function resolvePassages(
   const target = index.findTranslation(translationKey);
   if (!target) return { translation: null, results: refs.map((r) => unknownLanguage(r, translationKey)) };
   const inc = { ...DEFAULT_INCLUDE, ...include };
+  const budget = new VerseBudget(MAX_VERSES_PER_REQUEST);
   const results: PassageResult[] = [];
-  let budget = MAX_VERSES_PER_REQUEST;
-  for (const ref of refs) {
-    if (budget <= 0) {
-      results.push({ ref, status: 'out_of_range', translation: target.code, notes: ['Too many verses in one request.'] });
-      continue;
-    }
-    const result = await resolvePassage(index, ref, target, inc);
-    budget -= result.verses?.length ?? (result.status === 'ok' || result.status === 'partial' ? MAX_VERSES_PER_REF : 0);
-    results.push(result);
-  }
+  for (const ref of refs) results.push(await resolvePassage(index, ref, target, inc, budget));
   return { translation: target.code, results };
 }
 
 export async function validateReferences(refs: string[]): Promise<ReferenceCheck[]> {
   const index = await getBibleIndex();
+  const budget = new VerseBudget(MAX_VERSES_PER_REQUEST);
   const out: ReferenceCheck[] = [];
-  for (const ref of refs) out.push(await validateReference(index, ref));
+  for (const ref of refs) out.push(await validateReference(index, ref, budget));
   return out;
 }
 

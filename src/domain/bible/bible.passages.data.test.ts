@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { memoryBible } from './bible.memory'
-import { resolvePassage, unknownLanguage, validateReference } from './bible.passages'
+import { resolvePassage, unknownLanguage, validateReference, VerseBudget } from './bible.passages'
 import { prepareTranslation } from './bible.prepare'
 import { DEFAULT_INCLUDE, declarationsSchema, type Include } from './bible.types'
 import { catalogMeta, TRANSLATIONS } from './lib/translations'
@@ -163,5 +163,17 @@ describe('resolvePassage (bible-api data)', { skip }, async () => {
     assert.equal(r.status, 'out_of_range')
     assert.match(r.notes[0]!, /more than 300 verses/)
     assert.equal((await resolve('Ps 119', t('sar-hr'))).status, 'ok')
+    const split = await resolve('Gen 1-10; Exod 1-10', t('sar-hr'))
+    assert.equal(split.status, 'out_of_range')
+    assert.match(split.notes[0]!, /more than 300 verses/)
+  })
+
+  test('charges one budget across references, resolved or not', async () => {
+    const budget = new VerseBudget(200)
+    assert.equal((await resolvePassage(index, 'Ps 119', t('sar-hr'), DEFAULT_INCLUDE, budget)).status, 'ok')
+    assert.equal(budget.remaining, 24)
+    const over = await resolvePassage(index, 'John 3', t('sar-hr'), DEFAULT_INCLUDE, budget)
+    assert.equal(over.status, 'out_of_range')
+    assert.deepEqual(over.notes, ['Too many verses in one request.'])
   })
 })

@@ -21,6 +21,20 @@ import {
 /** Longest passage one reference may ask for: Ps 119 is 176 verses, a whole Gospel is not a citation. */
 export const MAX_VERSES_PER_REF = 300;
 
+/**
+ * Verses a caller may still read, shared by every reference of one request so
+ * that many references cannot add up to the whole Bible. Charged before any
+ * chapter is read, whether or not the reference then resolves.
+ */
+export class VerseBudget {
+  constructor(public remaining: number) {}
+
+  take(verses: number) {
+    if (verses > this.remaining) throw new Miss('out_of_range', 'Too many verses in one request.');
+    this.remaining -= verses;
+  }
+}
+
 class Miss {
   constructor(
     public status: Exclude<PassageStatus, 'ok' | 'partial'>,
@@ -46,6 +60,7 @@ export async function resolvePassage(
   ref: string,
   target: IndexTranslation,
   include: Include = DEFAULT_INCLUDE,
+  budget: VerseBudget = new VerseBudget(MAX_VERSES_PER_REF),
 ): Promise<PassageResult> {
   const source = index.source;
   if (!source) return { ref, status: 'unknown_language', notes: ['No source Bible (RSV-CE) has been imported.'] };
@@ -57,12 +72,18 @@ export async function resolvePassage(
   const passages: Passage[] = [];
   const sources: Passage[] = [];
   let firstBook: string | undefined;
+  let length = 0;
   try {
     for (const p of parsed) {
       const usfm = index.resolveBook(p.book, target);
       if (!usfm) throw new Miss('unknown_book', `Unrecognised book '${p.book}'.`);
       firstBook ??= usfm;
       const addresses = expand(index, source, usfm, p.ranges);
+      length += addresses.addresses.length;
+      if (length > MAX_VERSES_PER_REF) {
+        throw new Miss('out_of_range', `The passage covers more than ${MAX_VERSES_PER_REF} verses; cite a shorter one.`);
+      }
+      budget.take(addresses.addresses.length * (include.source && target.id !== source.id ? 2 : 1));
       passages.push(await fetchPassage(index, usfm, addresses, target));
       if (include.source && target.id !== source.id) sources.push(await fetchPassage(index, usfm, addresses, source));
     }
@@ -93,9 +114,13 @@ export async function resolvePassage(
 }
 
 /** Checks a reference against the source only: no target, no text. */
-export async function validateReference(index: BibleIndex, ref: string): Promise<ReferenceCheck> {
+export async function validateReference(
+  index: BibleIndex,
+  ref: string,
+  budget?: VerseBudget,
+): Promise<ReferenceCheck> {
   if (!index.source) return { ref, status: 'unknown_language', notes: ['No source Bible (RSV-CE) has been imported.'] };
-  const r = await resolvePassage(index, ref, index.source, { text: false, verses: false, rendered: true, source: false });
+  const r = await resolvePassage(index, ref, index.source, { text: false, verses: false, rendered: true, source: false }, budget);
   return {
     ref,
     status: r.status,
@@ -155,9 +180,6 @@ function expand(index: BibleIndex, source: IndexTranslation, usfm: string, range
     }
   }
   if (out.addresses.length === 0) throw new Miss('out_of_range', out.notes.join(' ') || `Nothing to resolve in ${usfm}.`);
-  if (out.addresses.length > MAX_VERSES_PER_REF) {
-    throw new Miss('out_of_range', `The passage covers more than ${MAX_VERSES_PER_REF} verses; cite a shorter one.`);
-  }
   out.addresses.sort((a, b) => a.chapter - b.chapter || a.verse - b.verse);
   return out;
 }
