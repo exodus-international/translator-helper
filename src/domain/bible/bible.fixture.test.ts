@@ -74,6 +74,7 @@ describe('resolver on the fixture', () => {
   it('keeps chapter numbers when the file skips chapters', () => {
     const psalms = source.books.find((b) => b.usfm === 'PSA')!;
     assert.deepEqual([...new Set(psalms.verses.map((v) => v.chapter))], [3, 4, 51]);
+    assert.equal(psalms.chapterCount, 51);
     assert.equal(psalms.chapterVerseCounts.length, 51);
     assert.equal(psalms.chapterVerseCounts[0], 0);
   });

@@ -125,9 +125,10 @@ export function prepareTranslation(
       abbreviation: (abbreviations[usfm] ?? book.abbreviation).trim() || usfm,
       testament: book.testament === 'new' ? 'NT' : 'OT',
       order: CANON_ORDER_BY_USFM.get(book.usfm) ?? bi + 1,
-      chapterCount: chapters.length,
+      // The highest chapter, not how many the file has: a file may skip chapters.
+      chapterCount: Math.max(0, ...chapters.map((c) => c.number)),
       verseCount: bookVerses,
-      chapterVerseCounts: Array.from({ length: Math.max(...chapters.map((c) => c.number)) }, (_, i) => counts[i] ?? 0),
+      chapterVerseCounts: Array.from({ length: Math.max(0, ...chapters.map((c) => c.number)) }, (_, i) => counts[i] ?? 0),
       verses,
       headers,
     });
