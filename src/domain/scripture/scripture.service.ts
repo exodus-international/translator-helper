@@ -1,4 +1,7 @@
 import { parseFrontmatter } from '@/lib/frontmatter';
+import { formatReading, readingAfter, similarity, type Reading } from './citations';
+
+export { similarity, type Reading };
 
 /**
  * Scripture is never translated by the AI. Before the source goes to the model,
@@ -41,7 +44,6 @@ const CITATION_ONLY = new RegExp(String.raw`^${CITATION_SOURCE}$`);
 
 const READING_HEADING = /^#{1,6}[ \t]+A Reading\b/;
 const CITATION_LINE = /^<span\b[^>]*>\s*(.+?)\s*<\/span>$/;
-const READING_END = /^\s*(?:#{1,6}\s|<span\b|(?:-{3,}|\*{3,})\s*$)/;
 const FRONTMATTER = /^(﻿?---[ \t]*\r?\n)([\s\S]*?)(\r?\n---)/;
 const VERSE_TAG_LINE = /^verse_tag:[ \t]*(.*)$/m;
 const PLACEHOLDER = /\{\{bible:\d+\}\}/;
@@ -51,33 +53,6 @@ const placeholder = (n: number) => `{{bible:${n}}}`;
 const normalizeCitation = (c: string) => c.replace(/\s+/g, ' ').trim();
 
 // ─── Finding Scripture in the source ──────────────────────
-
-export interface Reading {
-  citation: string;
-  /** Line indexes of the italic text, end exclusive. */
-  start: number;
-  end: number;
-  /** The source prints a verse per line rather than one paragraph. */
-  linePerVerse: boolean;
-  text: string;
-}
-
-/**
- * The reading's text: from line `from` to the next heading, citation line or
- * rule. It may hold elisions (". . .") and plain paragraphs between the italic
- * ones, so it is never cut at the first one. It must start in italics.
- */
-function readingAfter(lines: string[], citation: string, line: number): Reading | null {
-  let start = line + 1;
-  while (start < lines.length && !lines[start].trim()) start++;
-  if (!/^[*_]/.test(lines[start]?.trim() ?? '')) return null;
-  let end = start;
-  for (let i = start; i < lines.length && !READING_END.test(lines[i]); i++) {
-    if (lines[i].trim()) end = i + 1;
-  }
-  const text = lines.slice(start, end).filter((l) => l.trim());
-  return { citation, start, end, linePerVerse: text.length > 1, text: text.join(' ') };
-}
 
 /** The readings in a document body, given its `verse_tag`. */
 export function findReadings(body: string, verseTag: string | null): Reading[] {
@@ -130,33 +105,9 @@ const inAppBible: PassageLookup = async (refs, languageCode) => {
 
 // ─── Text ─────────────────────────────────────────────────
 
-const escapeMarkdown = (text: string) => text.replace(/([\\*_`])/g, '\\$1');
-
 /** The reading as an italic block, a verse per line when the source had one. */
-function formatReading(passage: Resolved, linePerVerse: boolean): string {
-  const verses = passage.verses.map((v) => escapeMarkdown(v.text.replace(/\s+/g, ' ').trim()));
-  return `*${verses.join(linePerVerse ? '\n' : ' ')}*`;
-}
-
-const words = (text: string) => text.toLowerCase().match(/\p{L}+/gu) ?? [];
-
-/** How much two texts share their words, from 0 to 1 (the Dice coefficient over word counts). */
-export function similarity(a: string, b: string): number {
-  const wa = words(a);
-  const wb = words(b);
-  if (wa.length + wb.length === 0) return 1;
-  const counts = new Map<string, number>();
-  for (const w of wa) counts.set(w, (counts.get(w) ?? 0) + 1);
-  let shared = 0;
-  for (const w of wb) {
-    const n = counts.get(w) ?? 0;
-    if (n > 0) {
-      shared++;
-      counts.set(w, n - 1);
-    }
-  }
-  return (2 * shared) / (wa.length + wb.length);
-}
+const formatResolvedReading = (passage: Resolved, linePerVerse: boolean) =>
+  formatReading(passage.verses.map((v) => v.text), linePerVerse);
 
 // ─── Preparing and restoring ──────────────────────────────
 
@@ -247,7 +198,7 @@ export async function prepareScripture(
         `${reading.citation}: the English reading is shortened or from another translation. The full ${result.rendered} was inserted; trim it to match.`,
       );
     }
-    placed.push({ key: fill(formatReading(result, reading.linePerVerse), `the reading ${result.rendered}`), reading });
+    placed.push({ key: fill(formatResolvedReading(result, reading.linePerVerse), `the reading ${result.rendered}`), reading });
   }
   const body = [...lines];
   for (const { key, reading } of placed.sort((a, b) => b.reading.start - a.reading.start)) {
