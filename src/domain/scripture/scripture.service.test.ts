@@ -225,6 +225,35 @@ test('prepareScripture finds citations of one-chapter books', async () => {
   assert.equal(scripture.restore(scripture.content).content, 'As Jd 5 and Flm 4-7.10 say. Day 9 at 5:30.\n');
 });
 
+test('prepareScripture swaps a quotation of the whole passage for the official text', async () => {
+  const { lookup } = fromTable({
+    'John 3:16': {
+      ref: 'John 3:16',
+      status: 'ok',
+      rendered: 'Iv 3,16',
+      verses: [{ text: 'Bog je tako ljubio svijet.' }],
+      source: { text: 'For God so loved the world.' },
+    },
+    'Psalm 46:10': {
+      ref: 'Psalm 46:10',
+      status: 'ok',
+      rendered: 'Ps 46,11',
+      verses: [{ text: 'Prestanite i spoznajte da sam ja Bog!' }],
+      source: { text: 'Be still, and know that I am God. I am exalted among the nations, I am exalted in the earth!' },
+    },
+  });
+  const source = '"For God so loved the world." (John 3:16) and "Be still, and know that I am God." — Psalm 46:10\n';
+  const scripture = await prepareScripture(source, 'hr', lookup);
+  assert.ok(!scripture.content.includes('loved the world'));
+  // Half the verse is quoted: left to the model, with the official wording as a guide.
+  assert.ok(scripture.content.includes('"Be still, and know that I am God."'));
+  const { content, notices } = scripture.restore(scripture.content);
+  assert.equal(content, '"Bog je tako ljubio svijet." (Iv 3,16) and "Be still, and know that I am God." — Ps 46,11\n');
+  assert.deepEqual(notices, [
+    'Psalm 46:10: the quotation beside it is shortened or from another translation, so the AI translated it -- check it against Ps 46,11.',
+  ]);
+});
+
 test('applyVerseTag sets verse_tag, keeping its quotes, and leaves the body alone', () => {
   assert.equal(applyVerseTag('---\nverse_tag: "Jakov 2:1-4"\n---\n', 'Jak 2,1-4'), '---\nverse_tag: "Jak 2,1-4"\n---\n');
   assert.equal(applyVerseTag('---\nverse_tag:\n---\n', 'Jak 2,1-4'), '---\nverse_tag: Jak 2,1-4\n---\n');

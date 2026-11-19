@@ -54,10 +54,13 @@ language and role.
 | The text under `# A Reading from …`, which is the `verse_tag` passage | The official text, a verse per line when the source has one |
 | A citation line followed by the reading (`<span …>James 5:11-13</span>`, then the italic text) | The citation and the official text |
 | A citation anywhere in the text (`(John 3:16)`, `— Psalm 46:10`) | The citation as that Bible writes it (`Iv 3,16`, `Ps 46,11`) |
+| A quotation of the whole passage beside a citation (`"Be still, and know that I am God." — Psalm 46:10`) | The official text inside the quotation marks |
 
 1. Before the model sees the source, every reading and citation the Bible
    resolves is replaced with a placeholder (`{{bible:1}}`). The model is told
-   to keep the placeholders. For quoted citations it gets the official wording.
+   to keep the placeholders. A quotation of only part of a cited passage is
+   left to the model, which gets the official wording to follow, and a warning
+   says to check it.
 2. The model translates everything else.
 3. Each placeholder is filled from the Bible, and `verse_tag` is set from it.
 

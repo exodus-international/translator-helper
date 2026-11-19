@@ -1,5 +1,5 @@
 import { parseFrontmatter } from '@/lib/frontmatter';
-import { formatReading, readingAfter, similarity, type Reading } from './citations';
+import { findQuotedText, formatInlineQuote, formatReading, readingAfter, similarity, type Reading } from './citations';
 
 export { similarity, type Reading };
 
@@ -54,6 +54,23 @@ const PLACEHOLDER = /\{\{bible:\d+\}\}/;
 const PLACEHOLDERS = new RegExp(PLACEHOLDER.source, 'g');
 
 const placeholder = (n: number) => `{{bible:${n}}}`;
+
+/** How much of `part`'s words `whole` has, from 0 to 1: a quotation of a few words from a long verse scores high. */
+function coverage(part: string, whole: string): number {
+  const words = (text: string) => text.toLowerCase().match(/\p{L}+/gu) ?? [];
+  const pool = new Map<string, number>();
+  for (const w of words(whole)) pool.set(w, (pool.get(w) ?? 0) + 1);
+  const quoted = words(part);
+  let found = 0;
+  for (const w of quoted) {
+    const left = pool.get(w) ?? 0;
+    if (left > 0) {
+      found++;
+      pool.set(w, left - 1);
+    }
+  }
+  return quoted.length ? found / quoted.length : 0;
+}
 const normalizeCitation = (c: string) => c.replace(/\s+/g, ' ').trim();
 
 // ─── Finding Scripture in the source ──────────────────────
@@ -209,10 +226,35 @@ export async function prepareScripture(
     body.splice(reading.start, reading.end - reading.start, key);
   }
 
+  // Quotations beside a citation: the official wording when the source quotes the
+  // whole passage, so the model never writes Scripture out itself. Back to front,
+  // so earlier offsets hold.
+  let bodyText = body.join('\n');
+  const quotes: Array<{ from: number; to: number; key: string }> = [];
+  for (const match of bodyText.matchAll(CITATION)) {
+    const citation = normalizeCitation(match[0]);
+    const result = results.get(citation);
+    if (!isResolved(result) || !result.source?.text) continue;
+    const quote = findQuotedText(bodyText, { from: match.index, to: match.index + match[0].length });
+    if (quote?.kind !== 'quote' || quotes.some((q) => quote.from < q.to && q.from < quote.to)) continue;
+    const likeness = similarity(quote.plain, result.source.text);
+    if (likeness >= MIN_SIMILARITY) {
+      const text = formatInlineQuote(result.verses.map((v) => v.text));
+      quotes.push({ from: quote.from, to: quote.to, key: fill(text, `the quotation of ${result.rendered}`) });
+    } else if (likeness >= MIN_SAME_PASSAGE || coverage(quote.plain, result.source.text) >= MIN_SIMILARITY) {
+      notices.push(
+        `${citation}: the quotation beside it is shortened or from another translation, so the AI translated it -- check it against ${result.rendered}.`,
+      );
+    }
+  }
+  for (const { from, to, key } of quotes.sort((a, b) => b.from - a.from)) {
+    bodyText = bodyText.slice(0, from) + key + bodyText.slice(to);
+  }
+
   // Citations, one placeholder for each distinct one.
   const citationKeys = new Map<string, string>();
   const hints: string[] = [];
-  const withCitations = body.join('\n').replace(CITATION, (match) => {
+  const withCitations = bodyText.replace(CITATION, (match) => {
     const citation = normalizeCitation(match);
     const result = results.get(citation);
     if (!isResolved(result)) return match;
@@ -242,7 +284,7 @@ export async function prepareScripture(
     fills.size === 0
       ? ''
       : [
-          "Scripture: the placeholders {{bible:1}}, {{bible:2}}, … stand for Scripture readings and citations. After translation each is replaced with the official text of the target language's Catholic Bible.",
+          "Scripture: the placeholders {{bible:1}}, {{bible:2}}, … stand for Scripture readings, quotations and citations. After translation each is replaced with the official text of the target language's Catholic Bible.",
           'Keep every placeholder exactly as written, as often and where it appears in the source. Do not translate, write out or repeat the Scripture it stands for.',
           ...(hints.length
             ? [
