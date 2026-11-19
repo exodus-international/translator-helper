@@ -25,7 +25,7 @@ import { toast } from 'sonner';
 import { applyEdits, revealRange } from './cm-scripture';
 import { ScriptureCheck, type ScriptureCheckState } from './scripture-check';
 import { useScriptureHost, type ScriptureHost } from './scripture-context';
-import { resolvePassages } from './scripture-client';
+import { resolvePassages, retryFailedPassages } from './scripture-client';
 
 const CHECK_DELAY_MS = 600;
 const EDITOR_WAIT_MS = 1_500;
@@ -73,7 +73,9 @@ export function ScriptureCheckCard({ open, onOpenChange }: { open: boolean; onOp
   const content = useEditorStore((s) => s.content);
   const setContent = useEditorStore((s) => s.setContent);
   const [chatOpen, setChatOpen] = useState(false);
-  const [analysis, setAnalysis] = useState<{ key: string; items: CheckItem[] }>();
+  // `unchecked`: citations the Bible did not answer for, so the list is not the whole story.
+  const [analysis, setAnalysis] = useState<{ key: string; items: CheckItem[]; unchecked: number }>();
+  const [attempt, setAttempt] = useState(0);
 
   // Read by the wait for the editor, which outlives the render that started it.
   const hostRef = useRef<ScriptureHost | null>(host);
@@ -102,13 +104,14 @@ export function ScriptureCheckCard({ open, onOpenChange }: { open: boolean; onOp
       setAnalysis({
         key: `${translation}\u0000${content}`,
         items: buildCheckItems({ text: content, citations, results, sourceRendered }),
+        unchecked: refs.filter((ref) => !results.has(ref)).length,
       });
     }, CHECK_DELAY_MS);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [bible, translation, content, sourceRendered]);
+  }, [bible, translation, content, sourceRendered, attempt]);
 
   const items = useMemo(() => analysis?.items ?? [], [analysis]);
   const checking = !!bible && analysis?.key !== key;
@@ -204,6 +207,11 @@ export function ScriptureCheckCard({ open, onOpenChange }: { open: boolean; onOp
             items={items}
             sourceOnly={sourceOnly}
             checking={checking}
+            unchecked={analysis?.unchecked ?? 0}
+            onRetry={() => {
+              retryFailedPassages();
+              setAttempt((n) => n + 1);
+            }}
             languageName={host.languageName}
             readOnly={!host.editable}
             onReveal={(item) => withEditor((view) => revealRange(view, item.citation.from, item.citation.to, item.citation.raw))}

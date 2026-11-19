@@ -35,6 +35,11 @@ class Cache<T> {
     return entry?.state === 'done' ? entry.value : undefined;
   }
 
+  /** Lets failed keys be asked again at once, for a person's "Try again". */
+  forgetFailed() {
+    for (const [key, entry] of this.entries) if (entry.state === 'failed') this.entries.delete(key);
+  }
+
   /** Whether asking again would send a request. */
   isSettled(key: string): boolean {
     const entry = this.entries.get(key);
@@ -125,6 +130,10 @@ export const checkReferences = (refs: string[]) => checks.getMany(refs);
 
 /** Passages in a language's (or translation's) Bible, with the RSV-CE side. */
 export const resolvePassage = (ref: string, translation: string) => passages.get(`${translation}${SEP}${ref}`);
+export const peekPassage = (ref: string, translation: string) => passages.peek(`${translation}${SEP}${ref}`);
+export const isPassageSettled = (ref: string, translation: string) => passages.isSettled(`${translation}${SEP}${ref}`);
+/** After a failure, the next lookups go out at once instead of after a pause. */
+export const retryFailedPassages = () => passages.forgetFailed();
 
 export async function resolvePassages(refs: string[], translation: string): Promise<Map<string, PassageResult>> {
   const found = await passages.getMany(refs.map((ref) => `${translation}${SEP}${ref}`));

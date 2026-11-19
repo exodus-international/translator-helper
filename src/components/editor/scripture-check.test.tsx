@@ -139,3 +139,19 @@ test('citations the source has and the translation lacks are listed apart', () =
   const list = screen.getByRole('list', { name: 'Cited in the source only' });
   assert.equal(within(list).getByRole('listitem').textContent, 'Rim 5,8');
 });
+
+test('citations the Bible did not answer for are reported, never passed as official', async () => {
+  let retried = 0;
+  renderCheck({ items: items('Rim 8,28 „Znamo da Bog sve okreće na dobro.“'), unchecked: 2, onRetry: () => retried++ });
+  assert.equal(screen.queryByText(/all official/), null);
+  const alert = screen.getByRole('alert');
+  assert.match(alert.textContent ?? '', /2 citations could not be checked/);
+  await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+  assert.equal(retried, 1);
+});
+
+test('with nothing answered, the card does not say there are no citations', () => {
+  renderCheck({ items: [], unchecked: 1 });
+  assert.equal(screen.queryByText('No citations yet'), null);
+  assert.ok(screen.getByText('Citations not checked'));
+});

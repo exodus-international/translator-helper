@@ -9,7 +9,7 @@ import {
   type SourceOnly,
 } from '@/domain/scripture/scripture-check';
 import { cn } from '@/lib/utils';
-import { Loader2, Quote, Replace } from 'lucide-react';
+import { Loader2, Quote, Replace, RotateCw } from 'lucide-react';
 import { itemVerdict, numberingNote, TONE_CLASS, TONE_DOT, WordDiff } from './scripture-parts';
 
 export type ScriptureCheckState =
@@ -24,6 +24,9 @@ export interface ScriptureCheckProps {
   sourceOnly: SourceOnly[];
   /** A check of the current text is still under way. */
   checking: boolean;
+  /** Citations the Bible did not answer for: they are missing from the list. */
+  unchecked?: number;
+  onRetry?: () => void;
   readOnly?: boolean;
   languageName: string | null;
   onReveal: (item: CheckItem) => void;
@@ -43,6 +46,8 @@ export function ScriptureCheck({
   items,
   sourceOnly,
   checking,
+  unchecked = 0,
+  onRetry,
   readOnly = false,
   languageName,
   onReveal,
@@ -70,12 +75,14 @@ export function ScriptureCheck({
         <span className="min-w-0 flex-1" aria-live="polite">
           {checking && items.length === 0 ? (
             'Checking citations…'
+          ) : unchecked > 0 && items.length === 0 ? (
+            'Citations not checked'
           ) : items.length === 0 ? (
             'No citations yet'
           ) : (
             <>
               {items.length} {items.length === 1 ? 'citation' : 'citations'}
-              {attention > 0 ? `, ${attention} to check` : ', all official'}
+              {attention > 0 ? `, ${attention} to check` : unchecked > 0 ? '' : ', all official'}
             </>
           )}
         </span>
@@ -88,7 +95,21 @@ export function ScriptureCheck({
         )}
       </div>
 
-      {items.length === 0 && !checking && (
+      {unchecked > 0 && !checking && (
+        <div role="alert" className="flex items-center gap-2 border-t px-3 py-2 text-xs text-warning">
+          <span className="min-w-0 flex-1">
+            {unchecked} {unchecked === 1 ? 'citation' : 'citations'} could not be checked: the Bible did not answer.
+          </span>
+          {onRetry && (
+            <Button size="xs" variant="outline" onClick={onRetry}>
+              <RotateCw />
+              Try again
+            </Button>
+          )}
+        </div>
+      )}
+
+      {items.length === 0 && unchecked === 0 && !checking && (
         <p className="border-t px-3 py-3 text-xs leading-relaxed text-muted-foreground">
           Citations such as John 3:16 or Iv 3,16 are checked against the {state.bibleName} as you write.
         </p>
