@@ -114,7 +114,7 @@ test('similarity is 1 for the same words and falls with what is missing', () => 
   assert.ok(similarity(JAMES_EN.slice(0, 2).join(' '), JAMES_EN.join(' ')) < 0.9);
 });
 
-test('prepareScripture swaps Scripture for placeholders and restores it from the Bible API', async () => {
+test('prepareScripture swaps Scripture for placeholders and restores it from the Bible', async () => {
   const { lookup, calls } = fromTable(API);
   const scripture = await prepareScripture(day, 'hr', lookup);
 
