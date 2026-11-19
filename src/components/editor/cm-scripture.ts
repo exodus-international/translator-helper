@@ -16,10 +16,17 @@ import {
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { findCitations, type Citation } from '@/domain/scripture/citations';
-import { NOT_A_REFERENCE, type Edit } from '@/domain/scripture/scripture-check';
+import { isResolved, NOT_A_REFERENCE, type Edit } from '@/domain/scripture/scripture-check';
 import type { ScriptureHost } from './scripture-context';
 import { ScriptureCard } from './scripture-card';
-import { checkReference, isReferenceCheckSettled, peekReferenceCheck } from './scripture-client';
+import {
+  checkReference,
+  isPassageSettled,
+  isReferenceCheckSettled,
+  peekPassage,
+  peekReferenceCheck,
+  resolvePassage,
+} from './scripture-client';
 
 /**
  * Scripture citations in the translation editor: underlined once the Bible
@@ -105,24 +112,34 @@ class Scanner {
       }
     }
 
+    // RSV-CE says whether it is a reference at all; the document's Bible says
+    // whether it can supply it (a psalm whose numbering is not mapped cannot).
+    const translation = host.bible ? host.translation : null;
     const found: Found[] = [];
     const unknown: string[] = [];
+    const unresolved: string[] = [];
     for (const c of [...candidates.values()].sort((a, b) => a.from - b.from)) {
       const check = peekReferenceCheck(c.text);
-      if (check) {
-        if (!NOT_A_REFERENCE.has(check.status)) found.push({ ...c, warn: check.status !== 'ok' && check.status !== 'partial' });
-      } else if (!isReferenceCheckSettled(c.text)) {
-        unknown.push(c.text);
+      if (!check) {
+        if (!isReferenceCheckSettled(c.text)) unknown.push(c.text);
+        continue;
       }
+      if (NOT_A_REFERENCE.has(check.status)) continue;
+      const passage = translation ? peekPassage(c.text, translation) : undefined;
+      if (translation && !passage && !isPassageSettled(c.text, translation)) unresolved.push(c.text);
+      const supplied = passage ? isResolved(passage) : check.status === 'ok' || check.status === 'partial';
+      found.push({ ...c, warn: !supplied });
     }
     this.found = found;
     const ranges: Range<Decoration>[] = found.map((c) => (c.warn ? warnMark : refMark).range(c.from, c.to));
     this.decorations = Decoration.set(ranges, true);
 
-    if (unknown.length) {
-      Promise.all([...new Set(unknown)].map((ref) => checkReference(ref))).then(() => {
-        if (!this.destroyed) this.view.dispatch({ effects: rescanScripture.of(null) });
-      });
+    const rescan = () => {
+      if (!this.destroyed) this.view.dispatch({ effects: rescanScripture.of(null) });
+    };
+    if (unknown.length) Promise.all([...new Set(unknown)].map((ref) => checkReference(ref))).then(rescan);
+    if (translation && unresolved.length) {
+      Promise.all([...new Set(unresolved)].map((ref) => resolvePassage(ref, translation))).then(rescan);
     }
   }
 
