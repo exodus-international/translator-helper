@@ -78,6 +78,37 @@ arrives:
 If no Bible is imported for the language, the whole document is translated by
 the AI and one warning says so.
 
+## Where to find it
+
+- **Bible** (sidebar, everyone): a chat that answers with the official text.
+  Ask for a passage, search for words or compare a citation with RSV-CE; every
+  passage it quotes comes from the app's Bible, never from the model, and can
+  be copied as a citation. It opens in the Bible of your first language;
+  `/bible?translation=hr` opens another.
+- **Admin → Bible texts** (admins): every imported Bible with its versification
+  coverage, and **Import** for a bible-api file. A translation's page has four
+  tabs: **Books** (declare and review each book), **Read** (the text by
+  chapter), **Versification** (verses per chapter beside RSV-CE, the mapping
+  rows, adding and removing rows) and **Try it** (resolve any reference the way
+  a translation will).
+- **The editor**: citations in a translation are underlined (amber when the
+  Bible can't supply them). Hovering one shows the passage in the document's
+  Bible, the citation as that Bible writes it and how a quotation beside it
+  differs from the official text, with buttons to fix the notation or use the
+  official text.
+- **The Scripture card** in the document panel lists every citation in the
+  translation with its verdict, in document order; clicking one goes to it.
+  **Fix all notations** rewrites English citations (`John 3:16` → `Iv 3,16`)
+  in one undo step. A citation already in the target's notation whose numbers
+  would change (a psalm, say) is flagged to check, never rewritten, since it
+  may already use the target's numbering. Citations the source has and the
+  translation lacks are listed too. **Ask the Bible** opens the chat beside
+  the editor; **Insert** puts a passage at the cursor.
+- Reviewers get the same card. It changes the text only while the review can
+  be edited; otherwise it only checks.
+- **New document**: under the content box, a summary of the citations found
+  in the source and any that RSV-CE can't resolve.
+
 ## Limits
 
 One reference covers at most 300 verses and one lookup at most 2000, so a
