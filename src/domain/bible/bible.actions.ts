@@ -15,6 +15,7 @@ import {
 import {
   bibleForLanguage,
   getChapter,
+  identifyPassage,
   invalidateBibleIndex,
   listTranslations,
   resolvePassages,
@@ -72,6 +73,15 @@ export async function getBibleChapterAction(input: unknown) {
 export async function listBibleTranslationsAction() {
   await authorize('authenticated');
   return listTranslations();
+}
+
+/** Longer than any day's reading; a reading is found by its first and last sentence. */
+const MAX_READING_CHARS = 20_000;
+
+/** The RSV-CE passage a reading is, found by its text, or null. */
+export async function identifyPassageAction(text: unknown) {
+  await authorize('authenticated');
+  return identifyPassage(z.string().trim().min(1).max(MAX_READING_CHARS).parse(text));
 }
 
 /** The Bible a document language resolves to, or null when none is imported. */

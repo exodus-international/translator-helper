@@ -5,6 +5,7 @@
 
 import {
   bibleForLanguageAction,
+  identifyPassageAction,
   resolvePassagesAction,
   validateReferencesAction,
 } from '@/domain/bible/bible.actions';
@@ -153,6 +154,19 @@ export function bibleForLanguage(languageCode: string): Promise<BibleTranslation
     pending = bibleForLanguageAction(key);
     pending.catch(() => bibles.delete(key));
     bibles.set(key, pending);
+  }
+  return pending;
+}
+
+const identified = new Map<string, Promise<string | null>>();
+
+/** The RSV-CE passage a reading is, found by its text, or null. Throws when the Bible cannot be read. */
+export function identifyReading(text: string): Promise<string | null> {
+  let pending = identified.get(text);
+  if (!pending) {
+    pending = identifyPassageAction(text);
+    pending.catch(() => identified.delete(text));
+    identified.set(text, pending);
   }
   return pending;
 }

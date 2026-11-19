@@ -22,7 +22,14 @@ import {
   setLanguageDefault,
   writeTranslation,
 } from './bible.repository';
-import { bibleForLanguage, getChapter, invalidateBibleIndex, resolvePassages, searchBible } from './bible.service';
+import {
+  bibleForLanguage,
+  getChapter,
+  identifyPassage,
+  invalidateBibleIndex,
+  resolvePassages,
+  searchBible,
+} from './bible.service';
 
 const fixture = (name: string) => readFileSync(path.join(import.meta.dirname, 'fixtures', name), 'utf8');
 const CODES = ['rsvce-en', 'sar-hr', 'test-hr'];
@@ -232,6 +239,40 @@ describe('an AI translation into Croatian', () => {
     const prepared = await prepareScripture('See John 3:16.', 'hr');
     const { notices } = prepared.restore('Vidi.');
     assert.ok(notices.some((n) => n.includes('The AI dropped')));
+  });
+
+  it('finds a reading with no verse_tag by its text, fills it and sets verse_tag', async () => {
+    const day = [
+      '---',
+      'title: T',
+      'verse_tag:',
+      '---',
+      '',
+      '# A Reading from the Holy Gospel according to St. John',
+      '',
+      '*For God so loved the world that he gave his only Son, that whoever believes in him should not perish but have eternal life.',
+      'For God sent the Son into the world, not to condemn the world, but that the world might be saved through him.*',
+      '',
+      '# Reflection',
+      '',
+    ].join('\n');
+    const prepared = await prepareScripture(day, 'hr');
+    assert.match(prepared.content, /# A Reading from the Holy Gospel according to St\. John\n\n\{\{bible:1\}\}\n/);
+    const { content, notices } = prepared.restore(prepared.content);
+    assert.match(content, /verse_tag: Iv 3,16-17\n/);
+    assert.match(content, /\*Jer je Bog tako ljubio svijet/);
+    assert.equal(notices.length, 1);
+    assert.match(notices[0], /by its text the reading is John 3:16-17/);
+  });
+
+  it('finds a passage by its first and last sentence, and nothing for text the Bible does not have', async () => {
+    assert.equal(await identifyPassage('For God so loved the world that he gave his only Son.'), 'John 3:16');
+    assert.equal(
+      await identifyPassage('And as Moses lifted up the serpent in the wilderness. He who believes in him is not condemned.'),
+      'John 3:14-18',
+    );
+    assert.equal(await identifyPassage('Let all our people fix their minds not on death but rather on immortality.'), null);
+    assert.equal(await identifyPassage('Amen.'), null);
   });
 
   it('leaves the Scripture to the model, with a warning, for a language with no Bible', async () => {

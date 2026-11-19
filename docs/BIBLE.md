@@ -64,6 +64,14 @@ language and role.
 2. The model translates everything else.
 3. Each placeholder is filled from the Bible, and `verse_tag` is set from it.
 
+A day whose `verse_tag` is empty is still filled: the reading under its one
+`# A Reading from …` heading is looked up in RSV-CE by its text (the verse its
+first sentence opens and the verse its last sentence closes). When the passage
+found matches the reading, the reading is filled from the Bible, `verse_tag` is
+set in the translation, and a warning names the passage to check. When the
+text is not found, the AI translates the reading and a warning says to add the
+`verse_tag`.
+
 Anything that needs a translator's eye shows as a warning after the AI draft
 arrives:
 
@@ -110,7 +118,8 @@ the AI and one warning says so.
 - Reviewers get the same card. It changes the text only while the review can
   be edited; otherwise it only checks.
 - **New document**: under the content box, a summary of the citations found
-  in the source and any that RSV-CE can't resolve.
+  in the source and any that RSV-CE can't resolve, and, when `verse_tag` is
+  empty, the passage the reading was found as by its text.
 
 ## Limits
 

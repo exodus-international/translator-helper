@@ -4,8 +4,10 @@ import {
   formatInlineQuote,
   formatReading,
   normalizeCitation,
+  READING_HEADING,
   readingAfter,
   similarity,
+  untaggedReading,
   type Reading,
 } from './citations';
 
@@ -21,7 +23,8 @@ export { similarity, type Reading };
  *
  * Readings are the passage a document is built on, in the two shapes the content
  * uses:
- * - a day's `# A Reading from …` heading, whose italic text is its `verse_tag`;
+ * - a day's `# A Reading from …` heading, whose italic text is its `verse_tag`
+ *   (when `verse_tag` is empty, the passage is found by the reading's text);
  * - a line holding only a citation (`<span …>James 5:11-13</span>`) followed by
  *   the italic text.
  *
@@ -56,7 +59,6 @@ const CITATION_SOURCE = String.raw`\b(?:${BOOK}\s\d+:\d+[a-z]?(?:\s?[-–]\s?\d+
 const CITATION = new RegExp(CITATION_SOURCE, 'g');
 const CITATION_ONLY = new RegExp(String.raw`^${CITATION_SOURCE}$`);
 
-const READING_HEADING = /^#{1,6}[ \t]+A Reading\b/;
 const CITATION_LINE = /^<span\b[^>]*>\s*(.+?)\s*<\/span>$/;
 const FRONTMATTER = /^(﻿?---[ \t]*\r?\n)([\s\S]*?)(\r?\n---)/;
 const VERSE_TAG_LINE = /^verse_tag:[ \t]*(.*)$/m;
@@ -133,6 +135,16 @@ const inAppBible: PassageLookup = async (refs, languageCode) => {
   return new Map(results.map((r) => [r.ref, r]));
 };
 
+/** Finds the RSV-CE passage a reading is by its text; null when it is not found. */
+export type PassageIdentify = (text: string) => Promise<string | null>;
+
+const inAppIdentify: PassageIdentify = async (text) => {
+  const { identifyPassage } = await import('@/domain/bible/bible.service');
+  return identifyPassage(text);
+};
+
+const noIdentify: PassageIdentify = async () => null;
+
 // ─── Text ─────────────────────────────────────────────────
 
 /** The reading as an italic block, a verse per line when the source had one. */
@@ -174,32 +186,53 @@ export async function prepareScripture(
   source: string,
   languageCode: string,
   lookup: PassageLookup = inAppBible,
+  identify: PassageIdentify = lookup === inAppBible ? inAppIdentify : noIdentify,
 ): Promise<PreparedScripture> {
   if (PLACEHOLDER.test(source)) return unchanged(source);
 
   const frontmatter = source.match(FRONTMATTER)?.[0] ?? '';
   const lines = source.slice(frontmatter.length).split('\n');
   const { data } = parseFrontmatter(source);
-  const verseTag = typeof data.verse_tag === 'string' && data.verse_tag.trim() ? normalizeCitation(data.verse_tag) : null;
+  let verseTag = typeof data.verse_tag === 'string' && data.verse_tag.trim() ? normalizeCitation(data.verse_tag) : null;
+
+  // With no verse_tag, the day's reading is found by its text.
+  const notices: string[] = [];
+  const untagged = verseTag ? null : untaggedReading(source);
+  let foundByText = false;
+  if (untagged) {
+    try {
+      verseTag = await identify(untagged.text);
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Finding the reading by its text failed:`, error instanceof Error ? error.message : error);
+    }
+    foundByText = verseTag !== null;
+    if (!foundByText) {
+      notices.push(
+        `"${untagged.heading}" has no verse_tag and its text was not found in RSV-CE, so the AI translated the reading; check it against the official text and add the verse_tag.`,
+      );
+    }
+  }
 
   const readings = findReadings(lines.join('\n'), verseTag);
   const outsideReadings = lines.filter((_, i) => !readings.some((r) => i >= r.start && i < r.end)).join('\n');
   const inline = [...new Set((outsideReadings.match(CITATION) ?? []).map(normalizeCitation))];
   const refs = [...new Set([...(verseTag ? [verseTag] : []), ...readings.map((r) => r.citation), ...inline])];
-  if (refs.length === 0) return unchanged(source);
+  if (refs.length === 0) return unchanged(source, notices);
 
   let results: Map<string, PassageResult> | null;
   try {
     results = await lookup(refs.slice(0, MAX_REFS), languageCode);
   } catch (error) {
     console.error(`${LOG_PREFIX} Bible lookup failed:`, error instanceof Error ? error.message : error);
-    return unchanged(source, ['The Bible could not be read, so the AI translated the Scripture. Check it against the official text.']);
+    return unchanged(source, [
+      ...notices,
+      'The Bible could not be read, so the AI translated the Scripture. Check it against the official text.',
+    ]);
   }
   if (!results || [...results.values()].every((r) => r.status === 'unknown_language')) {
     return unchanged(source, [`No Bible is imported for "${languageCode}", so the AI translated the Scripture.`]);
   }
 
-  const notices: string[] = [];
   const fills = new Map<string, { text: string; count: number; label: string }>();
   const fill = (text: string, label: string) => {
     const key = placeholder(fills.size + 1);
@@ -286,9 +319,16 @@ export async function prepareScripture(
   }
 
   const tag = verseTag ? results.get(verseTag) : undefined;
-  const verseTagValue = isResolved(tag) ? tag.rendered : null;
-  if (verseTag && !verseTagValue && !readings.some((r) => r.citation === verseTag)) {
+  // A passage found by its text is the verse_tag only once the reading was filled from it.
+  const trusted = !foundByText || placed.some((p) => p.reading.citation === verseTag);
+  const verseTagValue = isResolved(tag) && trusted ? tag.rendered : null;
+  if (verseTag && !foundByText && !verseTagValue && !readings.some((r) => r.citation === verseTag)) {
     notices.push(...unresolvedNotice(verseTag, tag, 'verse_tag'));
+  }
+  if (untagged && foundByText && verseTagValue) {
+    notices.push(
+      `"${untagged.heading}" had no verse_tag; by its text the reading is ${verseTag}, so it was filled from ${verseTagValue} and verse_tag set to it. Check that it is the right passage.`,
+    );
   }
 
   const prompt =

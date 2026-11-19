@@ -74,6 +74,57 @@ export async function validateReferences(refs: string[]): Promise<ReferenceCheck
   return out;
 }
 
+/** Words of a sentence a text search takes, then fewer when that finds nothing. */
+const ANCHOR_WORDS = [8, 5];
+/** A sentence shorter than this says too little to be found by. */
+const MIN_ANCHOR_WORDS = 4;
+/** How many chapters a reading found by its text may cross. */
+const MAX_READING_CHAPTERS = 3;
+
+/**
+ * The RSV-CE passage a reading is, found by its text: from the verse its first
+ * sentence opens to the verse its last sentence closes. It is a guess for the
+ * caller to compare with the passage's text. Null when either end is not found.
+ */
+export async function identifyPassage(text: string): Promise<string | null> {
+  const index = await getBibleIndex();
+  const source = index.source;
+  if (!source) return null;
+  const sentences = text
+    .split(/(?<=[.?!;])\s+/)
+    .map((s) => searchKey(s).split(' ').filter(Boolean))
+    .filter((words) => words.length >= MIN_ANCHOR_WORDS);
+  if (sentences.length === 0) return null;
+
+  const find = async (words: string[], from: 'start' | 'end') => {
+    for (const count of ANCHOR_WORDS) {
+      const anchor = from === 'start' ? words.slice(0, count) : words.slice(-count);
+      const rows = await searchVerses(source.id, anchor, 10);
+      if (rows.length) return rows;
+    }
+    return [];
+  };
+  const starts = await find(sentences[0], 'start');
+  const ends = sentences.length > 1 ? await find(sentences.at(-1)!, 'end') : starts;
+
+  let best: { start: (typeof starts)[number]; end: (typeof ends)[number]; span: number } | null = null;
+  for (const start of starts) {
+    for (const end of ends) {
+      if (end.book.usfm !== start.book.usfm) continue;
+      const chapters = end.chapter - start.chapter;
+      const span = chapters * 1000 + (end.numberEnd ?? end.number) - start.number;
+      if (chapters < 0 || chapters > MAX_READING_CHAPTERS || span < 0) continue;
+      if (!best || span < best.span) best = { start, end, span };
+    }
+  }
+  if (!best) return null;
+  const { start, end } = best;
+  const book = index.findBook(source, start.book.usfm)?.shortName ?? start.book.usfm;
+  const last = end.numberEnd ?? end.number;
+  if (end.chapter !== start.chapter) return `${book} ${start.chapter}:${start.number}-${end.chapter}:${last}`;
+  return `${book} ${start.chapter}:${start.number}${last > start.number ? `-${last}` : ''}`;
+}
+
 /** The Bible a language resolves to, or null when none is imported. */
 export async function bibleForLanguage(languageCode: string) {
   const index = await getBibleIndex();

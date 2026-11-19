@@ -8,6 +8,7 @@ import {
   formatInlineQuote,
   formatReading,
   plainText,
+  untaggedReading,
   type Citation,
 } from './citations';
 
@@ -155,4 +156,17 @@ test('a word diff counts punctuation', () => {
 test('an empty side diffs to one insertion or deletion', () => {
   assert.deepEqual(diffWords('', 'a b'), [{ type: 'insert', text: 'a b' }]);
   assert.deepEqual(diffWords('a b', ''), [{ type: 'delete', text: 'a b' }]);
+});
+
+test('untaggedReading is the one "A Reading" text of a day whose verse_tag is empty', () => {
+  const body = '# A Reading from the Letter of St. Paul to the Romans\n \n*Who shall separate us? No, in **all** these things.*\n\n# Reflection\n\nText.\n';
+  assert.deepEqual(untaggedReading(`---\ntitle: T\nverse_tag:\nday: 29\n---\n\n${body}`), {
+    heading: 'A Reading from the Letter of St. Paul to the Romans',
+    text: 'Who shall separate us? No, in all these things.',
+  });
+  assert.ok(untaggedReading(`---\nverse_tag: ""\n---\n${body}`));
+  assert.ok(untaggedReading(body));
+  assert.equal(untaggedReading(`---\nverse_tag: Romans 8:35-39\n---\n${body}`), null);
+  assert.equal(untaggedReading(`${body}\n# A Reading from Exodus\n\n*More*\n`), null);
+  assert.equal(untaggedReading('# A Reading from Romans\n\nNot italic.\n'), null);
 });

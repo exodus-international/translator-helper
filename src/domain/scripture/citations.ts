@@ -242,6 +242,25 @@ export function findQuotedText(text: string, citation: Pick<Citation, 'from' | '
 
 const HEADING = /^#{1,6}[ \t]/;
 const FRONTMATTER_BLOCK = /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+export const READING_HEADING = /^#{1,6}[ \t]+A Reading\b/;
+const VERSE_TAG_VALUE = /^verse_tag:[ \t]*(.*)$/m;
+
+/**
+ * The day's reading when the document does not say which passage it is: an
+ * empty or missing `verse_tag` and one "A Reading" heading with italic text
+ * under it. Null otherwise.
+ */
+export function untaggedReading(source: string): { heading: string; text: string } | null {
+  const frontmatter = source.match(FRONTMATTER_BLOCK)?.[0] ?? '';
+  const tag = frontmatter.match(VERSE_TAG_VALUE)?.[1].trim().replace(/^["']|["']$/g, '');
+  if (tag) return null;
+  const lines = source.slice(frontmatter.length).split('\n');
+  const headings = lines.flatMap((line, i) => (READING_HEADING.test(line) ? [i] : []));
+  if (headings.length !== 1) return null;
+  const reading = readingAfter(lines, '', headings[0]);
+  if (!reading) return null;
+  return { heading: lines[headings[0]].replace(/^#+\s*/, '').trim(), text: plainText(reading.text) };
+}
 
 /** Whether the citation sits on the frontmatter's `verse_tag:` line. */
 export function isVerseTag(text: string, citation: Pick<Citation, 'from' | 'to'>): boolean {

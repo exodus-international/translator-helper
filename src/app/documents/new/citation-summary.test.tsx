@@ -61,3 +61,52 @@ test('shows nothing for a document with no citations', () => {
   assert.equal(container.textContent, '');
   assert.equal(asked.length, 0);
 });
+
+const UNTAGGED_DAY = [
+  '---',
+  'title: The Victorious Life',
+  'verse_tag:',
+  '---',
+  '',
+  '# A Reading from the Letter of St. Paul to the Romans',
+  ' ',
+  '*Who shall separate us from the love of Christ? No, in all these things we are more than conquerors.*',
+  '',
+  '# Reflection',
+  '',
+  'As Hebrews says (Hebrews 2:14–15).',
+].join('\n');
+
+test('names the passage a reading with no verse_tag is, found by its text', async () => {
+  const asked: string[] = [];
+  const identify = async (text: string) => {
+    asked.push(text);
+    return 'Romans 8:35-39';
+  };
+  const check = async (refs: string[]) =>
+    new Map(refs.map((r) => [r, { ref: r, status: 'ok', normalized: 'Hebrews 2:14-15', notes: [] } as ReferenceCheck]));
+  render(<CitationSummary content={UNTAGGED_DAY} check={check} identify={identify} />);
+
+  assert.ok(screen.getByText('Finding the reading under “A Reading from the Letter of St. Paul to the Romans” by its text…'));
+  await waitFor(() => screen.getByText('Romans 8:35-39'), { timeout: 2_000 });
+  assert.deepEqual(asked, ['Who shall separate us from the love of Christ? No, in all these things we are more than conquerors.']);
+  await waitFor(() => screen.getByText('1 Bible citation, all found in RSV-CE.'), { timeout: 2_000 });
+});
+
+test('warns when a reading with no verse_tag is not found, even with no other citations', async () => {
+  const content = UNTAGGED_DAY.replace('As Hebrews says (Hebrews 2:14–15).', 'No citations.');
+  render(<CitationSummary content={content} check={() => assert.fail('nothing to check')} identify={async () => null} />);
+  await waitFor(
+    () =>
+      screen.getByText(
+        'The reading under “A Reading from the Letter of St. Paul to the Romans” has no verse_tag, and its text was not found in RSV-CE. Add the verse_tag, or the AI will translate the reading.',
+      ),
+    { timeout: 2_000 },
+  );
+});
+
+test('says the reading could not be searched when the Bible is down', async () => {
+  const content = UNTAGGED_DAY.replace('As Hebrews says (Hebrews 2:14–15).', '');
+  render(<CitationSummary content={content} identify={() => Promise.reject(new Error('down'))} />);
+  await waitFor(() => screen.getByText(/has no verse_tag, and the Bible could not be searched right now\./), { timeout: 2_000 });
+});

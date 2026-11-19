@@ -53,6 +53,7 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     getBibleChapterAction: ['authenticated'],
     listBibleTranslationsAction: ['authenticated'],
     bibleForLanguageAction: ['authenticated'],
+    identifyPassageAction: ['authenticated'],
     listBibleMappingsAction: ['admin'],
     deleteBibleTranslationAction: ['admin'],
     setBibleLanguageDefaultAction: ['admin'],

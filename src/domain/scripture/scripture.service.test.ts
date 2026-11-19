@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import {
   applyVerseTag,
@@ -277,4 +279,93 @@ test('applyVerseTag sets verse_tag, keeping its quotes, and leaves the body alon
   assert.equal(applyVerseTag('---\nverse_tag:\n---\n', 'Jak 2,1-4'), '---\nverse_tag: Jak 2,1-4\n---\n');
   const body = '---\ntitle: T\n---\n\nverse_tag: James 2:1-4';
   assert.equal(applyVerseTag(body, 'Jak 2,1-4'), body);
+});
+
+// ─── A day with no verse_tag ──────────────────────────────
+
+const VICTORIOUS = readFileSync(path.join(import.meta.dirname, 'fixtures', 'the-victorious-life.md'), 'utf8');
+const ROMANS_EN =
+  'Who shall separate us from the love of Christ? Shall tribulation, or distress, or persecution, or famine, or nakedness, or peril, or sword? As it is written, "For thy sake we are being killed all the day long; we are regarded as sheep to be slaughtered." No, in all these things we are more than conquerors through him who loved us. For I am sure that neither death, nor life, nor angels, nor principalities, nor things present, nor things to come, nor powers, nor height, nor depth, nor anything else in all creation, will be able to separate us from the love of God in Christ Jesus our Lord.';
+const HEBREWS_EN =
+  'Since therefore the children share in flesh and blood, he himself likewise partook of the same nature, that through death he might destroy him who has the power of death, that is, the devil, and deliver all those who through fear of death were subject to lifelong bondage.';
+const UNTAGGED: Record<string, PassageResult> = {
+  'Romans 8:35-39': {
+    ref: 'Romans 8:35-39',
+    status: 'ok',
+    rendered: 'Rim 8,35-39',
+    verses: [{ text: 'Tko će nas rastaviti od Božje ljubavi?' }, { text: 'Kao što je pisano.' }, { text: 'Ali u svemu tome pobjeđujemo.' }],
+    source: { text: ROMANS_EN },
+  },
+  'Hebrews 2:14–15': {
+    ref: 'Hebrews 2:14–15',
+    status: 'ok',
+    rendered: 'Heb 2,14-15',
+    verses: [{ text: 'Budući da djeca zajednički imaju tijelo i krv.' }, { text: 'Tako izbavi one.' }],
+    source: { text: HEBREWS_EN },
+  },
+};
+
+test('a reading with no verse_tag is found by its text, filled from the Bible, and verse_tag set', async () => {
+  const { lookup, calls } = fromTable(UNTAGGED);
+  const searched: string[] = [];
+  const scripture = await prepareScripture(VICTORIOUS, 'hr', lookup, async (text) => {
+    searched.push(text);
+    return 'Romans 8:35-39';
+  });
+
+  assert.equal(searched.length, 1);
+  assert.ok(searched[0].startsWith('Who shall separate us from the love of Christ?'));
+  assert.ok(searched[0].endsWith('in Christ Jesus our Lord.'));
+  assert.deepEqual(calls, [{ lang: 'hr', refs: ['Romans 8:35-39', 'Hebrews 2:14–15'] }]);
+
+  // Neither the reading nor the quotation of Hebrews reaches the model; the prayers do.
+  assert.ok(!scripture.content.includes('Who shall separate us'));
+  assert.ok(scripture.content.includes('# A Reading from the Letter of St. Paul to the Romans\n \n{{bible:1}}\n\n# Reflection'));
+  assert.ok(scripture.content.includes('The Letter to the Hebrews states: “{{bible:2}}” ({{bible:3}}).'));
+  assert.ok(scripture.content.includes('*O God, great and omnipotent judge'));
+  assert.ok(scripture.content.includes('“O Death! Where is your victory?”'));
+  // The frontmatter goes to the model as written.
+  assert.ok(scripture.content.startsWith('---\ntitle: The Victorious Life\nsubtitle: November 28, 2026\nday: 29\nverse_tag:\n'));
+
+  const { content, notices } = scripture.restore(scripture.content);
+  assert.ok(content.includes('\nverse_tag: Rim 8,35-39\nhero: hero-november_2026\n\ndisciplines:\n  office_of_the_dead:\n    behavior: disable\n---\n'));
+  assert.ok(content.includes('\n*Tko će nas rastaviti od Božje ljubavi? Kao što je pisano. Ali u svemu tome pobjeđujemo.*\n'));
+  assert.ok(content.includes('states: “Budući da djeca zajednički imaju tijelo i krv. Tako izbavi one.” (Heb 2,14-15).'));
+  assert.deepEqual(notices, [
+    '"A Reading from the Letter of St. Paul to the Romans" had no verse_tag; by its text the reading is Romans 8:35-39, so it was filled from Rim 8,35-39 and verse_tag set to it. Check that it is the right passage.',
+  ]);
+});
+
+test('a reading with no verse_tag whose text is not found is left to the model, with a notice', async () => {
+  const { lookup } = fromTable(UNTAGGED);
+  const scripture = await prepareScripture(VICTORIOUS, 'hr', lookup, async () => null);
+  assert.ok(scripture.content.includes('*Who shall separate us from the love of Christ?'));
+  const { content, notices } = scripture.restore(scripture.content);
+  assert.ok(content.includes('\nverse_tag:\nhero:'));
+  assert.deepEqual(notices, [
+    '"A Reading from the Letter of St. Paul to the Romans" has no verse_tag and its text was not found in RSV-CE, so the AI translated the reading; check it against the official text and add the verse_tag.',
+  ]);
+});
+
+test('a passage found by its text that is not the reading sets no verse_tag', async () => {
+  const { lookup } = fromTable({ ...UNTAGGED, 'Romans 8:35-39': { ...UNTAGGED['Romans 8:35-39'], source: { text: HEBREWS_EN } } });
+  const scripture = await prepareScripture(VICTORIOUS, 'hr', lookup, async () => 'Romans 8:35-39');
+  const { content, notices } = scripture.restore(scripture.content);
+  assert.ok(content.includes('*Who shall separate us from the love of Christ?'));
+  assert.ok(content.includes('\nverse_tag:\nhero:'));
+  assert.ok(notices[0].startsWith('Romans 8:35-39: the English reading does not match this passage in RSV-CE'));
+});
+
+test('a failed search for the reading still translates the rest', async () => {
+  const { lookup } = fromTable(UNTAGGED);
+  const scripture = await prepareScripture(VICTORIOUS, 'hr', lookup, async () => {
+    throw new Error('connection refused');
+  });
+  assert.ok(scripture.content.includes('({{bible:2}})'));
+  assert.ok(scripture.restore(scripture.content).notices[0].includes('its text was not found in RSV-CE'));
+});
+
+test('a day with a verse_tag is never searched by its text', async () => {
+  const { lookup } = fromTable(API);
+  await prepareScripture(day, 'hr', lookup, async () => assert.fail('searched'));
 });
