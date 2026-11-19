@@ -25,6 +25,7 @@ const RESULTS = new Map<string, PassageResult>([
   ['Iv 3,16', ok('Iv 3,16', 'Iv 3,16', ['Bog je tako ljubio svijet.'])],
   ['Ps 51,3-5', ok('Ps 51,3-5', 'Ps 51,5-7', ['wrong verses'])],
   ['Matej 4,19', ok('Matej 4,19', 'Mt 4,19', ['Hajdete za mnom.'])],
+  ['Jak 2,1-4', ok('Jak 2,1-4', 'Jak 2,1-4', ['Braćo moja, vjeru u Gospodina imajte.', 'Jer ako uđe u vaš zbor čovjek.'])],
   ['Ps 13,1', { ref: 'Ps 13,1', status: 'versification_unmapped', notes: ['PSA 13 has no mapping yet.'] }],
   ['At 5:30', { ref: 'At 5:30', status: 'unknown_book', notes: [] }],
 ]);
@@ -119,4 +120,42 @@ test('the source passages the translation never cites', () => {
     ['Psalm 13:1', { ref: 'Psalm 13:1', status: 'versification_unmapped', notes: [] }],
   ]);
   assert.deepEqual(sourceOnlyCitations(source, check('Iv 3,16')), [{ ref: 'Psalm 46:10', rendered: 'Ps 46,11' }]);
+});
+
+test('verse_tag is checked against the main reading, under whatever heading it has', () => {
+  const text = [
+    '---',
+    'verse_tag: Jak 2,1-4',
+    '---',
+    '',
+    '# Uvod',
+    '',
+    '*Danas razmišljamo o vjeri.*',
+    '',
+    '# Čitanje iz Poslanice svetoga Jakova',
+    '',
+    '*Braćo moja, vjeru u Gospodina imajte.',
+    'Jer ako uđe u naš zbor čovjek.*',
+    '',
+    '# Razmatranje',
+  ].join('\n');
+  const [item] = check(text);
+  assert.equal(item.citation.text, 'Jak 2,1-4');
+  assert.equal(item.quote?.kind, 'reading');
+  assert.equal(item.quote?.matches, false);
+  assert.deepEqual(
+    item.quote?.diff.filter((p) => p.type !== 'equal'),
+    [
+      { type: 'delete', text: 'naš' },
+      { type: 'insert', text: 'vaš' },
+    ],
+  );
+  const edit = quoteEdit(item)!;
+  assert.equal(text.slice(edit.from, edit.to), '*Braćo moja, vjeru u Gospodina imajte.\nJer ako uđe u naš zbor čovjek.*');
+  assert.equal(edit.insert, '*Braćo moja, vjeru u Gospodina imajte.\nJer ako uđe u vaš zbor čovjek.*');
+});
+
+test('verse_tag with no reading like its passage quotes nothing', () => {
+  const [item] = check('---\nverse_tag: Jak 2,1-4\n---\n\n# Uvod\n\n*Nešto sasvim drugo.*\n');
+  assert.equal(item.quote, null);
 });

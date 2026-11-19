@@ -5,6 +5,8 @@ import {
   findQuotedText,
   formatInlineQuote,
   formatReading,
+  headingReadings,
+  isVerseTag,
   sameText,
   similarity,
   type Citation,
@@ -136,10 +138,27 @@ export function buildCheckItems({ text, citations, results, sourceRendered }: Ch
   return items;
 }
 
+/** Below this a reading under a heading is some other text, not the `verse_tag` passage. */
+const MIN_SAME_PASSAGE = 0.6;
+
+/**
+ * The text a citation quotes. For `verse_tag`, the day's main reading: the
+ * reading under a heading that is most like the passage.
+ */
+function quotedFor(text: string, citation: Citation, official: string): QuotedText | null {
+  if (!isVerseTag(text, citation)) return findQuotedText(text, citation);
+  let best: { quote: QuotedText; score: number } | null = null;
+  for (const quote of headingReadings(text)) {
+    const score = similarity(quote.plain, official);
+    if (score >= MIN_SAME_PASSAGE && (!best || score > best.score)) best = { quote, score };
+  }
+  return best?.quote ?? null;
+}
+
 function checkQuote(text: string, citation: Citation, verses: string[]): QuoteCheck | null {
-  const quote = findQuotedText(text, citation);
-  if (!quote) return null;
   const official = verses.map((v) => v.replace(/\s+/g, ' ').trim()).join(' ');
+  const quote = quotedFor(text, citation, official);
+  if (!quote) return null;
   const matches = sameText(quote.plain, official);
   return {
     ...quote,

@@ -240,6 +240,41 @@ export function findQuotedText(text: string, citation: Pick<Citation, 'from' | '
   return null;
 }
 
+const HEADING = /^#{1,6}[ \t]/;
+const FRONTMATTER_BLOCK = /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+
+/** Whether the citation sits on the frontmatter's `verse_tag:` line. */
+export function isVerseTag(text: string, citation: Pick<Citation, 'from' | 'to'>): boolean {
+  const frontmatter = text.match(FRONTMATTER_BLOCK)?.[0].length ?? 0;
+  const { start, end } = lineBounds(text, citation.from, citation.to);
+  return citation.to <= frontmatter && /^verse_tag:/.test(text.slice(start, end));
+}
+
+/**
+ * The italic readings under the body's headings. The `verse_tag` passage is
+ * read under one of them, but a translated heading need not say "A Reading",
+ * so the caller picks the one whose text is the passage.
+ */
+export function headingReadings(text: string): QuotedText[] {
+  const lines = text.split('\n');
+  const offsets: number[] = [];
+  let at = 0;
+  for (const line of lines) {
+    offsets.push(at);
+    at += line.length + 1;
+  }
+  const bodyStart = text.match(FRONTMATTER_BLOCK)?.[0].length ?? 0;
+  const out: QuotedText[] = [];
+  lines.forEach((line, i) => {
+    if (offsets[i] < bodyStart || !HEADING.test(line)) return;
+    const reading = readingAfter(lines, '', i);
+    if (!reading) return;
+    const to = offsets[reading.end - 1] + lines[reading.end - 1].length;
+    out.push(quoted(text, offsets[reading.start], to, 'reading', reading.linePerVerse));
+  });
+  return out;
+}
+
 // ─── Comparing texts ──────────────────────────────────────
 
 const words = (text: string) => text.toLowerCase().match(/\p{L}+/gu) ?? [];
