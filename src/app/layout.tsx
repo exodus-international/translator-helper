@@ -63,6 +63,11 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#FE5A25',
+  width: 'device-width',
+  initialScale: 1,
+  // The on-screen keyboard shrinks the layout viewport instead of covering it,
+  // so bottom sheets and editors measured in dvh stay above it on a phone.
+  interactiveWidget: 'resizes-content',
 };
 
 export default async function RootLayout({

@@ -7,7 +7,7 @@ import { useSourceEditing } from '@/components/editor/use-source-editing';
 import { useFollowSelection } from '@/components/editor/toolbar-placement';
 import { DiscardDialog } from '@/components/editor/discard-dialog';
 import { useSuggestionAuthoring } from '@/components/editor/use-suggestion-authoring';
-import { FloatingSuggestionWindow } from '@/components/editor/floating-suggestion-window';
+import { SuggestionFormSurface } from '@/components/editor/suggestion-form-surface';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import {
   FileCode,
   FileEdit,
   Loader2,
+  MessageSquare,
   PanelRightOpen,
   Plus,
   Save,
@@ -402,14 +403,52 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     // moves with the selection as the pane scrolls.
     useFollowSelection(toolbarPosition !== null, translationContainerRef, translationEditorRef, setToolbarPosition);
 
+    // Threads are anchored to editor lines, so a thread tapped while the pane
+    // shows Live or Audio text first switches the pane to its editor. Leaving
+    // Audio text asks before it drops an unsaved draft.
+    const showTranslationEditor = (proceed: () => void) => {
+      if (isYaml || translationRawVisible) {
+        proceed();
+        return;
+      }
+      if (variant === 'translate') {
+        setTranslateTab('edit');
+        proceed();
+        return;
+      }
+      if (reviewViewMode === 'audio') {
+        requestLeaveAudioText(() => {
+          setReviewViewMode('review');
+          proceed();
+        });
+        return;
+      }
+      setReviewViewMode('review');
+      proceed();
+    };
+
     const handleSuggestionClickInternal = (suggestion: SuggestionWithUser) => {
       setActiveThreadId(suggestion.id);
+      const needsLayout = isMobile || !(isYaml || translationRawVisible);
       if (isMobile) {
         // The thread list lives in the mobile Sheet; jump back to the
         // translation pane so the selected suggestion is actually visible.
         setOpenMobile(false);
         setMobilePane('translation');
       }
+      showTranslationEditor(() => {
+        // A pane or editor that was hidden until this render has no height to
+        // scroll in yet; reveal the lines once it is laid out.
+        if (needsLayout) {
+          setTimeout(() => revealSuggestion(suggestion), 50);
+        } else {
+          revealSuggestion(suggestion);
+        }
+        onSuggestionClick?.(suggestion);
+      });
+    };
+
+    const revealSuggestion = (suggestion: SuggestionWithUser) => {
       try {
         // Only scroll editor for anchored suggestions
         if (
@@ -439,8 +478,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
         }
       } catch (error) {
         console.error('Error selecting suggestion in editor:', error);
-      } finally {
-        onSuggestionClick?.(suggestion);
       }
     };
 
@@ -594,7 +631,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Tabs>
 
           <Card className={cn(paneClassName, paneVisibility(sourcePaneVisible))}>
-            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
+            <div className="flex h-11 shrink-0 items-center justify-between gap-1 border-b px-2 md:gap-2 md:px-3">
               {/* The mobile switcher above already names this pane; the language
                   badge below still travels with the header. */}
               <div className="flex min-w-0 items-center gap-2">
@@ -608,7 +645,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1 md:gap-2">
                 {!isSourceEditing && !isYaml && (
                   <PaneTabs
                     mounted={mounted}
@@ -731,7 +768,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Card>
 
           <Card className={cn(paneClassName, paneVisibility(translationPaneVisible))}>
-            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
+            <div className="flex h-11 shrink-0 items-center justify-between gap-1 border-b px-2 md:gap-2 md:px-3">
               <div className="flex min-w-0 items-center gap-2">
                 <h2 className="hidden min-w-0 truncate text-sm font-medium md:block">Translation</h2>
                 {translationBadge}
@@ -743,7 +780,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1 md:gap-2">
                 {variant === 'translate' ? (
                   isYaml ? null : (
                     <PaneTabs
@@ -792,7 +829,34 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                 {/* On desktop the panel folds to its own rail, so it needs no
                     button here. On mobile it is a sheet with no rail to reach
                     for, and this icon is the only way in. */}
-                {hasPanel && !isZen && panelHidden && (
+                {/* On desktop the panel folds to its own rail, so it needs no
+                    button here. On mobile it is a sheet with no rail to reach
+                    for: with a thread list, this opens it straight on the
+                    threads and carries the open count; otherwise it opens the
+                    document panel. */}
+                {hasPanel && !isZen && panelHidden && hasSidebar && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSidebarView('threads');
+                      setOpenMobile(true);
+                      // The sheet holds the whole panel; land on the threads,
+                      // past the status and workflow buttons above them.
+                      setTimeout(
+                        () => document.getElementById('document-panel-threads')?.scrollIntoView({ block: 'start' }),
+                        350,
+                      );
+                    }}
+                    className="md:hidden"
+                    aria-label={`Open comments, ${openSuggestionsCount} open`}
+                    title="Open comments"
+                  >
+                    <MessageSquare data-icon="inline-start" />
+                    <span className="tabular-nums">{openSuggestionsCount}</span>
+                  </Button>
+                )}
+                {hasPanel && !isZen && panelHidden && !hasSidebar && (
                   <Button
                     variant="outline"
                     size="icon-sm"
@@ -881,9 +945,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       />
                     )}
                     {showSuggestionForm && selectedRange && (
-                      <FloatingSuggestionWindow
+                      <SuggestionFormSurface
                         title={suggestionFormType === SuggestionType.CHANGE ? 'Suggest edit' : 'Comment'}
                         containerRef={translationContainerRef}
+                        onRequestClose={() => requestCloseSuggestionForm()}
                         maxWidth={384}
                         widthRatio={1}
                       >
@@ -896,7 +961,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                             suggestionFormDirtyRef.current = dirty;
                           }}
                         />
-                      </FloatingSuggestionWindow>
+                      </SuggestionFormSurface>
                     )}
                   </div>
                 ) : (
@@ -969,9 +1034,10 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         />
                       )}
                       {showSuggestionForm && selectedRange && (
-                        <FloatingSuggestionWindow
+                        <SuggestionFormSurface
                           title={suggestionFormType === SuggestionType.CHANGE ? 'Suggest edit' : 'Comment'}
                           containerRef={translationContainerRef}
+                          onRequestClose={() => requestCloseSuggestionForm()}
                           widthRatio={0.75}
                         >
                           <SuggestionForm
@@ -985,7 +1051,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                               suggestionFormDirtyRef.current = dirty;
                             }}
                           />
-                        </FloatingSuggestionWindow>
+                        </SuggestionFormSurface>
                       )}
                     </>
                   )}

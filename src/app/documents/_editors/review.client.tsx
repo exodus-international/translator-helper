@@ -1,6 +1,7 @@
 'use client';
 
 import { ActivityLog } from '@/components/activity-log';
+import { cn } from '@/lib/utils';
 import { AudioStatus } from '@/components/audio-status';
 import { GitHubStatus } from '@/components/github-status';
 import { Button } from '@/components/ui/button';
@@ -190,7 +191,7 @@ function ReviewWorkflowActions({ document }: { document: any }) {
           // Not the outline variant: its dark:bg-input and dark:border-input
           // outrank an unprefixed bg-success, which left dark text on a dark
           // button in the dark theme.
-          className={waitingForFinalLabel ? 'bg-success text-background hover:bg-success/90' : ''}
+          className={cn('max-md:h-11', waitingForFinalLabel && 'bg-success text-background hover:bg-success/90')}
         >
           {waitingForFinalLabel ? <FileCheck /> : <FilePlus />}
           {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
@@ -200,7 +201,7 @@ function ReviewWorkflowActions({ document }: { document: any }) {
         <Button
           variant="outline"
           size="sm"
-          className="w-full justify-start"
+          className="w-full justify-start max-md:h-11"
           onClick={handleDownload}
           disabled={isAnyLoading}
         >

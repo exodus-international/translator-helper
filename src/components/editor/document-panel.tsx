@@ -209,7 +209,7 @@ export function DocumentPanel({
           )}
 
           {threads.show && (
-            <div className="flex min-h-[16rem] flex-1 flex-col">
+            <div id="document-panel-threads" className="flex min-h-[16rem] scroll-mt-3 flex-1 flex-col">
               <ThreadSidebar
                 suggestions={threads.suggestions}
                 currentUserId={threads.currentUserId}
