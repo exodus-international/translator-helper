@@ -67,7 +67,7 @@ export function catalogMeta(code: string) {
 }
 
 /** A language's name in that language, capitalised as the catalog writes it ("cs" → "Čeština"), or null when unknown. */
-export function nativeLanguageName(languageCode: string): string | null {
+function nativeLanguageName(languageCode: string): string | null {
   try {
     const name = new Intl.DisplayNames([languageCode], { type: 'language' }).of(languageCode)
     if (!name || name.toLowerCase() === languageCode.toLowerCase()) return null
