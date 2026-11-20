@@ -37,11 +37,22 @@ export function BooksTab({
     return { book, status, differing, needsAttention };
   });
   const attentionCount = rows.filter((r) => r.needsAttention).length;
-  const shown = attentionOnly ? rows.filter((r) => r.needsAttention) : rows;
+  // The filter is offered only when it would hide something: with every book
+  // (or none) needing attention it would leave the list as it is.
+  const canFilter = attentionCount > 0 && attentionCount < rows.length;
+  const shown = attentionOnly && canFilter ? rows.filter((r) => r.needsAttention) : rows;
 
   return (
     <div className="space-y-4">
-      {role === 'target' && (
+      {role === 'target' && attentionCount === rows.length && rows.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Every book needs attention: not declared, not reviewed or with unmappable chapters.
+        </p>
+      )}
+      {role === 'target' && attentionCount === 0 && rows.length > 0 && (
+        <p className="text-sm text-muted-foreground">Every book is declared and reviewed.</p>
+      )}
+      {role === 'target' && canFilter && (
         <Field orientation="horizontal">
           <Checkbox
             id={`${id}-attention`}
@@ -53,8 +64,6 @@ export function BooksTab({
           </FieldLabel>
         </Field>
       )}
-
-      {shown.length === 0 && <p className="text-sm text-muted-foreground">Every book is declared and reviewed.</p>}
 
       {TESTAMENTS.map(({ key, label }) => {
         const group = shown.filter((r) => r.book.testament === key);

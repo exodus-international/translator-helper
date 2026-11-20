@@ -110,7 +110,7 @@ export default function BibleTranslationClient({ translation, books, sourceCode,
 
       <div className="px-4 py-4">
         <Tabs value={tab} onValueChange={(v) => changeTab(v as BibleTab)}>
-          <TabsList variant="line" className="max-w-full overflow-x-auto">
+          <TabsList variant="line" className="max-w-full">
             <TabsTrigger value="books">Books</TabsTrigger>
             <TabsTrigger value="read">Read</TabsTrigger>
             {isTarget && <TabsTrigger value="versification">Versification</TabsTrigger>}
