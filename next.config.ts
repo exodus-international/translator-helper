@@ -30,6 +30,8 @@ const nextConfig: NextConfig = {
     // so uploads land far below this. The headroom is for the server action's
     // own multipart overhead, not for bigger pictures.
     serverActions: { bodySizeLimit: '3mb' },
+    // Tells `next upgrade` this app takes security patch upgrades only.
+    agentUpgrade: 'security',
   },
   // The /releases page reads release-notes/*.md from disk at request time.
   // File tracing only picks up files reachable through static imports/requires,
