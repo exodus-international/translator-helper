@@ -94,13 +94,15 @@ const RATE_WINDOW_MS = 60_000;
 const bodySchema = z.object({
   messages: z
     .array(
+      // An answer comes back as the model wrote it, however long; the chat
+      // keeps only the recent messages and clips each, and the body limit
+      // bounds the request.
       z.object({
         role: z.enum(['user', 'assistant']),
-        content: z.string().max(CHAT_LIMITS.maxAssistantChars * 2),
+        content: z.string(),
       }),
     )
     .min(1)
-    .max(200)
     .refine((messages) => messages.at(-1)?.role === 'user', 'The last message must be the question.')
     .refine(
       (messages) => messages.every((m) => m.role !== 'user' || m.content.length <= CHAT_LIMITS.maxUserChars),

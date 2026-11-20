@@ -32,7 +32,11 @@ class Cache<T> {
   private queue = new Set<string>();
   private timer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly fetchBatch: (keys: string[]) => Promise<Map<string, T>>) {}
+  /**
+   * `fetchBatch` answers what it can; keys it `deferred` (a request reads a
+   * limited number of verses) are asked again in the next batch, not failed.
+   */
+  constructor(private readonly fetchBatch: (keys: string[]) => Promise<{ found: Map<string, T>; deferred: string[] }>) {}
 
   peek(key: string): T | undefined {
     const entry = this.entries.get(key);
@@ -81,18 +85,27 @@ class Cache<T> {
     for (let i = 0; i < keys.length; i += MAX_REFS) {
       const chunk = keys.slice(i, i + MAX_REFS);
       let found: Map<string, T> | null = null;
+      let deferred = new Set<string>();
       try {
-        found = await this.fetchBatch(chunk);
+        const answer = await this.fetchBatch(chunk);
+        found = answer.found;
+        // A batch that got nowhere is failed, so a server that defers everything cannot loop.
+        if (answer.found.size > 0) deferred = new Set(answer.deferred);
       } catch (error) {
         console.error('[Scripture] Bible request failed:', error instanceof Error ? error.message : error);
       }
       for (const key of chunk) {
+        if (deferred.has(key)) {
+          this.queue.add(key);
+          continue;
+        }
         const value = found?.get(key);
         this.entries.set(key, value === undefined ? { state: 'failed', at: Date.now() } : { state: 'done', value });
         for (const resolve of this.waiters.get(key) ?? []) resolve(value);
         this.waiters.delete(key);
       }
     }
+    if (this.queue.size) this.timer ??= setTimeout(() => this.flush(), 0);
     if (this.entries.size > MAX_ENTRIES) {
       for (const key of [...this.entries.keys()].slice(0, this.entries.size - MAX_ENTRIES)) {
         if (this.entries.get(key)?.state !== 'pending') this.entries.delete(key);
@@ -102,8 +115,8 @@ class Cache<T> {
 }
 
 const checks = new Cache<ReferenceCheck>(async (refs) => {
-  const results = await validateReferencesAction({ refs });
-  return new Map(results.map((r) => [r.ref, r]));
+  const { results, deferred } = await validateReferencesAction({ refs });
+  return { found: new Map(results.map((r) => [r.ref, r])), deferred };
 });
 
 const SEP = '\u0000';
@@ -114,16 +127,18 @@ const passages = new Cache<PassageResult>(async (keys) => {
     const [translation, ref] = key.split(SEP);
     byTranslation.set(translation, [...(byTranslation.get(translation) ?? []), ref]);
   }
-  const out = new Map<string, PassageResult>();
+  const found = new Map<string, PassageResult>();
+  const deferred: string[] = [];
   for (const [translation, refs] of byTranslation) {
-    const { results } = await resolvePassagesAction({
+    const answer = await resolvePassagesAction({
       refs,
       translation,
       include: { rendered: true, text: true, verses: true, source: true },
     });
-    for (const r of results) out.set(`${translation}${SEP}${r.ref}`, r);
+    for (const r of answer.results) found.set(`${translation}${SEP}${r.ref}`, r);
+    for (const ref of answer.deferred) deferred.push(`${translation}${SEP}${ref}`);
   }
-  return out;
+  return { found, deferred };
 });
 
 /** Whether each ref is a Bible reference at all, checked against RSV-CE. */

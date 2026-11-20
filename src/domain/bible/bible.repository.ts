@@ -284,8 +284,26 @@ async function touch(tx: Tx, translationId: string) {
   await tx.bibleTranslation.update({ where: { id: translationId }, data: { updatedAt: new Date() } });
 }
 
+/**
+ * Deletes a translation. When it was its language's Bible, the most recently
+ * imported one left takes over, so a language with Bibles always has one.
+ */
 export async function deleteTranslation(code: string) {
-  return prisma.bibleTranslation.delete({ where: { code }, select: { code: true } });
+  return prisma.$transaction(async (tx) => {
+    await lockTranslations(tx);
+    const t = await tx.bibleTranslation.findUnique({ where: { code } });
+    if (!t) throw new BibleImportError(`No translation '${code}'.`);
+    await tx.bibleTranslation.delete({ where: { id: t.id } });
+    if (t.isLanguageDefault) {
+      const next = await tx.bibleTranslation.findFirst({
+        where: { languageCode: t.languageCode },
+        orderBy: [{ importedAt: 'desc' }, { code: 'asc' }],
+        select: { id: true },
+      });
+      if (next) await tx.bibleTranslation.update({ where: { id: next.id }, data: { isLanguageDefault: true } });
+    }
+    return { code };
+  });
 }
 
 /** Makes this translation the one its language resolves to. */

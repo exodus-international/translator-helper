@@ -200,10 +200,10 @@ test('prepareScripture leaves Scripture to the model, with a notice, when the Bi
   });
 });
 
-test('prepareScripture says when the language has no Bible', async () => {
+test('prepareScripture leaves a language with no Bible to the model, without a notice', async () => {
   const scripture = await prepareScripture(day, 'lt', bible(() => null).lookup);
   assert.equal(scripture.content, day);
-  assert.deepEqual(scripture.restore('draft').notices, ['No Bible is imported for "lt", so the AI translated the Scripture.']);
+  assert.deepEqual(scripture.restore('draft').notices, []);
 });
 
 test('prepareScripture does nothing when the source has its own placeholders or no Scripture', async () => {
@@ -316,7 +316,10 @@ test('a reading with no verse_tag is found by its text, filled from the Bible, a
   assert.equal(searched.length, 1);
   assert.ok(searched[0].startsWith('Who shall separate us from the love of Christ?'));
   assert.ok(searched[0].endsWith('in Christ Jesus our Lord.'));
-  assert.deepEqual(calls, [{ lang: 'hr', refs: ['Romans 8:35-39', 'Hebrews 2:14–15'] }]);
+  assert.deepEqual(calls, [
+    { lang: 'hr', refs: [] },
+    { lang: 'hr', refs: ['Romans 8:35-39', 'Hebrews 2:14–15'] },
+  ]);
 
   // Neither the reading nor the quotation of Hebrews reaches the model; the prayers do.
   assert.ok(!scripture.content.includes('Who shall separate us'));
@@ -368,4 +371,14 @@ test('a failed search for the reading still translates the rest', async () => {
 test('a day with a verse_tag is never searched by its text', async () => {
   const { lookup } = fromTable(API);
   await prepareScripture(day, 'hr', lookup, async () => assert.fail('searched'));
+});
+
+test('prepareScripture does not look for a reading by its text when the language has no Bible', async () => {
+  let searched = 0;
+  const scripture = await prepareScripture(VICTORIOUS, 'lt', bible(() => null).lookup, async () => {
+    searched++;
+    return 'Romans 8:35-39';
+  });
+  assert.equal(searched, 0);
+  assert.deepEqual(scripture.restore('draft'), { content: 'draft', notices: [] });
 });

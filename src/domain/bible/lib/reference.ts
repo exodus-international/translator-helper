@@ -1,5 +1,5 @@
 /**
- * Language-neutral Bible reference parser. Pure — no DB access.
+ * Language-neutral Bible reference parser. Pure: no DB access.
  *
  * Accepts both notations:
  *   English:  "John 3:16-18, 20; 4:1"   (':' = chapter/verse, ',' = verse list)

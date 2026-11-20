@@ -28,12 +28,20 @@ export function PlaygroundTab({ translation }: { translation: BibleTranslationDt
     setBusy(true);
     setError(null);
     try {
-      const { results } = await resolvePassagesAction({
-        refs: refs.slice(0, MAX_REFS),
-        translation: translation.code,
-        include: { text: true, rendered: true, verses: false, source: isTarget },
-      });
-      setResults(results);
+      // A request reads a limited number of verses; what did not fit is asked again.
+      const found: PassageResult[] = [];
+      let pending = refs.slice(0, MAX_REFS);
+      while (pending.length) {
+        const { results, deferred } = await resolvePassagesAction({
+          refs: pending,
+          translation: translation.code,
+          include: { text: true, rendered: true, verses: false, source: isTarget },
+        });
+        found.push(...results);
+        if (deferred.length >= pending.length) break;
+        pending = deferred;
+      }
+      setResults(found);
     } catch {
       setError('The references could not be resolved. Check that each line is under 200 characters.');
     } finally {

@@ -87,7 +87,8 @@ arrives:
   reading by hand.
 
 If no Bible is imported for the language, the whole document is translated by
-the AI and one warning says so.
+the AI as before, with no warning: most languages have no Bible yet. If the
+Bible cannot be read, the AI translates the Scripture and one warning says so.
 
 ## Where to find it
 

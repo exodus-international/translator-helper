@@ -11,8 +11,8 @@ import { DEFAULT_INCLUDE, type Include, type PassageResult, type ReferenceCheck 
  */
 
 const STAMP_TTL_MS = 2000;
-/** Verses one resolve call may read across all its references. */
-const MAX_VERSES_PER_REQUEST = 2000;
+/** Verses one request from a browser may read across all its references. */
+export const MAX_VERSES_PER_REQUEST = 2000;
 
 interface Cached {
   stamp: string;
@@ -22,56 +22,97 @@ interface Cached {
 
 declare global {
   var bibleIndexCache: Cached | undefined;
-  var bibleIndexLoading: Promise<Cached> | undefined;
+  var bibleIndexLoading: { generation: number; promise: Promise<Cached> } | undefined;
+  /** Bumped by every invalidation, so a load started before one cannot be kept after it. */
+  var bibleIndexGeneration: number | undefined;
 }
 
 export async function getBibleIndex(): Promise<BibleIndex> {
   const cached = globalThis.bibleIndexCache;
   if (cached && Date.now() - cached.checkedAt < STAMP_TTL_MS) return cached.index;
+  const generation = globalThis.bibleIndexGeneration ?? 0;
   const stamp = await bibleStamp();
-  if (cached && cached.stamp === stamp) {
+  if (cached && cached.stamp === stamp && globalThis.bibleIndexCache === cached) {
     cached.checkedAt = Date.now();
     return cached.index;
   }
-  if (!globalThis.bibleIndexLoading) {
-    globalThis.bibleIndexLoading = (async () => {
+  let loading = globalThis.bibleIndexLoading;
+  if (!loading || loading.generation !== generation) {
+    const promise = (async () => {
       const snapshot = await loadSnapshot();
       const next: Cached = { stamp, checkedAt: Date.now(), index: new BibleIndex(snapshot, loadChapter) };
-      globalThis.bibleIndexCache = next;
+      if ((globalThis.bibleIndexGeneration ?? 0) === generation) globalThis.bibleIndexCache = next;
       return next;
     })().finally(() => {
-      globalThis.bibleIndexLoading = undefined;
+      if (globalThis.bibleIndexLoading?.promise === promise) globalThis.bibleIndexLoading = undefined;
     });
+    loading = { generation, promise };
+    globalThis.bibleIndexLoading = loading;
   }
-  return (await globalThis.bibleIndexLoading).index;
+  return (await loading.promise).index;
 }
 
-/** Drops the cached index; the next call reloads it. */
+/**
+ * Drops the cached index and any load already under way; the next call reads
+ * the data afresh. A load that began before the change is still returned to
+ * whoever awaits it, but is never kept.
+ */
 export function invalidateBibleIndex() {
+  globalThis.bibleIndexGeneration = (globalThis.bibleIndexGeneration ?? 0) + 1;
   globalThis.bibleIndexCache = undefined;
+  globalThis.bibleIndexLoading = undefined;
 }
 
+/**
+ * References one call has no verses left for come back in `deferred`, not as
+ * a miss: they are as valid as the rest, and the caller sends them again. The
+ * first reference always fits (one is capped well under the budget), so asking
+ * again always gets further.
+ */
+async function withinBudget<T>(
+  refs: string[],
+  maxVerses: number | undefined,
+  run: (ref: string, budget: VerseBudget | undefined) => Promise<T>,
+): Promise<{ results: T[]; deferred: string[] }> {
+  const budget = maxVerses === undefined ? undefined : new VerseBudget(maxVerses);
+  const results: T[] = [];
+  for (let i = 0; i < refs.length; i++) {
+    const result = await run(refs[i]!, budget);
+    if (budget?.refused) return { results, deferred: refs.slice(i) };
+    results.push(result);
+  }
+  return { results, deferred: [] };
+}
+
+/**
+ * Passages in a translation (or a language's Bible). `maxVerses` caps what the
+ * whole call reads, for requests a browser makes; the server's own callers
+ * read every reference, each still capped on its own.
+ */
 export async function resolvePassages(
   refs: string[],
   translationKey: string,
   include: Partial<Include> = {},
-): Promise<{ translation: string | null; results: PassageResult[] }> {
+  { maxVerses }: { maxVerses?: number } = {},
+): Promise<{ translation: string | null; results: PassageResult[]; deferred: string[] }> {
   const index = await getBibleIndex();
   const target = index.findTranslation(translationKey);
-  if (!target) return { translation: null, results: refs.map((r) => unknownLanguage(r, translationKey)) };
+  if (!target) {
+    return { translation: null, results: refs.map((r) => unknownLanguage(r, translationKey)), deferred: [] };
+  }
   const inc = { ...DEFAULT_INCLUDE, ...include };
-  const budget = new VerseBudget(MAX_VERSES_PER_REQUEST);
-  const results: PassageResult[] = [];
-  for (const ref of refs) results.push(await resolvePassage(index, ref, target, inc, budget));
-  return { translation: target.code, results };
+  const { results, deferred } = await withinBudget(refs, maxVerses, (ref, budget) =>
+    resolvePassage(index, ref, target, inc, budget),
+  );
+  return { translation: target.code, results, deferred };
 }
 
-export async function validateReferences(refs: string[]): Promise<ReferenceCheck[]> {
+export async function validateReferences(
+  refs: string[],
+  { maxVerses }: { maxVerses?: number } = {},
+): Promise<{ results: ReferenceCheck[]; deferred: string[] }> {
   const index = await getBibleIndex();
-  const budget = new VerseBudget(MAX_VERSES_PER_REQUEST);
-  const out: ReferenceCheck[] = [];
-  for (const ref of refs) out.push(await validateReference(index, ref, budget));
-  return out;
+  return withinBudget(refs, maxVerses, (ref, budget) => validateReference(index, ref, budget));
 }
 
 /** Words of a sentence a text search takes, then fewer when that finds nothing. */

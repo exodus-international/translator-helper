@@ -63,6 +63,7 @@ export default function ReviewClient({
   const showTranslationEditor = useCallback(() => viewerRef.current?.enterTranslationEditMode(), []);
 
   // Reviewers check Scripture too; only a review they can edit lets the panel change the text.
+  // This is the status the page opened with; the editor keeps it current as the status changes.
   return (
     <ScriptureProvider
       languageCode={targetLanguage?.code}

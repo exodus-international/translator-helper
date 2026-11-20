@@ -211,10 +211,11 @@ export function ScriptureCheckCard({ open, onOpenChange }: { open: boolean; onOp
             items={items}
             sourceOnly={sourceOnly}
             checking={checking}
-            unchecked={analysis?.unchecked ?? 0}
+            unchecked={(analysis?.unchecked ?? 0) + host.sourceUnchecked}
             onRetry={() => {
               retryFailedPassages();
               setAttempt((n) => n + 1);
+              host.retry();
             }}
             languageName={host.languageName}
             readOnly={!host.editable}

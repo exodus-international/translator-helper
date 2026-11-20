@@ -36,6 +36,13 @@ export interface ScriptureHost {
    * there is none or it could not be found.
    */
   sourceReading: PassageResult | null;
+  /**
+   * The source's citations (and its reading, when found by its text) the Bible
+   * did not answer for, so the check of the translation is missing their side.
+   */
+  sourceUnchecked: number;
+  /** Asks the Bible again for what it did not answer. */
+  retry: () => void;
   /** The translation's editor, while one is mounted. */
   view: EditorView | null;
   /** Called by the translation editor; returns the call that unregisters it. */
@@ -44,6 +51,11 @@ export interface ScriptureHost {
   requestEditor?: () => void;
   /** Whether the panel may change the text; false leaves it checking and pointing only. */
   editable: boolean;
+  /**
+   * Called by the document editor with what the live document allows, since a
+   * review approved while the page is open can no longer be edited.
+   */
+  reportEditable: (editable: boolean) => void;
 }
 
 const ScriptureContext = createContext<ScriptureHost | null>(null);
@@ -76,7 +88,12 @@ export function ScriptureProvider({
     key: string;
     passages: Map<string, PassageResult>;
     reading: PassageResult | null;
+    unchecked: number;
   }>();
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const [reportedEditable, reportEditable] = useState<boolean>();
+  const canEdit = reportedEditable ?? editable;
 
   useEffect(() => {
     if (!language) return;
@@ -103,21 +120,30 @@ export function ScriptureProvider({
     let cancelled = false;
     (async () => {
       const passages = await resolvePassages(refs, bible.code);
+      // A ref the Bible did not answer (an expired session, say) is counted, so the check can say it is incomplete.
+      let unchecked = refs.filter((ref) => !passages.has(ref)).length;
       let reading = tag ? (passages.get(tag.text) ?? null) : null;
       if (untagged) {
         // A day with no verse_tag: its reading is found by its text, as the AI translation does.
-        const ref = await identifyReading(untagged.text).catch(() => null);
+        let ref: string | null = null;
+        try {
+          ref = await identifyReading(untagged.text);
+        } catch {
+          unchecked++;
+        }
         reading = ref ? ((await resolvePassage(ref, bible.code)) ?? null) : null;
+        if (ref && !reading) unchecked++;
       }
-      if (!cancelled) setSourceState({ key: `${bible.code}\u0000${sourceContent}`, passages, reading });
+      if (!cancelled) setSourceState({ key: `${bible.code}\u0000${sourceContent}`, passages, reading, unchecked });
     })();
     return () => {
       cancelled = true;
     };
-  }, [bible, sourceContent]);
+  }, [bible, sourceContent, attempt]);
 
   const sourcePassages = sourceState?.key === sourceKey ? sourceState.passages : EMPTY;
   const sourceReading = sourceState?.key === sourceKey ? sourceState.reading : null;
+  const sourceUnchecked = sourceState?.key === sourceKey ? sourceState.unchecked : 0;
   const sourceRendered = useMemo(() => {
     const out = new Map<string, PassageResult>();
     for (const result of sourcePassages.values()) {
@@ -141,12 +167,30 @@ export function ScriptureProvider({
       sourcePassages,
       sourceRendered,
       sourceReading,
+      sourceUnchecked,
+      retry,
       view,
       registerView,
       requestEditor,
-      editable,
+      editable: canEdit,
+      reportEditable,
     }),
-    [language, languageName, bible, bibleState, translation, sourcePassages, sourceRendered, sourceReading, view, registerView, requestEditor, editable],
+    [
+      language,
+      languageName,
+      bible,
+      bibleState,
+      translation,
+      sourcePassages,
+      sourceRendered,
+      sourceReading,
+      sourceUnchecked,
+      retry,
+      view,
+      registerView,
+      requestEditor,
+      canEdit,
+    ],
   );
 
   if (!language) return <>{children}</>;

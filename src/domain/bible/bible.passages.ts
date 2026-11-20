@@ -27,10 +27,16 @@ const MAX_VERSES_PER_REF = 300;
  * chapter is read, whether or not the reference then resolves.
  */
 export class VerseBudget {
+  /** Set once a reference did not fit: the caller may send it again in a request of its own. */
+  refused = false;
+
   constructor(public remaining: number) {}
 
   take(verses: number) {
-    if (verses > this.remaining) throw new Miss('out_of_range', 'Too many verses in one request.');
+    if (verses > this.remaining) {
+      this.refused = true;
+      throw new Miss('out_of_range', 'Too many verses in one request.');
+    }
     this.remaining -= verses;
   }
 }

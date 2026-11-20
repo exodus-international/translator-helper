@@ -18,6 +18,7 @@ import {
   identifyPassage,
   invalidateBibleIndex,
   listTranslations,
+  MAX_VERSES_PER_REQUEST,
   resolvePassages,
   validateReferences,
 } from './bible.service';
@@ -55,13 +56,13 @@ async function admin<T>(work: () => Promise<T>): Promise<Outcome<T>> {
 export async function resolvePassagesAction(input: unknown) {
   await authorize('authenticated');
   const { refs, translation, include } = resolvePassagesSchema.parse(input);
-  return resolvePassages(refs, translation, include);
+  return resolvePassages(refs, translation, include, { maxVerses: MAX_VERSES_PER_REQUEST });
 }
 
 export async function validateReferencesAction(input: unknown) {
   await authorize('authenticated');
   const { refs } = validateReferencesSchema.parse(input);
-  return validateReferences(refs);
+  return validateReferences(refs, { maxVerses: MAX_VERSES_PER_REQUEST });
 }
 
 export async function getBibleChapterAction(input: unknown) {

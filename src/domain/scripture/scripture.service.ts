@@ -180,7 +180,8 @@ function unresolvedNotice(citation: string, result: PassageResult | undefined, w
 /**
  * Swaps the source's resolvable Scripture for placeholders. Leaves the source
  * untouched when the language has no Bible or the Bible can't be read; the model
- * then translates the Scripture as before, and a notice says so.
+ * then translates the Scripture as before, and when the Bible could not be read
+ * a notice says so.
  */
 export async function prepareScripture(
   source: string,
@@ -200,6 +201,14 @@ export async function prepareScripture(
   const untagged = verseTag ? null : untaggedReading(source);
   let foundByText = false;
   if (untagged) {
+    // Finding a reading by its text takes several searches; a language with no Bible has no use for it.
+    let hasBible = true;
+    try {
+      hasBible = (await lookup([], languageCode)) !== null;
+    } catch {
+      // The lookup below meets the same failure and says so.
+    }
+    if (!hasBible) return unchanged(source);
     try {
       verseTag = await identify(untagged.text);
     } catch (error) {
@@ -229,9 +238,8 @@ export async function prepareScripture(
       'The Bible could not be read, so the AI translated the Scripture. Check it against the official text.',
     ]);
   }
-  if (!results || [...results.values()].every((r) => r.status === 'unknown_language')) {
-    return unchanged(source, [`No Bible is imported for "${languageCode}", so the AI translated the Scripture.`]);
-  }
+  // Most languages have no Bible, and their translations are the model's as before: a notice on every one would only be noise.
+  if (!results || [...results.values()].every((r) => r.status === 'unknown_language')) return unchanged(source);
 
   const fills = new Map<string, { text: string; count: number; label: string }>();
   const fill = (text: string, label: string) => {

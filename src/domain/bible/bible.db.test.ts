@@ -196,10 +196,31 @@ describe('what an admin changes', () => {
     assert.equal((await prisma.bibleTranslation.findUniqueOrThrow({ where: { code: 'sar-hr' } })).isLanguageDefault, false);
 
     await deleteTranslation('test-hr');
-    await setLanguageDefault('sar-hr');
     invalidateBibleIndex();
     assert.equal((await bibleForLanguage('hr'))?.code, 'sar-hr');
+    assert.equal(
+      (await prisma.bibleTranslation.findUniqueOrThrow({ where: { code: 'sar-hr' } })).isLanguageDefault,
+      true,
+      'the Bible left takes over as the default',
+    );
     assert.equal(await prisma.bibleVerse.count({ where: { book: { translation: { code: 'test-hr' } } } }), 0);
+    await assert.rejects(deleteTranslation('test-hr'), BibleImportError);
+  });
+
+  it('defers what one request has no verses left for, instead of failing it', async () => {
+    invalidateBibleIndex();
+    const refs = ['John 4', 'John 3:16', 'John 4'];
+    const capped = await resolvePassages(refs, 'hr', { text: true }, { maxVerses: 100 });
+    assert.deepEqual(
+      capped.results.map((r) => [r.ref, r.status]),
+      [['John 4', 'ok'], ['John 3:16', 'ok']],
+    );
+    assert.deepEqual(capped.deferred, ['John 4']);
+    const again = await resolvePassages(capped.deferred, 'hr', { text: true }, { maxVerses: 100 });
+    assert.deepEqual([again.results[0]?.status, again.deferred], ['ok', []]);
+
+    const uncapped = await resolvePassages(refs, 'hr', { text: true });
+    assert.deepEqual([uncapped.results.length, uncapped.deferred], [3, []]);
   });
 
   it('reads a chapter and finds words, with or without diacritics', async () => {
@@ -275,9 +296,9 @@ describe('an AI translation into Croatian', () => {
     assert.equal(await identifyPassage('Amen.'), null);
   });
 
-  it('leaves the Scripture to the model, with a warning, for a language with no Bible', async () => {
+  it('leaves the Scripture to the model, without a warning, for a language with no Bible', async () => {
     const prepared = await prepareScripture('See John 3:16.', 'xx');
     assert.equal(prepared.content, 'See John 3:16.');
-    assert.ok(prepared.restore('Vidi Iv 3,16.').notices.some((n) => n.includes('No Bible is imported')));
+    assert.deepEqual(prepared.restore('Vidi Iv 3,16.').notices, []);
   });
 });

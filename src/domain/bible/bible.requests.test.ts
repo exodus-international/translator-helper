@@ -133,6 +133,13 @@ describe('the chat endpoint', () => {
     assert.equal(response.status, 413);
   });
 
+  it('takes a long earlier answer back with the next question', async () => {
+    const answer = 'Iv 3,16 '.repeat(4000);
+    const next = { ...ask, messages: [ask.messages[0], { role: 'assistant', content: answer }, ask.messages[0]] };
+    const response = await handleBibleChat(question(next), { ...translator, id: 'long-answer-user' }, deps);
+    assert.equal(response.status, 200);
+  });
+
   it('slows down one user who asks too often, and only that user', async () => {
     const user = { ...translator, id: 'busy-user' };
     for (let i = 0; i < 20; i++) await (await handleBibleChat(question(ask), user, deps)).text();
