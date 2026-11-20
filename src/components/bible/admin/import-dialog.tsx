@@ -15,7 +15,7 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { catalogMeta } from '@/domain/bible/lib/translations';
+import { catalogMeta, defaultMeta } from '@/domain/bible/lib/translations';
 import type { BibleTranslationDto } from '@/domain/bible/bible.service';
 import { AlertTriangle, CheckCircle2, ChevronDown, Loader2 } from 'lucide-react';
 import { useId, useState } from 'react';
@@ -43,7 +43,6 @@ interface VersificationResult {
 
 type ImportResult = TranslationResult | VersificationResult;
 
-const ROLE_ITEMS = { auto: 'From the catalog', target: 'Target', source: 'Source' };
 
 export function ImportBibleDialog({
   open,
@@ -69,13 +68,21 @@ export function ImportBibleDialog({
   const [languageCode, setLanguageCode] = useState('');
   const [languageName, setLanguageName] = useState('');
   const [role, setRole] = useState<'auto' | 'source' | 'target'>('auto');
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>('idle');
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const targets = translations.filter((t) => t.role === 'target');
   const detectedCode = code.trim() || (translationFile ? codeFromFileName(translationFile.name) : null);
-  const hint = detectedCode ? catalogMeta(detectedCode) : null;
+  const known = detectedCode ? catalogMeta(detectedCode) : null;
+  // What an empty field becomes: the catalog's value, or one guessed from the code.
+  const hint = detectedCode ? defaultMeta(detectedCode, languageCode) : null;
+  const roleItems = {
+    auto: `Automatic (${hint?.role === 'source' ? 'Source' : 'Target'})`,
+    target: 'Target',
+    source: 'Source',
+  };
   const existing = detectedCode ? translations.find((t) => t.code === detectedCode) : undefined;
   const busy = phase === 'compressing' || phase === 'uploading';
   const canSubmit = mode === 'translation' ? Boolean(translationFile) : Boolean(versificationFile && code);
@@ -88,6 +95,7 @@ export function ImportBibleDialog({
     setLanguageCode('');
     setLanguageName('');
     setRole('auto');
+    setDetailsOpen(false);
     setPhase('idle');
     setMessage('');
     setResult(null);
@@ -189,7 +197,13 @@ export function ImportBibleDialog({
                     type="file"
                     accept=".json,.gz,application/json,application/gzip"
                     disabled={busy}
-                    onChange={(e) => setTranslationFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      setTranslationFile(file);
+                      // A code outside the catalog needs at least its name, which is under Details.
+                      const guess = code.trim() || (file ? codeFromFileName(file.name) : null);
+                      if (guess && !catalogMeta(guess)) setDetailsOpen(true);
+                    }}
                   />
                   <FieldDescription>
                     <code>data/normalized/&lt;code&gt;.json</code> from bible-api.
@@ -211,7 +225,7 @@ export function ImportBibleDialog({
                   </FieldDescription>
                 </Field>
 
-                <Collapsible>
+                <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
                   <CollapsibleTrigger
                     render={
                       <Button
@@ -227,12 +241,13 @@ export function ImportBibleDialog({
                       aria-hidden="true"
                     />
                     Details
-                    {hint && <span className="font-normal">(known code: {hint.code})</span>}
+                    {known && <span className="font-normal">(known code: {known.code})</span>}
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-3 grid gap-3 sm:grid-cols-2">
                     <p className="text-xs text-muted-foreground sm:col-span-2">
-                      Leave these empty to take them from the file and the built-in catalog of the seven bible-api
-                      translations.
+                      {detectedCode && !known
+                        ? `'${detectedCode}' isn't one of the seven built-in Bibles, so give its name. A field left empty takes the value shown in it.`
+                        : 'A field left empty takes the value shown in it, from the file and the built-in catalog of the seven bible-api translations.'}
                     </p>
                     <MetaInput
                       id={`${id}-code`}
@@ -247,7 +262,7 @@ export function ImportBibleDialog({
                       label="Language code"
                       value={languageCode}
                       onChange={setLanguageCode}
-                      placeholder={hint?.languageCode ?? 'hr'}
+                      placeholder={hint?.languageCode || 'hr'}
                       disabled={busy}
                     />
                     <MetaInput
@@ -255,7 +270,7 @@ export function ImportBibleDialog({
                       label="Name"
                       value={name}
                       onChange={setName}
-                      placeholder={hint?.name ?? 'Full name of the translation'}
+                      placeholder={hint?.name || 'Full name of the translation'}
                       disabled={busy}
                       className="sm:col-span-2"
                     />
@@ -264,7 +279,7 @@ export function ImportBibleDialog({
                       label="Language name"
                       value={languageName}
                       onChange={setLanguageName}
-                      placeholder={hint?.languageName ?? 'Hrvatski'}
+                      placeholder={hint?.languageName || 'Hrvatski'}
                       disabled={busy}
                     />
                     <Field>
@@ -272,14 +287,14 @@ export function ImportBibleDialog({
                       <Select
                         value={role}
                         onValueChange={(v) => setRole((v as typeof role) ?? 'auto')}
-                        items={ROLE_ITEMS}
+                        items={roleItems}
                         disabled={busy}
                       >
                         <SelectTrigger id={`${id}-role`} className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(ROLE_ITEMS).map(([value, label]) => (
+                          {Object.entries(roleItems).map(([value, label]) => (
                             <SelectItem key={value} value={value}>
                               {label}
                             </SelectItem>

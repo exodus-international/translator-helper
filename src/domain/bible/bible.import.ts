@@ -4,7 +4,7 @@ import { prepareDeclarations, prepareTranslation } from './bible.prepare';
 import { BibleImportError, replaceDeclarations, writeTranslation } from './bible.repository';
 import { invalidateBibleIndex } from './bible.service';
 import { declarationsSchema, normalizedTranslationSchema, translationMetaSchema, type TranslationMeta } from './bible.types';
-import { catalogMeta } from './lib/translations';
+import { catalogMeta, defaultMeta } from './lib/translations';
 
 /**
  * Imports a bible-api translation file (and optionally its versification file)
@@ -63,13 +63,37 @@ export function parseDeclarationsFile(text: string) {
   return parsed.data;
 }
 
-/** The import's metadata: what the admin typed over the catalog's defaults for the code. */
+/** The import dialog's labels, so an error names the field to fill in. */
+const META_LABELS: Record<string, string> = {
+  code: 'Code',
+  name: 'Name',
+  languageCode: 'Language code',
+  languageName: 'Language name',
+  role: 'Role',
+};
+
+const listOf = (items: string[]) =>
+  items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+
+/**
+ * The import's metadata: what the admin typed over the defaults for the code
+ * (the catalog's for a known one, guessed from the code for any other).
+ */
 export function resolveMeta(code: string, overrides: Partial<TranslationMeta>): TranslationMeta {
-  const defaults = catalogMeta(code);
-  const parsed = translationMetaSchema.safeParse({ ...defaults, ...stripEmpty(overrides), code });
+  const given = stripEmpty(overrides);
+  const merged: Record<string, unknown> = { ...stripEmpty(defaultMeta(code, given.languageCode)), ...given, code };
+  const parsed = translationMetaSchema.safeParse(merged);
   if (!parsed.success) {
-    const missing = parsed.error.issues.map((i) => i.path.join('.')).join(', ');
-    throw new BibleImportError(`'${code}' is not a known translation; give its ${missing}.`);
+    const fields = [...new Set(parsed.error.issues.map((i) => String(i.path[0])))];
+    const label = (f: string) => META_LABELS[f] ?? f;
+    const missing = fields.filter((f) => merged[f] === undefined).map(label);
+    const invalid = fields.filter((f) => merged[f] !== undefined).map(label);
+    const parts = [
+      missing.length &&
+        (catalogMeta(code) ? `Fill in ${listOf(missing)}.` : `'${code}' isn't one of the built-in Bibles: fill in ${listOf(missing)}.`),
+      invalid.length && `Check ${listOf(invalid)}.`,
+    ].filter(Boolean);
+    throw new BibleImportError(parts.join(' '));
   }
   return parsed.data;
 }

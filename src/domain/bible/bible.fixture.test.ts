@@ -117,7 +117,18 @@ describe('import files', () => {
   it('fills catalog metadata and takes overrides', () => {
     assert.equal(resolveMeta('sar-hr', {}).languageCode, 'hr');
     assert.equal(resolveMeta('sar-hr', { name: 'Šarić' }).name, 'Šarić');
-    assert.throws(() => resolveMeta('new-hr', {}), /not a known translation/);
+    assert.throws(() => resolveMeta('new-hr', {}), /^Error: 'new-hr' isn't one of the built-in Bibles: fill in Name\.$/);
+    // Outside the catalog, the language and role come from the code; only the name must be given.
+    assert.deepEqual(resolveMeta('clp-cs', { name: 'Český liturgický překlad' }), {
+      code: 'clp-cs',
+      name: 'Český liturgický překlad',
+      languageCode: 'cs',
+      languageName: 'Čeština',
+      role: 'target',
+    });
+    assert.equal(resolveMeta('clp-cs', { name: 'X', languageCode: 'sk' }).languageName, 'Slovenčina');
+    assert.throws(() => resolveMeta('custom', {}), /fill in Name, Language code and Language name\./);
+    assert.throws(() => resolveMeta('sar-hr', { languageCode: 'not a code' }), /^Error: Check Language code\.$/);
     const custom = resolveMeta('new-hr', { name: 'New', languageCode: 'HR', languageName: 'Hrvatski', role: 'target' });
     assert.equal(custom.languageCode, 'hr');
   });
