@@ -65,3 +65,33 @@ export function catalogMeta(code: string) {
   if (!def) return null
   return { code: def.code, name: def.name, languageCode: def.language, languageName: def.languageName, role: def.role }
 }
+
+/** A language's name in that language, capitalised as the catalog writes it ("cs" → "Čeština"), or null when unknown. */
+export function nativeLanguageName(languageCode: string): string | null {
+  try {
+    const name = new Intl.DisplayNames([languageCode], { type: 'language' }).of(languageCode)
+    if (!name || name.toLowerCase() === languageCode.toLowerCase()) return null
+    return name.charAt(0).toLocaleUpperCase(languageCode) + name.slice(1)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * What an import fills in by itself: the catalog's metadata for a known code;
+ * for any other, the language from the code's last part ("clp-cs" → cs), that
+ * language's own name, and the target role, since RSV-CE is the one source.
+ * The translation's name is never guessed.
+ */
+export function defaultMeta(code: string, languageCode?: string) {
+  const known = catalogMeta(code)
+  if (known) return known
+  const language = languageCode?.trim().toLowerCase() || (/-([a-z]{2,3})$/.exec(code)?.[1] ?? '')
+  return {
+    code,
+    name: '',
+    languageCode: language,
+    languageName: (language && nativeLanguageName(language)) || '',
+    role: 'target' as const,
+  }
+}
