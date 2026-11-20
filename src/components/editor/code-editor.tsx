@@ -26,6 +26,8 @@ import { findAndReplace } from './cm-search';
 import { frontmatterDecoration } from './cm-frontmatter';
 import { markdownSupport } from './cm-markdown';
 import { editorHighlighting, editorTheme } from './cm-theme';
+import { rescanScripture, scriptureExtension } from './cm-scripture';
+import { useScriptureHost } from './scripture-context';
 
 const setHighlightLine = StateEffect.define<number | null>();
 
@@ -195,6 +197,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   const readOnlyCompartment = useRef(new Compartment()).current;
   const placeholderCompartment = useRef(new Compartment()).current;
   const lintCompartment = useRef(new Compartment()).current;
+  const scriptureCompartment = useRef(new Compartment()).current;
   // One object for the editor's whole life, mutated in place. `contentLinter`
   // captures it when the compartment is configured but reads `disabled` at
   // lint time, so replacing the object here would leave the linter holding the
@@ -275,6 +278,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       placeholderCompartment.of(placeholder ? placeholderExtension(placeholder) : []),
       highlightLineField,
       suggestionExtension((suggestion) => callbacks.current.onSuggestionClick?.(suggestion)),
+      scriptureCompartment.of([]),
       lintCompartment.of(
         lintEnabled
           ? [contentLinter(lintOptions.current, { onOpenGuide: () => callbacks.current.onOpenGuide?.() }), lintGutter()]
@@ -397,6 +401,37 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       ),
     });
   }, [lintEnabled, lintCompartment]);
+
+  // Scripture citations are checked in the translation only: the pane that is
+  // given the source to compare against, under a page that knows the target
+  // language. The source pane and the audio panel's SSML stay as they were.
+  const scripture = useScriptureHost();
+  const scriptureRef = useRef(scripture);
+  scriptureRef.current = scripture;
+  const scriptureEnabled = !!scripture && !isSource && sourceContent !== undefined && lintsAsMarkdown(language);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: scriptureCompartment.reconfigure(
+        scriptureEnabled ? scriptureExtension({ host: () => scriptureRef.current }) : [],
+      ),
+    });
+  }, [scriptureEnabled, scriptureCompartment, ready]);
+
+  // Only an editable pane is the one the panel writes through; a read-only one
+  // (the review pane) still shows the underlines and cards, but changing its
+  // text would never reach the document.
+  const registerScriptureView = scriptureEnabled && !readOnly ? scripture.registerView : undefined;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !registerScriptureView) return;
+    return registerScriptureView(view);
+  }, [registerScriptureView, ready]);
+
+  const scriptureBible = scripture?.bible;
+  useEffect(() => {
+    if (scriptureEnabled) viewRef.current?.dispatch({ effects: rescanScripture.of(null) });
+  }, [scriptureBible, scriptureEnabled]);
 
   // Turning a rule off changes no text, so CodeMirror has no reason to lint
   // again on its own: without this the squiggles and gutter markers keep the

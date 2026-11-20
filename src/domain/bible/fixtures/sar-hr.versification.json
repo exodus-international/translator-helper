@@ -1,0 +1,284 @@
+{
+ "translation": "sar-hr",
+ "source": "rsvce-en",
+ "books": {
+  "JHN": {},
+  "MAL": {
+   "unmappable": [
+    3,
+    4
+   ]
+  },
+  "JOL": {
+   "unmappable": [
+    2,
+    3
+   ]
+  },
+  "PSA": {
+   "unmappable": [
+    13,
+    105,
+    120,
+    121,
+    127
+   ],
+   "shifted": [
+    13,
+    105,
+    120,
+    121
+   ],
+   "map": [
+    {
+     "chapter": 3,
+     "offset": 1
+    },
+    {
+     "chapter": 4,
+     "offset": 1
+    },
+    {
+     "chapter": 5,
+     "offset": 1
+    },
+    {
+     "chapter": 6,
+     "offset": 1
+    },
+    {
+     "chapter": 7,
+     "offset": 1
+    },
+    {
+     "chapter": 8,
+     "offset": 1
+    },
+    {
+     "chapter": 9,
+     "offset": 1
+    },
+    {
+     "chapter": 12,
+     "offset": 1
+    },
+    {
+     "chapter": 18,
+     "offset": 1
+    },
+    {
+     "chapter": 19,
+     "offset": 1
+    },
+    {
+     "chapter": 20,
+     "offset": 1
+    },
+    {
+     "chapter": 21,
+     "offset": 1
+    },
+    {
+     "chapter": 22,
+     "offset": 1
+    },
+    {
+     "chapter": 30,
+     "offset": 1
+    },
+    {
+     "chapter": 31,
+     "offset": 1
+    },
+    {
+     "chapter": 34,
+     "offset": 1
+    },
+    {
+     "chapter": 36,
+     "offset": 1
+    },
+    {
+     "chapter": 38,
+     "offset": 1
+    },
+    {
+     "chapter": 39,
+     "offset": 1
+    },
+    {
+     "chapter": 40,
+     "offset": 1
+    },
+    {
+     "chapter": 41,
+     "offset": 1
+    },
+    {
+     "chapter": 42,
+     "offset": 1
+    },
+    {
+     "chapter": 44,
+     "offset": 1
+    },
+    {
+     "chapter": 45,
+     "offset": 1
+    },
+    {
+     "chapter": 46,
+     "offset": 1
+    },
+    {
+     "chapter": 47,
+     "offset": 1
+    },
+    {
+     "chapter": 48,
+     "offset": 1
+    },
+    {
+     "chapter": 49,
+     "offset": 1
+    },
+    {
+     "chapter": 51,
+     "offset": 2
+    },
+    {
+     "chapter": 52,
+     "offset": 2
+    },
+    {
+     "chapter": 53,
+     "offset": 1
+    },
+    {
+     "chapter": 54,
+     "offset": 2
+    },
+    {
+     "chapter": 55,
+     "offset": 1
+    },
+    {
+     "chapter": 56,
+     "offset": 1
+    },
+    {
+     "chapter": 57,
+     "offset": 1
+    },
+    {
+     "chapter": 58,
+     "offset": 1
+    },
+    {
+     "chapter": 59,
+     "offset": 1
+    },
+    {
+     "chapter": 60,
+     "offset": 2
+    },
+    {
+     "chapter": 61,
+     "offset": 1
+    },
+    {
+     "chapter": 62,
+     "offset": 1
+    },
+    {
+     "chapter": 63,
+     "offset": 1
+    },
+    {
+     "chapter": 64,
+     "offset": 1
+    },
+    {
+     "chapter": 65,
+     "offset": 1
+    },
+    {
+     "chapter": 67,
+     "offset": 1
+    },
+    {
+     "chapter": 68,
+     "offset": 1
+    },
+    {
+     "chapter": 69,
+     "offset": 1
+    },
+    {
+     "chapter": 70,
+     "offset": 1
+    },
+    {
+     "chapter": 75,
+     "offset": 1
+    },
+    {
+     "chapter": 76,
+     "offset": 1
+    },
+    {
+     "chapter": 77,
+     "offset": 1
+    },
+    {
+     "chapter": 80,
+     "offset": 1
+    },
+    {
+     "chapter": 81,
+     "offset": 1
+    },
+    {
+     "chapter": 83,
+     "offset": 1
+    },
+    {
+     "chapter": 84,
+     "offset": 1
+    },
+    {
+     "chapter": 85,
+     "offset": 1
+    },
+    {
+     "chapter": 88,
+     "offset": 1
+    },
+    {
+     "chapter": 89,
+     "offset": 1
+    },
+    {
+     "chapter": 92,
+     "offset": 1
+    },
+    {
+     "chapter": 102,
+     "offset": 1
+    },
+    {
+     "chapter": 108,
+     "offset": 1
+    },
+    {
+     "chapter": 140,
+     "offset": 1
+    },
+    {
+     "chapter": 142,
+     "offset": 1
+    }
+   ]
+  }
+ }
+}

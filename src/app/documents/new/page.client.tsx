@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { DocumentType } from '@/generated/prisma/enums';
 import { toast } from 'sonner';
+import { CitationSummary } from './citation-summary';
 
 interface NewDocumentClientProps {
   sourceProjects: Array<{
@@ -433,6 +434,7 @@ export default function NewDocumentClient({ sourceProjects: initialSourceProject
                       rows={15}
                       className="font-mono"
                     />
+                    {contentFormat !== 'YAML' && <CitationSummary content={content} className="mt-2" />}
                   </div>
 
                   <div className="flex justify-between">
