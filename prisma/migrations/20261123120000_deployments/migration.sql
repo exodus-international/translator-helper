@@ -87,16 +87,20 @@ ALTER TABLE "deployment_item" ADD CONSTRAINT "deployment_item_documentVersionId_
 -- commit, so a document's deploy history does not start empty. The ids are
 -- reused: each row becomes exactly one deployment and one item. Who deployed
 -- was never recorded, so requestedById stays null.
+--
+-- Only a merged pull request put the file on the branch. A row with no error
+-- whose pull request was left open or closed unmerged never got there, so it
+-- comes over as failed, with Retry offered, rather than as published.
 INSERT INTO "deployment" ("id", "status", "trigger", "sourceProjectId", "languageId", "branch", "commitSha", "commitUrl", "error", "createdAt", "startedAt", "finishedAt")
 SELECT gc."id",
-       CASE WHEN gc."errorMessage" IS NULL THEN 'SUCCEEDED'::"DeploymentStatus" ELSE 'FAILED'::"DeploymentStatus" END,
+       CASE WHEN gc."errorMessage" IS NULL AND gc."prStatus" = 'MERGED' THEN 'SUCCEEDED'::"DeploymentStatus" ELSE 'FAILED'::"DeploymentStatus" END,
        'MANUAL'::"DeploymentTrigger",
        d."sourceProjectId",
        dv."languageId",
        gc."branchName",
        NULLIF(gc."commitSha", ''),
        gc."prUrl",
-       gc."errorMessage",
+       COALESCE(gc."errorMessage", CASE WHEN gc."prStatus" IS DISTINCT FROM 'MERGED' THEN 'The pull request was never merged, so this may not have reached the branch. Retry to deploy it.' END),
        gc."createdAt",
        gc."createdAt",
        gc."createdAt"
@@ -108,8 +112,8 @@ INSERT INTO "deployment_item" ("id", "deploymentId", "documentVersionId", "outco
 SELECT gc."id",
        gc."id",
        gc."documentVersionId",
-       CASE WHEN gc."errorMessage" IS NULL THEN 'PUBLISHED'::"DeploymentItemOutcome" ELSE 'FAILED'::"DeploymentItemOutcome" END,
+       CASE WHEN gc."errorMessage" IS NULL AND gc."prStatus" = 'MERGED' THEN 'PUBLISHED'::"DeploymentItemOutcome" ELSE 'FAILED'::"DeploymentItemOutcome" END,
        gc."filePath",
-       gc."errorMessage",
+       COALESCE(gc."errorMessage", CASE WHEN gc."prStatus" IS DISTINCT FROM 'MERGED' THEN 'The pull request was never merged, so this may not have reached the branch. Retry to deploy it.' END),
        gc."createdAt"
 FROM "github_commit" gc;
