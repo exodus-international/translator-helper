@@ -47,6 +47,7 @@ const preview: DeployPreview = {
   documents: [{ id: 'version-1', title: 'Day 2', languageName: 'Czech', status: DocumentStatus.APPROVED }],
   target: { repository: 'exodus/site', branch: 'main' },
   audioNotReady: 0,
+  audioUnchecked: 0,
   notPublished: 0,
   alreadyRunning: 0,
 };

@@ -36,7 +36,7 @@ const versionForDeploy = {
 export type VersionForDeploy = Prisma.DocumentVersionGetPayload<{ select: typeof versionForDeploy }>;
 
 /** Everything a history row shows, without the documents' text. */
-export const deploymentSummarySelect = {
+const deploymentSummarySelect = {
   id: true,
   status: true,
   trigger: true,
@@ -193,12 +193,14 @@ export async function finishDeployment(
 }
 
 /**
- * Moves an approved version to DEPLOYED, unless it moved meanwhile. Returns
- * whether it did, so the activity log and notification follow only a real move.
+ * Moves an approved version to DEPLOYED, unless it moved meanwhile or its text
+ * is no longer the text that was deployed (an administrator may edit approved
+ * text while the deploy runs). Returns whether it did, so the activity log and
+ * notification follow only a real move.
  */
-export async function markVersionDeployed(versionId: string): Promise<boolean> {
+export async function markVersionDeployed(versionId: string, deployedContent: string): Promise<boolean> {
   const { count } = await prisma.documentVersion.updateMany({
-    where: { id: versionId, status: DocumentStatus.APPROVED },
+    where: { id: versionId, status: DocumentStatus.APPROVED, content: deployedContent },
     data: { status: DocumentStatus.DEPLOYED },
   });
   return count === 1;
@@ -224,15 +226,6 @@ export async function getDeployment(id: string): Promise<DeploymentRecord | null
   return prisma.deployment.findUnique({ where: { id }, select: deploymentSummarySelect });
 }
 
-/** The languages a deployment's items are in, for deciding who may see or retry it. */
-export async function getDeploymentLanguageIds(id: string): Promise<string[]> {
-  const items = await prisma.deploymentItem.findMany({
-    where: { deploymentId: id },
-    select: { documentVersion: { select: { languageId: true } } },
-  });
-  return [...new Set(items.map((item) => item.documentVersion.languageId))];
-}
-
 export async function getRetryableItems(deploymentId: string) {
   return prisma.deploymentItem.findMany({
     where: { deploymentId, outcome: { in: [DeploymentItemOutcome.FAILED, DeploymentItemOutcome.PENDING] } },
@@ -247,7 +240,7 @@ export async function getDeploymentScope(id: string) {
   });
 }
 
-export const HISTORY_PAGE_SIZE = 20;
+const HISTORY_PAGE_SIZE = 20;
 
 /**
  * Deployment history, newest first. A deployment shows in a scope when any of

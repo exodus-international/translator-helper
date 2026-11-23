@@ -66,7 +66,7 @@ export interface StatusChangeDeps<Version> {
   revalidateDocumentPage: () => void;
 }
 
-export const DEPLOY_THROUGH_DEPLOY =
+const DEPLOY_THROUGH_DEPLOY =
   'A document becomes Deployed when it is published. Use Deploy to publish it.';
 
 /** Whether this move is a deploy, which only Deploy makes. */

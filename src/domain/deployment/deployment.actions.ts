@@ -120,6 +120,7 @@ export async function previewDeployAction(input: unknown): Promise<DeployPreview
     })),
     target: deployTarget,
     audioNotReady,
+    audioUnchecked: Math.max(0, ids.length - AUDIO_CHECK_LIMIT),
     notPublished: deployTarget
       ? versions.filter((version) => !version.document.sourceProject?.repositoryDirectory).length
       : versions.length,
@@ -129,7 +130,8 @@ export async function previewDeployAction(input: unknown): Promise<DeployPreview
 
 /**
  * The audio check reads each version's recording; past a few dozen versions
- * the confirmation would wait on it, so a large batch checks the first ones.
+ * the confirmation would wait on it, so a large batch checks the first ones
+ * and the confirmation says how many it did not.
  */
 async function countAudioNotReady(versionIds: string[]): Promise<number> {
   if (versionIds.length === 0) return 0;
@@ -221,12 +223,12 @@ export async function getDeploymentAction(deploymentId: string): Promise<Deploym
 
   const record = await repository.getDeployment(deploymentId);
   if (!record) return null;
-  if (user.role !== Role.ADMIN && record.requestedBy?.id !== user.id) {
-    const mine = new Set(await deployableLanguageIds(user));
-    const visible = record.items.some((item) => mine.has(item.documentVersion.languageId));
-    if (!visible) throw new Error('Forbidden: this deploy is outside your languages');
-  }
-  return toDeploymentView(record);
+  // Whoever asked for a deploy sees all of it; anyone else sees their own languages' part.
+  if (user.role === Role.ADMIN || record.requestedBy?.id === user.id) return toDeploymentView(record);
+  const mine = new Set(await deployableLanguageIds(user));
+  const visible = record.items.some((item) => mine.has(item.documentVersion.languageId));
+  if (!visible) throw new Error('Forbidden: this deploy is outside your languages');
+  return toDeploymentView(record, mine);
 }
 
 /**
@@ -241,7 +243,8 @@ export async function listDeploymentsAction(input: unknown = {}): Promise<Deploy
 
   const languageIds = await deployableLanguageIds(user);
   const records = await repository.listDeployments({ ...filter, languageIds });
-  return records.map(toDeploymentView);
+  const visible = languageIds ? new Set(languageIds) : undefined;
+  return records.map((record) => toDeploymentView(record, visible));
 }
 
 /** Turns deploy-on-approval on or off for one project in one language. */

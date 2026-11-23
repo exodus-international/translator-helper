@@ -80,16 +80,26 @@ export function createDeployments(deps: DeploymentDeps) {
   async function runDeployment(id: string): Promise<void> {
     if (!(await repository.claimDeployment(id, deps.githubConfigured() ? deps.deployBranch() : null))) return;
 
+    // The commit, once made, is kept even when recording what followed fails:
+    // it is on the branch whatever the database says.
+    const progress: { commit: PublishResult['commit'] } = { commit: null };
     try {
-      await publishDeployment(id);
+      await publishDeployment(id, progress);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[Deploy] Deployment ${id} failed:`, error);
-      await repository.finishDeployment(id, { status: DeploymentStatus.FAILED, error: message }).catch(() => {});
+      await repository
+        .finishDeployment(id, {
+          status: DeploymentStatus.FAILED,
+          commitSha: progress.commit?.sha ?? null,
+          commitUrl: progress.commit?.url ?? null,
+          error: message,
+        })
+        .catch(() => {});
     }
   }
 
-  async function publishDeployment(id: string): Promise<void> {
+  async function publishDeployment(id: string, progress: { commit: PublishResult['commit'] }): Promise<void> {
     const deployment = await repository.getDeploymentForRun(id);
     if (!deployment) return;
 
@@ -134,6 +144,7 @@ export function createDeployments(deps: DeploymentDeps) {
           message,
         );
         commit = result.commit;
+        progress.commit = commit;
         const changed = new Set(result.changedPaths);
         for (const { itemId, plan } of toPublish) {
           outcomes.set(itemId, {
@@ -149,17 +160,17 @@ export function createDeployments(deps: DeploymentDeps) {
       }
     }
 
+    // What the deploy did is saved first: the outcomes, the versions that are
+    // now out, and the deployment with its commit.
+    const moved = new Set<string>();
     for (const { item } of plans) {
       const result = outcomes.get(item.id)!;
       await repository.setItemOutcome(item.id, result.outcome, { filePath: result.filePath, error: result.error });
-      if (actorId) {
-        await recordVersion(item.documentVersion, result, { actorId, deploymentId: id, commit });
-      }
-    }
-    if (!actorId) {
-      // The requester's account is gone; the versions still move, without a log line to attribute.
-      for (const { item } of plans) {
-        if (countsAsDeployed(outcomes.get(item.id)!.outcome)) await repository.markVersionDeployed(item.documentVersion.id);
+      if (
+        countsAsDeployed(result.outcome) &&
+        (await repository.markVersionDeployed(item.documentVersion.id, item.documentVersion.content))
+      ) {
+        moved.add(item.documentVersion.id);
       }
     }
 
@@ -174,15 +185,33 @@ export function createDeployments(deps: DeploymentDeps) {
           ? (publishError ?? (failures.length === 1 ? failures[0].error : `${failures.length} documents could not be deployed.`))
           : null,
     });
+
+    // Then the activity log and notifications, which a deploy does not depend
+    // on: one that cannot be written is reported and the rest still go out.
+    // The requester's account may be gone; then there is nobody to attribute them to.
+    if (!actorId) return;
+    for (const { item } of plans) {
+      const version = item.documentVersion;
+      try {
+        await recordVersion(version, outcomes.get(item.id)!, {
+          actorId,
+          deploymentId: id,
+          commit,
+          moved: moved.has(version.id),
+        });
+      } catch (error) {
+        console.error(`[Deploy] Could not record deployment ${id} for version ${version.id}:`, error);
+      }
+    }
   }
 
-  /** Moves the version and writes its activity log line and notification. */
+  /** Writes a version's activity log lines and, when it moved, its notification. */
   async function recordVersion(
     version: VersionForDeploy,
     result: { outcome: DeploymentItemOutcome; error?: string },
-    context: { actorId: string; deploymentId: string; commit: PublishResult['commit'] },
+    context: { actorId: string; deploymentId: string; commit: PublishResult['commit']; moved: boolean },
   ): Promise<void> {
-    const { actorId, deploymentId, commit } = context;
+    const { actorId, deploymentId, commit, moved } = context;
     if (result.outcome === DeploymentItemOutcome.SKIPPED) return;
 
     if (result.outcome === DeploymentItemOutcome.FAILED) {
@@ -195,7 +224,6 @@ export function createDeployments(deps: DeploymentDeps) {
       return;
     }
 
-    const moved = await repository.markVersionDeployed(version.id);
     if (moved) {
       await deps.log({ documentVersionId: version.id, userId: actorId, action: 'status_updated', details: { status: DocumentStatus.DEPLOYED } });
       await deps.notify({ versionId: version.id, actorId, from: DocumentStatus.APPROVED, to: DocumentStatus.DEPLOYED });
@@ -259,10 +287,22 @@ const NO_COUNTS: Record<DeploymentItemOutcome, number> = {
   FAILED: 0,
 };
 
-/** A deployment as the client sees it. */
-export function toDeploymentView(record: DeploymentRecord): DeploymentView {
+/** Shown in place of a deploy error that belongs to a document the viewer cannot see. */
+const HIDDEN_ITEM_ERROR = 'A document in another language could not be deployed.';
+
+/**
+ * A deployment as the client sees it. With `languageIds`, only the items in
+ * those languages are shown and counted: a batch can span languages, and a
+ * team member sees their own language's part of it, not the other teams'
+ * titles and errors.
+ */
+export function toDeploymentView(record: DeploymentRecord, languageIds?: ReadonlySet<string>): DeploymentView {
+  const items = languageIds
+    ? record.items.filter((item) => languageIds.has(item.documentVersion.languageId))
+    : record.items;
+  const hidden = record.items.filter((item) => !items.includes(item));
   const counts = { ...NO_COUNTS };
-  for (const item of record.items) counts[item.outcome] += 1;
+  for (const item of items) counts[item.outcome] += 1;
   return {
     id: record.id,
     status: record.status,
@@ -273,12 +313,13 @@ export function toDeploymentView(record: DeploymentRecord): DeploymentView {
     branch: record.branch,
     commitSha: record.commitSha,
     commitUrl: record.commitUrl,
-    error: record.error,
+    // A deploy's error can be one hidden item's own; then it is not repeated.
+    error: hidden.some((item) => item.error === record.error) ? HIDDEN_ITEM_ERROR : record.error,
     createdAt: record.createdAt.toISOString(),
     finishedAt: record.finishedAt?.toISOString() ?? null,
     retryOfId: record.retryOfId,
     counts,
-    items: record.items.map((item) => {
+    items: items.map((item) => {
       const { document, language } = item.documentVersion;
       return {
         id: item.id,

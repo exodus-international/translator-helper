@@ -19,7 +19,7 @@ import {
 import prisma from '@/lib/db';
 import type { PublishFile } from '../github/github.publish';
 import { SEEDED_USERS, seededLanguage, seededSourceProject, seededUser } from '../../../tests/seeded';
-import { createDeployments, type DeploymentDeps } from './deployment.service';
+import { createDeployments, toDeploymentView, type DeploymentDeps } from './deployment.service';
 import * as repository from './deployment.repository';
 import { INTERRUPTED_MESSAGE, STALE_DEPLOYMENT_MS } from './deployment.plan';
 
@@ -37,11 +37,13 @@ afterEach(async () => {
 
 let counter = 0;
 
-/** A document with one version in Czech, in a project that publishes or one that does not. */
-async function makeVersion(options: { status?: DocumentStatus; project?: 'exodus90' | 'summer2025'; content?: string } = {}) {
+/** A document with one version, in Czech unless told otherwise, in a project that publishes or one that does not. */
+async function makeVersion(
+  options: { status?: DocumentStatus; project?: 'exodus90' | 'summer2025'; content?: string; language?: string } = {},
+) {
   counter += 1;
   const project = await seededSourceProject(options.project ?? 'exodus90');
-  const czech = await seededLanguage('cs');
+  const language = await seededLanguage(options.language ?? 'cs');
   const slug = `deploy-test-${Date.now()}-${counter}`;
   const document = await prisma.document.create({
     data: {
@@ -56,16 +58,24 @@ async function makeVersion(options: { status?: DocumentStatus; project?: 'exodus
   const version = await prisma.documentVersion.create({
     data: {
       documentId: document.id,
-      languageId: czech.id,
+      languageId: language.id,
       content: options.content ?? `# ${slug}`,
       status: options.status ?? DocumentStatus.APPROVED,
     },
   });
-  return { version, path: `translations/cs/exercises/${project.repositoryDirectory}/days/${slug}.md` };
+  return { version, path: `translations/${language.code}/exercises/${project.repositoryDirectory}/days/${slug}.md` };
 }
 
 /** A repository in memory, and a deployments service wired to it with fakes that record every call. */
-function harness(options: { githubConfigured?: boolean } = {}) {
+function harness(
+  options: {
+    githubConfigured?: boolean;
+    /** Runs while the commit is being made, as an edit in another tab would. */
+    duringPublish?: () => Promise<void>;
+    /** The activity log cannot be written. */
+    logFails?: boolean;
+  } = {},
+) {
   const files = new Map<string, string>();
   const logs: { action: string; documentVersionId: string; details: Record<string, unknown> }[] = [];
   const notified: { versionId: string; to: DocumentStatus }[] = [];
@@ -76,6 +86,7 @@ function harness(options: { githubConfigured?: boolean } = {}) {
     githubConfigured: () => options.githubConfigured ?? true,
     deployBranch: () => 'main',
     publish: async (toPublish: PublishFile[]) => {
+      await options.duringPublish?.();
       if (failNext) {
         const message = failNext;
         failNext = null;
@@ -88,6 +99,7 @@ function harness(options: { githubConfigured?: boolean } = {}) {
       return { commit: { sha: `sha${commits}`.padEnd(40, '0'), url: `https://github.test/commit/${commits}` }, changedPaths: changed.map((file) => file.path) };
     },
     log: async (entry) => {
+      if (options.logFails) throw new Error('activity log is down');
       logs.push({ action: entry.action, documentVersionId: entry.documentVersionId, details: entry.details });
     },
     notify: async (input) => {
@@ -193,6 +205,38 @@ describe('deploying approved documents', () => {
     assert.equal(outcomeOf(deployment, version.id), DeploymentItemOutcome.SKIPPED);
     assert.equal(await statusOf(version.id), DocumentStatus.IN_PROGRESS);
     assert.equal(github.commits(), 0);
+  });
+});
+
+describe('what a deploy saves', () => {
+  it('leaves a version approved when its text was edited while the deploy ran', async () => {
+    const { version, path } = await makeVersion({ content: '# First text' });
+    const github = harness({
+      duringPublish: () =>
+        prisma.documentVersion.update({ where: { id: version.id }, data: { content: '# Edited text' } }).then(() => {}),
+    });
+
+    const { deployment } = await github.deploy([version.id]);
+
+    // The first text went out, so the version is not what is on the branch: it stays approved for the next deploy.
+    assert.equal(deployment?.status, DeploymentStatus.SUCCEEDED);
+    assert.equal(outcomeOf(deployment, version.id), DeploymentItemOutcome.PUBLISHED);
+    assert.equal(github.files.get(path), '# First text');
+    assert.equal(await statusOf(version.id), DocumentStatus.APPROVED);
+    assert.equal(github.notified.length, 0);
+  });
+
+  it('keeps the commit and the deployed status when the activity log cannot be written', async () => {
+    const { version } = await makeVersion();
+    const github = harness({ logFails: true });
+
+    const { deployment } = await github.deploy([version.id]);
+
+    assert.equal(deployment?.status, DeploymentStatus.SUCCEEDED);
+    assert.match(deployment?.commitSha ?? '', /^sha1/);
+    assert.ok(deployment?.commitUrl);
+    assert.equal(outcomeOf(deployment, version.id), DeploymentItemOutcome.PUBLISHED);
+    assert.equal(await statusOf(version.id), DocumentStatus.DEPLOYED);
   });
 });
 
@@ -306,6 +350,56 @@ describe('deploy history', () => {
 
     const slovak = await seededLanguage('sk');
     assert.deepEqual(await repository.listDeployments({ documentVersionId: version.id, languageIds: [slovak.id] }), []);
+  });
+});
+
+describe('a deploy seen from one language', () => {
+  it('shows a team member only their language’s documents, counts and errors', async () => {
+    const czech = await makeVersion();
+    const slovak = await makeVersion({ language: 'sk' });
+    const github = harness();
+    github.failNextPublish('Resource not accessible by integration');
+    const { deployment } = await github.deploy([czech.version.id, slovak.version.id]);
+    const record = deployment!;
+
+    const full = toDeploymentView(record);
+    assert.equal(full.items.length, 2);
+
+    const czechLanguage = await seededLanguage('cs');
+    const mine = toDeploymentView(record, new Set([czechLanguage.id]));
+    assert.deepEqual(mine.items.map((item) => item.documentVersionId), [czech.version.id]);
+    assert.equal(mine.counts.FAILED, 1);
+    assert.equal(mine.items[0].title.startsWith('Deploy test'), true);
+
+    const slovakLanguage = await seededLanguage('sk');
+    const theirs = toDeploymentView(record, new Set([slovakLanguage.id]));
+    assert.deepEqual(theirs.items.map((item) => item.documentVersionId), [slovak.version.id]);
+  });
+
+  it('does not repeat another language’s error to a team member who cannot see that document', async () => {
+    const czech = await makeVersion();
+    const slovak = await makeVersion({ language: 'sk' });
+    const github = harness();
+    const requester = await seededUser(SEEDED_USERS.translator);
+    const started = await github.service.queueDeployment({
+      versionIds: [czech.version.id, slovak.version.id],
+      trigger: DeploymentTrigger.MANUAL,
+      requestedById: requester.id,
+    });
+    createdDeployments.add(started.deploymentId!);
+    // The Slovak one leaves approval after it was queued, and is skipped with a reason of its own.
+    await prisma.documentVersion.update({ where: { id: slovak.version.id }, data: { status: DocumentStatus.IN_PROGRESS } });
+    await github.service.runDeployment(started.deploymentId!);
+    const record = (await repository.getDeployment(started.deploymentId!))!;
+    const failed = record.items.find((item) => item.documentVersion.id === slovak.version.id)!;
+    await prisma.deployment.update({ where: { id: record.id }, data: { status: DeploymentStatus.FAILED, error: failed.error } });
+
+    const czechLanguage = await seededLanguage('cs');
+    const mine = toDeploymentView((await repository.getDeployment(record.id))!, new Set([czechLanguage.id]));
+
+    assert.ok(failed.error);
+    assert.notEqual(mine.error, failed.error);
+    assert.equal(mine.error, 'A document in another language could not be deployed.');
   });
 });
 

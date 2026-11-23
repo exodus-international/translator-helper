@@ -15,7 +15,7 @@ import { toast } from 'sonner';
  * they all say the same thing.
  */
 
-export const POLL_INTERVAL_MS = 1500;
+const POLL_INTERVAL_MS = 1500;
 /** Past this the toast stops waiting; the deploy still finishes and its history says how. */
 export const FOLLOW_LIMIT_MS = 5 * 60 * 1000;
 

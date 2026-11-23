@@ -32,6 +32,8 @@ export function describeDeployTarget(): { repository: string; branch: string } {
 }
 
 /** The publisher's dependencies, bound to the configured repository and deploy branch. */
+// Loaded with a dynamic import by the deployment service, which the dead-code check does not follow.
+// fallow-ignore-next-line unused-export
 export async function createGitHubPublishDeps(): Promise<PublishDeps & { branch: string }> {
   const config = getGitHubConfig();
   const octokit = await getApp().getInstallationOctokit(config.installationId);

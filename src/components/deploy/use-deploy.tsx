@@ -38,7 +38,7 @@ import { defaultDeployFeedbackDeps, followDeployment, retryAndFollow } from './d
  * board) knows to put it back.
  */
 
-export type DeployRequest =
+type DeployRequest =
   | { versionIds: string[]; redeploy?: boolean; via: DeployVia }
   | { scope: DeployScope; via: DeployVia };
 
@@ -321,6 +321,13 @@ function DeployNotes({ preview }: { preview: DeployPreview }) {
       key: 'audio',
       warn: true,
       text: `${preview.audioNotReady} ${plural(preview.audioNotReady, 'document has', 'documents have')} no up-to-date audio. ${plural(preview.audioNotReady, 'It goes', 'They go')} out without an audio link, and the audio can be generated later.`,
+    });
+  }
+  if (preview.audioUnchecked > 0) {
+    notes.push({
+      key: 'audio-unchecked',
+      warn: true,
+      text: `${preview.audioUnchecked} more ${plural(preview.audioUnchecked, 'was', 'were')} not checked for audio. ${plural(preview.audioUnchecked, 'If it has', 'Any that have')} no up-to-date audio ${plural(preview.audioUnchecked, 'goes', 'go')} out without an audio link.`,
     });
   }
   if (preview.target && preview.notPublished > 0 && preview.notPublished < preview.documents.length) {

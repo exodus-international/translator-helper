@@ -142,7 +142,7 @@ export function countsAsDeployed(outcome: DeploymentItemOutcome): boolean {
   );
 }
 
-export function isActive(status: DeploymentStatus): boolean {
+function isActive(status: DeploymentStatus): boolean {
   return ACTIVE_DEPLOYMENT_STATUSES.includes(status);
 }
 

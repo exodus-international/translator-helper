@@ -41,6 +41,8 @@ export interface DeployPreview {
   target: { repository: string; branch: string } | null;
   /** Documents with no recording yet, or one made from older text. */
   audioNotReady: number;
+  /** Documents past the audio check's limit, so not checked: a large batch checks the first ones. */
+  audioUnchecked: number;
   /** Documents whose project has no repository directory: marked deployed, not published. */
   notPublished: number;
   /** Documents already in a deploy that is running; they join it. */
@@ -67,8 +69,6 @@ export const deployTargetSchema = z.union([
   z.object({ versionIds: versionIdsSchema }).strict(),
   z.object({ scope: deployScopeSchema }).strict(),
 ]);
-
-export type DeployTarget = z.infer<typeof deployTargetSchema>;
 
 export const historyFilterSchema = z
   .object({
