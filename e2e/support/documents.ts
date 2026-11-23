@@ -26,6 +26,9 @@ const SEEDED = [
   // the admin; Slovak only shows a translator what is not offered.
   { title: 'Day 2 - Discipline of Prayer', projectSlug: 'exodus90', slug: 'ex90-day-2', languageCode: 'cs' },
   { title: 'Day 1 - The Call', projectSlug: 'exodus90', slug: 'ex90-day-1', languageCode: 'sk' },
+  // Not started in the seed, and no other scenario uses French: the automatic
+  // translation scenario turns it on for the whole language.
+  { title: 'Day 1 - The Call', projectSlug: 'exodus90', slug: 'ex90-day-1', languageCode: 'fr' },
 ] as const;
 
 const LANGUAGE_CODES: Record<string, string> = {
