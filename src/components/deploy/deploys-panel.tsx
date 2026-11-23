@@ -12,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { listDeploymentsAction, setAutoDeployAction } from '@/domain/deployment/deployment.actions';
 import type { DeployScope, DeploymentView, HistoryFilter } from '@/domain/deployment/deployment.types';
 import { capture } from '@/lib/analytics';
-import { DeploymentHistory } from './deployment-history';
+import { DeployHistoryError, DeploymentHistory } from './deployment-history';
 import { useDeploy, useRetryDeployment, type DeployVia } from './use-deploy';
 
 /** How often the history is read again while one of its deploys is still running. */
@@ -48,19 +48,19 @@ export function DeploysPanel({
 }) {
   const filterKey = JSON.stringify(filter);
   // The history is kept with the filter it was read for, so another filter shows the skeleton until its own arrives.
-  const [loaded, setLoaded] = useState<{ key: string; deployments: DeploymentView[] } | null>(null);
-  const history = loaded?.key === filterKey ? loaded.deployments : null;
+  const [loaded, setLoaded] = useState<{ key: string; deployments: DeploymentView[] | 'failed' } | null>(null);
+  const current = loaded?.key === filterKey ? loaded.deployments : null;
+  const loadFailed = current === 'failed';
+  const history = current === 'failed' ? null : current;
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    let deployments: DeploymentView[];
     try {
-      deployments = await listDeploymentsAction(JSON.parse(filterKey) as HistoryFilter);
+      setLoaded({ key: filterKey, deployments: await listDeploymentsAction(JSON.parse(filterKey) as HistoryFilter) });
     } catch (error) {
       console.error('[DeploysPanel] Could not load deploy history:', error);
-      deployments = [];
+      setLoaded({ key: filterKey, deployments: 'failed' });
     }
-    setLoaded({ key: filterKey, deployments });
   }, [filterKey]);
 
   useEffect(() => {
@@ -97,8 +97,16 @@ export function DeploysPanel({
       </CardHeader>
       <CardContent className="space-y-6">
         {autoDeploy && <AutoDeployField key={autoDeploy.translationProjectId} {...autoDeploy} canChange={canDeploy} />}
-        {history === null ? (
-          <div className="space-y-3" aria-label="Loading deploys">
+        {loadFailed ? (
+          <DeployHistoryError
+            onRetry={() => {
+              setLoaded(null);
+              void load();
+            }}
+          />
+        ) : history === null ? (
+          <div role="status" className="space-y-3">
+            <span className="sr-only">Loading deploys…</span>
             <Skeleton className="h-4 w-1/3" />
             <Skeleton className="h-4 w-2/3" />
             <Skeleton className="h-4 w-1/2" />
@@ -108,9 +116,9 @@ export function DeploysPanel({
             deployments={history}
             canRetry={canDeploy}
             retryingId={retryingId}
-            onRetry={(id) => {
+            onRetry={(id, label) => {
               setRetryingId(id);
-              void retry(id).finally(() => setRetryingId(null));
+              void retry(id, label).finally(() => setRetryingId(null));
             }}
             emptyText={emptyText}
           />

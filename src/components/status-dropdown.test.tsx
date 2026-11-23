@@ -285,7 +285,7 @@ test('the team can take a deployed document back to Approved', async () => {
       return outcome({});
     },
   });
-  await choose(user, 'Deployed', /Revoke deployment/);
+  await choose(user, 'Deployed', /Move back to Approved/);
   assert.ok(await screen.findByRole('button', { name: 'Document status: Approved' }));
   assert.deepEqual(moves, [DocumentStatus.APPROVED]);
 });

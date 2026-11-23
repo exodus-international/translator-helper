@@ -18,12 +18,58 @@ import { cn } from '@/lib/utils';
 
 type BadgeProps = ComponentProps<typeof Badge>;
 
-const STATUS_BADGE: Record<DeploymentView['status'], { label: string; variant: BadgeProps['variant'] }> = {
+const STATUS_BADGE: Record<DeploymentView['status'] | 'SKIPPED', { label: string; variant: BadgeProps['variant'] }> = {
   QUEUED: { label: 'Queued', variant: 'secondary' },
   PUBLISHING: { label: 'Deploying', variant: 'secondary' },
   SUCCEEDED: { label: 'Deployed', variant: 'success' },
   FAILED: { label: 'Failed', variant: 'destructive' },
+  SKIPPED: { label: 'Skipped', variant: 'secondary' },
 };
+
+/** How one document fared in a deployment, which in a batch can differ from how the batch fared. */
+export type DocumentOutcome = 'running' | 'deployed' | 'skipped' | 'failed';
+
+/**
+ * This document's own outcome in a deployment: failed only when its item
+ * failed or never went out of a failed batch, skipped when it had left
+ * approval, deployed otherwise. A deployment without the document falls back
+ * to the deployment's status.
+ */
+export function documentOutcome(deployment: DeploymentView, documentVersionId: string): DocumentOutcome {
+  if (deployment.status === 'QUEUED' || deployment.status === 'PUBLISHING') return 'running';
+  const item = deployment.items.find((candidate) => candidate.documentVersionId === documentVersionId);
+  if (!item) return deployment.status === 'FAILED' ? 'failed' : 'deployed';
+  if (item.outcome === 'FAILED' || (item.outcome === 'PENDING' && deployment.status === 'FAILED')) return 'failed';
+  if (item.outcome === 'SKIPPED') return 'skipped';
+  return 'deployed';
+}
+
+const OUTCOME_BADGE: Record<Exclude<DocumentOutcome, 'running'>, keyof typeof STATUS_BADGE> = {
+  deployed: 'SUCCEEDED',
+  skipped: 'SKIPPED',
+  failed: 'FAILED',
+};
+
+/** Shown in place of the history when it could not be read, so it never reads as "nothing deployed". */
+/** What a retry sends again, for its toast: the documents that failed or never went out. */
+function retryLabel(deployment: DeploymentView): string {
+  const left = deployment.items.filter((item) => item.outcome === 'FAILED' || item.outcome === 'PENDING');
+  if (left.length === 1) return `"${left[0].title}" (${left[0].languageName}) again`;
+  if (left.length > 1) return `${left.length} documents again`;
+  return 'the documents again';
+}
+
+export function DeployHistoryError({ onRetry, className }: { onRetry: () => void; className?: string }) {
+  return (
+    <div role="alert" className={cn('flex flex-wrap items-center gap-2 text-sm', className)}>
+      <span className="text-destructive">Could not load the deploy history.</span>
+      <Button variant="outline" size="xs" onClick={onRetry}>
+        <RotateCcw aria-hidden />
+        Try again
+      </Button>
+    </div>
+  );
+}
 
 const TRIGGER_LABEL: Record<DeploymentView['trigger'], string | null> = {
   MANUAL: null,
@@ -71,7 +117,7 @@ export function DeploymentHistory({
   deployments: DeploymentView[];
   /** Whether the viewer may deploy these documents, and so retry a failure. */
   canRetry: boolean;
-  onRetry: (deploymentId: string) => void;
+  onRetry: (deploymentId: string, label: string) => void;
   retryingId?: string | null;
   /** On one document's page: its version. Each row then tells that document's own outcome, without the document list. */
   documentVersionId?: string;
@@ -110,7 +156,7 @@ function DeploymentRow({
 }: {
   deployment: DeploymentView;
   documentVersionId?: string;
-  retry: { onRetry: (id: string) => void; busy: boolean } | null;
+  retry: { onRetry: (id: string, label: string) => void; busy: boolean } | null;
 }) {
   const trigger = TRIGGER_LABEL[deployment.trigger];
   const running = deployment.status === 'QUEUED' || deployment.status === 'PUBLISHING';
@@ -122,11 +168,11 @@ function DeploymentRow({
   const what = only ? OUTCOME_LABEL[only.outcome] : summarizeOutcomes(deployment);
   // On a document's page the row is about that document: a batch that failed
   // on another document went fine for this one, and offers it no retry.
-  const failedHere =
-    only !== null && (only.outcome === 'FAILED' || (only.outcome === 'PENDING' && deployment.status === 'FAILED'));
-  const status = documentScope && only && !running ? (failedHere ? 'FAILED' : 'SUCCEEDED') : deployment.status;
+  const outcome = documentScope && only ? documentOutcome(deployment, documentVersionId) : null;
+  const failedHere = outcome === 'failed';
+  const status = outcome && outcome !== 'running' ? OUTCOME_BADGE[outcome] : deployment.status;
   const badge = STATUS_BADGE[status];
-  const error = documentScope ? (failedHere ? (only.error ?? deployment.error) : null) : deployment.error;
+  const error = documentScope ? (failedHere ? (only?.error ?? deployment.error) : null) : deployment.error;
   const canRetryHere = retry && (!documentScope || failedHere) ? retry : null;
   const note = only?.error && only.outcome !== 'FAILED' && only.outcome !== 'PUBLISHED' ? only.error : null;
   const scope = [deployment.sourceProject?.name, deployment.language?.name].filter(Boolean).join(' · ');
@@ -172,7 +218,7 @@ function DeploymentRow({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => canRetryHere.onRetry(deployment.id)}
+          onClick={() => canRetryHere.onRetry(deployment.id, retryLabel(deployment))}
           disabled={canRetryHere.busy}
           aria-label={`Retry the deploy from ${formatRelativeTime(createdAt)}`}
         >
@@ -219,9 +265,9 @@ function DeploymentItems({ items }: { items: DeploymentItemView[] }) {
         {items.length === 1 ? '1 document' : `${items.length} documents`}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <ul className="mt-1.5 space-y-1 border-s ps-3">
+        <ul className="mt-1.5 border-s ps-3">
           {items.map((item) => (
-            <li key={item.id} className="text-xs">
+            <li key={item.id} className="text-xs leading-6">
               <div className="flex items-baseline justify-between gap-3">
                 <Link href={item.href} className="min-w-0 truncate underline-offset-4 hover:underline" title={item.title}>
                   {item.title}
@@ -230,7 +276,7 @@ function DeploymentItems({ items }: { items: DeploymentItemView[] }) {
                 <span className={cn('shrink-0', OUTCOME_CLASS[item.outcome])}>{OUTCOME_LABEL[item.outcome]}</span>
               </div>
               {item.error && item.outcome !== 'PUBLISHED' && (
-                <p className="mt-0.5 text-muted-foreground text-pretty">{item.error}</p>
+                <p className="leading-normal text-muted-foreground text-pretty">{item.error}</p>
               )}
             </li>
           ))}

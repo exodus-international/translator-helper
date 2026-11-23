@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { DeploymentItemView, DeploymentView } from '@/domain/deployment/deployment.types';
 import { DeploymentHistory } from './deployment-history';
 
@@ -80,4 +81,18 @@ test('without a document, the row tells the whole batch and lists its documents'
   assert.ok(screen.getByText('Day 3 has no file name to publish under.'));
   assert.ok(screen.getByText('2 documents'));
   assert.ok(screen.getByRole('button', { name: /Retry/ }));
+});
+
+test('a retry names the documents it sends again', async () => {
+  const retried: [string, string][] = [];
+  render(
+    <DeploymentHistory
+      deployments={[batch('UNCHANGED')]}
+      canRetry
+      onRetry={(id, label) => retried.push([id, label])}
+    />,
+  );
+  await userEvent.setup().click(screen.getByRole('button', { name: /Retry/ }));
+
+  assert.deepEqual(retried, [['deployment-1', '"Day 3" (Czech) again']]);
 });

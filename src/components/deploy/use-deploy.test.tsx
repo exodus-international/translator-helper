@@ -67,6 +67,6 @@ test('a batch confirmation lists each document with its language and warns about
   assert.deepEqual(rows, ['Day 2Czech', 'Day 3Slovak']);
   assert.ok(within(dialog).getByText(/1 document has no up-to-date audio/));
   assert.ok(within(dialog).getByText('exodus/site'));
-  assert.ok(within(dialog).getByRole('button', { name: 'Deploy 2' }));
+  assert.ok(within(dialog).getByRole('button', { name: 'Deploy 2 documents' }));
   assert.equal(sent, 0);
 });

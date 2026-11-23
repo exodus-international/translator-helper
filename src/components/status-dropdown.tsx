@@ -130,7 +130,7 @@ export function StatusDropdown({
     [DocumentStatus.PENDING_TRANSLATION]: 'Back to pending',
     [DocumentStatus.IN_PROGRESS]: 'Return to translation',
     [DocumentStatus.PENDING_REVIEW]: 'Request new review',
-    [DocumentStatus.APPROVED]: 'Revoke deployment',
+    [DocumentStatus.APPROVED]: 'Move back to Approved',
   };
 
   const getTransitionLabel = (from: DocumentStatus | null | undefined, to: DocumentStatus) => {

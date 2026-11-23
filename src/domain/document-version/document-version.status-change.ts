@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
 import { refuse, type Refusal } from '@/lib/action-refusal';
@@ -127,6 +128,7 @@ async function autoDeployAfterStatusChange<Version>(
   } catch (error) {
     // The approval stands; the team can still deploy by hand.
     console.error('[StatusChange] Could not start the auto-deploy:', error);
+    Sentry.captureException(error, { tags: { area: 'deploy', step: 'auto-deploy start' }, extra: { versionId } });
     return null;
   }
 }

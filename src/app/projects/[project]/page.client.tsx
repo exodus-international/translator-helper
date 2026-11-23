@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 import { updateSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import { buildProjectPath } from '@/domain/source-project/source-project-url';
 import { DeployOffWarning } from '@/components/project-form';
@@ -213,12 +212,7 @@ export default function ProjectDetailClient({
 
       <div className="px-4 py-4">
         <Tabs defaultValue="dashboard">
-          <TabsList
-            className={cn(
-              'grid w-full grid-cols-4 sm:inline-flex sm:w-fit',
-              isAdminClient(user) && 'max-sm:grid-cols-5',
-            )}
-          >
+          <TabsList className="flex w-full justify-start overflow-x-auto sm:inline-flex sm:w-fit">
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
               <LayoutDashboard className="hidden size-4 sm:block" />
               Dashboard

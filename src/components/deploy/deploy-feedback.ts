@@ -20,7 +20,19 @@ const POLL_INTERVAL_MS = 1500;
 export const FOLLOW_LIMIT_MS = 5 * 60 * 1000;
 
 type ToastId = string | number;
-type ToastOptions = { id?: ToastId; duration?: number; description?: string; action?: { label: string; onClick: () => void } };
+type ToastOptions = {
+  id?: ToastId;
+  duration?: number;
+  closeButton?: boolean;
+  description?: string;
+  action?: { label: string; onClick: () => void };
+};
+
+/**
+ * A toast that asks the person to act (retry, or go and look) stays until it
+ * is dismissed, so it can be reached from the keyboard or a screen reader.
+ */
+const UNTIL_DISMISSED = { duration: Infinity, closeButton: true } as const;
 
 export interface DeployFeedbackDeps {
   toast: {
@@ -34,6 +46,8 @@ export interface DeployFeedbackDeps {
   wait: (ms: number) => Promise<void>;
   now: () => number;
   open: (url: string) => void;
+  /** Goes to a page of the app. */
+  navigate: (path: string) => void;
 }
 
 /** What a finished deployment did, in one sentence. */
@@ -45,8 +59,9 @@ export function describeOutcome(view: DeploymentView): { title: string; descript
 
   if (view.status === DeploymentStatus.FAILED) {
     const sent = counts.PUBLISHED + counts.UNCHANGED + counts.NOT_PUBLISHED;
+    const notSent = counts.FAILED + counts.PENDING;
     return {
-      title: only ? `Could not deploy "${only.title}"` : `${counts.FAILED + counts.PENDING} of ${total} documents were not deployed`,
+      title: only ? `Could not deploy "${only.title}"` : `${notSent} of ${total} documents ${notSent === 1 ? 'was' : 'were'} not deployed`,
       description: [view.error, sent > 0 && !only ? `${sent} went out.` : null].filter(Boolean).join(' ') || undefined,
     };
   }
@@ -108,7 +123,12 @@ export async function followDeployment(
       view = null;
     }
     if (!view) {
-      deps.toast.error('Could not follow this deploy', { id, description: 'Open Deploys to see how it ended.' });
+      deps.toast.error('Could not follow this deploy', {
+        id,
+        description: 'It may still be running.',
+        ...UNTIL_DISMISSED,
+        action: { label: 'Open Deploys', onClick: () => deps.navigate('/deploys') },
+      });
       options.onFinished?.(null);
       return null;
     }
@@ -118,7 +138,12 @@ export async function followDeployment(
       deps.toast.loading(heading, { id, description: PHASE_TEXT[view.status] });
     }
     if (deps.now() > deadline) {
-      deps.toast.message('Still deploying', { id, description: 'It carries on without this page. Deploys shows how it ends.' });
+      deps.toast.message('Still deploying', {
+        id,
+        description: 'It carries on without this page.',
+        ...UNTIL_DISMISSED,
+        action: { label: 'Open Deploys', onClick: () => deps.navigate('/deploys') },
+      });
       options.onFinished?.(null);
       return null;
     }
@@ -139,7 +164,7 @@ export async function followDeployment(
     deps.toast.error(title, {
       id,
       description,
-      duration: 15000,
+      ...UNTIL_DISMISSED,
       action: {
         label: 'Retry',
         onClick: () => {
@@ -182,5 +207,6 @@ export function defaultDeployFeedbackDeps(actions: {
     wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     now: () => Date.now(),
     open: (url) => window.open(url, '_blank', 'noopener,noreferrer'),
+    navigate: (path) => window.location.assign(path),
   };
 }

@@ -45,11 +45,16 @@ function view(status: DeploymentView['status'], outcomes: Outcome[], extra: Part
   };
 }
 
-type Toast = { kind: string; message: string; options?: { id?: string | number; duration?: number; description?: string; action?: { label: string; onClick: () => void } } };
+type Toast = {
+  kind: string;
+  message: string;
+  options?: { id?: string | number; duration?: number; closeButton?: boolean; description?: string; action?: { label: string; onClick: () => void } };
+};
 
 function fakeDeps(views: (DeploymentView | null)[], overrides: Partial<DeployFeedbackDeps> = {}) {
   const toasts: Toast[] = [];
   const opened: string[] = [];
+  const visited: string[] = [];
   let clock = 0;
   let reads = 0;
   const record = (kind: string) => (message: string, options?: Toast['options']) => {
@@ -65,9 +70,10 @@ function fakeDeps(views: (DeploymentView | null)[], overrides: Partial<DeployFee
     },
     now: () => clock,
     open: (url) => opened.push(url),
+    navigate: (path) => visited.push(path),
     ...overrides,
   };
-  return { deps, toasts, opened, reads: () => reads };
+  return { deps, toasts, opened, visited, reads: () => reads };
 }
 
 describe('describeOutcome', () => {
@@ -92,6 +98,7 @@ describe('describeOutcome', () => {
   it('gives the reason a deploy failed, and how much of a batch still went out', () => {
     const outcome = describeOutcome(view('FAILED', ['PUBLISHED', 'FAILED', 'PENDING'], { error: 'GitHub is down' }));
     assert.equal(outcome.title, '2 of 3 documents were not deployed');
+    assert.equal(describeOutcome(view('FAILED', ['PUBLISHED', 'FAILED'])).title, '1 of 2 documents was not deployed');
     assert.equal(outcome.description, 'GitHub is down 1 went out.');
   });
 });
@@ -145,6 +152,8 @@ describe('followDeployment', () => {
     assert.equal(failure?.message, 'Could not deploy "Day 1"');
     assert.equal(failure?.options?.description, 'GitHub is down');
     assert.equal(failure?.options?.action?.label, 'Retry');
+    assert.equal(failure?.options?.duration, Infinity, 'a failure stays until it is dismissed');
+    assert.equal(failure?.options?.closeButton, true);
 
     failure?.options?.action?.onClick();
     await new Promise((resolve) => setImmediate(resolve));
@@ -163,10 +172,14 @@ describe('followDeployment', () => {
     assert.ok(deps.now() > FOLLOW_LIMIT_MS);
   });
 
-  it('says so when the deploy can no longer be read', async () => {
-    const { deps, toasts } = fakeDeps([null]);
+  it('says so when the deploy can no longer be read, and opens Deploys from the toast', async () => {
+    const { deps, toasts, visited } = fakeDeps([null]);
     await followDeployment({ deploymentId: 'deployment-1', joined: false }, { label: 'x' }, deps);
-    assert.equal(toasts.at(-1)?.message, 'Could not follow this deploy');
+    const last = toasts.at(-1);
+    assert.equal(last?.message, 'Could not follow this deploy');
+    assert.equal(last?.options?.duration, Infinity);
+    last?.options?.action?.onClick();
+    assert.deepEqual(visited, ['/deploys']);
   });
 });
 

@@ -9,7 +9,7 @@ import { listDeploymentsAction } from '@/domain/deployment/deployment.actions';
 import type { DeploymentView } from '@/domain/deployment/deployment.types';
 import { formatRelativeTime } from '@/lib/relative-time';
 import { useEditorStoreApi } from '@/lib/stores/editor-provider';
-import { DeploymentHistory } from './deployment-history';
+import { DeployHistoryError, DeploymentHistory, documentOutcome } from './deployment-history';
 import { useDeploy, useRetryDeployment } from './use-deploy';
 
 /** How often the history is read again while one of its deploys is still running. */
@@ -63,6 +63,7 @@ export function DocumentDeployPanel({
   const currentStatus = editorStatus ?? status;
   const deployable = currentStatus === DocumentStatus.APPROVED || currentStatus === DocumentStatus.DEPLOYED;
   const [history, setHistory] = useState<DeploymentView[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   /** Tells the editor once a deploy has put this version out. */
@@ -87,8 +88,10 @@ export function DocumentDeployPanel({
       deployments = await listDeploymentsAction({ documentVersionId });
     } catch (error) {
       console.error('[DocumentDeployPanel] Could not load deploy history:', error);
-      deployments = [];
+      setLoadFailed(true);
+      return;
     }
+    setLoadFailed(false);
     for (const deployment of deployments) {
       if (isRunning(deployment)) seenRunning.current.add(deployment.id);
       else if (seenRunning.current.delete(deployment.id)) markDeployed(deployment);
@@ -101,6 +104,12 @@ export function DocumentDeployPanel({
   }, [deployable, load]);
 
   const latest = history?.[0] ?? null;
+  const latestOutcome = latest ? documentOutcome(latest, documentVersionId) : null;
+  const retryLoad = () => {
+    setLoadFailed(false);
+    setHistory(null);
+    void load();
+  };
   const running = isRunning(latest ?? undefined);
   useEffect(() => {
     if (!running) return;
@@ -127,14 +136,21 @@ export function DocumentDeployPanel({
           Deploy
         </span>
         <span className="text-xs font-medium">
-          {history === null ? (
-            <Loader2 className="size-3 animate-spin text-muted-foreground" aria-label="Loading" />
+          {loadFailed ? (
+            <span className="text-destructive">Could not load</span>
+          ) : history === null ? (
+            <span role="status" className="inline-flex">
+              <Loader2 className="size-3 animate-spin text-muted-foreground" aria-hidden />
+              <span className="sr-only">Loading deploys…</span>
+            </span>
           ) : !latest ? (
             <span className="text-muted-foreground">Not deployed yet</span>
           ) : running ? (
             <span>Deploying…</span>
-          ) : latest.status === 'FAILED' ? (
+          ) : latestOutcome === 'failed' ? (
             <span className="text-destructive">Last deploy failed</span>
+          ) : latestOutcome === 'skipped' ? (
+            <span className="text-muted-foreground">Last deploy skipped it</span>
           ) : (
             <span>Deployed {formatRelativeTime(new Date(latest.createdAt))}</span>
           )}
@@ -163,8 +179,10 @@ export function DocumentDeployPanel({
         ) : undefined
       }
     >
-      {history === null ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+      {loadFailed ? (
+        <DeployHistoryError onRetry={retryLoad} />
+      ) : history === null ? (
+        <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           Loading deploys…
         </p>
@@ -174,9 +192,9 @@ export function DocumentDeployPanel({
           documentVersionId={documentVersionId}
           canRetry={canDeploy}
           retryingId={retryingId}
-          onRetry={(id) => {
+          onRetry={(id, label) => {
             setRetryingId(id);
-            void retry(id).finally(() => setRetryingId(null));
+            void retry(id, label).finally(() => setRetryingId(null));
           }}
           emptyText={
             canDeploy

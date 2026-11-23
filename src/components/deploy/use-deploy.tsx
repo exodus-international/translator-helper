@@ -95,12 +95,12 @@ export function useRetryDeployment(
   const router = useRouter();
   const deps = useFeedbackDeps(actions);
   return useCallback(
-    (deploymentId: string) => {
+    (deploymentId: string, label = 'the documents again') => {
       capture('deploy_retried', { deploymentId });
       return retryAndFollow(
         deploymentId,
         {
-          label: 'the documents again',
+          label,
           onFinished: (view) => {
             router.refresh();
             onFinished?.(view);
@@ -274,11 +274,14 @@ function DeployDialogBody({ state, onConfirm }: { state: DialogState; onConfirm:
                   have not changed are left as they are.
                 </>
               ) : (
-                <>Nothing here publishes to GitHub. The documents are marked Deployed.</>
+                <>Nothing here publishes to GitHub. {count === 1 ? 'The document is' : 'The documents are'} marked Deployed.</>
               )}
             </>
           ) : (
-            <>GitHub is not set up for this app, so the documents are marked Deployed without publishing.</>
+            <>
+              GitHub is not set up for this app, so {count === 1 ? 'the document is' : 'the documents are'} marked Deployed
+              without publishing.
+            </>
           )}
         </AlertDialogDescription>
       </AlertDialogHeader>
@@ -304,7 +307,7 @@ function DeployDialogBody({ state, onConfirm }: { state: DialogState; onConfirm:
         <AlertDialogCancel disabled={starting}>Cancel</AlertDialogCancel>
         <Button onClick={onConfirm} disabled={starting}>
           {starting ? <Loader2 className="animate-spin" aria-hidden /> : <GitCommitHorizontal aria-hidden />}
-          {starting ? 'Starting…' : count === 1 ? verb : `${verb} ${count}`}
+          {starting ? 'Starting…' : count === 1 ? verb : `${verb} ${count} documents`}
         </Button>
       </AlertDialogFooter>
     </>
@@ -327,7 +330,7 @@ function DeployNotes({ preview }: { preview: DeployPreview }) {
     notes.push({
       key: 'audio-unchecked',
       warn: true,
-      text: `${preview.audioUnchecked} more ${plural(preview.audioUnchecked, 'was', 'were')} not checked for audio. ${plural(preview.audioUnchecked, 'If it has', 'Any that have')} no up-to-date audio ${plural(preview.audioUnchecked, 'goes', 'go')} out without an audio link.`,
+      text: `${preview.audioUnchecked}${preview.audioNotReady > 0 ? ' more' : ''} ${plural(preview.audioUnchecked, 'document was', 'documents were')} not checked for audio. ${plural(preview.audioUnchecked, 'If it has', 'Any that have')} no up-to-date audio ${plural(preview.audioUnchecked, 'goes', 'go')} out without an audio link.`,
     });
   }
   if (preview.target && preview.notPublished > 0 && preview.notPublished < preview.documents.length) {
