@@ -22,6 +22,7 @@ import { Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { reviewEditControls, type ReviewEditing } from './review-editing';
 
 interface ReviewClientProps {
   document: any;
@@ -37,6 +38,10 @@ interface ReviewClientProps {
   /** Set when this document gets audio; enables the Audio text tab. */
   audioTextVersionId?: string | null;
   initialSuggestions?: any[];
+  /** How a review edits the text in place; see `ReviewEditing`. */
+  reviewEditing?: ReviewEditing;
+  /** The model's draft this text started from, when it did. */
+  machineTranslation?: { content: string; model: string | null } | null;
 }
 
 const isApprovedOrLater = (tv: any) => tv?.status === DocumentStatus.APPROVED || tv?.status === DocumentStatus.DEPLOYED;
@@ -56,6 +61,8 @@ export default function ReviewClient({
   canChangeStatus,
   audioTextVersionId = null,
   initialSuggestions = [],
+  reviewEditing = 'scripture',
+  machineTranslation = null,
 }: ReviewClientProps) {
   useAnalyticsProjectGroup(document?.sourceProject?.id, document?.sourceProject?.name);
   useActiveLanguage(targetLanguage?.code, targetLanguage?.name);
@@ -69,7 +76,7 @@ export default function ReviewClient({
       languageCode={targetLanguage?.code}
       languageName={targetLanguage?.name}
       sourceContent={sourceVersion?.content ?? ''}
-      editable={initialTargetVersion.status === DocumentStatus.PENDING_REVIEW}
+      editable={reviewEditControls(initialTargetVersion.status, reviewEditing).canEdit}
       requestEditor={showTranslationEditor}
     >
       <DocumentEditor
@@ -90,8 +97,10 @@ export default function ReviewClient({
         canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
         disableReopen={(tv) => isApprovedOrLater(tv)}
         reviewConfig={{
-          canEdit: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW,
+          canEdit: (tv) => reviewEditControls(tv?.status, reviewEditing).canEdit,
+          showEditButton: (tv) => reviewEditControls(tv?.status, reviewEditing).showEditButton,
           renderEditActions: ({ exitEditMode }) => <ReviewEditActions exitEditMode={exitEditMode} />,
+          machineTranslation,
         }}
         onEditSuggestion={async (suggestionId, data) => {
           try {

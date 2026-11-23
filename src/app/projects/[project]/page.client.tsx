@@ -1,5 +1,6 @@
 'use client';
 
+import ProjectAutoTranslation from '@/components/project-auto-translation';
 import ProjectKanbanBoard from '@/components/project-kanban-board';
 import ProjectStatisticsTab from '@/components/project-statistics-tab';
 import ProjectTeamTab from '@/components/project-team-tab';
@@ -22,7 +23,7 @@ import type { Language } from '@/generated/prisma/client';
 import { BarChart3, CheckCircle2, LayoutDashboard, Settings, Users } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface ProjectDetailClientProps {
@@ -64,6 +65,10 @@ interface ProjectDetailClientProps {
   initialLanguageId: string;
   /** Language ids this person may deploy: all of them for an admin, their own for a manager. */
   deployableLanguageIds: string[];
+  /** Language ids whose AI translation setting this person may change: all for an admin, the managed ones otherwise. */
+  managedLanguageIds: string[];
+  /** Language ids whose team this person is on (all for an admin): they see AI translation progress. */
+  memberLanguageIds: string[];
   /** True when the URL named the language, which then outranks the stored choice. */
   languageFromUrl: boolean;
 }
@@ -75,6 +80,8 @@ export default function ProjectDetailClient({
   translationProjects,
   initialLanguageId,
   deployableLanguageIds,
+  managedLanguageIds,
+  memberLanguageIds,
   languageFromUrl,
 }: ProjectDetailClientProps) {
   const router = useRouter();
@@ -127,6 +134,10 @@ export default function ProjectDetailClient({
 
   // Find the translation project for the selected language
   const selectedTranslationProject = translationProjects.find((tp) => tp.languageId === selectedLanguage);
+
+  // New AI drafts move cards to review; the board reloads when they land.
+  const [boardVersion, setBoardVersion] = useState(0);
+  const reloadBoard = useCallback(() => setBoardVersion((version) => version + 1), []);
 
   const handleSaveSettings = async () => {
     // The slug is this project's URL, and the repository directory is where it
@@ -235,8 +246,20 @@ export default function ProjectDetailClient({
             )}
           </TabsList>
 
-          <TabsContent value="dashboard" className="mt-4">
+          <TabsContent value="dashboard" className="mt-4 space-y-4">
+            {selectedTranslationProject && selectedLang && memberLanguageIds.includes(selectedLanguage) && (
+              <ProjectAutoTranslation
+                key={selectedTranslationProject.id}
+                translationProjectId={selectedTranslationProject.id}
+                languageName={selectedLang.name}
+                languageCode={selectedLang.code}
+                projectSlug={sourceProject.slug}
+                canManage={managedLanguageIds.includes(selectedLanguage)}
+                onDraftsWritten={reloadBoard}
+              />
+            )}
             <ProjectKanbanBoard
+              reloadKey={boardVersion}
               user={user}
               languages={languages}
               deployableLanguageIds={deployableLanguageIds}

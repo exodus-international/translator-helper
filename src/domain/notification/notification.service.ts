@@ -1,6 +1,7 @@
 import prisma from '@/lib/db';
 import { isEmailConfigured, sendEmail } from '@/lib/email';
 import { buildDocumentPath } from '../document/document-url';
+import { buildProjectPath } from '../source-project/source-project-url';
 import {
   DocumentStatus,
   NotificationEmailStatus,
@@ -344,6 +345,42 @@ export async function notifyStatusChange(input: {
     }
 
     return [];
+  });
+}
+
+/**
+ * When a language's automatic translation queue has drained: one summary to
+ * the language's managers, in place of a "needs a reviewer" notice per
+ * document.
+ */
+export async function notifyAutoTranslationFinished(input: {
+  translationProjectId: string;
+  translated: number;
+  failed: number;
+}) {
+  await safely('automatic translation summary', async () => {
+    const project = await prisma.translationProject.findUnique({
+      where: { id: input.translationProjectId },
+      select: {
+        languageId: true,
+        language: { select: { name: true, code: true } },
+        sourceProject: { select: { name: true, slug: true } },
+      },
+    });
+    if (!project) return [];
+    const managers = (await languageManagers([project.languageId])).get(project.languageId) ?? [];
+    const work = `${project.sourceProject.name} (${project.language.name})`;
+    const documents = (n: number) => `${n} ${n === 1 ? 'document' : 'documents'}`;
+    const title =
+      input.translated > 0 ? `AI drafts of ${work} are ready for review` : `AI translation of ${work} could not finish`;
+    const body = [
+      input.translated > 0 ? `${documents(input.translated)} translated and waiting for a reviewer.` : '',
+      input.failed > 0 ? `${documents(input.failed)} failed; retry them from the project page.` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const url = `${buildProjectPath(project.sourceProject.slug)}?lang=${encodeURIComponent(project.language.code)}`;
+    return managers.map((userId) => ({ userId, type: NotificationType.AUTO_TRANSLATION_FINISHED, title, body, url }));
   });
 }
 

@@ -65,10 +65,43 @@ export function buildTranslationMessages({
   ];
 }
 
-export async function translateWithChatGPT(params: TranslateWithChatGPTParams): Promise<string> {
+/** The model every translation goes to, single-document and automatic alike. */
+export function translationModel(): string {
+  return process.env.CHATGPT_MODEL || 'gpt-4o-mini';
+}
+
+/**
+ * The model's API answered with an error. Carries the HTTP status and, for a
+ * 429 or 503, how long the API asked callers to wait, so a background caller
+ * can back off by exactly that much.
+ */
+export class TranslationApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly retryAfterMs: number | null,
+  ) {
+    super(message);
+    this.name = 'TranslationApiError';
+  }
+}
+
+/** `Retry-After` as milliseconds: either delay-seconds or an HTTP date. */
+export function parseRetryAfter(value: string | null, now: number = Date.now()): number | null {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? null : Math.max(0, date - now);
+}
+
+export async function translateWithChatGPT(
+  params: TranslateWithChatGPTParams,
+  options: { signal?: AbortSignal } = {},
+): Promise<string> {
   const apiKey = process.env.CHATGPT_API;
   const endpoint = process.env.CHATGPT_API_BASE_URL?.replace(/\/$/, '') || 'https://api.openai.com/v1/chat/completions';
-  const model = process.env.CHATGPT_MODEL || 'gpt-4o-mini';
+  const model = translationModel();
 
   if (!apiKey) {
     throw new Error('CHATGPT_API_KEY is not configured. Please set it in your environment.');
@@ -87,11 +120,16 @@ export async function translateWithChatGPT(params: TranslateWithChatGPTParams): 
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
+    signal: options.signal,
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`ChatGPT API request failed: ${response.status} ${response.statusText} - ${errorBody}`);
+    throw new TranslationApiError(
+      `ChatGPT API request failed: ${response.status} ${response.statusText} - ${errorBody}`,
+      response.status,
+      parseRetryAfter(response.headers.get('retry-after')),
+    );
   }
 
   const payload = (await response.json()) as {

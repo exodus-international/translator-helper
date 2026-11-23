@@ -40,6 +40,9 @@ export function getDetailText(action: string, details: Record<string, any> | nul
     case 'audio_generation_started':
     case 'audio_regeneration_requested':
       return details.voice || null;
+    case 'auto_translated':
+      // Logged under whoever turned automatic translation on; the model wrote it.
+      return details.model ? `by ${details.model}` : null;
     case 'audio_transcript_edited':
       return details.characters ? `${details.characters} characters` : null;
     case 'github_deployed':

@@ -162,8 +162,10 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = updateDocumentVersionSchema.parse(input);
 
-  // Language membership, and no edits once the text has passed review.
-  await assertCanEditDocumentVersionContent(id, user);
+  // Language membership, and no edits once the text has passed review. A
+  // direct edit: on a language with automatic translation, text in review is
+  // the reviewers' to change.
+  await assertCanEditDocumentVersionContent(id, user, { directEdit: true });
 
   const version = await updateDocumentVersion(id, validated.content, user.id);
 

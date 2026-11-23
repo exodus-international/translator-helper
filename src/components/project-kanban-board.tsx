@@ -42,8 +42,8 @@ import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { toast } from 'sonner';
 import type { Language } from '@/generated/prisma/client';
-import { DocumentStatus } from '@/generated/prisma/enums';
-import { FileCheck, FileText, UserPlus } from 'lucide-react';
+import { AutoTranslationStatus, DocumentStatus } from '@/generated/prisma/enums';
+import { FileCheck, FileText, Sparkles, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
@@ -53,6 +53,27 @@ const UNASSIGN_VALUE = '__none__';
 const TYPE_FILTER_STORAGE_KEY = 'kanban:documentTypeFilter';
 
 type MemberLike = { id: string; name: string | null; email?: string | null; image?: string | null };
+
+/** Marks a version whose text the model drafted, or that is waiting for a draft. */
+function AutoTranslationBadge({ status }: { status?: AutoTranslationStatus | null }) {
+  if (status === AutoTranslationStatus.SUCCEEDED) {
+    return (
+      <Badge variant="outline" className="text-info" title="The text was drafted by AI and needs review">
+        <Sparkles aria-hidden />
+        AI-translated
+      </Badge>
+    );
+  }
+  if (status === AutoTranslationStatus.QUEUED || status === AutoTranslationStatus.RUNNING) {
+    return (
+      <Badge variant="outline" className="text-muted-foreground" title="Waiting for an AI draft">
+        <Sparkles aria-hidden />
+        AI draft pending
+      </Badge>
+    );
+  }
+  return null;
+}
 
 function MemberAvatarStack({ users }: { users: MemberLike[] }) {
   return (
@@ -196,6 +217,8 @@ interface ProjectKanbanBoardProps {
   selectedLanguage: string;
   sourceProjectId?: string;
   translationProjectId?: string | null;
+  /** Changing it reloads the documents: AI drafts landing elsewhere on the page. */
+  reloadKey?: number;
   loaders?: ProjectKanbanBoardLoaders;
 }
 
@@ -206,6 +229,7 @@ export default function ProjectKanbanBoard({
   selectedLanguage,
   sourceProjectId,
   translationProjectId,
+  reloadKey,
   loaders = serverLoaders,
 }: ProjectKanbanBoardProps) {
   const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
@@ -236,6 +260,16 @@ export default function ProjectKanbanBoard({
   useEffect(() => {
     loadDocuments();
   }, [selectedLanguage, sourceProjectId]);
+
+  // A reload asked for by the page keeps the board on screen instead of
+  // flashing the loading state.
+  useEffect(() => {
+    if (!reloadKey) return;
+    loaders
+      .documents(selectedLanguage, sourceProjectId)
+      .then(setDocuments)
+      .catch((error) => console.error('Error reloading documents:', error));
+  }, [reloadKey]);
 
   // Restored after mount rather than in the initial state so server and client
   // render the same markup.
@@ -698,6 +732,7 @@ export default function ProjectKanbanBoard({
                               </div>
                               <div className="flex flex-wrap gap-1 items-center">
                                 <DocumentTypeBadge type={doc.type} />
+                                <AutoTranslationBadge status={version?.autoTranslation?.status} />
                                 {doc.sourceProject && (
                                   <Badge variant="secondary">
                                     {doc.sourceProject.name}

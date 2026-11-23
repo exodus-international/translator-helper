@@ -31,7 +31,10 @@ export interface VersionPermissionDeps<Version extends PermissionVersion = Permi
   getVersion: (id: string) => Promise<Version | null>;
   getLanguage: (id: string) => Promise<{ code: string } | null>;
   getDocument: (id: string) => Promise<{ sourceProject?: { id: string } | null } | null>;
-  getTranslationProject: (sourceProjectId: string, languageId: string) => Promise<{ id: string } | null>;
+  getTranslationProject: (
+    sourceProjectId: string,
+    languageId: string,
+  ) => Promise<{ id: string; autoTranslate?: boolean } | null>;
   authorize: (permission: Parameters<Authorize>[0]) => Promise<unknown>;
 }
 
@@ -85,12 +88,38 @@ export function createVersionPermissions<Version extends PermissionVersion>(deps
    * administrator: the reviewer edits during PENDING_REVIEW, and later changes
    * go back through review, so a deploy never publishes unreviewed text.
    */
-  async function assertCanEditDocumentVersionContent(versionId: string, user: SessionUser) {
+  async function assertCanEditDocumentVersionContent(
+    versionId: string,
+    user: SessionUser,
+    options: { directEdit?: boolean } = {},
+  ) {
     const result = await assertCanEditDocumentVersion(versionId, user);
-    if (!result.isSourceEnglish && user.role !== Role.ADMIN && isReviewedStatus(result.version.status)) {
+    if (result.isSourceEnglish || user.role === Role.ADMIN) return result;
+    if (isReviewedStatus(result.version.status)) {
       throw new Error('This version has been approved. Move it back to review before editing it.');
     }
+    if (options.directEdit && result.version.status === DocumentStatus.PENDING_REVIEW) {
+      await assertCanEditInReview(result.version);
+    }
     return result;
+  }
+
+  /**
+   * On a language that lets the model draft its documents, the text in review
+   * is machine output and the review screen offers direct editing, so changing
+   * it there is a reviewer's job: reviewer, editor or the language's manager.
+   * Translators only read the review there; leaving feedback in review is a
+   * reviewer's right on every language. Languages without the setting keep
+   * the translator rule above. Applying a suggestion is not a direct edit.
+   */
+  async function assertCanEditInReview(version: Version) {
+    const document = await deps.getDocument(version.documentId);
+    const sourceProjectId = document?.sourceProject?.id;
+    if (!sourceProjectId) return;
+    const translationProject = await deps.getTranslationProject(sourceProjectId, version.languageId);
+    if (translationProject?.autoTranslate) {
+      await deps.authorize({ project: translationProject.id, role: 'reviewer' });
+    }
   }
 
   /**

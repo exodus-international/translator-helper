@@ -121,6 +121,8 @@ export type AnalyticsEvent =
   | 'source_project_status_toggled'
   | 'translation_project_created'
   | 'project_settings_saved'
+  | 'auto_translation_toggled'
+  | 'auto_translation_retried'
   | 'language_member_added'
   | 'language_member_role_changed'
   | 'language_member_removed'

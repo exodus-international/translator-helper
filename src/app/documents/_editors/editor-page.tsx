@@ -5,6 +5,7 @@ import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-p
 import { isDraftPhase } from '@/lib/document-status';
 import { SessionUser } from '@/lib/session';
 import { Role } from '@/generated/prisma/enums';
+import { getMachineTranslation } from '@/domain/auto-translation/auto-translation.repository';
 import { canChangeLanguageStatus, canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { EDITOR_SIDEBAR_COOKIE_NAME, parseSidebarState } from '@/lib/sidebar-cookie';
@@ -12,6 +13,7 @@ import { SidebarStoredStateProvider } from '@/components/ui/sidebar';
 import { cookies } from 'next/headers';
 import ReviewClient from './review.client';
 import TranslateClient from './translate.client';
+import { reviewEditingFor } from './review-editing';
 
 /**
  * Renders whichever editor the version's status calls for.
@@ -71,6 +73,18 @@ export async function DocumentEditorPage({
   const storedSidebarState = parseSidebarState((await cookies()).get(EDITOR_SIDEBAR_COOKIE_NAME)?.value);
 
   if (targetVersion && !isDraftPhase(targetVersion.status)) {
+    // On a project that lets the model draft its documents, the review is where
+    // the text gets fixed: reviewers and up edit it in place, with the model's
+    // draft to compare against; a translator only reads it. The server
+    // enforces the same rule (assertCanEditDocumentVersionContent with
+    // directEdit).
+    const reviewEditing = reviewEditingFor({
+      autoTranslate: translationProject?.autoTranslate ?? false,
+      isAdmin: languageAccess.isAdmin,
+      role: languageAccess.memberships.find((membership) => membership.languageId === language.id)?.role,
+    });
+    const machine = await getMachineTranslation(targetVersion.id);
+
     return (
       <SidebarStoredStateProvider cookieName={EDITOR_SIDEBAR_COOKIE_NAME} value={storedSidebarState}>
         <ReviewClient
@@ -84,6 +98,10 @@ export async function DocumentEditorPage({
           canChangeStatus={canChangeStatus}
           audioTextVersionId={audioTextVersionId}
           initialSuggestions={initialSuggestions}
+          reviewEditing={reviewEditing}
+          machineTranslation={
+            machine?.machineContent ? { content: machine.machineContent, model: machine.model } : null
+          }
         />
       </SidebarStoredStateProvider>
     );

@@ -28,8 +28,10 @@ import {
   PanelRightOpen,
   Plus,
   Save,
+  Sparkles,
   X,
 } from 'lucide-react';
+import { DiffEditor } from '@/components/editor/diff-editor';
 import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ReaderPreview } from '@/components/reader-preview';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
@@ -59,7 +61,7 @@ export interface SourceTranslationViewerHandle {
 }
 
 /** Formatted and Review are the old pair; Audio text is offered only where audio applies. */
-type TranslationViewMode = 'formatted' | 'review' | 'audio';
+type TranslationViewMode = 'formatted' | 'review' | 'audio' | 'ai-diff';
 
 interface SourceTranslationViewerProps {
   variant: ViewerVariant;
@@ -97,6 +99,10 @@ interface SourceTranslationViewerProps {
     renderEditActions?: (ctx: { exitEditMode: () => void }) => ReactNode;
     editingDefault?: boolean;
     headerExtra?: ReactNode;
+    /** An Edit button on the pane, for projects whose reviewers edit AI drafts in place. */
+    showEditButton?: boolean;
+    /** The model's draft this text started from: an "AI-translated" marker and a diff tab. */
+    machineTranslation?: { content: string; model: string | null } | null;
   };
   // Suggestion props
   suggestions?: SuggestionWithUser[];
@@ -275,6 +281,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     );
     const isZen = layout === 'zen';
     const isYaml = contentLanguage === 'yaml';
+    const machineTranslation = variant === 'review' ? (reviewConfig?.machineTranslation ?? null) : null;
     const { open: sidebarOpen, openMobile, setOpenMobile, toggleSidebar } = useSidebar();
     const isMobile = useIsMobile();
     // Mobile shows one pane at a time; translation is the working pane, so start there.
@@ -285,7 +292,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
     const [reviewViewMode, setReviewViewMode] = useState<TranslationViewMode>('review');
 
-    // The tab strip is not rendered for a YAML document, so an Audio text pane
+    // A YAML document's tab strip has no Audio text tab, so an Audio text pane
     // there would be one with no way back out. Everything that opens the tab
     // and everything that renders it reads this, not the prop.
     const audioTabVersionId = isYaml ? null : audioTextVersionId;
@@ -449,6 +456,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const paneClassName = 'min-h-0 min-w-0 flex-1 gap-0 overflow-hidden rounded-lg border bg-editor p-0 shadow-none';
     const panelStatus = status ? getDocumentStatusConfig(status) : null;
     const bodyClassName = 'relative min-h-0 flex-1 overflow-hidden';
+    // One 44px row while everything fits. A narrow pane (a side panel open, a
+    // small window, a long tab list) wraps the actions onto a second row
+    // instead of clipping them at the pane's edge.
+    const paneHeaderClassName =
+      'flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-3 py-1';
+    const paneActionsClassName = 'ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2';
     // Mobile: only the active pane is displayed; desktop keeps both side by side.
     const paneVisibility = (visible: boolean) => (visible ? 'flex' : 'hidden md:flex');
     const sourcePaneVisible = !isMobile || mobilePane === 'source';
@@ -594,7 +607,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Tabs>
 
           <Card className={cn(paneClassName, paneVisibility(sourcePaneVisible))}>
-            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
+            <div className={paneHeaderClassName}>
               {/* The mobile switcher above already names this pane; the language
                   badge below still travels with the header. */}
               <div className="flex min-w-0 items-center gap-2">
@@ -608,7 +621,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className={paneActionsClassName}>
                 {!isSourceEditing && !isYaml && (
                   <PaneTabs
                     mounted={mounted}
@@ -731,7 +744,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Card>
 
           <Card className={cn(paneClassName, paneVisibility(translationPaneVisible))}>
-            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
+            <div className={paneHeaderClassName}>
               <div className="flex min-w-0 items-center gap-2">
                 <h2 className="hidden min-w-0 truncate text-sm font-medium md:block">Translation</h2>
                 {translationBadge}
@@ -743,7 +756,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className={paneActionsClassName}>
                 {variant === 'translate' ? (
                   isYaml ? null : (
                     <PaneTabs
@@ -756,7 +769,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       ]}
                     />
                   )
-                ) : !isReviewEditing && !isYaml ? (
+                ) : !isReviewEditing && (!isYaml || machineTranslation) ? (
+                  // A YAML document has no Live view or audio, but a drafted
+                  // one still needs the way to its changes from the AI.
                   <PaneTabs
                     mounted={mounted}
                     value={reviewViewMode}
@@ -768,7 +783,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       setReviewViewMode(next);
                     }}
                     tabs={[
-                      { value: 'formatted', label: 'Live' },
+                      ...(isYaml ? [] : [{ value: 'formatted' as const, label: 'Live' }]),
                       {
                         value: 'review',
                         label: (
@@ -782,10 +797,31 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           </>
                         ),
                       },
+                      ...(machineTranslation ? [{ value: 'ai-diff' as const, label: 'Changes from AI' }] : []),
                       ...(audioTabVersionId ? [{ value: 'audio' as const, label: 'Audio text' }] : []),
                     ]}
                   />
                 ) : null}
+                {machineTranslation && (
+                  <Badge
+                    variant="outline"
+                    className="text-info"
+                    title={
+                      machineTranslation.model
+                        ? `Drafted by ${machineTranslation.model}. Check it before approving.`
+                        : 'Drafted by AI. Check it before approving.'
+                    }
+                  >
+                    <Sparkles aria-hidden />
+                    AI-translated
+                  </Badge>
+                )}
+                {variant === 'review' && reviewConfig?.showEditButton && reviewConfig.canEdit && !isReviewEditing && (
+                  <Button variant="outline" size="sm" onClick={enterReviewEditMode} aria-label="Edit translation">
+                    <FileEdit aria-hidden />
+                    Edit
+                  </Button>
+                )}
                 {showTranslationCopy && <CopyAllButton pane="translation" text={translationContent} />}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
@@ -928,6 +964,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   onDirtyChange={(dirty) => {
                     audioDraftDirtyRef.current = dirty;
                   }}
+                />
+              ) : machineTranslation && reviewViewMode === 'ai-diff' ? (
+                <DiffEditor
+                  original={machineTranslation.content}
+                  modified={translationContent}
+                  className="rounded-none border-0"
                 />
               ) : !isYaml && reviewViewMode === 'formatted' ? (
                 <ReaderPreview content={translationPreview} />

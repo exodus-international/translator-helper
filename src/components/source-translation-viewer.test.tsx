@@ -257,9 +257,47 @@ test('a reviewer who may edit enters and leaves edit mode through the handle and
   assert.equal((await screen.findByRole('textbox', { name: 'Translation' })).hasAttribute('readonly'), true);
 });
 
+test('the review offers its Edit button only where direct editing is allowed', async () => {
+  render(<Harness variant="review" reviewConfig={{ canEdit: true, showEditButton: true }} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Edit translation' }));
+  assert.equal((await screen.findByRole('textbox', { name: 'Translation' })).hasAttribute('readonly'), false);
+  cleanup();
+
+  // A project without AI translation: the Scripture check may still edit, but there is no button.
+  render(<Harness variant="review" reviewConfig={{ canEdit: true, showEditButton: false }} />);
+  assert.equal(screen.queryByRole('button', { name: 'Edit translation' }), null);
+  cleanup();
+
+  // A translator on a project with AI translation only reads the review.
+  render(<Harness variant="review" reviewConfig={{ canEdit: false, showEditButton: false }} />);
+  assert.equal(screen.queryByRole('button', { name: 'Edit translation' }), null);
+  assert.equal(translationPane().hasAttribute('readonly'), true);
+});
+
 test('a reviewer who may not edit is left in review whatever the handle asks', async () => {
   const ref = createRef<SourceTranslationViewerHandle>();
   render(<Harness variant="review" viewerRef={ref} reviewConfig={{ canEdit: false }} />);
   ref.current?.enterTranslationEditMode();
   assert.equal(translationPane().hasAttribute('readonly'), true);
+});
+
+test('a drafted YAML document in review still offers its changes from the AI, without a Live view', async () => {
+  render(
+    <Harness
+      variant="review"
+      contentLanguage="yaml"
+      translationContent={'title: Poziv\n'}
+      reviewConfig={{ canEdit: false, machineTranslation: { content: 'title: Appel\n', model: 'gpt-test' } }}
+    />,
+  );
+
+  assert.ok(await screen.findByRole('tab', { name: 'Changes from AI' }));
+  assert.ok(screen.getByRole('tab', { name: /Review/ }));
+  assert.equal(screen.queryByRole('tab', { name: 'Live' }), null);
+});
+
+test('a YAML document nobody drafted keeps its review without tabs', () => {
+  render(<Harness variant="review" contentLanguage="yaml" translationContent={'title: Poziv\n'} />);
+  assert.equal(screen.queryByRole('tab', { name: /Review/ }), null);
 });

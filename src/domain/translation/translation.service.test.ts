@@ -233,3 +233,41 @@ test('buildTranslationMessages puts the Scripture instructions just before the s
   });
   assert.ok(user.content.endsWith('Scripture: keep {{bible:1}}.\n\nSource content:\n\nRead {{bible:1}}.'));
 });
+
+test('parseRetryAfter reads seconds and HTTP dates', async () => {
+  const { parseRetryAfter } = await import('./translation.service');
+  assert.equal(parseRetryAfter('12'), 12_000);
+  assert.equal(parseRetryAfter(null), null);
+  assert.equal(parseRetryAfter('Mon, 23 Nov 2026 10:00:30 GMT', Date.parse('2026-11-23T10:00:00Z')), 30_000);
+  assert.equal(parseRetryAfter('soon'), null);
+});
+
+test('translateWithChatGPT throws a TranslationApiError carrying the status and Retry-After', async () => {
+  const { TranslationApiError } = await import('./translation.service');
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.CHATGPT_API;
+  process.env.CHATGPT_API = 'test-key';
+  globalThis.fetch = async () =>
+    new Response('slow down', { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '7' } });
+  try {
+    await assert.rejects(
+      translateWithChatGPT({
+        documentTitle: 'Doc',
+        sourceLanguageName: 'English',
+        targetLanguageName: 'Czech',
+        targetLanguageCode: 'cs',
+        sourceContent: 'Hello',
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof TranslationApiError);
+        assert.equal(error.status, 429);
+        assert.equal(error.retryAfterMs, 7000);
+        assert.equal(error.message, 'ChatGPT API request failed: 429 Too Many Requests - slow down');
+        return true;
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.CHATGPT_API = originalKey;
+  }
+});

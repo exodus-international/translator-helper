@@ -47,6 +47,12 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     keepAudioTranscriptAction: ['authenticated'],
     resetAudioTranscriptAction: ['authenticated'],
   },
+  'auto-translation/auto-translation.actions.ts': {
+    getAutoTranslationAction: ['project:member'],
+    // Turning it on spends model calls on every document of the language.
+    setAutoTranslateAction: ['project:manager'],
+    retryAutoTranslationAction: ['project:manager'],
+  },
   'bible/bible.actions.ts': {
     resolvePassagesAction: ['authenticated'],
     validateReferencesAction: ['authenticated'],
@@ -67,7 +73,9 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     getWorkVersionsForUserAction: ['authenticated'],
     listVersionsForTranslationProjectAction: ['project:member'],
     // Then assertCanEditDocumentVersionContent: translator in the language, and
-    // no edits to APPROVED or DEPLOYED text except by an administrator.
+    // no edits to APPROVED or DEPLOYED text except by an administrator. On a
+    // language with automatic translation, reviewer or higher for text in
+    // PENDING_REVIEW.
     updateDocumentVersionAction: ['authenticated'],
     // Member of the project when there is one, administrator otherwise.
     submitForReviewAction: ['authenticated', 'project:member', 'admin'],

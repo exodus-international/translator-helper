@@ -18,6 +18,7 @@ import {
   MessageSquarePlus,
   MessageSquareText,
   Siren,
+  Sparkles,
   Undo2,
   UserCheck,
   UserMinus,
@@ -37,6 +38,7 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   [NotificationType.TRANSLATION_APPROVED]: CircleCheck,
   [NotificationType.SUGGESTION_ADDED]: MessageSquarePlus,
   [NotificationType.SUGGESTION_REPLY]: MessageSquareText,
+  [NotificationType.AUTO_TRANSLATION_FINISHED]: Sparkles,
 };
 
 /**

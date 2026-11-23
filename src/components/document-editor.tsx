@@ -47,6 +47,15 @@ function getContentWithoutFrontmatter(text: string) {
 
 type CapFn<T = boolean> = T | ((targetVersion: any) => T);
 
+interface ReviewConfig {
+  canEdit: CapFn;
+  renderEditActions: (args: { exitEditMode: () => void }) => ReactNode;
+  /** Shows an Edit button on the translation pane; otherwise only the Scripture check opens the editor. */
+  showEditButton?: CapFn;
+  /** The model's draft this text started from: marks the pane and offers a diff against it. */
+  machineTranslation?: { content: string; model: string | null } | null;
+}
+
 interface ViewerConfig {
   variant: 'review' | 'translate';
   layout?: 'default' | 'zen';
@@ -60,10 +69,7 @@ interface ViewerConfig {
   canEditSource: CapFn;
   canCreateSuggestions?: CapFn;
   disableReopen?: CapFn;
-  reviewConfig?: {
-    canEdit: CapFn;
-    renderEditActions: (args: { exitEditMode: () => void }) => ReactNode;
-  };
+  reviewConfig?: ReviewConfig;
   translationPlaceholder?: string;
   translationPreviewEmptyText?: string;
   /** Version id when this document is eligible for audio; enables the Audio text tab. */
@@ -196,7 +202,12 @@ function EditorViewer({
     canCreateSuggestions !== undefined ? evalCap(canCreateSuggestions, targetVersion) : undefined;
   const resolvedDisableReopen = disableReopen !== undefined ? evalCap(disableReopen, targetVersion) : undefined;
   const resolvedReviewConfig = reviewConfig
-    ? { canEdit: evalCap(reviewConfig.canEdit, targetVersion), renderEditActions: reviewConfig.renderEditActions }
+    ? {
+        canEdit: evalCap(reviewConfig.canEdit, targetVersion),
+        renderEditActions: reviewConfig.renderEditActions,
+        showEditButton: reviewConfig.showEditButton ? evalCap(reviewConfig.showEditButton, targetVersion) : false,
+        machineTranslation: reviewConfig.machineTranslation ?? null,
+      }
     : undefined;
 
   const handleSourceSave = async () => {
@@ -464,10 +475,7 @@ interface DocumentEditorProps {
   canEditSource: CapFn;
   canCreateSuggestions?: CapFn;
   disableReopen?: CapFn;
-  reviewConfig?: {
-    canEdit: CapFn;
-    renderEditActions: (args: { exitEditMode: () => void }) => ReactNode;
-  };
+  reviewConfig?: ReviewConfig;
 
   // Suggestion handler (review-only edit)
   onEditSuggestion?: (id: string, data: { comment: string; proposedText?: string }) => Promise<void>;
