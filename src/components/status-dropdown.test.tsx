@@ -52,7 +52,8 @@ const preview: DeployPreview = {
   alreadyRunning: 0,
 };
 
-function finished(status: 'SUCCEEDED' | 'FAILED'): DeploymentView {
+/** `keptApproved`: published, but the text was edited meanwhile, so the server kept the version Approved. */
+function finished(status: 'SUCCEEDED' | 'FAILED', keptApproved = false): DeploymentView {
   const succeeded = status === 'SUCCEEDED';
   return {
     id: 'deployment-1',
@@ -85,6 +86,7 @@ function finished(status: 'SUCCEEDED' | 'FAILED'): DeploymentView {
         languageCode: 'cs',
         href: '/documents/exodus90/ex90-day-2/cs',
         outcome: succeeded ? 'PUBLISHED' : 'FAILED',
+        versionDeployed: succeeded && !keptApproved,
         filePath: 'cs/day-2.md',
         error: null,
       },
@@ -92,7 +94,7 @@ function finished(status: 'SUCCEEDED' | 'FAILED'): DeploymentView {
   };
 }
 
-function fakeDeployActions(ends: 'SUCCEEDED' | 'FAILED' = 'SUCCEEDED') {
+function fakeDeployActions(ends: 'SUCCEEDED' | 'FAILED' = 'SUCCEEDED', keptApproved = false) {
   const deployed: string[][] = [];
   const actions: DeployActions = {
     ...DEPLOY_ACTIONS,
@@ -101,7 +103,7 @@ function fakeDeployActions(ends: 'SUCCEEDED' | 'FAILED' = 'SUCCEEDED') {
       deployed.push((input as { versionIds: string[] }).versionIds);
       return { deploymentId: 'deployment-1', joined: false };
     },
-    getDeployment: async () => finished(ends),
+    getDeployment: async () => finished(ends, keptApproved),
     retry: async () => ({ deploymentId: 'deployment-2', joined: false }),
   };
   return { actions, deployed };
@@ -183,6 +185,19 @@ test('a deploy that failed leaves the document Approved and offers Retry', async
   const failure = toastsShown().find((entry) => entry.type === 'error');
   assert.equal(failure?.title, 'Could not deploy "Day 2"');
   assert.equal(actionLabel(failure), 'Retry');
+  assert.ok(screen.getByRole('button', { name: 'Document status: Approved' }));
+  assert.deepEqual(moved, []);
+});
+
+test('a deploy that published text edited meanwhile leaves the document Approved, as the server does', async () => {
+  const moved: DocumentStatus[] = [];
+  const { actions } = fakeDeployActions('SUCCEEDED', true);
+  const user = renderControl({ status: DocumentStatus.APPROVED, deployActions: actions, onStatusChange: (s) => moved.push(s) });
+  await choose(user, 'Approved', /Deploy/);
+  await user.click(await within(await screen.findByRole('alertdialog')).findByRole('button', { name: 'Deploy' }));
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.ok(toastsShown().some((entry) => entry.type === 'success'));
   assert.ok(screen.getByRole('button', { name: 'Document status: Approved' }));
   assert.deepEqual(moved, []);
 });

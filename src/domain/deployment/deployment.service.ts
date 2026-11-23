@@ -312,7 +312,7 @@ export function toDeploymentView(record: DeploymentRecord, languageIds?: Readonl
     commitSha: record.commitSha,
     commitUrl: record.commitUrl,
     // A deploy's error can be one hidden item's own; then it is not repeated.
-    error: hidden.some((item) => item.error === record.error) ? HIDDEN_ITEM_ERROR : record.error,
+    error: record.error !== null && hidden.some((item) => item.error === record.error) ? HIDDEN_ITEM_ERROR : record.error,
     createdAt: record.createdAt.toISOString(),
     finishedAt: record.finishedAt?.toISOString() ?? null,
     retryOfId: record.retryOfId,
@@ -332,6 +332,7 @@ export function toDeploymentView(record: DeploymentRecord, languageIds?: Readonl
           documentId: document.id,
         }),
         outcome: item.outcome,
+        versionDeployed: item.documentVersion.status === DocumentStatus.DEPLOYED,
         filePath: item.filePath,
         error: item.error,
       };

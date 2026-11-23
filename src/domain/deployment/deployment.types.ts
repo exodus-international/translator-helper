@@ -29,6 +29,12 @@ export interface DeploymentItemView {
   /** The document's editor in this language. */
   href: string;
   outcome: DeploymentItemOutcome;
+  /**
+   * Whether the version is Deployed as the history was read. A published item
+   * does not say so on its own: text edited while the deploy ran keeps the
+   * version Approved.
+   */
+  versionDeployed: boolean;
   filePath: string | null;
   error: string | null;
 }

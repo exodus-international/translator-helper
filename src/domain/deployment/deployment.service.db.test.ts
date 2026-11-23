@@ -224,6 +224,8 @@ describe('what a deploy saves', () => {
     assert.equal(github.files.get(path), '# First text');
     assert.equal(await statusOf(version.id), DocumentStatus.APPROVED);
     assert.equal(github.notified.length, 0);
+    // The page reads that status from the history, not the outcome.
+    assert.equal(toDeploymentView(deployment!).items[0].versionDeployed, false);
   });
 
   it('keeps the commit and the deployed status when the activity log cannot be written', async () => {
@@ -400,6 +402,19 @@ describe('a deploy seen from one language', () => {
     assert.ok(failed.error);
     assert.notEqual(mine.error, failed.error);
     assert.equal(mine.error, 'A document in another language could not be deployed.');
+  });
+
+  it('shows no error for a deploy that succeeded in every language', async () => {
+    const czech = await makeVersion();
+    const slovak = await makeVersion({ language: 'sk' });
+    const { deployment } = await harness().deploy([czech.version.id, slovak.version.id]);
+
+    const czechLanguage = await seededLanguage('cs');
+    const mine = toDeploymentView(deployment!, new Set([czechLanguage.id]));
+
+    assert.equal(deployment?.status, DeploymentStatus.SUCCEEDED);
+    assert.equal(mine.error, null);
+    assert.equal(mine.items[0].versionDeployed, true);
   });
 });
 

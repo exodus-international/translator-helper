@@ -37,6 +37,7 @@ function view(status: DeploymentView['status'], outcomes: Outcome[], extra: Part
       languageCode: 'cs',
       href: `/documents/x/day-${index + 1}/cs`,
       outcome,
+      versionDeployed: outcome !== 'FAILED',
       filePath: null,
       error: null,
     })),

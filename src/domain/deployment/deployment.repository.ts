@@ -63,6 +63,7 @@ const deploymentSummarySelect = {
         select: {
           id: true,
           languageId: true,
+          status: true,
           document: { select: { id: true, title: true, slug: true, sourceProject: { select: { slug: true } } } },
           language: { select: { name: true, code: true } },
         },

@@ -21,6 +21,7 @@ function item(documentVersionId: string, outcome: DeploymentItemView['outcome'],
     languageCode: 'cs',
     href: `/documents/exodus90/${documentVersionId}/cs`,
     outcome,
+    versionDeployed: outcome !== 'FAILED',
     filePath: null,
     error,
   };

@@ -65,11 +65,12 @@ export function StatusDropdown({
   const router = useRouter();
   const followDeployment = useFollowDeployment(deployActions);
   // Choosing Deploy runs a deploy rather than a status move: the version
-  // becomes DEPLOYED once it is published, and the page refreshes then.
+  // becomes DEPLOYED once it is published, and the page refreshes then. The
+  // server's status decides: text edited while it ran stays Approved.
   const { requestDeploy, dialog: deployDialog } = useDeploy({
     actions: deployActions,
     onFinished: (view) => {
-      if (view?.status !== 'SUCCEEDED') return;
+      if (!view?.items.find((item) => item.documentVersionId === versionId)?.versionDeployed) return;
       setDisplayedStatus(DocumentStatus.DEPLOYED);
       onStatusChange?.(DocumentStatus.DEPLOYED);
     },

@@ -18,10 +18,12 @@ const RUNNING_REFRESH_MS = 3000;
 const isRunning = (deployment: DeploymentView | undefined) =>
   deployment?.status === 'QUEUED' || deployment?.status === 'PUBLISHING';
 
-/** Whether a deploy put this version out: it succeeded, or failed only on other documents. */
+/**
+ * Whether a deploy left this version Deployed. The server's status decides, not
+ * the item's outcome: text edited while it ran was published but stays Approved.
+ */
 function deployedHere(view: DeploymentView | null, versionId: string): boolean {
-  const item = view?.items.find((candidate) => candidate.documentVersionId === versionId);
-  return item?.outcome === 'PUBLISHED' || item?.outcome === 'UNCHANGED' || item?.outcome === 'NOT_PUBLISHED';
+  return view?.items.find((candidate) => candidate.documentVersionId === versionId)?.versionDeployed === true;
 }
 
 const noSubscription = () => () => {};
