@@ -307,6 +307,8 @@ export async function getDashboardDocuments(
           reviewer: userBrief,
           assignedBy: userBrief,
           activityLogs: { orderBy: { createdAt: 'desc' } },
+          // The card marks text the model drafted, and work still queued for it.
+          autoTranslation: { select: { status: true } },
         },
         orderBy: { updatedAt: 'desc' },
       },

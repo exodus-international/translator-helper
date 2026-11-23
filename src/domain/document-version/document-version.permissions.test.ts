@@ -17,6 +17,8 @@ interface Setup {
   translationProject?: boolean;
   /** The user's role on the version's language, or null when not on it. */
   languageRole?: ProjectRole | null;
+  /** Whether the language lets the model draft every document. */
+  autoTranslate?: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ function setup({
   versionUserId = null,
   translationProject = true,
   languageRole = null,
+  autoTranslate = false,
 }: Setup = {}) {
   const asked: unknown[] = [];
   const authorize = createAuthorize({
@@ -44,7 +47,7 @@ function setup({
         : null,
     getLanguage: async () => ({ code: languageCode }),
     getDocument: async () => ({ sourceProject: { id: 'source-1' } }),
-    getTranslationProject: async () => (translationProject ? { id: 'tp-1' } : null),
+    getTranslationProject: async () => (translationProject ? { id: 'tp-1', autoTranslate } : null),
     authorize: async (permission) => {
       asked.push(permission);
       return authorize(permission);
@@ -191,5 +194,53 @@ describe('assertCanDeleteDocumentVersion', () => {
       const adminSetup = setup({ user: admin, status });
       await adminSetup.assertCanDeleteDocumentVersion('version-1', adminSetup.user);
     }
+  });
+});
+
+describe('direct edits in review on a language with automatic translation', () => {
+  const inReview = { status: DocumentStatus.PENDING_REVIEW, autoTranslate: true };
+
+  it('lets a reviewer change the text', async () => {
+    const { assertCanEditDocumentVersionContent, asked, user } = setup({ ...inReview, languageRole: ProjectRole.REVIEWER });
+    await assertCanEditDocumentVersionContent('version-1', user, { directEdit: true });
+    assert.deepEqual(asked, [
+      { project: 'tp-1', role: 'translator' },
+      { project: 'tp-1', role: 'reviewer' },
+    ]);
+  });
+
+  it('lets an editor and the manager change the text', async () => {
+    for (const languageRole of [ProjectRole.EDITOR, ProjectRole.PROJECT_MANAGER]) {
+      const { assertCanEditDocumentVersionContent, user } = setup({ ...inReview, languageRole });
+      await assertCanEditDocumentVersionContent('version-1', user, { directEdit: true });
+    }
+  });
+
+  it('refuses a translator, who leaves suggestions instead', async () => {
+    const { assertCanEditDocumentVersionContent, user } = setup({ ...inReview, languageRole: ProjectRole.TRANSLATOR });
+    await assert.rejects(assertCanEditDocumentVersionContent('version-1', user, { directEdit: true }), /Forbidden/);
+  });
+
+  it('lets an administrator through without asking', async () => {
+    const { assertCanEditDocumentVersionContent, asked } = setup({ ...inReview, user: admin });
+    await assertCanEditDocumentVersionContent('version-1', admin, { directEdit: true });
+    assert.deepEqual(asked, [{ project: 'tp-1', role: 'translator' }]);
+  });
+
+  it('keeps the translator rule on a language without the setting', async () => {
+    const { assertCanEditDocumentVersionContent, asked, user } = setup({
+      status: DocumentStatus.PENDING_REVIEW,
+      languageRole: ProjectRole.TRANSLATOR,
+    });
+    await assertCanEditDocumentVersionContent('version-1', user, { directEdit: true });
+    assert.deepEqual(asked, [{ project: 'tp-1', role: 'translator' }]);
+  });
+
+  it('keeps the translator rule for drafts, and for paths that are not a direct edit', async () => {
+    const draft = setup({ autoTranslate: true, status: DocumentStatus.IN_PROGRESS, languageRole: ProjectRole.TRANSLATOR });
+    await draft.assertCanEditDocumentVersionContent('version-1', draft.user, { directEdit: true });
+
+    const suggestion = setup({ ...inReview, languageRole: ProjectRole.TRANSLATOR });
+    await suggestion.assertCanEditDocumentVersionContent('version-1', suggestion.user);
   });
 });

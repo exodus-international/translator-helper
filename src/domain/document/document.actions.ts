@@ -23,6 +23,7 @@ import {
 } from './document.repository';
 import { canAccessSourceProject } from '@/lib/permissions';
 import { createDocumentSchema, toggleDocumentLabelSchema, updateDocumentSchema } from './document.types';
+import { queueNewDocuments } from '../auto-translation/auto-translation.service';
 
 export async function listDocumentsAction(filters?: {
   sourceProjectId?: string;
@@ -79,6 +80,15 @@ export async function createDocumentAction(input: unknown) {
     [document.id],
     translationProjects.map((tp) => tp.languageId),
   );
+
+  // Languages that let the model draft every document get this one drafted
+  // too. The document exists either way, so a failure to queue is logged
+  // rather than thrown.
+  try {
+    await queueNewDocuments(validated.sourceProjectId, [document.id]);
+  } catch (error) {
+    console.error('[AutoTranslation] Queueing a new document failed:', error);
+  }
 
   // Log the activity
   await createActivityLog({

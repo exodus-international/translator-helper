@@ -122,6 +122,14 @@ export const NOTIFICATION_CATALOG: Record<NotificationType, NotificationTypeInfo
     description: 'Someone replies in a suggestion thread you are part of.',
     emailByDefault: false,
   },
+  [NotificationType.AUTO_TRANSLATION_FINISHED]: {
+    label: 'AI translation finished',
+    tag: 'AI translation',
+    tone: 'action',
+    status: DocumentStatus.PENDING_REVIEW,
+    description: 'Automatic AI translation of a project you manage has drafted every document it could.',
+    emailByDefault: true,
+  },
 };
 
 export const NOTIFICATION_TYPES = Object.keys(NOTIFICATION_CATALOG) as NotificationType[];
