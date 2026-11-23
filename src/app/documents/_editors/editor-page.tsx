@@ -4,7 +4,7 @@ import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
 import { isDraftPhase } from '@/lib/document-status';
 import { SessionUser } from '@/lib/session';
-import { ProjectRole, Role } from '@/generated/prisma/enums';
+import { Role } from '@/generated/prisma/enums';
 import { getMachineTranslation } from '@/domain/auto-translation/auto-translation.repository';
 import { canChangeLanguageStatus, canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
@@ -13,6 +13,7 @@ import { SidebarStoredStateProvider } from '@/components/ui/sidebar';
 import { cookies } from 'next/headers';
 import ReviewClient from './review.client';
 import TranslateClient from './translate.client';
+import { reviewEditingFor } from './review-editing';
 
 /**
  * Renders whichever editor the version's status calls for.
@@ -77,13 +78,11 @@ export async function DocumentEditorPage({
     // draft to compare against; a translator only reads it. The server
     // enforces the same rule (assertCanEditDocumentVersionContent with
     // directEdit).
-    const autoTranslate = translationProject?.autoTranslate ?? false;
-    const role = languageAccess.memberships.find((membership) => membership.languageId === language.id)?.role;
-    const editsInReview =
-      languageAccess.isAdmin ||
-      role === ProjectRole.REVIEWER ||
-      role === ProjectRole.EDITOR ||
-      role === ProjectRole.PROJECT_MANAGER;
+    const reviewEditing = reviewEditingFor({
+      autoTranslate: translationProject?.autoTranslate ?? false,
+      isAdmin: languageAccess.isAdmin,
+      role: languageAccess.memberships.find((membership) => membership.languageId === language.id)?.role,
+    });
     const machine = await getMachineTranslation(targetVersion.id);
 
     return (
@@ -99,7 +98,7 @@ export async function DocumentEditorPage({
           canChangeStatus={canChangeStatus}
           audioTextVersionId={audioTextVersionId}
           initialSuggestions={initialSuggestions}
-          reviewEditing={autoTranslate ? (editsInReview ? 'direct' : 'none') : 'scripture'}
+          reviewEditing={reviewEditing}
           machineTranslation={
             machine?.machineContent ? { content: machine.machineContent, model: machine.model } : null
           }

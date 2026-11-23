@@ -30,6 +30,7 @@ import {
   retryAutoTranslations,
   setAutoTranslate,
 } from './auto-translation.repository';
+import { queueNewDocuments } from './auto-translation.service';
 
 type Snapshot = { id: string; status: DocumentStatus; content: string; version: number };
 let snapshot: Snapshot[] = [];
@@ -108,6 +109,37 @@ describe('queueing', () => {
     assert.equal(row.autoTranslateChangedById, manager.id);
     const jobs = await prisma.autoTranslation.findMany({ where: { translationProjectId: tp.id } });
     assert.deepEqual(jobs.map((job) => [job.status, job.requestedById]), [[AutoTranslationStatus.QUEUED, manager.id]]);
+  });
+
+  it('a document added later is queued for every language that has the setting on, and only that document', async () => {
+    const fr = await project('fr');
+    const de = await project('de');
+    const admin = await seededUser(SEEDED_USERS.admin);
+    // French has the setting on with nothing queued yet; German keeps it off.
+    await setAutoTranslate(fr.id, true, admin.id);
+
+    const pending = await prisma.documentVersion.findMany({
+      where: { languageId: fr.languageId, status: DocumentStatus.PENDING_TRANSLATION, document: { sourceProjectId: fr.sourceProjectId } },
+      select: { id: true, documentId: true },
+    });
+    assert.equal(pending.length, 1);
+    const added = pending[0];
+    const other = await prisma.document.findFirstOrThrow({
+      where: { sourceProjectId: fr.sourceProjectId, id: { not: added.documentId } },
+      select: { id: true },
+    });
+
+    // A document with no French version waiting queues nothing.
+    assert.equal(await queueNewDocuments(fr.sourceProjectId, [other.id]), 0);
+    assert.equal(await queueNewDocuments(fr.sourceProjectId, [added.documentId]), 1);
+
+    const jobs = await prisma.autoTranslation.findMany({
+      select: { documentVersionId: true, translationProjectId: true, status: true, requestedById: true },
+    });
+    assert.deepEqual(jobs, [
+      { documentVersionId: added.id, translationProjectId: fr.id, status: AutoTranslationStatus.QUEUED, requestedById: null },
+    ]);
+    assert.equal(await prisma.autoTranslation.count({ where: { translationProjectId: de.id } }), 0);
   });
 
   it('the sweep queues versions an enabled project never queued, and leaves ended jobs alone', async () => {
