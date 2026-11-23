@@ -30,7 +30,7 @@ function loaders(initial: AutoTranslationState) {
     load: async () => initial,
     setEnabled: async (input) => {
       calls.setEnabled.push(input);
-      return { queued: initial.candidates };
+      return { enabled: true as const, queued: initial.candidates, cancelled: 0 };
     },
     retry: async (input) => {
       calls.retry.push(input);

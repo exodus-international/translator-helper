@@ -1,7 +1,8 @@
 /**
  * The automatic translation worker's scheduling, apart from the database and
  * the model: how many jobs run at once, how far apart they start, when the
- * queue is checked again and when stalled jobs go back to it.
+ * queue is checked again, and when stalled jobs and missed versions go back
+ * to it.
  *
  * Built with `createWorkerLoop(deps)` so a test drives it with fakes.
  */
@@ -21,6 +22,8 @@ export interface WorkerLoopDeps {
   claim: () => Promise<{ id: string } | null>;
   run: (jobId: string) => Promise<unknown>;
   requeueStalled: (leaseMs: number) => Promise<number>;
+  /** Queues what a failed or interrupted queueing missed; run with the stalled check. */
+  queueMissed?: () => Promise<number>;
   log?: (message: string, error?: unknown) => void;
   now?: () => number;
 }
@@ -64,6 +67,13 @@ export function createWorkerLoop(deps: WorkerLoopDeps, options: WorkerLoopOption
       if (count > 0) log(`Re-queued ${count} stalled job(s).`);
     } catch (error) {
       log('Re-queueing stalled jobs failed:', error);
+    }
+    if (!deps.queueMissed) return;
+    try {
+      const count = await deps.queueMissed();
+      if (count > 0) log(`Queued ${count} missed version(s).`);
+    } catch (error) {
+      log('Queueing missed versions failed:', error);
     }
   }
 

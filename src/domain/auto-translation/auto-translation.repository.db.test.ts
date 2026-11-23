@@ -19,11 +19,14 @@ import {
   closeAutoTranslation,
   completeAutoTranslation,
   countAutoTranslateCandidates,
+  enableAutoTranslate,
   enqueueAutoTranslations,
+  enqueueMissedAutoTranslations,
   getAutoTranslationProgress,
   getMachineTranslation,
   loadAutoTranslationJob,
   requeueStalledAutoTranslations,
+  retryAutoTranslationLater,
   retryAutoTranslations,
   setAutoTranslate,
 } from './auto-translation.repository';
@@ -95,6 +98,42 @@ describe('queueing', () => {
     assert.equal(jobs[0].status, AutoTranslationStatus.QUEUED);
   });
 
+  it('turns the setting on and queues its work together', async () => {
+    const tp = await project('de');
+    const manager = await seededUser(SEEDED_USERS.admin);
+    assert.equal(await enableAutoTranslate(tp, manager.id), 1);
+
+    const row = await prisma.translationProject.findUniqueOrThrow({ where: { id: tp.id } });
+    assert.equal(row.autoTranslate, true);
+    assert.equal(row.autoTranslateChangedById, manager.id);
+    const jobs = await prisma.autoTranslation.findMany({ where: { translationProjectId: tp.id } });
+    assert.deepEqual(jobs.map((job) => [job.status, job.requestedById]), [[AutoTranslationStatus.QUEUED, manager.id]]);
+  });
+
+  it('the sweep queues versions an enabled project never queued, and leaves ended jobs alone', async () => {
+    const fr = await project('fr');
+    const de = await project('de');
+    const admin = await seededUser(SEEDED_USERS.admin);
+    // French: on, but its queueing never happened, as when a server stopped.
+    await setAutoTranslate(fr.id, true, admin.id);
+    // German: on, and its one job failed; that waits for Retry, not the sweep.
+    await enableAutoTranslate(de, admin.id);
+    const claimed = (await claimNextAutoTranslation())!;
+    await closeAutoTranslation(claimed, 'FAILED', 'boom');
+
+    assert.equal(await enqueueMissedAutoTranslations(), 1);
+    assert.equal(await enqueueMissedAutoTranslations(), 0, 'a second sweep finds nothing');
+
+    const jobs = await prisma.autoTranslation.findMany({ select: { translationProjectId: true, status: true } });
+    assert.deepEqual(
+      jobs.map((job) => [job.translationProjectId === fr.id ? 'fr' : 'de', job.status]).sort(),
+      [
+        ['de', AutoTranslationStatus.FAILED],
+        ['fr', AutoTranslationStatus.QUEUED],
+      ],
+    );
+  });
+
   it('reuses an ended job row when the version is queued again', async () => {
     const { tp } = await frenchOn();
     assert.equal(await cancelAutoTranslations(tp.id), 1);
@@ -150,14 +189,13 @@ describe('the worker', () => {
     assert.deepEqual(log.details, { model: 'gpt-test' });
   });
 
-  it('discards the draft when the setting was turned off while the model worked', async () => {
+  it('discards the draft when the setting is off by the time it writes', async () => {
     const { tp } = await frenchOn();
     const claimed = (await claimNextAutoTranslation())!;
     const job = (await loadAutoTranslationJob(claimed.id))!;
 
+    // Off, as when a server stopped between the setting and the cancel.
     await setAutoTranslate(tp.id, false, (await seededUser(SEEDED_USERS.admin)).id);
-    // The running job is left alone by the cancel; it finds out when it writes.
-    assert.equal(await cancelAutoTranslations(tp.id), 0);
 
     const outcome = await completeAutoTranslation({
       job: { id: job.id, lockedAt: job.lockedAt, translationProjectId: tp.id, versionId: job.version.id },
@@ -168,6 +206,26 @@ describe('the worker', () => {
     const version = await prisma.documentVersion.findUniqueOrThrow({ where: { id: job.version.id } });
     assert.equal(version.status, DocumentStatus.PENDING_TRANSLATION);
     assert.equal(await getMachineTranslation(version.id), null);
+  });
+
+  it('turning it off and on again while the model works leaves the old claim unable to write or requeue', async () => {
+    const { tp, manager } = await frenchOn();
+    const claimed = (await claimNextAutoTranslation())!;
+    const job = (await loadAutoTranslationJob(claimed.id))!;
+
+    await setAutoTranslate(tp.id, false, manager.id);
+    assert.equal(await cancelAutoTranslations(tp.id), 1, 'the running job is cancelled too');
+    assert.equal(await enableAutoTranslate(tp, manager.id), 1, 'on again: the version is queued afresh');
+
+    const old = { id: job.id, lockedAt: job.lockedAt, translationProjectId: tp.id, versionId: job.version.id };
+    assert.equal(await completeAutoTranslation({ job: old, content: 'Ancien', model: 'gpt-test' }), 'lost');
+    assert.equal(await retryAutoTranslationLater(old, new Date(), 'late'), false);
+
+    const version = await prisma.documentVersion.findUniqueOrThrow({ where: { id: job.version.id } });
+    assert.equal(version.status, DocumentStatus.PENDING_TRANSLATION);
+    const row = await prisma.autoTranslation.findUniqueOrThrow({ where: { id: job.id } });
+    assert.equal(row.status, AutoTranslationStatus.QUEUED);
+    assert.equal(row.attempts, 0);
   });
 
   it('leaves a version someone started while the model worked', async () => {
@@ -241,7 +299,7 @@ describe('failures, retry and the summary', () => {
     assert.equal(row.attempts, 0);
   });
 
-  it('turning the setting off cancels queued and failed work', async () => {
+  it('turning the setting off cancels queued, running and failed work', async () => {
     const { tp } = await frenchOn();
     const de = await project('de');
     await setAutoTranslate(de.id, true, (await seededUser(SEEDED_USERS.admin)).id);
@@ -249,6 +307,7 @@ describe('failures, retry and the summary', () => {
 
     const claimed = (await claimNextAutoTranslation())!;
     await closeAutoTranslation(claimed, 'FAILED', 'boom');
+    assert.ok(await claimNextAutoTranslation(), 'the other job is running');
 
     assert.equal(await cancelAutoTranslations(tp.id) + (await cancelAutoTranslations(de.id)), 2);
     const statuses = (await prisma.autoTranslation.findMany()).map((job) => job.status);

@@ -6,6 +6,7 @@ import {
   claimNextAutoTranslation,
   closeAutoTranslation,
   completeAutoTranslation,
+  enqueueMissedAutoTranslations,
   loadAutoTranslationJob,
   requeueStalledAutoTranslations,
   retryAutoTranslationLater,
@@ -16,7 +17,8 @@ import { createRunAutoTranslation } from './auto-translation.runner';
  * The automatic translation worker: one per server process, started from
  * `instrumentation.ts` when the server starts. Jobs live in the database, so
  * a restart loses nothing; jobs a stopped server left RUNNING are re-queued
- * once their lease runs out.
+ * once their lease runs out, and versions of an enabled project that never
+ * got a job are queued on start and with every stalled check.
  *
  * Kept on `globalThis` because dev reloads modules on every change and server
  * actions may load their own copy of this module; either way there is one
@@ -72,7 +74,12 @@ export function startAutoTranslationWorker(): Worker {
   });
 
   worker = createWorkerLoop(
-    { claim: claimNextAutoTranslation, run, requeueStalled: requeueStalledAutoTranslations },
+    {
+      claim: claimNextAutoTranslation,
+      run,
+      requeueStalled: requeueStalledAutoTranslations,
+      queueMissed: enqueueMissedAutoTranslations,
+    },
     options,
   );
   registry[KEY] = worker;

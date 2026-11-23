@@ -52,7 +52,11 @@ export async function listAutoTranslateProjects(sourceProjectId: string) {
  * Versions of the project's language that nobody has started and that have no
  * open job: what turning the setting on would queue now.
  */
-function candidateWhere(project: { languageId: string; sourceProjectId: string }, documentIds?: string[]) {
+function candidateWhere(
+  project: { languageId: string; sourceProjectId: string },
+  documentIds?: string[],
+  neverQueued = false,
+) {
   return {
     languageId: project.languageId,
     status: DocumentStatus.PENDING_TRANSLATION,
@@ -60,12 +64,58 @@ function candidateWhere(project: { languageId: string; sourceProjectId: string }
       sourceProjectId: project.sourceProjectId,
       ...(documentIds ? { id: { in: documentIds } } : {}),
     },
-    OR: [{ autoTranslation: null }, { autoTranslation: { status: { notIn: OPEN_STATUSES } } }],
+    OR: neverQueued
+      ? [{ autoTranslation: null }]
+      : [{ autoTranslation: null }, { autoTranslation: { status: { notIn: OPEN_STATUSES } } }],
   };
 }
 
 export async function countAutoTranslateCandidates(project: { languageId: string; sourceProjectId: string }) {
   return prisma.documentVersion.count({ where: candidateWhere(project) });
+}
+
+type Db = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+interface EnqueueInput {
+  project: { id: string; languageId: string; sourceProjectId: string };
+  requestedById: string | null;
+  documentIds?: string[];
+  /** Only versions that never had a job: what a missed queueing left behind. */
+  neverQueued?: boolean;
+}
+
+async function enqueueWith(db: Db, input: EnqueueInput): Promise<number> {
+  const versions = await db.documentVersion.findMany({
+    where: candidateWhere(input.project, input.documentIds, input.neverQueued),
+    select: { id: true },
+  });
+  if (versions.length === 0) return 0;
+  const ids = versions.map((version) => version.id);
+
+  await db.autoTranslation.createMany({
+    data: ids.map((documentVersionId) => ({
+      documentVersionId,
+      translationProjectId: input.project.id,
+      requestedById: input.requestedById,
+    })),
+    skipDuplicates: true,
+  });
+  await db.autoTranslation.updateMany({
+    where: { documentVersionId: { in: ids }, status: { notIn: OPEN_STATUSES } },
+    data: {
+      status: AutoTranslationStatus.QUEUED,
+      translationProjectId: input.project.id,
+      requestedById: input.requestedById,
+      attempts: 0,
+      nextAttemptAt: new Date(),
+      lockedAt: null,
+      error: null,
+      machineContent: null,
+      model: null,
+      finishedAt: null,
+    },
+  });
+  return ids.length;
 }
 
 /**
@@ -74,60 +124,62 @@ export async function countAutoTranslateCandidates(project: { languageId: string
  * (cancelled, failed, skipped, or drafted before it was moved back) gets the
  * same row reset, so there is never more than one job per version.
  */
-export async function enqueueAutoTranslations(input: {
-  project: { id: string; languageId: string; sourceProjectId: string };
-  requestedById: string | null;
-  documentIds?: string[];
-}): Promise<number> {
-  const versions = await prisma.documentVersion.findMany({
-    where: candidateWhere(input.project, input.documentIds),
-    select: { id: true },
-  });
-  if (versions.length === 0) return 0;
-  const ids = versions.map((version) => version.id);
-
-  await prisma.$transaction([
-    prisma.autoTranslation.createMany({
-      data: ids.map((documentVersionId) => ({
-        documentVersionId,
-        translationProjectId: input.project.id,
-        requestedById: input.requestedById,
-      })),
-      skipDuplicates: true,
-    }),
-    prisma.autoTranslation.updateMany({
-      where: { documentVersionId: { in: ids }, status: { notIn: OPEN_STATUSES } },
-      data: {
-        status: AutoTranslationStatus.QUEUED,
-        translationProjectId: input.project.id,
-        requestedById: input.requestedById,
-        attempts: 0,
-        nextAttemptAt: new Date(),
-        lockedAt: null,
-        error: null,
-        machineContent: null,
-        model: null,
-        finishedAt: null,
-      },
-    }),
-  ]);
-  return ids.length;
+export async function enqueueAutoTranslations(input: EnqueueInput): Promise<number> {
+  return prisma.$transaction((tx) => enqueueWith(tx, input));
 }
 
 /**
- * Turning the setting off: queued work and failures waiting for a retry are
- * cancelled. A job already running is left to finish; it finds the setting
- * off when it comes to write, and discards its result.
+ * Turning the setting on and queueing its work, in one transaction: a server
+ * that stops in between leaves neither, so the setting is never on with its
+ * documents unqueued.
+ */
+export async function enableAutoTranslate(
+  project: { id: string; languageId: string; sourceProjectId: string },
+  userId: string,
+): Promise<number> {
+  return prisma.$transaction(async (tx) => {
+    await tx.translationProject.update({
+      where: { id: project.id },
+      data: { autoTranslate: true, autoTranslateChangedAt: new Date(), autoTranslateChangedById: userId },
+    });
+    return enqueueWith(tx, { project, requestedById: userId });
+  });
+}
+
+/**
+ * The worker's safety net: versions of an enabled project that nobody has
+ * started and that never had a job, as when queueing a new document failed.
+ * Versions whose job ended (failed, cancelled, skipped) are left alone; those
+ * wait for Retry or for the setting to be turned on again.
+ */
+export async function enqueueMissedAutoTranslations(): Promise<number> {
+  const projects = await prisma.translationProject.findMany({
+    where: { autoTranslate: true },
+    select: { id: true, languageId: true, sourceProjectId: true },
+  });
+  let queued = 0;
+  for (const project of projects) {
+    queued += await enqueueAutoTranslations({ project, requestedById: null, neverQueued: true });
+  }
+  return queued;
+}
+
+/**
+ * Turning the setting off: queued work, failures waiting for a retry and jobs
+ * already running are cancelled. A running job loses its claim, so when its
+ * model call returns it can neither write the draft nor go back to the queue,
+ * even if the setting has been turned on again by then.
  */
 export async function cancelAutoTranslations(translationProjectId: string): Promise<number> {
   const { count } = await prisma.autoTranslation.updateMany({
     where: {
       translationProjectId,
-      status: { in: [AutoTranslationStatus.QUEUED, AutoTranslationStatus.FAILED] },
+      status: { in: [AutoTranslationStatus.QUEUED, AutoTranslationStatus.RUNNING, AutoTranslationStatus.FAILED] },
     },
     data: {
       status: AutoTranslationStatus.CANCELLED,
       error: 'Automatic translation was turned off.',
+      lockedAt: null,
       finishedAt: new Date(),
     },
   });

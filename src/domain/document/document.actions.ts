@@ -83,7 +83,7 @@ export async function createDocumentAction(input: unknown) {
 
   // Languages that let the model draft every document get this one drafted
   // too. The document exists either way, so a failure to queue is logged
-  // rather than thrown.
+  // rather than thrown; the worker's sweep queues it later.
   try {
     await queueNewDocuments(validated.sourceProjectId, [document.id]);
   } catch (error) {

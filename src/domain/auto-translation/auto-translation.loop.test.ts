@@ -64,6 +64,29 @@ describe('worker loop', () => {
     assert.deepEqual(leases, [60_000]);
   });
 
+  it('queues missed versions when it starts, and a failing sweep does not stop it', async () => {
+    let sweeps = 0;
+    const logged: string[] = [];
+    const loop = createWorkerLoop(
+      {
+        claim: async () => null,
+        run: async () => {},
+        requeueStalled: async () => 0,
+        queueMissed: async () => {
+          sweeps += 1;
+          throw new Error('database down');
+        },
+        log: (message) => logged.push(message),
+      },
+      { concurrency: 1, minIntervalMs: 0, pollMs: 10, leaseMs: 60_000 },
+    );
+    void loop.start();
+    await tick();
+    await loop.stop();
+    assert.equal(sweeps, 1);
+    assert.deepEqual(logged, ['Queueing missed versions failed:']);
+  });
+
   it('spaces the starts of consecutive jobs', async () => {
     const queue = ['a', 'b', 'c'];
     const startedAt: number[] = [];
