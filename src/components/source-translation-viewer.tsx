@@ -809,8 +809,8 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   </Badge>
                 )}
                 {variant === 'review' && reviewConfig?.showEditButton && reviewConfig.canEdit && !isReviewEditing && (
-                  <Button variant="outline" size="sm" onClick={enterReviewEditMode}>
-                    <FileEdit />
+                  <Button variant="outline" size="sm" onClick={enterReviewEditMode} aria-label="Edit translation">
+                    <FileEdit aria-hidden />
                     Edit
                   </Button>
                 )}

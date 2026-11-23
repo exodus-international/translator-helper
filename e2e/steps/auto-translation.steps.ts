@@ -45,7 +45,7 @@ Then('the translation should be marked as AI-translated', async ({ page }) => {
 });
 
 When('I edit the translation in review to read {string}', async ({ page }, text: string) => {
-  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit translation' }).click();
   await waitForTranslationPane(page);
   await replaceTranslation(page, text);
   await page.getByRole('button', { name: 'Save Changes' }).click();
