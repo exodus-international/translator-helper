@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { GitCommitHorizontal, Loader2 } from 'lucide-react';
 import { SidebarSection } from '@/components/sidebar-section';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,32 @@ import { DocumentStatus } from '@/generated/prisma/enums';
 import { listDeploymentsAction } from '@/domain/deployment/deployment.actions';
 import type { DeploymentView } from '@/domain/deployment/deployment.types';
 import { formatRelativeTime } from '@/lib/relative-time';
+import { useEditorStoreApi } from '@/lib/stores/editor-provider';
 import { DeploymentHistory } from './deployment-history';
 import { useDeploy, useRetryDeployment } from './use-deploy';
+
+/** How often the history is read again while one of its deploys is still running. */
+const RUNNING_REFRESH_MS = 3000;
+
+const isRunning = (deployment: DeploymentView | undefined) =>
+  deployment?.status === 'QUEUED' || deployment?.status === 'PUBLISHING';
+
+/** Whether a deploy put this version out: it succeeded, or failed only on other documents. */
+function deployedHere(view: DeploymentView | null, versionId: string): boolean {
+  const item = view?.items.find((candidate) => candidate.documentVersionId === versionId);
+  return item?.outcome === 'PUBLISHED' || item?.outcome === 'UNCHANGED' || item?.outcome === 'NOT_PUBLISHED';
+}
+
+const noSubscription = () => () => {};
 
 /**
  * Deploying one document from its editor: Deploy once it is approved,
  * Redeploy once it is out, and every deploy it was part of below.
+ *
+ * Inside the editor the status comes from the editor's store, so the panel
+ * follows an approval made on the page, and a deploy that finishes, from here,
+ * from a retry or on approval, moves the editor's status to Deployed. While a
+ * deploy is running the history is read again until it ends.
  *
  * `compact` is the one-line row in the sidebar summary; the full section sits
  * with the audio and the activity log.
@@ -29,31 +49,73 @@ export function DocumentDeployPanel({
   canDeploy: boolean;
   compact?: boolean;
 }) {
-  const deployable = status === DocumentStatus.APPROVED || status === DocumentStatus.DEPLOYED;
+  const editor = useEditorStoreApi();
+  const editorStatus = useSyncExternalStore(
+    editor?.subscribe ?? noSubscription,
+    () => {
+      const version = editor?.getState().targetVersion;
+      return version?.id === documentVersionId ? (version.status as DocumentStatus) : undefined;
+    },
+    () => undefined,
+  );
+  const currentStatus = editorStatus ?? status;
+  const deployable = currentStatus === DocumentStatus.APPROVED || currentStatus === DocumentStatus.DEPLOYED;
   const [history, setHistory] = useState<DeploymentView[] | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
+  /** Tells the editor once a deploy has put this version out. */
+  const markDeployed = useCallback(
+    (view: DeploymentView | null) => {
+      if (!editor || !deployedHere(view, documentVersionId)) return;
+      const version = editor.getState().targetVersion;
+      if (version?.id === documentVersionId && version.status === DocumentStatus.APPROVED) {
+        editor.getState().handleStatusChange(DocumentStatus.DEPLOYED);
+      }
+    },
+    [editor, documentVersionId],
+  );
+
+  // Deploys seen running, so the one that ends while the page is open moves the
+  // status; an old deploy in the history never does (the version may have been
+  // taken back to Approved since).
+  const seenRunning = useRef(new Set<string>());
   const load = useCallback(async () => {
+    let deployments: DeploymentView[];
     try {
-      setHistory(await listDeploymentsAction({ documentVersionId }));
+      deployments = await listDeploymentsAction({ documentVersionId });
     } catch (error) {
       console.error('[DocumentDeployPanel] Could not load deploy history:', error);
-      setHistory([]);
+      deployments = [];
     }
-  }, [documentVersionId]);
+    for (const deployment of deployments) {
+      if (isRunning(deployment)) seenRunning.current.add(deployment.id);
+      else if (seenRunning.current.delete(deployment.id)) markDeployed(deployment);
+    }
+    setHistory(deployments);
+  }, [documentVersionId, markDeployed]);
 
   useEffect(() => {
     if (deployable) void load();
   }, [deployable, load]);
 
-  const { requestDeploy, dialog } = useDeploy({ onFinished: () => void load() });
-  const retry = useRetryDeployment(() => void load());
+  const latest = history?.[0] ?? null;
+  const running = isRunning(latest ?? undefined);
+  useEffect(() => {
+    if (!running) return;
+    const timer = setTimeout(() => void load(), RUNNING_REFRESH_MS);
+    return () => clearTimeout(timer);
+  }, [running, history, load]);
+
+  const onFinished = (view: DeploymentView | null) => {
+    markDeployed(view);
+    void load();
+  };
+  const { requestDeploy, dialog } = useDeploy({ onFinished });
+  const retry = useRetryDeployment(onFinished);
 
   if (!deployable) return null;
 
-  const latest = history?.[0] ?? null;
-  const running = latest?.status === 'QUEUED' || latest?.status === 'PUBLISHING';
-  const redeploy = status === DocumentStatus.DEPLOYED;
+  const redeploy = currentStatus === DocumentStatus.DEPLOYED;
 
   if (compact) {
     return (
@@ -107,7 +169,7 @@ export function DocumentDeployPanel({
       ) : (
         <DeploymentHistory
           deployments={history}
-          documentScope
+          documentVersionId={documentVersionId}
           canRetry={canDeploy}
           retryingId={retryingId}
           onRetry={(id) => {

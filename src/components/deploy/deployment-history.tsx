@@ -32,7 +32,7 @@ const TRIGGER_LABEL: Record<DeploymentView['trigger'], string | null> = {
   AUTO: 'On approval',
 };
 
-export const OUTCOME_LABEL: Record<DeploymentItemView['outcome'], string> = {
+const OUTCOME_LABEL: Record<DeploymentItemView['outcome'], string> = {
   PENDING: 'Not sent',
   PUBLISHED: 'Published',
   UNCHANGED: 'Up to date',
@@ -51,7 +51,7 @@ const OUTCOME_CLASS: Record<DeploymentItemView['outcome'], string> = {
 };
 
 /** "2 published, 1 up to date": the outcomes a batch had, largest first. */
-export function summarizeOutcomes(view: DeploymentView): string {
+function summarizeOutcomes(view: DeploymentView): string {
   return (Object.entries(view.counts) as [DeploymentItemView['outcome'], number][])
     .filter(([, count]) => count > 0)
     .sort(([, a], [, b]) => b - a)
@@ -64,7 +64,7 @@ export function DeploymentHistory({
   canRetry,
   onRetry,
   retryingId,
-  documentScope = false,
+  documentVersionId,
   emptyText = 'Nothing has been deployed yet.',
   className,
 }: {
@@ -73,8 +73,8 @@ export function DeploymentHistory({
   canRetry: boolean;
   onRetry: (deploymentId: string) => void;
   retryingId?: string | null;
-  /** On one document's page the rows describe that document, so the document list is left out. */
-  documentScope?: boolean;
+  /** On one document's page: its version. Each row then tells that document's own outcome, without the document list. */
+  documentVersionId?: string;
   emptyText?: string;
   className?: string;
 }) {
@@ -91,7 +91,7 @@ export function DeploymentHistory({
         <DeploymentRow
           key={deployment.id}
           deployment={deployment}
-          documentScope={documentScope}
+          documentVersionId={documentVersionId}
           retry={
             canRetry && deployment.status === 'FAILED' && !retried.has(deployment.id)
               ? { onRetry, busy: retryingId === deployment.id }
@@ -105,20 +105,30 @@ export function DeploymentHistory({
 
 function DeploymentRow({
   deployment,
-  documentScope,
+  documentVersionId,
   retry,
 }: {
   deployment: DeploymentView;
-  documentScope: boolean;
+  documentVersionId?: string;
   retry: { onRetry: (id: string) => void; busy: boolean } | null;
 }) {
-  const badge = STATUS_BADGE[deployment.status];
   const trigger = TRIGGER_LABEL[deployment.trigger];
   const running = deployment.status === 'QUEUED' || deployment.status === 'PUBLISHING';
   const createdAt = new Date(deployment.createdAt);
   const who = deployment.requestedBy?.name ?? 'A former member';
-  const only = documentScope ? deployment.items[0] : null;
+  const documentScope = documentVersionId !== undefined;
+  // In a batch the document's own item, not the batch's first one.
+  const only = documentScope ? (deployment.items.find((item) => item.documentVersionId === documentVersionId) ?? null) : null;
   const what = only ? OUTCOME_LABEL[only.outcome] : summarizeOutcomes(deployment);
+  // On a document's page the row is about that document: a batch that failed
+  // on another document went fine for this one, and offers it no retry.
+  const failedHere =
+    only !== null && (only.outcome === 'FAILED' || (only.outcome === 'PENDING' && deployment.status === 'FAILED'));
+  const status = documentScope && only && !running ? (failedHere ? 'FAILED' : 'SUCCEEDED') : deployment.status;
+  const badge = STATUS_BADGE[status];
+  const error = documentScope ? (failedHere ? (only.error ?? deployment.error) : null) : deployment.error;
+  const canRetryHere = retry && (!documentScope || failedHere) ? retry : null;
+  const note = only?.error && only.outcome !== 'FAILED' && only.outcome !== 'PUBLISHED' ? only.error : null;
   const scope = [deployment.sourceProject?.name, deployment.language?.name].filter(Boolean).join(' · ');
 
   return (
@@ -146,28 +156,28 @@ function DeploymentRow({
         {what && <span className="text-muted-foreground"> · {what}</span>}
       </p>
 
-      {(deployment.commitSha || deployment.error || (only?.error && only.outcome !== 'PUBLISHED')) && (
+      {(deployment.commitSha || error || note) && (
         <div className="space-y-1 text-xs">
           {deployment.commitSha && (
             <CommitLink sha={deployment.commitSha} url={deployment.commitUrl} branch={deployment.branch} />
           )}
-          {deployment.error && <p className="text-destructive text-pretty">{deployment.error}</p>}
-          {!deployment.error && only?.error && <p className="text-muted-foreground text-pretty">{only.error}</p>}
+          {error && <p className="text-destructive text-pretty">{error}</p>}
+          {note && <p className="text-muted-foreground text-pretty">{note}</p>}
         </div>
       )}
 
       {!documentScope && deployment.items.length > 0 && <DeploymentItems items={deployment.items} />}
 
-      {retry && (
+      {canRetryHere && (
         <Button
           variant="outline"
           size="sm"
-          onClick={() => retry.onRetry(deployment.id)}
-          disabled={retry.busy}
+          onClick={() => canRetryHere.onRetry(deployment.id)}
+          disabled={canRetryHere.busy}
           aria-label={`Retry the deploy from ${formatRelativeTime(createdAt)}`}
         >
-          {retry.busy ? <Loader2 className="animate-spin" aria-hidden /> : <RotateCcw aria-hidden />}
-          {retry.busy ? 'Retrying…' : 'Retry'}
+          {canRetryHere.busy ? <Loader2 className="animate-spin" aria-hidden /> : <RotateCcw aria-hidden />}
+          {canRetryHere.busy ? 'Retrying…' : 'Retry'}
         </Button>
       )}
     </li>
