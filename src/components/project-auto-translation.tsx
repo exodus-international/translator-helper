@@ -29,8 +29,8 @@ import { buildDocumentPath } from '@/domain/document/document-url';
 import { isRefusal } from '@/lib/action-refusal';
 import { capture } from '@/lib/analytics';
 
-/** How often the card asks for progress while documents are being drafted. */
-const POLL_MS = 3000;
+/** How often the card asks for progress: while drafting, and while on with nothing queued. */
+const POLL_MS = { busy: 3000, idle: 15_000 };
 
 export interface ProjectAutoTranslationLoaders {
   load: typeof getAutoTranslationAction;
@@ -54,6 +54,7 @@ interface ProjectAutoTranslationProps {
   /** Called when more drafts have landed, so the board below can reload. */
   onDraftsWritten?: () => void;
   loaders?: ProjectAutoTranslationLoaders;
+  pollMs?: { busy: number; idle: number };
 }
 
 function documents(count: number) {
@@ -73,6 +74,7 @@ export default function ProjectAutoTranslation({
   canManage,
   onDraftsWritten,
   loaders = serverLoaders,
+  pollMs = POLL_MS,
 }: ProjectAutoTranslationProps) {
   const [state, setState] = useState<AutoTranslationState | null>(null);
   const [confirming, setConfirming] = useState<'on' | 'off' | null>(null);
@@ -99,12 +101,16 @@ export default function ProjectAutoTranslation({
   }, [refresh]);
 
   const open = state ? state.progress.queued + state.progress.running : 0;
+  const watching = state?.enabled ?? false;
 
+  // Quick while drafts are being written; slower while the setting is on and
+  // the queue is empty, so a document added later shows up without a reload.
   useEffect(() => {
-    if (open === 0) return;
-    const timer = setInterval(() => void refresh(), POLL_MS);
+    const every = open > 0 ? pollMs.busy : watching ? pollMs.idle : null;
+    if (every === null) return;
+    const timer = setInterval(() => void refresh(), every);
     return () => clearInterval(timer);
-  }, [open, refresh]);
+  }, [open, watching, refresh, pollMs.busy, pollMs.idle]);
 
   if (!state) return null;
 

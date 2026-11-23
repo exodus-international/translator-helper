@@ -40,7 +40,12 @@ function loaders(initial: AutoTranslationState) {
   return { fakes, calls };
 }
 
-function renderCard(initial: AutoTranslationState, canManage: boolean) {
+function renderCard(
+  initial: AutoTranslationState,
+  canManage: boolean,
+  overrides: Partial<ProjectAutoTranslationLoaders> = {},
+  onDraftsWritten?: () => void,
+) {
   const { fakes, calls } = loaders(initial);
   const view = render(
     <ProjectAutoTranslation
@@ -49,7 +54,9 @@ function renderCard(initial: AutoTranslationState, canManage: boolean) {
       languageCode="fr"
       projectSlug="exodus90"
       canManage={canManage}
-      loaders={fakes}
+      loaders={{ ...fakes, ...overrides }}
+      onDraftsWritten={onDraftsWritten}
+      pollMs={{ busy: 10, idle: 20 }}
     />,
   );
   return { ...view, calls };
@@ -124,4 +131,21 @@ test('a team member sees the progress and failures but cannot retry', async () =
   assert.ok(screen.getByText('On'));
   assert.equal(screen.queryByRole('switch'), null);
   assert.equal(screen.queryByRole('button', { name: /Retry/ }), null);
+});
+
+test('while it is on with nothing queued, the card still picks up a document added later', async () => {
+  const idle = state({
+    enabled: true,
+    progress: { queued: 0, running: 0, succeeded: 1, failed: 0, failures: [] },
+  });
+  let current = idle;
+  let reloads = 0;
+  renderCard(idle, true, { load: async () => current }, () => (reloads += 1));
+
+  assert.ok(await screen.findByText('1 of 1 translated'));
+  // A document added after the queue drained, then drafted by the worker.
+  current = state({ enabled: true, progress: { queued: 0, running: 0, succeeded: 2, failed: 0, failures: [] } });
+
+  assert.ok(await screen.findByText('2 of 2 translated'));
+  assert.equal(reloads, 1, 'the board reloads for the new draft');
 });
