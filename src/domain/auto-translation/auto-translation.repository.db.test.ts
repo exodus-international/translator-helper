@@ -9,7 +9,7 @@
  */
 import { after, afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { AutoTranslationStatus, DocumentStatus } from '@/generated/prisma/enums';
+import { AutoTranslationFailure, AutoTranslationStatus, DocumentStatus } from '@/generated/prisma/enums';
 import prisma from '@/lib/db';
 import { SEEDED_USERS, seededTranslationProject, seededUser } from '../../../tests/seeded';
 import {
@@ -311,13 +311,21 @@ describe('failures, retry and the summary', () => {
     const claimed = (await claimNextAutoTranslation())!;
     assert.equal(await claimDrainSummary(tp.id), null, 'no summary while a job is open');
 
-    assert.equal(await closeAutoTranslation(claimed, 'FAILED', 'ChatGPT API request failed: 500'), true);
+    assert.equal(
+      await closeAutoTranslation(claimed, 'FAILED', 'ChatGPT API request failed: 500', AutoTranslationFailure.UNAVAILABLE),
+      true,
+    );
     let progress = await getAutoTranslationProgress(tp.id);
     assert.deepEqual(
       { queued: progress.queued, running: progress.running, succeeded: progress.succeeded, failed: progress.failed },
       { queued: 0, running: 0, succeeded: 0, failed: 1 },
     );
-    assert.equal(progress.failures[0].error, 'ChatGPT API request failed: 500');
+    // The page gets the plain reason; the raw error stays on the row.
+    assert.equal(progress.failures[0].message, 'The AI service was unavailable. Retry in a few minutes.');
+    assert.equal('error' in progress.failures[0], false);
+    const failedRow = await prisma.autoTranslation.findUniqueOrThrow({ where: { id: claimed.id } });
+    assert.equal(failedRow.error, 'ChatGPT API request failed: 500');
+    assert.equal(failedRow.failureReason, AutoTranslationFailure.UNAVAILABLE);
     assert.ok(progress.failures[0].document.title);
 
     assert.deepEqual(await claimDrainSummary(tp.id), { translated: 0, failed: 1 });
@@ -329,6 +337,7 @@ describe('failures, retry and the summary', () => {
     assert.equal(progress.failed, 0);
     const row = await prisma.autoTranslation.findUniqueOrThrow({ where: { id: claimed.id } });
     assert.equal(row.attempts, 0);
+    assert.equal(row.failureReason, null, 'a retry starts with no reason');
   });
 
   it('turning the setting off cancels queued, running and failed work', async () => {

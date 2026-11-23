@@ -1,4 +1,5 @@
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { AutoTranslationFailure, DocumentStatus } from '@/generated/prisma/enums';
+import { failureReasonOf } from './auto-translation.failure';
 
 /**
  * One run of one automatic translation job: what the worker does with a job
@@ -61,8 +62,17 @@ export interface RunAutoTranslationDeps {
     job: { id: string; lockedAt: Date | null },
     status: 'FAILED' | 'CANCELLED' | 'SKIPPED',
     error: string,
+    reason?: AutoTranslationFailure | null,
   ) => Promise<boolean>;
-  retryLater: (job: { id: string; lockedAt: Date | null }, at: Date, error: string, refundAttempt?: boolean) => Promise<boolean>;
+  retryLater: (
+    job: { id: string; lockedAt: Date | null },
+    at: Date,
+    error: string,
+    refundAttempt?: boolean,
+    reason?: AutoTranslationFailure | null,
+  ) => Promise<boolean>;
+  /** The raw error of a failed model call, for the server log and Sentry; the page shows only the reason. */
+  report?: (error: unknown, context: { jobId: string; attempts: number; reason: AutoTranslationFailure; final: boolean }) => void;
   /** After a job ends for good: tells the managers when it was the project's last open one. */
   afterFinish: (translationProjectId: string) => Promise<void>;
   /** The API asked everyone to wait: the worker holds every new call until then. */
@@ -97,8 +107,9 @@ export function createRunAutoTranslation(deps: RunAutoTranslationDeps) {
     job: RunnableJob,
     status: 'FAILED' | 'CANCELLED' | 'SKIPPED',
     error: string,
+    reason: AutoTranslationFailure | null = null,
   ): Promise<RunOutcome> {
-    if (!(await deps.close(job, status, error))) return 'lost';
+    if (!(await deps.close(job, status, error, reason))) return 'lost';
     await deps.afterFinish(job.translationProjectId);
     return status === 'FAILED' ? 'failed' : status === 'CANCELLED' ? 'cancelled' : 'skipped';
   }
@@ -114,7 +125,7 @@ export function createRunAutoTranslation(deps: RunAutoTranslationDeps) {
       return finish(job, 'SKIPPED', 'Someone started this version first.');
     }
     if (!job.sourceContent?.trim()) {
-      return finish(job, 'FAILED', 'The English version has no text to translate yet.');
+      return finish(job, 'FAILED', 'The English version has no text to translate yet.', AutoTranslationFailure.NO_SOURCE);
     }
 
     let draft: { translatedContent: string; model: string };
@@ -135,21 +146,25 @@ export function createRunAutoTranslation(deps: RunAutoTranslationDeps) {
     } catch (error) {
       const failure = (error ?? {}) as ApiFailure;
       const message = messageOf(error);
+      const reason = failureReasonOf(error);
 
       // Rate limited: the API, not this document, is the problem. Wait as long
       // as it asked, hold every other call too, and keep the attempt.
       if (failure.status === 429) {
+        deps.report?.(error, { jobId: job.id, attempts: job.attempts, reason, final: false });
         const at = new Date(now().getTime() + (failure.retryAfterMs ?? backoffMs(job.attempts)));
         deps.pauseUntil?.(at);
-        return (await deps.retryLater(job, at, message, true)) ? 'retrying' : 'lost';
+        return (await deps.retryLater(job, at, message, true, reason)) ? 'retrying' : 'lost';
       }
 
-      if (isPermanent(failure) || job.attempts >= maxAttempts) {
-        return finish(job, 'FAILED', message);
+      const final = isPermanent(failure) || job.attempts >= maxAttempts;
+      deps.report?.(error, { jobId: job.id, attempts: job.attempts, reason, final });
+      if (final) {
+        return finish(job, 'FAILED', message, reason);
       }
 
       const at = new Date(now().getTime() + (failure.retryAfterMs ?? backoffMs(job.attempts)));
-      return (await deps.retryLater(job, at, message)) ? 'retrying' : 'lost';
+      return (await deps.retryLater(job, at, message, false, reason)) ? 'retrying' : 'lost';
     }
 
     const outcome = await deps.complete({

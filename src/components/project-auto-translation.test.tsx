@@ -104,7 +104,7 @@ const withFailure = state({
     failures: [
       {
         id: 'job-1',
-        error: 'The model took too long to answer.',
+        message: 'The AI service was unavailable. Retry in a few minutes.',
         finishedAt: new Date('2026-11-23T10:00:00Z'),
         document: { id: 'doc-1', title: 'Day 1 - The Call', slug: 'ex90-day-1' },
       },
@@ -118,7 +118,7 @@ test('progress counts drafts against every document, and a manager can retry a f
 
   assert.ok(await screen.findByText('2 of 3 translated'));
   assert.ok(screen.getByText('1 failed'));
-  assert.ok(screen.getByText('The model took too long to answer.'));
+  assert.ok(screen.getByText('The AI service was unavailable. Retry in a few minutes.'));
 
   await user.click(screen.getByRole('button', { name: 'Retry Day 1 - The Call' }));
   await waitFor(() => assert.deepEqual(calls.retry, [{ translationProjectId: 'tp-fr', jobId: 'job-1' }]));

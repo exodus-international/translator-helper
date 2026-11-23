@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { notifyAutoTranslationFinished } from '../notification/notification.service';
 import { translateDocument } from '../translation/translation.document';
 import { createWorkerLoop, type WorkerLoopOptions } from './auto-translation.loop';
@@ -54,6 +55,27 @@ async function afterFinish(translationProjectId: string) {
   }
 }
 
+/**
+ * A failed model call, in full, for whoever runs the server. A retry is only
+ * logged; a failure that ends the job also goes to Sentry, so a broken key or
+ * a model that rejects every document shows up without anyone opening the page.
+ */
+function reportFailure(
+  error: unknown,
+  context: { jobId: string; attempts: number; reason: string; final: boolean },
+) {
+  const line = `[AutoTranslation] Job ${context.jobId} attempt ${context.attempts} ${context.final ? 'failed' : 'will retry'} (${context.reason}):`;
+  if (!context.final) {
+    console.warn(line, error);
+    return;
+  }
+  console.error(line, error);
+  Sentry.captureException(error, {
+    tags: { area: 'auto-translation', reason: context.reason },
+    extra: { jobId: context.jobId, attempts: context.attempts },
+  });
+}
+
 export function startAutoTranslationWorker(): Worker {
   const existing = registry[KEY];
   if (existing) return existing;
@@ -67,6 +89,7 @@ export function startAutoTranslationWorker(): Worker {
     close: closeAutoTranslation,
     retryLater: retryAutoTranslationLater,
     afterFinish,
+    report: reportFailure,
     pauseUntil: (at) => worker?.pauseUntil(at),
     // Half the lease, so a slow call fails as an attempt before another server
     // could take the job for stalled.

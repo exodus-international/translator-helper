@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { AutoTranslationFailure, DocumentStatus } from '@/generated/prisma/enums';
 import { TranslationApiError } from '../translation/translation.service';
 import { backoffMs, createRunAutoTranslation, type RunAutoTranslationDeps } from './auto-translation.runner';
 
@@ -29,6 +29,7 @@ function setup(loaded: ReturnType<typeof job> | null, translate?: RunAutoTransla
       return value;
     };
   const paused: Date[] = [];
+  const reported: { error: unknown; context: Parameters<NonNullable<RunAutoTranslationDeps['report']>>[1] }[] = [];
   const run = createRunAutoTranslation({
     loadJob: async () => loaded,
     translate:
@@ -42,10 +43,11 @@ function setup(loaded: ReturnType<typeof job> | null, translate?: RunAutoTransla
     retryLater: record('retryLater', true),
     afterFinish: record('afterFinish', undefined),
     pauseUntil: (at) => paused.push(at),
+    report: (error, context) => reported.push({ error, context }),
     now: () => NOW,
   });
   const called = (name: string) => calls.filter((call) => call.name === name);
-  return { run, calls, called, paused };
+  return { run, calls, called, paused, reported };
 }
 
 describe('backoffMs', () => {
@@ -112,7 +114,7 @@ describe('runAutoTranslation', () => {
     const [retry] = called('retryLater');
     assert.equal((retry.args[1] as Date).getTime(), NOW.getTime() + backoffMs(2));
     assert.equal(retry.args[2], 'socket hang up');
-    assert.equal(retry.args[3], undefined);
+    assert.equal(retry.args[3], false, 'the attempt counts');
     assert.equal(called('afterFinish').length, 0);
   });
 
@@ -133,6 +135,35 @@ describe('runAutoTranslation', () => {
     assert.match(called('close')[0].args[2] as string, /401/);
   });
 
+  it('keeps the raw error on the job, stores a plain reason, and reports the error', async () => {
+    const raw = new TranslationApiError('ChatGPT API request failed: 400 Bad Request - {"error":{}}', 400, null);
+    const { run, called, reported } = setup(job({ attempts: 1 }), async () => {
+      throw raw;
+    });
+    assert.equal(await run('job-1'), 'failed');
+    const [, , error, reason] = called('close')[0].args;
+    assert.equal(error, raw.message);
+    assert.equal(reason, AutoTranslationFailure.REJECTED);
+    assert.deepEqual(reported, [
+      { error: raw, context: { jobId: 'job-1', attempts: 1, reason: AutoTranslationFailure.REJECTED, final: true } },
+    ]);
+  });
+
+  it('reports an attempt that will be retried as not final', async () => {
+    const { run, called, reported } = setup(job({ attempts: 1 }), async () => {
+      throw new TranslationApiError('ChatGPT API request failed: 503', 503, null);
+    });
+    assert.equal(await run('job-1'), 'retrying');
+    assert.equal(called('retryLater')[0].args[4], AutoTranslationFailure.UNAVAILABLE);
+    assert.equal(reported[0].context.final, false);
+  });
+
+  it('marks a version with no English text with its own reason', async () => {
+    const { run, called } = setup(job({ sourceContent: '  ' }));
+    assert.equal(await run('job-1'), 'failed');
+    assert.equal(called('close')[0].args[3], AutoTranslationFailure.NO_SOURCE);
+  });
+
   it('waits as long as a 429 asks, pauses every call, and keeps the attempt', async () => {
     const { run, called, paused } = setup(job({ attempts: 3 }), async () => {
       throw new TranslationApiError('ChatGPT API request failed: 429 Too Many Requests - slow down', 429, 20_000);
@@ -141,6 +172,7 @@ describe('runAutoTranslation', () => {
     const [retry] = called('retryLater');
     assert.equal((retry.args[1] as Date).getTime(), NOW.getTime() + 20_000);
     assert.equal(retry.args[3], true);
+    assert.equal(retry.args[4], AutoTranslationFailure.RATE_LIMITED);
     assert.deepEqual(paused, [new Date(NOW.getTime() + 20_000)]);
   });
 

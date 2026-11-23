@@ -131,6 +131,23 @@ enum AutoTranslationStatus {
   SKIPPED
 }
 
+/// Why an automatic translation failed, in terms a project manager can act on.
+/// The raw API error stays in `AutoTranslation.error` for the server log.
+enum AutoTranslationFailure {
+  /// The API refused this request (a 4xx other than those below).
+  REJECTED
+  /// The API refused the app's key or its access (401 or 403).
+  SETUP
+  /// The API asked callers to wait (429); the job is retried by itself.
+  RATE_LIMITED
+  /// The API failed, timed out or could not be reached.
+  UNAVAILABLE
+  /// The English version had no text to translate.
+  NO_SOURCE
+  /// Anything else.
+  UNKNOWN
+}
+
 enum NotificationEmailStatus {
   PENDING // waiting for the sweep to put it in the next digest
   SENT
@@ -607,6 +624,7 @@ model AutoTranslation {
   // belongs to a server that stopped, and goes back to the queue.
   lockedAt             DateTime?
   error                String?               @db.Text
+  failureReason        AutoTranslationFailure?
   machineContent       String?               @db.Text
   model                String?
   requestedById        String?

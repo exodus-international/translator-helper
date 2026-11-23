@@ -1,5 +1,6 @@
 import prisma from '@/lib/db';
-import { AutoTranslationStatus, DocumentStatus } from '@/generated/prisma/enums';
+import { AutoTranslationStatus, DocumentStatus, type AutoTranslationFailure } from '@/generated/prisma/enums';
+import { failureMessage } from './auto-translation.failure';
 
 /** Jobs a worker has yet to finish. */
 const OPEN_STATUSES = [AutoTranslationStatus.QUEUED, AutoTranslationStatus.RUNNING];
@@ -110,6 +111,7 @@ async function enqueueWith(db: Db, input: EnqueueInput): Promise<number> {
       nextAttemptAt: new Date(),
       lockedAt: null,
       error: null,
+      failureReason: null,
       machineContent: null,
       model: null,
       finishedAt: null,
@@ -179,6 +181,7 @@ export async function cancelAutoTranslations(translationProjectId: string): Prom
     data: {
       status: AutoTranslationStatus.CANCELLED,
       error: 'Automatic translation was turned off.',
+      failureReason: null,
       lockedAt: null,
       finishedAt: new Date(),
     },
@@ -201,6 +204,7 @@ export async function retryAutoTranslations(translationProjectId: string, jobId?
       nextAttemptAt: new Date(),
       lockedAt: null,
       error: null,
+      failureReason: null,
       finishedAt: null,
     },
   });
@@ -299,10 +303,11 @@ export async function closeAutoTranslation(
   job: { id: string; lockedAt: Date | null },
   status: 'FAILED' | 'CANCELLED' | 'SKIPPED',
   error: string,
+  reason: AutoTranslationFailure | null = null,
 ): Promise<boolean> {
   const { count } = await prisma.autoTranslation.updateMany({
     where: heldBy(job),
-    data: { status, error: clip(error), lockedAt: null, finishedAt: new Date() },
+    data: { status, error: clip(error), failureReason: reason, lockedAt: null, finishedAt: new Date() },
   });
   return count > 0;
 }
@@ -313,6 +318,7 @@ export async function retryAutoTranslationLater(
   at: Date,
   error: string,
   refundAttempt = false,
+  reason: AutoTranslationFailure | null = null,
 ): Promise<boolean> {
   const { count } = await prisma.autoTranslation.updateMany({
     where: heldBy(job),
@@ -321,6 +327,7 @@ export async function retryAutoTranslationLater(
       nextAttemptAt: at,
       lockedAt: null,
       error: clip(error),
+      failureReason: reason,
       ...(refundAttempt ? { attempts: { decrement: 1 } } : {}),
     },
   });
@@ -371,6 +378,7 @@ export async function completeAutoTranslation(input: {
         machineContent: input.content,
         model: input.model,
         error: null,
+        failureReason: null,
         lockedAt: null,
         finishedAt: new Date(),
       },
@@ -409,7 +417,11 @@ export async function completeAutoTranslation(input: {
 
 // ─── Progress and the summary ────────────────────────────────
 
-/** Counts for the project page, and the failed documents with their errors. */
+/**
+ * Counts for the project page, and the failed documents with a plain reason.
+ * The raw API error never leaves the server: every member of the project can
+ * read this, and the log has the detail.
+ */
 export async function getAutoTranslationProgress(translationProjectId: string) {
   const groups = await prisma.autoTranslation.groupBy({
     by: ['status'],
@@ -424,7 +436,7 @@ export async function getAutoTranslationProgress(translationProjectId: string) {
     take: 50,
     select: {
       id: true,
-      error: true,
+      failureReason: true,
       finishedAt: true,
       documentVersion: {
         select: { document: { select: { id: true, title: true, slug: true } } },
@@ -439,7 +451,7 @@ export async function getAutoTranslationProgress(translationProjectId: string) {
     failed: count(AutoTranslationStatus.FAILED),
     failures: failures.map((failure) => ({
       id: failure.id,
-      error: failure.error,
+      message: failureMessage(failure.failureReason),
       finishedAt: failure.finishedAt,
       document: failure.documentVersion.document,
     })),

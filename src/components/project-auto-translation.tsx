@@ -232,11 +232,7 @@ export default function ProjectAutoTranslation({
                       >
                         {failure.document.title}
                       </Link>
-                      {failure.error && (
-                        <p className="text-xs text-muted-foreground break-words line-clamp-2" title={failure.error}>
-                          {failure.error}
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground text-pretty">{failure.message}</p>
                     </div>
                     {canManage && enabled && (
                       <Button
