@@ -36,7 +36,7 @@ function numberFromEnv(name: string, fallback: number, min: number): number {
 }
 
 /** Env-tunable, so a provider with a tighter rate limit can be met without a deploy. */
-export function workerOptionsFromEnv(): WorkerLoopOptions {
+function workerOptionsFromEnv(): WorkerLoopOptions {
   return {
     concurrency: numberFromEnv('AUTO_TRANSLATE_CONCURRENCY', 2, 1),
     minIntervalMs: numberFromEnv('AUTO_TRANSLATE_MIN_INTERVAL_MS', 1000, 0),

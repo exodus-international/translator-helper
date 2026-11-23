@@ -12,7 +12,7 @@ import { DocumentStatus } from '@/generated/prisma/enums';
  */
 
 /** Attempts a job gets before it waits for someone to press Retry. */
-export const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 3;
 
 const BASE_BACKOFF_MS = 30_000;
 const MAX_BACKOFF_MS = 15 * 60_000;
@@ -73,7 +73,7 @@ export interface RunAutoTranslationDeps {
   maxAttempts?: number;
 }
 
-export type RunOutcome = 'written' | 'cancelled' | 'skipped' | 'failed' | 'retrying' | 'lost' | 'missing';
+type RunOutcome = 'written' | 'cancelled' | 'skipped' | 'failed' | 'retrying' | 'lost' | 'missing';
 
 /** Retrying cannot fix these: a bad request or a key the API refuses. */
 function isPermanent(failure: ApiFailure): boolean {

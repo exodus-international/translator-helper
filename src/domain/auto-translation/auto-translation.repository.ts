@@ -2,7 +2,7 @@ import prisma from '@/lib/db';
 import { AutoTranslationStatus, DocumentStatus } from '@/generated/prisma/enums';
 
 /** Jobs a worker has yet to finish. */
-export const OPEN_STATUSES = [AutoTranslationStatus.QUEUED, AutoTranslationStatus.RUNNING];
+const OPEN_STATUSES = [AutoTranslationStatus.QUEUED, AutoTranslationStatus.RUNNING];
 
 /** How much of an API error is kept on the job: enough to read, not a whole HTML page. */
 const ERROR_MAX = 1000;
@@ -288,8 +288,6 @@ export async function loadAutoTranslationJob(jobId: string) {
     sourceContent: version.document.versions[0]?.content ?? null,
   };
 }
-
-export type AutoTranslationJob = NonNullable<Awaited<ReturnType<typeof loadAutoTranslationJob>>>;
 
 /** The lease a write must still hold: the row is RUNNING under the claim this worker made. */
 function heldBy(job: { id: string; lockedAt: Date | null }) {
