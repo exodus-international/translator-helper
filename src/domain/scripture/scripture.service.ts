@@ -1,5 +1,6 @@
 import { parseFrontmatter } from '@/lib/frontmatter';
 import {
+  findCitations,
   findQuotedText,
   formatInlineQuote,
   formatReading,
@@ -45,19 +46,27 @@ const MIN_SAME_PASSAGE = 0.6;
 // A quotation is the whole passage when it has this share of the passage's words.
 const MIN_WHOLE_QUOTE = 0.95;
 
-// A book is one capitalised word, optionally numbered ("1 Corinthians", "I John")
-// or joined by "of" ("Song of Songs"), optionally abbreviated with a full stop.
-// A chapter and verse are required, so "Exodus 90" and "Day 9" are never citations.
-const BOOK = String.raw`(?:(?:[1-3]|I{1,3})\s?)?[A-Z][a-z]+\.?(?:\sof\s(?:the\s)?[A-Z][a-z]+)?`;
-const RANGE = String.raw`\d+(?::\d+)?[a-z]?(?:\s?[-–]\s?\d+(?::\d+)?[a-z]?)?`;
-// Further ranges ("6:1-6, 16-18", "8:28; 12:1-2"), unless the number starts another book ("2 Peter").
-// Books of one chapter are cited by verse alone ("Jude 5", "Philemon 4-7, 10"); only
-// these names, so a chapter and verse stay required everywhere else.
-const ONE_CHAPTER_BOOK = String.raw`(?:[23]\s?(?:John|Jn)|Jude|Obadiah|Obad|Philemon|Philem|Phlm)\.?`;
-const VERSES = String.raw`\d+[a-z]?(?:\s?[-–]\s?\d+[a-z]?)?`;
-const CITATION_SOURCE = String.raw`\b(?:${BOOK}\s\d+:\d+[a-z]?(?:\s?[-–]\s?\d+(?::\d+)?[a-z]?)?(?:\s?[,;]\s?${RANGE}(?![\d:]|\s?[A-Z]))*|${ONE_CHAPTER_BOOK}\s${VERSES}(?:,\s?${VERSES}(?![\d:]|\s?[A-Z]))*(?![\d:]))`;
-const CITATION = new RegExp(CITATION_SOURCE, 'g');
-const CITATION_ONLY = new RegExp(String.raw`^${CITATION_SOURCE}$`);
+// Citations are found as the editor's Scripture check finds them (see
+// ./citations), so the draft and the check agree on what a document cites.
+// "Day 9" and "At 5:30" may be candidates; the Bible says unknown_book and
+// they are left alone, without a notice.
+
+/** The whole text is one citation: a citation line before a reading. */
+function isCitation(text: string): boolean {
+  const [only, ...rest] = findCitations(text);
+  return !!only && rest.length === 0 && only.from === 0 && only.to === text.length;
+}
+
+/** Replaces each citation in the text with what `replace` returns for it. */
+function replaceCitations(text: string, replace: (citation: string, raw: string) => string): string {
+  let out = '';
+  let at = 0;
+  for (const { text: citation, raw, from, to } of findCitations(text)) {
+    out += text.slice(at, from) + replace(citation, raw);
+    at = to;
+  }
+  return out + text.slice(at);
+}
 
 const CITATION_LINE = /^<span\b[^>]*>\s*(.+?)\s*<\/span>$/;
 const FRONTMATTER = /^(﻿?---[ \t]*\r?\n)([\s\S]*?)(\r?\n---)/;
@@ -98,7 +107,7 @@ export function findReadings(body: string, verseTag: string | null): Reading[] {
   }
   lines.forEach((line, i) => {
     const citation = line.trim().match(CITATION_LINE)?.[1];
-    if (!citation || !CITATION_ONLY.test(citation)) return;
+    if (!citation || !isCitation(citation)) return;
     const reading = readingAfter(lines, normalizeCitation(citation), i);
     if (reading) readings.push(reading);
   });
@@ -224,7 +233,7 @@ export async function prepareScripture(
 
   const readings = findReadings(lines.join('\n'), verseTag);
   const outsideReadings = lines.filter((_, i) => !readings.some((r) => i >= r.start && i < r.end)).join('\n');
-  const inline = [...new Set((outsideReadings.match(CITATION) ?? []).map(normalizeCitation))];
+  const inline = [...new Set(findCitations(outsideReadings).map((c) => c.text))];
   const refs = [...new Set([...(verseTag ? [verseTag] : []), ...readings.map((r) => r.citation), ...inline])];
   if (refs.length === 0) return unchanged(source, notices);
 
@@ -281,11 +290,11 @@ export async function prepareScripture(
   // so earlier offsets hold.
   let bodyText = body.join('\n');
   const quotes: Array<{ from: number; to: number; key: string }> = [];
-  for (const match of bodyText.matchAll(CITATION)) {
-    const citation = normalizeCitation(match[0]);
+  for (const found of findCitations(bodyText)) {
+    const citation = found.text;
     const result = results.get(citation);
     if (!isResolved(result) || !result.source?.text) continue;
-    const quote = findQuotedText(bodyText, { from: match.index, to: match.index + match[0].length });
+    const quote = findQuotedText(bodyText, found);
     if (quote?.kind !== 'quote' || quotes.some((q) => quote.from < q.to && q.from < quote.to)) continue;
     const likeness = similarity(quote.plain, result.source.text);
     // Similar is not enough: a quotation that drops a clause still scores high,
@@ -306,10 +315,9 @@ export async function prepareScripture(
   // Citations, one placeholder for each distinct one.
   const citationKeys = new Map<string, string>();
   const hints: string[] = [];
-  const withCitations = bodyText.replace(CITATION, (match) => {
-    const citation = normalizeCitation(match);
+  const withCitations = replaceCitations(bodyText, (citation, raw) => {
     const result = results.get(citation);
-    if (!isResolved(result)) return match;
+    if (!isResolved(result)) return raw;
     const known = citationKeys.get(citation);
     if (known) {
       fills.get(known)!.count++;
