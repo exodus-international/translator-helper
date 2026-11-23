@@ -52,6 +52,43 @@ function fakeRepository(initial: Record<string, string> = {}, options: { movesUn
 
 const file = (path: string, content: string): PublishFile => ({ path, content });
 
+/**
+ * A branch two deploys share, with GitHub's rules: a tree builds on the base
+ * tree it names, and the branch moves only to a commit whose parent is its head.
+ */
+function sharedBranch() {
+  const trees = new Map<string, Record<string, string>>([['tree-c0', {}]]);
+  const commits = new Map<string, { parent: string; tree: string }>([['c0', { parent: '', tree: 'tree-c0' }]]);
+  let head = 'c0';
+  let made = 0;
+  const filesAt = (sha: string) => trees.get(commits.get(sha)!.tree)!;
+
+  const deps: PublishDeps = {
+    getHead: async () => ({ commitSha: head, treeSha: commits.get(head)!.tree }),
+    getBlobSha: async (path, ref) => (path in filesAt(ref) ? gitBlobSha(filesAt(ref)[path]) : null),
+    createTree: async (base, changed) => {
+      made += 1;
+      const tree = `tree-${made}`;
+      trees.set(tree, { ...trees.get(base)!, ...Object.fromEntries(changed.map((f) => [f.path, f.content])) });
+      return tree;
+    },
+    createCommit: async (_message, tree, parent) => {
+      made += 1;
+      const sha = `c${made}`;
+      commits.set(sha, { parent, tree });
+      return { sha, url: `https://github.test/commit/${sha}` };
+    },
+    updateBranch: async (sha) => {
+      if (commits.get(sha)!.parent !== head) {
+        throw Object.assign(new Error('Update is not a fast forward'), { status: 422 });
+      }
+      head = sha;
+    },
+    wait: async () => {},
+  };
+  return { deps, files: () => filesAt(head) };
+}
+
 describe('gitBlobSha', () => {
   it('gives the SHA git gives the same content', () => {
     // `printf 'hello\n' | git hash-object --stdin`
@@ -87,6 +124,16 @@ describe('publishFiles', () => {
     assert.equal(result.commit?.sha, 'c2');
     assert.deepEqual(repo.calls, ['commit:c0', 'commit:other-0']);
     assert.deepEqual(repo.waits, [BRANCH_MOVED_RETRY_DELAYS_MS[0]]);
+  });
+
+  it('keeps both deploys\' files when two publish to the branch at once', async () => {
+    const branch = sharedBranch();
+    const [first, second] = await Promise.all([
+      publishFiles(branch.deps, [file('cs/day-2.md', 'Czech')], 'Deploy Czech'),
+      publishFiles(branch.deps, [file('sk/day-2.md', 'Slovak')], 'Deploy Slovak'),
+    ]);
+    assert.ok(first.commit && second.commit);
+    assert.deepEqual(branch.files(), { 'cs/day-2.md': 'Czech', 'sk/day-2.md': 'Slovak' });
   });
 
   it('gives up with a clear message when the branch never stops moving', async () => {
