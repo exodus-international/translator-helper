@@ -39,7 +39,6 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
   'audio/audio.actions.ts': {
     getLatestAudioFileAction: ['authenticated'],
     advanceAudioJobAction: ['authenticated'],
-    getAudioReadinessAction: ['authenticated'],
     regenerateAudioAction: ['authenticated'],
     getAudioTranscriptAction: ['authenticated'],
     getAudioTranscriptStateAction: ['authenticated'],

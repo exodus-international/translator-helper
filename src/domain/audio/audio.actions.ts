@@ -11,7 +11,6 @@ import { getUserRoleForLanguage } from '../user-language/user-language.repositor
 import { getLatestAudioFileForVersion } from './audio.repository';
 import {
   advanceJob,
-  getAudioReadiness,
   getTranscript,
   getTranscriptState,
   keepTranscript,
@@ -21,7 +20,6 @@ import {
 import type {
   AudioFileView,
   AudioGenerationOutcome,
-  AudioReadiness,
   AudioTranscriptState,
   AudioTranscriptView,
   AudioTranscriptWriteOutcome,
@@ -38,12 +36,6 @@ export async function advanceAudioJobAction(audioFileId: string): Promise<AudioF
   await authorize('authenticated');
   const audioFile = await advanceJob(audioFileId);
   return audioFile ? toView(audioFile) : null;
-}
-
-/** Used by the deploy guard to decide whether to warn before deploying. */
-export async function getAudioReadinessAction(documentVersionId: string): Promise<AudioReadiness> {
-  await authorize('authenticated');
-  return getAudioReadiness(documentVersionId);
 }
 
 /**

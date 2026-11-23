@@ -268,10 +268,8 @@ export const deployments = createDeployments({
   githubConfigured: () => isGitHubConfigured(),
   deployBranch: () => getGitHubConfig().deployBranch,
   publish: async (files, message) => {
-    const [{ createGitHubPublishDeps }, { publishFiles }] = await Promise.all([
-      import('../github/github.client'),
-      import('../github/github.publish'),
-    ]);
+    const { createGitHubPublishDeps } = await import('../github/github.client');
+    const { publishFiles } = await import('../github/github.publish');
     return publishFiles(await createGitHubPublishDeps(), files, message);
   },
   log: createActivityLog,
