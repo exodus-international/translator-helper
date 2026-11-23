@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { DeploymentItemOutcome, DeploymentStatus, DeploymentTrigger, DocumentStatus } from '@/generated/prisma/enums';
 import { getGitHubConfig, isGitHubConfigured } from '@/lib/github-config';
 import { buildDocumentPath } from '../document/document-url';
@@ -36,6 +37,11 @@ export interface DeploymentDeps {
     details: Record<string, unknown>;
   }) => Promise<unknown>;
   notify: (input: { versionId: string; actorId: string; from: DocumentStatus; to: DocumentStatus }) => Promise<void>;
+  /**
+   * Sends an error to error tracking. A deploy runs after the response, so
+   * nobody sees its failure unless it is reported or someone opens the page.
+   */
+  reportError: (error: unknown, context: { deploymentId: string; step: 'publish' | 'run' | 'record failure' | 'record version' }) => void;
 }
 
 export function createDeployments(deps: DeploymentDeps) {
@@ -88,6 +94,7 @@ export function createDeployments(deps: DeploymentDeps) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[Deploy] Deployment ${id} failed:`, error);
+      deps.reportError(error, { deploymentId: id, step: 'run' });
       await repository
         .finishDeployment(id, {
           status: DeploymentStatus.FAILED,
@@ -95,7 +102,11 @@ export function createDeployments(deps: DeploymentDeps) {
           commitUrl: progress.commit?.url ?? null,
           error: message,
         })
-        .catch(() => {});
+        .catch((recordError: unknown) => {
+          // The stale sweep marks it interrupted later; until then it reads as running.
+          console.error(`[Deploy] Could not record the failure of deployment ${id}:`, recordError);
+          deps.reportError(recordError, { deploymentId: id, step: 'record failure' });
+        });
     }
   }
 
@@ -154,6 +165,7 @@ export function createDeployments(deps: DeploymentDeps) {
         }
       } catch (error) {
         publishError = error instanceof Error ? error.message : String(error);
+        deps.reportError(error, { deploymentId: id, step: 'publish' });
         for (const { itemId, plan } of toPublish) {
           outcomes.set(itemId, { outcome: DeploymentItemOutcome.FAILED, filePath: plan.path, error: publishError });
         }
@@ -201,6 +213,7 @@ export function createDeployments(deps: DeploymentDeps) {
         });
       } catch (error) {
         console.error(`[Deploy] Could not record deployment ${id} for version ${version.id}:`, error);
+        deps.reportError(error, { deploymentId: id, step: 'record version' });
       }
     }
   }
@@ -274,6 +287,9 @@ export const deployments = createDeployments({
   },
   log: createActivityLog,
   notify: notifyStatusChange,
+  reportError: (error, context) => {
+    Sentry.captureException(error, { tags: { area: 'deploy', step: context.step }, extra: { deploymentId: context.deploymentId } });
+  },
 });
 
 const NO_COUNTS: Record<DeploymentItemOutcome, number> = {

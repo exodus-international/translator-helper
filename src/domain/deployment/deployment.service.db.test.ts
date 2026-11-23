@@ -79,6 +79,7 @@ function harness(
   const files = new Map<string, string>();
   const logs: { action: string; documentVersionId: string; details: Record<string, unknown> }[] = [];
   const notified: { versionId: string; to: DocumentStatus }[] = [];
+  const reported: { message: string; step: string }[] = [];
   let commits = 0;
   let failNext: string | null = null;
 
@@ -105,6 +106,9 @@ function harness(
     notify: async (input) => {
       notified.push({ versionId: input.versionId, to: input.to });
     },
+    reportError: (error, context) => {
+      reported.push({ message: error instanceof Error ? error.message : String(error), step: context.step });
+    },
   };
 
   const service = createDeployments(deps);
@@ -112,6 +116,7 @@ function harness(
     files,
     logs,
     notified,
+    reported,
     commits: () => commits,
     failNextPublish: (message: string) => {
       failNext = message;
@@ -239,6 +244,7 @@ describe('what a deploy saves', () => {
     assert.ok(deployment?.commitUrl);
     assert.equal(outcomeOf(deployment, version.id), DeploymentItemOutcome.PUBLISHED);
     assert.equal(await statusOf(version.id), DocumentStatus.DEPLOYED);
+    assert.deepEqual(github.reported, [{ message: 'activity log is down', step: 'record version' }]);
   });
 });
 
@@ -258,6 +264,7 @@ describe('a deploy that fails, and its retry', () => {
     assert.equal(await statusOf(one.version.id), DocumentStatus.APPROVED);
     assert.equal(await statusOf(elsewhere.version.id), DocumentStatus.DEPLOYED);
     assert.ok(github.logs.some((log) => log.action === 'github_deploy_failed' && log.documentVersionId === one.version.id));
+    assert.deepEqual(github.reported, [{ message: 'Resource not accessible by integration', step: 'publish' }]);
 
     const retryable = await repository.getRetryableItems(failed!.id);
     assert.deepEqual(retryable.map((item) => item.documentVersionId), [one.version.id]);
