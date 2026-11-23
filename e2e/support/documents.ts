@@ -29,6 +29,8 @@ const SEEDED = [
   // Waiting to be started, in a language the admin and the reviewer both
   // review; the AI workflow scenario hands it to the AI.
   { title: 'Day 3 - Fasting and Freedom', projectSlug: 'exodus90', slug: 'ex90-day-3', languageCode: 'hr' },
+  // The AI demo: an AI draft in review, which anyone on the Czech team may edit.
+  { title: 'TEST AI xxx', projectSlug: 'advent2025', slug: 'test-ai-xxx-u9own', languageCode: 'cs' },
 ] as const;
 
 const LANGUAGE_CODES: Record<string, string> = {

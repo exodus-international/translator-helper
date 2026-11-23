@@ -1,7 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractTextAtRange } from '@/lib/text-range';
-import { audioTextProblems, deployProblems, locateQuote, parseTranslationWithNotes } from './ai-workflow.rules';
+import { DocumentStatus } from '@/generated/prisma/enums';
+import {
+  audioTextProblems,
+  canEditAiText,
+  deployProblems,
+  locateQuote,
+  parseTranslationWithNotes,
+} from './ai-workflow.rules';
 
 describe('parseTranslationWithNotes', () => {
   it('reads the translation and its notes', () => {
@@ -130,5 +137,12 @@ describe('audioTextProblems', () => {
   it('passes on what the SSML check finds', () => {
     const problems = check(derived, () => [{ message: 'Unclosed <voice>' }]);
     assert.deepEqual(problems, [{ message: 'Unclosed <voice>' }]);
+  });
+});
+
+describe('canEditAiText', () => {
+  it('lets people edit the text only while the team reviews it', () => {
+    const editable = Object.values(DocumentStatus).filter(canEditAiText);
+    assert.deepEqual(editable, [DocumentStatus.PENDING_REVIEW]);
   });
 });

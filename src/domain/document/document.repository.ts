@@ -308,6 +308,8 @@ export async function getDashboardDocuments(
           reviewer: userBrief,
           assignedBy: userBrief,
           activityLogs: { orderBy: { createdAt: 'desc' } },
+          // An AI-workflow card shows how many of the team have approved.
+          _count: { select: { approvals: true } },
         },
         orderBy: { updatedAt: 'desc' },
       },

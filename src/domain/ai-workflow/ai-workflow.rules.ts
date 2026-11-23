@@ -1,4 +1,5 @@
 import yaml from 'js-yaml';
+import { DocumentStatus } from '@/generated/prisma/enums';
 import { lintDocument } from '@/lib/lint';
 
 /**
@@ -17,6 +18,16 @@ export const REQUIRED_TEXT_APPROVALS = 2;
 
 /** An AI step that fails this many times waits for someone to press Retry. */
 export const MAX_AI_ATTEMPTS = 3;
+
+/**
+ * Whether a person may edit an AI version's text directly, not only through
+ * suggestions. Only while the team reviews it: before that the AI is still
+ * writing the draft and would overwrite the edit, and after it the text is
+ * approved and the audio is made from it.
+ */
+export function canEditAiText(status: DocumentStatus): boolean {
+  return status === DocumentStatus.PENDING_REVIEW;
+}
 
 /** A place in the draft the AI is unsure about, as the model reports it. */
 export interface AiNote {

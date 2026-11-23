@@ -32,8 +32,17 @@ upload ─▶ AI Translating ─▶ In Review ─▶ AI Preparing Audio ─▶ A
    cannot be found in its own draft, the note becomes a general comment that
    quotes the passage.
 2. **In Review.** Everyone on the language team reviews, translators included,
-   because the AI is the translator. Anyone on the team can edit the text and
-   comment. The AI workflow panel in the editor's sidebar has **Approve text**.
+   because the AI is the translator. Anyone on the team can comment, suggest
+   a change, or press **Edit text** above the translation and change the text
+   directly. The editor saves on its own three seconds after the last
+   keystroke, as the translate editor does, and **Back to review** returns to
+   the review view. A manual version stays suggestion-only for reviewers, because
+   there the translator owns the text. Each direct edit goes to the activity
+   log with the text before and after it (edits by one person within five
+   minutes merge into one entry), and **View changes** on that entry shows the
+   diff. The server refuses a direct edit in any other AI step: while the AI
+   drafts it would overwrite the edit, and after review the audio is made from
+   the approved text. The AI workflow panel in the editor's sidebar has **Approve text**.
    It is disabled while any comment is open, the AI's included. The second
    approval from a different person moves the version on. An approval stays
    valid when the text is edited afterwards, and anyone can withdraw their own

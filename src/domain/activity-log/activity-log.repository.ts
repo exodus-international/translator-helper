@@ -40,11 +40,18 @@ export async function coalesceEditLog(data: {
   });
 
   if (recentEditLog) {
+    // A merged entry spans the whole burst of edits, so it keeps the text from
+    // before the first one.
+    const previous = recentEditLog.details as Record<string, any> | null;
+    const details =
+      data.details && 'before' in data.details && previous && 'before' in previous
+        ? { ...data.details, before: previous.before }
+        : data.details || {};
     return prisma.activityLog.update({
       where: { id: recentEditLog.id },
       data: {
         createdAt: new Date(),
-        details: data.details || {},
+        details,
       },
       include: {
         user: {

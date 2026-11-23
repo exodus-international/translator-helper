@@ -7,6 +7,7 @@ Větev `feat/ai-flow`, stav k 2026-11-02. Původní rešerše proveditelnosti je
 - Přepínač na jazyce: Languages, jazyk, Settings, karta Workflow (Manual / AI). Platí jen pro nově nahrané dokumenty. Verze přejde do AI flow při nahrání (nebo když ji tam pošle manager) a už v něm zůstane, takže přepnutí nikdy nerozbije rozpracovaný dokument.
 - Nahrání anglického dokumentu pošle verze v AI jazycích AI. Překlad běží na pozadí po odeslání odpovědi. Kde si AI není jistá, založí komentář (nebo návrh změny, když má lepší znění) jako uživatel "AI Translator".
 - Review textu: všichni členové jazyka jsou revieweři, i translatoři. Tlačítko Approve text v panelu AI workflow. Dva různí lidé = posun dál. Palec platí i po pozdější úpravě textu (podle tvé odpovědi). Schválit nejde, dokud je otevřený jakýkoli komentář, včetně komentářů od AI.
+- Přímé úpravy v review (2026-11-03): v AI flow může kdokoli z týmu kliknout na Edit text nad překladem a upravit text přímo, nejen přes návrhy. Ruční flow zůstává pro reviewery jen přes návrhy, protože tam text patří překladateli. Každá přímá úprava jde do activity logu s textem před a po (úpravy jednoho člověka do pěti minut se slučují), tlačítko View changes ukáže diff. Mimo In Review server přímou úpravu AI verze odmítne.
 - AI připraví audio přepis (SSML ze záložky Audio text bez značek, které se nemají číst). Výstup se zahodí a krok zopakuje, když AI změní hlas nebo ztratí pauzu.
 - Review audia: jeden člověk, Approve audio text ve status menu. Úprava textu v tomhle kroku dokument nevrací (podle tvé odpovědi).
 - Approved: spustí se nahrávka, aplikace počká, až je hotová, zkontroluje YAML, frontmatter a lint (chyby, ne varování), deployne a zapne na PR auto-merge. GitHub pak mergne po zelených required checks v CI obsahového repa. Validace tedy běží v aplikaci i nezávisle v CI.
@@ -51,3 +52,5 @@ Kde jsem nemohl čekat na odpověď, zvolil jsem výchozí variantu. U každé o
 11. **Notifikace celému týmu.** Každý AI draft upozorní všechny členy jazyka. U českého týmu s hodně dokumenty to může být hodně notifikací. Nechat, nebo posílat jen e-mailový digest?
 
 12. **Kdo smí Retry.** Teď manager jazyka a admin, protože retry stojí tokeny a může skončit deployem. Má to smět kdokoli z týmu?
+
+13. **Úprava po palci.** Palec platí i po úpravě textu. Teď ale ten, kdo už schválil, nedostane vědět, že mu někdo text pod rukama přepsal. Má dostat notifikaci s odkazem na diff, nebo stačí activity log?

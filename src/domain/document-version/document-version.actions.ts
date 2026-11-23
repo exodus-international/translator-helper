@@ -21,6 +21,7 @@ import {
 } from '../notification/notification.service';
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { assertCanDeleteDocumentVersion, assertCanEditDocumentVersionContent } from './document-version.permissions';
+import { canEditAiText } from '../ai-workflow/ai-workflow.rules';
 import { validateTransition } from './document-version.transitions';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
@@ -162,15 +163,24 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   const validated = updateDocumentVersionSchema.parse(input);
 
   // Language membership, and no edits once the text has passed review.
-  await assertCanEditDocumentVersionContent(id, user);
+  const { version: current } = await assertCanEditDocumentVersionContent(id, user);
+  const isAi = current.workflow === TranslationWorkflow.AI;
+  if (isAi && !canEditAiText(current.status)) {
+    throw new Error('This AI translation can be edited only while it is in review.');
+  }
 
   const version = await updateDocumentVersion(id, validated.content, user.id);
 
-  // Log the activity (coalesce rapid edits within 5 minutes)
+  // Log the activity (coalesce rapid edits within 5 minutes). In the AI
+  // workflow every reviewer may edit the text, so nobody owns it the way a
+  // translator owns a manual version. The log keeps the text before and after
+  // each edit, so the team can see who changed what.
   await coalesceEditLog({
     documentVersionId: version.id,
     userId: user.id,
-    details: { version: version.version },
+    details: isAi
+      ? { version: version.version, before: current.content, after: version.content }
+      : { version: version.version },
   });
 
   return version;

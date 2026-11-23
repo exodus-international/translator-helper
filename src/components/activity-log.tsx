@@ -2,6 +2,9 @@
 
 import { GithubIcon } from '@/components/github-icon';
 import { getDetailText } from '@/components/activity-log-detail';
+import { DiffEditor } from '@/components/editor/diff-editor';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserAvatar } from '@/components/user-avatar';
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
@@ -111,6 +114,39 @@ function formatRelativeTime(date: Date): string {
 }
 
 
+/** An edit that recorded its text before and after, which AI-workflow edits do. */
+function editDiff(entry: ActivityLogEntry): { before: string; after: string } | null {
+  const details = entry.details;
+  if (entry.action !== 'edited' || typeof details?.before !== 'string' || typeof details?.after !== 'string') return null;
+  return { before: details.before, after: details.after };
+}
+
+function EditChangesButton({ entry }: { entry: ActivityLogEntry }) {
+  const [open, setOpen] = useState(false);
+  const diff = editDiff(entry);
+  if (!diff) return null;
+  const who = entry.user.name || entry.user.email;
+
+  return (
+    <>
+      <Button variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => setOpen(true)}>
+        View changes
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex h-[80vh] max-w-[min(1200px,95vw)] flex-col sm:max-w-[min(1200px,95vw)]">
+          <DialogHeader>
+            <DialogTitle>Changes by {who}</DialogTitle>
+            <DialogDescription>
+              {new Date(entry.createdAt).toLocaleString()}. Before the edit on the left, after it on the right.
+            </DialogDescription>
+          </DialogHeader>
+          {open && <DiffEditor original={diff.before} modified={diff.after} className="min-h-0 flex-1" />}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 interface CollapsedEntry {
   entries: ActivityLogEntry[];
   action: string;
@@ -174,7 +210,10 @@ function CollapsedGroupRow({ group }: { group: CollapsedEntry }) {
                 &times;{group.count}
               </button>
             ) : (
-              detailText && <span className="text-muted-foreground">{detailText}</span>
+              <>
+                {detailText && <span className="text-muted-foreground">{detailText}</span>}
+                <EditChangesButton entry={representative} />
+              </>
             )}
             <span className="text-muted-foreground text-xs ml-auto shrink-0" title={fullDate}>
               {formatRelativeTime(group.lastTime)}
@@ -199,6 +238,7 @@ function CollapsedGroupRow({ group }: { group: CollapsedEntry }) {
             return (
               <div key={entry.id} className="flex items-baseline gap-2 text-xs text-muted-foreground">
                 {entryDetail && <span>{entryDetail}</span>}
+                <EditChangesButton entry={entry} />
                 <span className="text-muted-foreground ml-auto shrink-0" title={entryTime.toLocaleString()}>
                   {formatRelativeTime(entryTime)}
                 </span>

@@ -8,9 +8,10 @@ import { GitHubStatus } from '@/components/github-status';
 import { Button } from '@/components/ui/button';
 import { DocumentEditor } from '@/components/document-editor';
 import { MarkdownGuide } from '@/components/markdown-guide';
-import { updateDocumentVersionAction } from '@/domain/document-version/document-version.actions';
+import { SaveControl } from '@/components/save-control';
 import { toggleDocumentLabelAction } from '@/domain/document/document.actions';
 import { editSuggestionAction } from '@/domain/suggestion/suggestion.actions';
+import { canEditAiText } from '@/domain/ai-workflow/ai-workflow.rules';
 import { capture } from '@/lib/analytics';
 import { isRefusal } from '@/lib/action-refusal';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
@@ -19,8 +20,9 @@ import type { SourceTranslationViewerHandle } from '@/components/source-translat
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useEditorStore } from '@/lib/stores/editor-provider';
+import { useAutoSave } from '@/lib/stores/hooks';
 import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
-import { Download, FileCheck, FilePlus } from 'lucide-react';
+import { Download, Eye, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -92,7 +94,15 @@ export default function ReviewClient({
         canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
         disableReopen={(tv) => isApprovedOrLater(tv)}
         reviewConfig={{
-          canEdit: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW,
+          // A manual version belongs to its translator: reviewers change it
+          // through suggestions, and its text only through the Scripture check.
+          // An AI version has no translator: anyone on the team may edit it
+          // while it is in review, and the activity log keeps each edit's diff.
+          canEdit: (tv) =>
+            tv?.workflow === TranslationWorkflow.AI
+              ? canChangeStatus && canEditAiText(tv.status)
+              : tv?.status === DocumentStatus.PENDING_REVIEW,
+          showEditButton: (tv) => tv?.workflow === TranslationWorkflow.AI,
           renderEditActions: ({ exitEditMode }) => <ReviewEditActions exitEditMode={exitEditMode} />,
         }}
         onEditSuggestion={async (suggestionId, data) => {
@@ -236,47 +246,48 @@ function ReviewWorkflowActions({ document }: { document: any }) {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Save/Cancel buttons rendered when in-place editing in PENDING_REVIEW
+// Editing an AI draft in review: autosave, like the translate editor, and a
+// way back to the review view
 // ──────────────────────────────────────────────────────────────────────
 
 function ReviewEditActions({ exitEditMode }: { exitEditMode: () => void }) {
-  const targetVersion = useEditorStore((s) => s.targetVersion);
-  const content = useEditorStore((s) => s.content);
-  const setContent = useEditorStore((s) => s.setContent);
-  const setTargetVersion = useEditorStore((s) => s.setTargetVersion);
+  const router = useRouter();
+  const saveContent = useEditorStore((s) => s.saveContent);
+  const saveStatus = useEditorStore((s) => s.saveStatus());
+  const lastSavedAt = useEditorStore((s) => s.lastSavedAt);
   const isAnyLoading = useEditorStore((s) => s.isAnyLoading());
   const [loading, setLoading] = useState(false);
+  useAutoSave({ delayMs: 3000 });
 
-  const handleSave = async () => {
-    if (!targetVersion) return;
+  const save = async () => {
     setLoading(true);
     try {
-      const updated = await updateDocumentVersionAction(targetVersion.id, { content });
-      setTargetVersion(updated);
-      capture('translation_saved', { context: 'review_edit' });
-      toast.success('Changes saved successfully!');
-      exitEditMode();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save changes');
+      await saveContent();
+      return true;
+    } catch {
+      // The store has already toasted it; the control shows the failed state.
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
+  const backToReview = async () => {
+    // Write what autosave has not reached yet, so leaving the editor never
+    // drops an edit. A failed save keeps the editor open.
+    if (!(await save())) return;
+    exitEditMode();
+    // Brings in the activity log entry the saves wrote.
+    router.refresh();
+  };
+
   return (
-    <div className="flex gap-2">
-      <Button onClick={handleSave} disabled={loading || isAnyLoading}>
-        Save Changes
+    <>
+      <SaveControl status={saveStatus} lastSavedAt={lastSavedAt} onSave={save} disabled={loading || isAnyLoading} />
+      <Button variant="outline" size="sm" onClick={backToReview} disabled={loading || isAnyLoading}>
+        <Eye />
+        Back to review
       </Button>
-      <Button
-        variant="outline"
-        onClick={() => {
-          setContent(targetVersion?.content || '');
-          exitEditMode();
-        }}
-      >
-        Cancel
-      </Button>
-    </div>
+    </>
   );
 }

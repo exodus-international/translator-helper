@@ -62,6 +62,8 @@ interface ViewerConfig {
   disableReopen?: CapFn;
   reviewConfig?: {
     canEdit: CapFn;
+    /** Whether the review shows its own Edit button; without it the editor opens only on request. */
+    showEditButton?: CapFn;
     renderEditActions: (args: { exitEditMode: () => void }) => ReactNode;
   };
   translationPlaceholder?: string;
@@ -196,7 +198,11 @@ function EditorViewer({
     canCreateSuggestions !== undefined ? evalCap(canCreateSuggestions, targetVersion) : undefined;
   const resolvedDisableReopen = disableReopen !== undefined ? evalCap(disableReopen, targetVersion) : undefined;
   const resolvedReviewConfig = reviewConfig
-    ? { canEdit: evalCap(reviewConfig.canEdit, targetVersion), renderEditActions: reviewConfig.renderEditActions }
+    ? {
+        canEdit: evalCap(reviewConfig.canEdit, targetVersion),
+        showEditButton: reviewConfig.showEditButton ? evalCap(reviewConfig.showEditButton, targetVersion) : false,
+        renderEditActions: reviewConfig.renderEditActions,
+      }
     : undefined;
 
   const handleSourceSave = async () => {
@@ -467,6 +473,8 @@ interface DocumentEditorProps {
   disableReopen?: CapFn;
   reviewConfig?: {
     canEdit: CapFn;
+    /** Whether the review shows its own Edit button; without it the editor opens only on request. */
+    showEditButton?: CapFn;
     renderEditActions: (args: { exitEditMode: () => void }) => ReactNode;
   };
 

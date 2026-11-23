@@ -44,7 +44,8 @@ import { toast } from 'sonner';
 import type { Language } from '@/generated/prisma/client';
 import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import { allowedTransitions } from '@/domain/document-version/document-version.transitions';
-import { FileCheck, FileText, UserPlus } from 'lucide-react';
+import { aiCardStep, type AiCardTone } from '@/domain/ai-workflow/ai-workflow.board';
+import { AlertCircle, FileCheck, FileText, Sparkles, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
@@ -168,6 +169,13 @@ const columns: KanbanColumn[] = COLUMN_IDS.map(({ id, status }) => ({
 }));
 
 const activeColumnIds = new Set(columns.map((column) => column.id));
+
+const AI_TONE_VARIANT: Record<AiCardTone, 'secondary' | 'warning' | 'destructive' | 'outline'> = {
+  working: 'secondary',
+  waiting: 'warning',
+  failed: 'destructive',
+  done: 'outline',
+};
 
 /**
  * What the board reads when it mounts, injectable so a component test can render
@@ -605,6 +613,9 @@ export default function ProjectKanbanBoard({
                     const shouldShowSeparator = hasWaitingForFinalLabel && !prevCardHasLabel && prevCardInColumn;
 
                     const openSuggestionsCount = version ? ((version as any).openSuggestionsCount ?? 0) : 0;
+                    const aiStep = version
+                      ? aiCardStep({ ...version, approvalCount: version._count?.approvals ?? 0 })
+                      : null;
 
                     return (
                       <Fragment key={card.id}>
@@ -636,6 +647,11 @@ export default function ProjectKanbanBoard({
                                 )}
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   {(() => {
+                                    // The whole team reviews an AI-workflow version and
+                                    // the AI is its translator, so there is nobody to
+                                    // show or assign.
+                                    if (aiStep) return null;
+
                                     // Show relevant user based on document status.
                                     // A version with no translator is unassigned.
                                     const translator = version?.user ?? null;
@@ -711,6 +727,12 @@ export default function ProjectKanbanBoard({
                                 </div>
                               </div>
                               <div className="flex flex-wrap gap-1 items-center">
+                                {aiStep && (
+                                  <Badge variant={AI_TONE_VARIANT[aiStep.tone]}>
+                                    {aiStep.tone === 'failed' ? <AlertCircle /> : <Sparkles />}
+                                    {aiStep.label}
+                                  </Badge>
+                                )}
                                 <DocumentTypeBadge type={doc.type} />
                                 {doc.sourceProject && (
                                   <Badge variant="secondary">

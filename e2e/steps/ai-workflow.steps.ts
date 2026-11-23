@@ -3,6 +3,7 @@ import type { DocumentStatus } from '@/generated/prisma/enums';
 import { Given, When, Then } from './fixtures';
 import { languageCode } from '../support/documents';
 import { signInAndSettle } from '../support/sign-in';
+import { replaceAllInTranslation } from '../support/editor';
 import { currentStatus, statusName } from '../support/status';
 
 async function openSettings(page: import('@playwright/test').Page, language: string) {
@@ -127,4 +128,23 @@ Then('the document should come to link to pull request {int}', async ({ page }, 
 Then('no AI step should have failed', async ({ page }) => {
   await expect(aiPanel(page)).toBeVisible();
   await expect(aiPanel(page).getByRole('alert')).toHaveCount(0);
+});
+
+When(
+  'I edit the text directly, replacing every {string} with {string}',
+  async ({ page }, find: string, replacement: string) => {
+    await page.getByRole('button', { name: 'Edit text' }).click();
+    await replaceAllInTranslation(page, find, replacement);
+    // Autosave writes the edit; going back to review writes anything left.
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to review' }).click();
+    await expect(page.getByRole('button', { name: 'Edit text' })).toBeVisible();
+  },
+);
+
+Then('the activity log should show my edit, with {string} in its changes', async ({ page }, text: string) => {
+  await page.getByRole('button', { name: 'Details' }).click();
+  await page.getByRole('button', { name: 'View changes' }).first().click();
+  const dialog = page.getByRole('dialog', { name: /Changes by/ });
+  await expect(dialog).toContainText(text);
 });

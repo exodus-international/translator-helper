@@ -59,3 +59,48 @@ test('a project with no documents shows an empty board with no filter to clear',
   assert.ok(await screen.findByText('No documents found'));
   assert.equal(screen.queryByRole('button', { name: 'Clear type filter' }), null);
 });
+
+test('an AI-workflow card shows its step and offers no translator to assign', async () => {
+  // The columns' scroll areas ask for running animations, which happy-dom lacks.
+  Element.prototype.getAnimations ??= () => [];
+
+  const aiDocument = {
+    id: 'doc-ai',
+    slug: 'gods-rescue-mission',
+    title: "God's Rescue Mission",
+    type: 'DAY',
+    labels: [],
+    deadline: null,
+    sourceProject: { id: 'sp-autumn', slug: 'advent2025', name: 'Advent 2025' },
+    versions: [
+      {
+        id: 'v-ai',
+        status: 'PENDING_REVIEW',
+        workflow: TranslationWorkflow.AI,
+        aiError: null,
+        language: croatian,
+        user: { id: 'ai', name: 'AI Translator', email: 'ai@example.invalid', image: null },
+        reviewer: null,
+        activityLogs: [],
+        openSuggestionsCount: 0,
+        _count: { approvals: 1 },
+      },
+    ],
+  };
+
+  render(
+    <ProjectKanbanBoard
+      user={admin}
+      languages={[croatian]}
+      deployableLanguageIds={[croatian.id]}
+      selectedLanguage={croatian.id}
+      sourceProjectId="sp-autumn"
+      translationProjectId="tp-hr"
+      loaders={{ ...emptyProject, documents: async () => [aiDocument] as never }}
+    />,
+  );
+
+  assert.ok(await screen.findByText('1/2 approvals'));
+  assert.equal(screen.queryByTitle('Reassign translator'), null);
+  assert.equal(screen.queryByTitle('Assign translator'), null);
+});

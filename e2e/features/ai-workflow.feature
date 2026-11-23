@@ -29,3 +29,9 @@ Feature: AI workflow
     And no AI step should have failed
     When "admin@example.org" takes over
     Then Croatian can go back to the manual workflow
+
+  @translator @high-usage
+  Scenario: A teammate edits the AI's draft directly, and the activity log keeps the change
+    Given I open "TEST AI xxx" in Czech
+    When I edit the text directly, replacing every "Memento Mori" with "Memento mori"
+    Then the activity log should show my edit, with "Memento mori" in its changes

@@ -94,6 +94,7 @@ interface SourceTranslationViewerProps {
   sourceEditContent?: string;
   reviewConfig?: {
     canEdit?: boolean;
+    showEditButton?: boolean;
     editButtonLabel?: string;
     renderEditActions?: (ctx: { exitEditMode: () => void }) => ReactNode;
     editingDefault?: boolean;
@@ -824,6 +825,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                 ) : null}
                 {showTranslationCopy && <CopyAllButton pane="translation" text={translationContent} />}
+                {variant === 'review' && isReviewEditing && translationEditActions}
+                {variant === 'review' && !isReviewEditing && reviewConfig?.canEdit && reviewConfig.showEditButton && (
+                  <Button variant="outline" size="sm" onClick={enterReviewEditMode}>
+                    <Edit />
+                    {reviewConfig.editButtonLabel || 'Edit text'}
+                  </Button>
+                )}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
                 {/* On desktop the panel folds to its own rail, so it needs no
@@ -984,7 +992,6 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                     fullHeight
                     onOpenGuide={onOpenGuide}
                   />
-                  {translationEditActions}
                 </div>
               ) : audioTabVersionId && reviewViewMode === 'audio' ? (
                 <AudioTextPanel
