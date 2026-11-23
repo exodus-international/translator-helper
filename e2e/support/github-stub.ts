@@ -55,7 +55,7 @@ export function githubStubEnv(): Record<string, string> {
     GITHUB_INSTALLATION_ID: '1',
     GITHUB_REPO_OWNER: 'stub',
     GITHUB_REPO_NAME: 'content',
-    GITHUB_PRIVATE_KEY: privateKey,
+    GITHUB_APP_PRIVATE_KEY: privateKey,
     GITHUB_DEPLOY_BRANCH: GITHUB_STUB.branch,
   };
 }

@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 
 const githubConfigSchema = z.object({
   appId: z.string().min(1, 'GITHUB_APP_ID is required'),
-  privateKey: z.string().min(1, 'GITHUB_PRIVATE_KEY or GITHUB_PRIVATE_KEY_PATH is required'),
+  privateKey: z.string().min(1, 'GITHUB_APP_PRIVATE_KEY (or GITHUB_PRIVATE_KEY_BASE64, GITHUB_PRIVATE_KEY, GITHUB_PRIVATE_KEY_PATH) is required'),
   repoOwner: z.string().min(1, 'GITHUB_REPO_OWNER is required'),
   repoName: z.string().min(1, 'GITHUB_REPO_NAME is required'),
   installationId: z.coerce.number().int().positive('GITHUB_INSTALLATION_ID must be a positive integer'),
@@ -22,22 +23,30 @@ type GitHubConfig = z.infer<typeof githubConfigSchema>;
 
 let cachedConfig: GitHubConfig | null = null;
 
+/**
+ * The GitHub App's private key, from the first of these that is set:
+ * GITHUB_PRIVATE_KEY_BASE64, GITHUB_APP_PRIVATE_KEY, GITHUB_PRIVATE_KEY,
+ * then the file GITHUB_PRIVATE_KEY_PATH names. Every name stays supported,
+ * so an environment set up for an older version keeps working.
+ */
+export function privateKeyFromEnv(env: Record<string, string | undefined>): string | undefined {
+  if (env.GITHUB_PRIVATE_KEY_BASE64) {
+    return Buffer.from(env.GITHUB_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
+  }
+  const inline = env.GITHUB_APP_PRIVATE_KEY || env.GITHUB_PRIVATE_KEY;
+  if (inline) return inline;
+  if (!env.GITHUB_PRIVATE_KEY_PATH) return undefined;
+  try {
+    return readFileSync(env.GITHUB_PRIVATE_KEY_PATH, 'utf-8');
+  } catch {
+    throw new Error(`Failed to read GitHub private key from path: ${env.GITHUB_PRIVATE_KEY_PATH}`);
+  }
+}
+
 export function getGitHubConfig(): GitHubConfig {
   if (cachedConfig) return cachedConfig;
 
-  let privateKey = process.env.GITHUB_PRIVATE_KEY_BASE64
-    ? Buffer.from(process.env.GITHUB_PRIVATE_KEY_BASE64, 'base64').toString('utf-8')
-    : process.env.GITHUB_PRIVATE_KEY;
-
-  if (!privateKey && process.env.GITHUB_PRIVATE_KEY_PATH) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require('fs');
-    try {
-      privateKey = fs.readFileSync(process.env.GITHUB_PRIVATE_KEY_PATH, 'utf-8');
-    } catch (err) {
-      throw new Error(`Failed to read GitHub private key from path: ${process.env.GITHUB_PRIVATE_KEY_PATH}`);
-    }
-  }
+  const privateKey = privateKeyFromEnv(process.env);
 
   const result = githubConfigSchema.safeParse({
     appId: process.env.GITHUB_APP_ID,
