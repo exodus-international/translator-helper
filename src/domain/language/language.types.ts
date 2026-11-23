@@ -7,7 +7,6 @@ export const TRANSLATION_INSTRUCTIONS_MAX_LENGTH = 10000;
 
 const NAME_LENGTH = 'must be at least two characters';
 const CODE_LENGTH = 'must be two to five characters, like hr or en-US';
-const BRANCH_REQUIRED = 'is required: without a branch, every deploy of this language fails';
 const RATE_MESSAGE = `must be a number from ${RATE_RANGE.min} to ${RATE_RANGE.max}, where 1 is the voice's own pace`;
 const PITCH_MESSAGE = `must be a percentage from ${PITCH_RANGE.min}% to +${PITCH_RANGE.max}%, like -10%`;
 const PAUSE_MESSAGE = `must be whole milliseconds from ${PAUSE_RANGE_MS.min} to ${PAUSE_RANGE_MS.max}`;
@@ -62,19 +61,12 @@ const audioPauseMs = z
     PAUSE_MESSAGE,
   );
 
-/**
- * A branch is required from the moment a language exists. Every language has at
- * least one project that deploys, so an absent branch is not a configuration
- * an admin might have meant -- it is a deploy that will throw, which is exactly
- * the failure the language pages exist to move forward in time.
- */
 export const createLanguageSchema = z.object({
   // Messages are written to follow the field name the formatter prefixes them
   // with, so "code: must be two to five characters" reads as a form error
   // rather than as Zod's "Too small: expected string to have >=2 characters".
   code: z.string().trim().min(2, CODE_LENGTH).max(5, CODE_LENGTH), // e.g., "en", "cs", "en-US"
   name: z.string().trim().min(2, NAME_LENGTH),
-  branchName: z.string().trim().min(1, BRANCH_REQUIRED),
 });
 
 /**
@@ -93,7 +85,6 @@ const PREVIEW_TEXT_TOO_LONG = `is longer than the ${PREVIEW_TEXT_MAX_LENGTH} cha
 export const updateLanguageSettingsSchema = z
   .strictObject({
     name: z.string().trim().min(2, NAME_LENGTH),
-    branchName: z.string().trim().min(1, BRANCH_REQUIRED).nullable(),
     audioProvider: z.enum(AudioProvider).nullable(),
     audioVoice: z.string().trim().max(100, 'is longer than any provider voice id').nullable(),
     audioRate,

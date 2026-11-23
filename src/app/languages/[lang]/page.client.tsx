@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, TriangleAlert } from 'lucide-react';
 
 import { PageHeader } from '@/components/page-header';
+import { DeploysPanel } from '@/components/deploy/deploys-panel';
 import { LanguageTabs } from '@/components/language-tabs';
 import { LanguageHealthPills } from '@/components/language-health-pills';
 import { UserAvatar } from '@/components/user-avatar';
@@ -21,9 +22,11 @@ import { capture } from '@/lib/analytics';
 import { useTrailStore } from '@/lib/page-trail';
 
 interface LanguageOverviewClientProps {
-  language: { code: string; name: string };
+  language: { id: string; code: string; name: string };
   /** Settings are administration; a manager sees the verdict, not the controls. */
   canAdminister: boolean;
+  /** Anyone on this language's team, and administrators, may deploy its approved work. */
+  canDeploy: boolean;
   progress: LanguageProgress;
   lastDeployAt: string | null;
   pills: LanguageHealthPill[];
@@ -34,6 +37,7 @@ interface LanguageOverviewClientProps {
 export default function LanguageOverviewClient({
   language,
   canAdminister,
+  canDeploy,
   progress,
   lastDeployAt,
   pills,
@@ -158,8 +162,16 @@ export default function LanguageOverviewClient({
                 <ProjectRow key={project.id} project={project} languageCode={language.code} />
               ))
             )}
-
           </div>
+
+          <DeploysPanel
+            description={`What went out to GitHub in ${language.name}, across every project, newest first. Deploy approved sends every approved ${language.name} document in one commit.`}
+            filter={{ languageId: language.id }}
+            scope={{ languageId: language.id }}
+            via="language"
+            canDeploy={canDeploy}
+            emptyText={`Nothing in ${language.name} has been deployed yet.`}
+          />
         </div>
 
         <div className="flex flex-col gap-4 lg:w-72">
@@ -178,7 +190,7 @@ export default function LanguageOverviewClient({
               <LanguageHealthPills pills={pills} className="flex-col items-start" />
               {!canAdminister && problems > 0 && (
                 <p className="text-muted-foreground text-xs">
-                  A branch, a voice and the language code are set by an administrator.
+                  The voice and the language code are set by an administrator.
                 </p>
               )}
             </CardContent>

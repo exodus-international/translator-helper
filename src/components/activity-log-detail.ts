@@ -43,8 +43,10 @@ export function getDetailText(action: string, details: Record<string, any> | nul
     case 'audio_transcript_edited':
       return details.characters ? `${details.characters} characters` : null;
     case 'github_deployed':
-      // Only deploys that merge record `merged`; one that leaves its pull
-      // request open by design has no details and shows none.
+      if (details.unchanged === true) return 'already up to date';
+      if (typeof details.commitSha === 'string') return `commit ${details.commitSha.slice(0, 7)}`;
+      // Entries from before in-app deploy went through a pull request; only
+      // those that merged record `merged`.
       if (details.merged === true) return 'merged into main';
       if (details.merged === false) return details.mergeError ? `PR left open: ${truncate(details.mergeError)}` : 'PR left open';
       return null;

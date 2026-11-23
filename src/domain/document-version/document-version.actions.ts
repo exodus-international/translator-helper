@@ -5,10 +5,8 @@ import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
 import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
-import { isGitHubConfigured } from '@/lib/github-config';
 import {
   createStatusChange,
-  involvesDeployed,
   toStatusChangeRefusal,
   type StatusChangeRefusal,
   type StatusChangeResult,
@@ -244,21 +242,18 @@ export async function deleteDocumentVersionAction(id: string) {
 }
 
 /**
- * The status change as the app wires it: real repositories, the GitHub and
- * audio services loaded on demand so a page that never deploys never loads
- * octokit, and the document page revalidated when something it shows moved.
+ * The status change as the app wires it: real repositories, the audio service
+ * and the deploy starter loaded on demand, and the document page revalidated
+ * when something it shows moved.
  */
 const changeStatus = createStatusChange({
   countOpenSuggestions,
   updateStatus: updateDocumentVersionStatus,
   log: createActivityLog,
   notify: notifyStatusChange,
-  github: {
-    isConfigured: () => isGitHubConfigured(),
-    deploy: async (versionId) => {
-      const { deployToGitHub } = await import('../github/github.service');
-      return deployToGitHub(versionId);
-    },
+  startAutoDeploy: async (versionId, actorId) => {
+    const { startAutoDeploy } = await import('../deployment/deployment.background');
+    return startAutoDeploy(versionId, actorId);
   },
   startAudio: async (versionId, userId) => {
     const { startGeneration } = await import('../audio/audio.service');
@@ -280,15 +275,9 @@ export async function updateDocumentVersionStatusAction(
 
   // Moving a version through its workflow belongs to that language's team,
   // whoever is assigned to it, so the work goes on when the translator is
-  // away. Someone from another language cannot move it.
+  // away. Someone from another language cannot move it. That includes taking
+  // a version back out of DEPLOYED; reaching DEPLOYED is Deploy's job.
   await authorize({ language: existingVersion.languageId, role: 'member' });
-
-  // Deploying publishes this language's work to the content repository, so it
-  // belongs to the people answerable for that language -- its manager and any
-  // administrator. Leaving DEPLOYED is the same decision in reverse.
-  if (involvesDeployed(existingVersion.status, status)) {
-    await authorize({ language: existingVersion.languageId, role: 'manager' });
-  }
 
   try {
     return await changeStatus({ version: existingVersion, to: status, actorId: user.id });

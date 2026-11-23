@@ -93,7 +93,7 @@ describe('canViewLanguage', () => {
 
 describe('canAdministerLanguages', () => {
   it('is the admin flag, not the manager role', () => {
-    // Branch, voice, code and deletion decide what the app does with a
+    // Voice, code and deletion decide what the app does with a
     // language, and getting one wrong breaks something outside it.
     assert.equal(canAdministerLanguages({ kind: 'admin' }), true);
     assert.equal(canAdministerLanguages(manager(HR.id)), false);
@@ -102,17 +102,21 @@ describe('canAdministerLanguages', () => {
 });
 
 describe('canDeployLanguage', () => {
-  it('lets a manager publish their own language', () => {
-    assert.equal(canDeployLanguage(manager(HR.id), HR.id), true);
+  const member = (role: ProjectRole, languageId = HR.id) => ({ isAdmin: false, memberships: [{ languageId, role }] });
+
+  it('lets anyone on the language team publish it, in any role', () => {
+    for (const role of Object.values(ProjectRole)) {
+      assert.equal(canDeployLanguage(member(role), HR.id), true, role);
+    }
   });
 
   it('does not let them publish another language', () => {
-    assert.equal(canDeployLanguage(manager(HR.id), CS.id), false);
+    assert.equal(canDeployLanguage(member(ProjectRole.PROJECT_MANAGER), CS.id), false);
   });
 
-  it('lets an admin publish any language, and everyone else none', () => {
-    assert.equal(canDeployLanguage({ kind: 'admin' }, CS.id), true);
-    assert.equal(canDeployLanguage({ kind: 'none' }, CS.id), false);
+  it('lets an admin publish any language, and nobody else', () => {
+    assert.equal(canDeployLanguage({ isAdmin: true, memberships: [] }, CS.id), true);
+    assert.equal(canDeployLanguage({ isAdmin: false, memberships: [] }, CS.id), false);
   });
 });
 

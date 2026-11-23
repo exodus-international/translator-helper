@@ -1,7 +1,5 @@
 import { DocumentStatus } from '@/generated/prisma/enums';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
-import { DeploySkippedError } from '../github/github.errors';
-import type { MergeOutcome } from '../github/github.merge';
 import { refuse, type Refusal } from '@/lib/action-refusal';
 import { StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
 
@@ -10,10 +8,13 @@ import { StatusTransitionRefusedError, validateTransition } from './document-ver
  *
  * The server action checks the caller and loads the version; this decides
  * whether the move is allowed, makes it, and runs what follows from it: the
- * activity log, the notifications, the GitHub deploy on entering DEPLOYED and
- * the audio generation on entering APPROVED. The two side effects never throw
- * back to the caller: a deploy or a recording that fails is reported in the
- * result, and the status change itself stands.
+ * activity log, the notifications, and on entering APPROVED the audio
+ * generation and, where the project deploys on approval, a deploy. Neither
+ * side effect throws back to the caller: a recording or a deploy that cannot
+ * start is reported in the result, and the status change itself stands.
+ *
+ * DEPLOYED is not reached here. A version becomes DEPLOYED when a deploy
+ * publishes it, so asking for that move is refused with a pointer to Deploy.
  *
  * Built with `createStatusChange(deps)` so a test can hand in fakes for every
  * write and every external call, the way audio.service and authorize are
@@ -25,23 +26,11 @@ interface StatusChangeVersion {
   status: DocumentStatus;
 }
 
-export interface GitHubOutcome {
-  status: 'success' | 'failed' | 'skipped';
-  error?: string;
-  prUrl?: string;
-  /**
-   * Set only when deploys merge their pull request: whether this one did.
-   * A deploy whose merge did not happen still succeeded, with its pull
-   * request left open, and `mergeError` says why.
-   */
-  merged?: boolean;
-  mergeError?: string;
-}
-
 export interface StatusChangeResult<Version> {
   version: Version;
-  github?: GitHubOutcome;
   audio?: AudioGenerationOutcome;
+  /** The deploy that approval started, for the page to follow. */
+  deploymentId?: string;
 }
 
 /** A move the server refused, with the status the version really has now. */
@@ -66,22 +55,23 @@ export interface StatusChangeDeps<Version> {
   log: (entry: {
     documentVersionId: string;
     userId: string;
-    action: 'status_updated' | 'github_deployed' | 'github_deploy_failed';
+    action: 'status_updated';
     details: Record<string, unknown>;
   }) => Promise<unknown>;
   notify: (input: { versionId: string; actorId: string; from: DocumentStatus; to: DocumentStatus }) => Promise<void>;
-  github: {
-    isConfigured: () => boolean;
-    deploy: (versionId: string) => Promise<{ prUrl: string; merge?: MergeOutcome } | undefined>;
-  };
+  /** Starts a deploy when the version's project deploys on approval; the deployment id, or null. */
+  startAutoDeploy: (versionId: string, actorId: string) => Promise<string | null>;
   startAudio: (versionId: string, userId: string) => Promise<AudioGenerationOutcome>;
   /** Drops the cached document page, once something the page shows has changed. */
   revalidateDocumentPage: () => void;
 }
 
-/** Whether moving to `to` from `from` touches DEPLOYED, in either direction. */
-export function involvesDeployed(from: DocumentStatus, to: DocumentStatus): boolean {
-  return from === DocumentStatus.DEPLOYED || to === DocumentStatus.DEPLOYED;
+export const DEPLOY_THROUGH_DEPLOY =
+  'A document becomes Deployed when it is published. Use Deploy to publish it.';
+
+/** Whether this move is a deploy, which only Deploy makes. */
+export function isDeployMove(to: DocumentStatus): boolean {
+  return to === DocumentStatus.DEPLOYED;
 }
 
 /** Whether entering `to` is refused while a suggestion is still open. */
@@ -97,6 +87,10 @@ export function createStatusChange<Version>(deps: StatusChangeDeps<Version>) {
   }): Promise<StatusChangeResult<Version>> {
     const { version: existing, to, actorId } = input;
 
+    if (isDeployMove(to)) {
+      throw new StatusTransitionRefusedError(DEPLOY_THROUGH_DEPLOY, 'use_deploy');
+    }
+
     if (guardedByOpenSuggestions(to)) {
       const openSuggestionsCount = await deps.countOpenSuggestions(existing.id);
       validateTransition(existing.status, to, { openSuggestionsCount });
@@ -110,39 +104,30 @@ export function createStatusChange<Version>(deps: StatusChangeDeps<Version>) {
     await deps.notify({ versionId: existing.id, actorId, from: existing.status, to });
 
     const result: StatusChangeResult<Version> = { version };
-    if (to === DocumentStatus.DEPLOYED) {
-      result.github = await deployAfterStatusChange(deps, existing.id, actorId);
-    }
     if (to === DocumentStatus.APPROVED) {
       result.audio = await recordAfterStatusChange(deps, existing.id, actorId);
+      // Only an approval deploys. Taking a version back out of DEPLOYED also
+      // lands here, and redeploying it at once would undo the revoke.
+      if (existing.status === DocumentStatus.PENDING_REVIEW) {
+        const deploymentId = await autoDeployAfterStatusChange(deps, existing.id, actorId);
+        if (deploymentId) result.deploymentId = deploymentId;
+      }
     }
     return result;
   };
 }
 
-async function deployAfterStatusChange<Version>(
+async function autoDeployAfterStatusChange<Version>(
   deps: StatusChangeDeps<Version>,
   versionId: string,
   actorId: string,
-): Promise<GitHubOutcome> {
-  if (!deps.github.isConfigured()) {
-    return { status: 'skipped' };
-  }
+): Promise<string | null> {
   try {
-    const deployed = await deps.github.deploy(versionId);
-    const merge = deployed?.merge;
-    const mergeFacts = merge ? { merged: merge.merged, ...(!merge.merged && { mergeError: merge.reason }) } : {};
-    await deps.log({ documentVersionId: versionId, userId: actorId, action: 'github_deployed', details: mergeFacts });
-    deps.revalidateDocumentPage();
-    return { status: 'success', prUrl: deployed?.prUrl, ...mergeFacts };
+    return await deps.startAutoDeploy(versionId, actorId);
   } catch (error) {
-    if (error instanceof DeploySkippedError) {
-      return { status: 'skipped' };
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    await deps.log({ documentVersionId: versionId, userId: actorId, action: 'github_deploy_failed', details: { error: message } });
-    deps.revalidateDocumentPage();
-    return { status: 'failed', error: message };
+    // The approval stands; the team can still deploy by hand.
+    console.error('[StatusChange] Could not start the auto-deploy:', error);
+    return null;
   }
 }
 

@@ -3,7 +3,6 @@ import { z } from 'zod';
 const githubConfigSchema = z.object({
   appId: z.string().min(1, 'GITHUB_APP_ID is required'),
   privateKey: z.string().min(1, 'GITHUB_PRIVATE_KEY or GITHUB_PRIVATE_KEY_PATH is required'),
-  webhookSecret: z.string().min(1, 'GITHUB_WEBHOOK_SECRET is required'),
   repoOwner: z.string().min(1, 'GITHUB_REPO_OWNER is required'),
   repoName: z.string().min(1, 'GITHUB_REPO_NAME is required'),
   installationId: z.coerce.number().int().positive('GITHUB_INSTALLATION_ID must be a positive integer'),
@@ -13,11 +12,10 @@ const githubConfigSchema = z.object({
    */
   apiBaseUrl: z.string().url().optional(),
   /**
-   * Whether a deploy merges its pull request into main straight away, so
-   * deploying publishes. Off leaves the pull request open for someone to
-   * merge on GitHub.
+   * The branch a deploy commits to. The site reads the content repository
+   * from it, so a deploy is live once its commit lands there.
    */
-  mergeOnDeploy: z.boolean(),
+  deployBranch: z.string().min(1),
 });
 
 type GitHubConfig = z.infer<typeof githubConfigSchema>;
@@ -44,12 +42,11 @@ export function getGitHubConfig(): GitHubConfig {
   const result = githubConfigSchema.safeParse({
     appId: process.env.GITHUB_APP_ID,
     privateKey,
-    webhookSecret: process.env.GITHUB_WEBHOOK_SECRET,
     repoOwner: process.env.GITHUB_REPO_OWNER,
     repoName: process.env.GITHUB_REPO_NAME,
     installationId: process.env.GITHUB_INSTALLATION_ID,
     apiBaseUrl: process.env.GITHUB_API_BASE_URL || undefined,
-    mergeOnDeploy: process.env.GITHUB_MERGE_ON_DEPLOY === 'true',
+    deployBranch: process.env.GITHUB_DEPLOY_BRANCH || 'main',
   });
 
   if (!result.success) {

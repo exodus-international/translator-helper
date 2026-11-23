@@ -3,8 +3,10 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { auth } from '@/lib/auth';
 import {
   AudioProvider,
+  DeploymentItemOutcome,
+  DeploymentStatus,
+  DeploymentTrigger,
   DocumentStatus,
-  GitHubPRStatus,
   InvitationStatus,
   PrismaClient,
   ProjectRole,
@@ -41,6 +43,7 @@ async function cleanup() {
     prisma.suggestion.deleteMany(),
     prisma.comment.deleteMany(),
     prisma.activityLog.deleteMany(),
+    prisma.deployment.deleteMany(),
     prisma.gitHubCommit.deleteMany(),
     prisma.documentVersion.deleteMany(),
     prisma.document.deleteMany(),
@@ -538,35 +541,48 @@ async function seedLanguageScenarios(langs: Record<string, string>, users: Recor
     },
   });
 
-  // Deploy history: a commit per deployed version, so "last deploy" has a real
-  // timestamp rather than a status with no history behind it.
+  // Deploy history: a deployment per deployed version, so "last deploy" and the
+  // history panels have real rows rather than a status with nothing behind it.
   const deployed = await prisma.documentVersion.findMany({
     where: { status: DocumentStatus.DEPLOYED },
-    select: { id: true, languageId: true, document: { select: { slug: true } } },
+    select: {
+      id: true,
+      languageId: true,
+      document: { select: { slug: true, sourceProjectId: true } },
+      language: { select: { code: true } },
+    },
   });
-  const branchByLanguage = new Map(
-    (await prisma.language.findMany({ select: { id: true, code: true, branchName: true } })).map((l) => [
-      l.id,
-      l.branchName ?? `translations/${l.code}`,
-    ]),
-  );
   let day = 0;
   for (const version of deployed) {
-    await prisma.gitHubCommit.create({
+    // Spread backwards so the newest is a few days old, not all identical.
+    const at = new Date(Date.now() - (day += 2) * 24 * 60 * 60 * 1000);
+    const sha = `5eed${version.id.replace(/-/g, '').slice(0, 36)}`;
+    await prisma.deployment.create({
       data: {
-        documentVersionId: version.id,
-        commitSha: `seed${version.id.slice(0, 7)}`,
-        branchName: branchByLanguage.get(version.languageId) ?? 'translations/unknown',
-        filePath: `translations/${version.document.slug}.md`,
-        prNumber: 100 + day,
-        prStatus: GitHubPRStatus.MERGED,
-        // Spread backwards so the newest is a few days old, not all identical.
-        createdAt: new Date(Date.now() - (day += 2) * 24 * 60 * 60 * 1000),
+        status: DeploymentStatus.SUCCEEDED,
+        trigger: DeploymentTrigger.MANUAL,
+        requestedById: users.admin1,
+        sourceProjectId: version.document.sourceProjectId,
+        languageId: version.languageId,
+        branch: 'main',
+        commitSha: sha,
+        commitUrl: `https://github.com/example/content/commit/${sha}`,
+        createdAt: at,
+        startedAt: at,
+        finishedAt: at,
+        items: {
+          create: {
+            documentVersionId: version.id,
+            outcome: DeploymentItemOutcome.PUBLISHED,
+            filePath: `translations/${version.language.code}/${version.document.slug}.md`,
+            createdAt: at,
+          },
+        },
       },
     });
   }
 
-  console.log(`Voices for ${Object.keys(voices).length} languages, Portuguese as an empty language, ${deployed.length} deploy commits`);
+  console.log(`Voices for ${Object.keys(voices).length} languages, Portuguese as an empty language, ${deployed.length} deployments`);
 }
 
 // ---------------------------------------------------------------------------

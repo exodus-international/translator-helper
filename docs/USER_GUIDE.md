@@ -62,7 +62,6 @@ There are two global roles:
 3. Fill in the form:
    - **Language code** - lowercase ISO code, e.g. `cs`, `de`, `fr`, `es`
    - **Language name** - display name, e.g. `Czech`, `German`, `French`
-   - **Branch name** (optional) - Git branch for GitHub deployment, e.g. `czech-translation`
    - **Translation instructions** (optional) - Markdown guidelines that translators will see on their dashboard (terminology, tone, formatting rules, etc.)
 4. Click **Save**
 
@@ -160,37 +159,33 @@ A deployer has all translator capabilities plus admin access.
 
 Navigate to **Admin** (`/admin`) to access:
 
-- **Languages** - add/edit languages, set translation instructions and branch names
+- **Languages** - add/edit languages and set translation instructions
 - **Projects** - create source projects, manage translation projects and assignments
 - **Users** - view users, change roles (Translator/Deployer)
 
 #### GitHub Integration (Optional)
 
-If your team uses GitHub for content deployment, configure the following environment variables:
+If your team publishes content to a GitHub repository, configure the GitHub App with these
+environment variables:
 
 ```
 GITHUB_APP_ID=xxxxx
-GITHUB_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n...
+GITHUB_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n...
 GITHUB_INSTALLATION_ID=xxxxx
 GITHUB_REPO_OWNER=username
 GITHUB_REPO_NAME=repo-name
+GITHUB_DEPLOY_BRANCH=main   # optional, defaults to main
 ```
 
-Each language needs a **branch name** configured in the language settings.
+The app deploys by committing straight to the deploy branch, one commit per deploy, through the
+GitHub App. There are no language branches, pull requests or webhook to manage. The App therefore
+needs **Contents: write** on the content repository, and if the deploy branch is protected (required
+reviews or status checks), the App must be on the branch's bypass list, or every deploy is refused.
+A refused deploy is shown as failed with GitHub's reason, and can be retried once the App has the
+rights.
 
-Deploying commits the translation to its language branch and opens a pull request into `main`. To
-have each deploy merge its pull request straight away, so deploying publishes, also set:
-
-```
-GITHUB_MERGE_ON_DEPLOY=true
-```
-
-The pull request is merged with a merge commit, never a squash or rebase, because the language
-branch lives on after the merge. If the content repository deletes head branches on merge, the next
-deploy recreates the language branch from `main`. A merge GitHub refuses, for example over a
-required review or status check or a conflict, leaves the pull request open and the deploy still
-counts: the deployer sees why, and someone merges it on GitHub. Required checks or reviews on
-`main` block every merge, so a repository that has them needs the GitHub App on its bypass list.
+Each project that publishes needs a **repository directory** (set on the project). Documents in a
+project without one are marked `Deployed` without being published.
 
 #### Deployer-Specific Dashboard
 
@@ -247,7 +242,7 @@ The translation interface has two panels:
 
 Drafts are auto-saved every 5 seconds while you type.
 
-You do not have to be the assigned translator to submit. Anyone on that language's team, and any administrator, can submit a document for review or move it to another status, so the work goes on when the translator is away. Only the language's manager or an administrator can deploy.
+You do not have to be the assigned translator to submit. Anyone on that language's team, and any administrator, can submit a document for review or move it to another status, so the work goes on when the translator is away. Deploying works the same way: anyone on the language's team, and any administrator, can deploy an approved document.
 
 After submitting for review, you cannot edit the translation until a reviewer either approves it or requests changes.
 
@@ -310,26 +305,52 @@ When requesting changes, always leave comments or suggestions explaining what ne
 
 ### Deploying Translations
 
-1. Open the **Ready to Deploy** section on your dashboard, or filter documents by `Approved` status
-2. Click **View & Deploy** to open the review page
-3. Review the final translation
-4. Click **Deploy**
+Anyone on a language's team, and any administrator, can deploy that language's approved documents.
+There is one **Deploy** action, and it works the same wherever you start it:
+
+- **One document**: choose **Deploy** in the document's status menu, or press **Deploy** in the
+  **Deploy** section of the document's sidebar. Dragging a card into **Deployed** on the project
+  board does the same.
+- **A batch**: press **Deploy approved** on a project's **Deploys** tab (that project in the
+  selected language), on a language's page (every approved document in that language), or on the
+  **Deploys** page (everything approved that you may deploy).
+
+Before anything is sent, a confirmation says what will go out: the documents, the repository and
+branch, and anything worth knowing first (documents without up-to-date audio, documents in a project
+with no repository directory, documents already being deployed). Nothing happens until you press
+**Deploy**.
 
 What happens on deploy:
 
-- The document status changes to `Deployed`
-- If GitHub integration is configured:
-  - A commit is created on the language's configured branch
-  - A pull request is created or updated
-  - The commit SHA, branch, and PR URL are recorded
-- The translated file becomes available for download
+- Every document in the deploy is written to the content repository in **one commit** on the deploy
+  branch. Files that have not changed are left as they are, so deploying the same content twice
+  makes no new commit.
+- Each document's status changes to `Deployed` once its file is published.
+- A message follows the deploy while it runs and reports how it went, with a link to the commit.
+
+**Deploy on approval.** A project's **Deploys** tab has a **Deploy on approval** switch for each
+language. When it is on, approving a document in that project and language deploys it straight
+away. It is off by default.
+
+**Redeploy.** A deployed document shows **Redeploy** in its **Deploy** section. Use it to publish the
+document again, for example after the files on GitHub were changed by hand.
+
+**When a deploy fails.** The message says why and offers **Retry**. Failed deploys also show
+**Retry** in the deploy history. Retrying sends the documents that did not go out; documents that
+were published stay published. Two deploys of the same document never run at once: starting a
+second one while the first is running joins the first.
+
+**Deploy history.** Every deploy is recorded with who started it, which documents went out and how
+each one went, when, the outcome, and the commit on GitHub. The history is shown on each document's
+**Deploy** section, on a project's **Deploys** tab, on a language's page, and on the **Deploys**
+page in the main navigation.
 
 ### Managing Languages
 
 **Admin > Languages** (`/admin/languages`)
 
 - **Add** new languages (code, name, branch, instructions)
-- **Edit** existing languages (update name, branch name, translation instructions)
+- **Edit** existing languages (update name and translation instructions)
 - **Delete** languages (removes the language and its translation projects)
 
 ### Managing Projects

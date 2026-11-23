@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { DocumentType } from '@/generated/prisma/enums';
 
 export interface FilePathParams {
@@ -9,16 +8,3 @@ export interface FilePathParams {
   originalFilename: string | null;
   slug: string;
 }
-
-export const pullRequestWebhookSchema = z.object({
-  action: z.string(),
-  number: z.number(),
-  pull_request: z.object({
-    number: z.number(),
-    merged: z.boolean(),
-    state: z.string(),
-    title: z.string(),
-    html_url: z.string(),
-  }),
-});
-

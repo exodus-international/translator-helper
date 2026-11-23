@@ -74,9 +74,9 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     // Then assertCanDeleteDocumentVersion: the edit rule for drafts, the
     // language's manager once the version is in review or later.
     deleteDocumentVersionAction: ['authenticated'],
-    // Anyone on the language team moves a version, not only its translator;
-    // the language's manager as well when the move enters or leaves DEPLOYED.
-    updateDocumentVersionStatusAction: ['authenticated', 'language:member', 'language:manager'],
+    // Anyone on the language team moves a version, not only its translator.
+    // A move into DEPLOYED is refused for everyone: Deploy makes that one.
+    updateDocumentVersionStatusAction: ['authenticated', 'language:member'],
     assignDocumentVersionAction: ['authenticated', 'project:translator'],
     getApprovedVersionsAction: ['authenticated'],
   },
@@ -93,10 +93,19 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     // pass canAccessSourceProject, checked against the row.
     toggleDocumentLabelAction: ['authenticated'],
   },
-  'github/github.actions.ts': {
-    // Then assertDeployableStatus: only APPROVED or DEPLOYED versions.
-    deployToGitHubAction: ['language:manager'],
-    getGitHubCommitsForVersionAction: ['authenticated'],
+  'deployment/deployment.actions.ts': {
+    // Then language:member on every language the deploy touches, through
+    // chosenVersions or versionsInScope; a person outside the team is refused
+    // before anything is written. Administrators pass every language.
+    previewDeployAction: ['authenticated'],
+    deployVersionsAction: ['authenticated'],
+    deployScopeAction: ['authenticated'],
+    // Then language:member on every language of the documents it sends again.
+    retryDeploymentAction: ['authenticated'],
+    // Administrators, the requester, or a member of a language in it, checked against the row.
+    getDeploymentAction: ['authenticated'],
+    listDeploymentsAction: ['authenticated', 'language:member'],
+    setAutoDeployAction: ['project:member'],
   },
   'invitation/invitation.actions.ts': {
     createInvitationAction: ['admin'],

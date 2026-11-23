@@ -1,5 +1,5 @@
 import prisma from '@/lib/db';
-import { AudioProvider, AudioQuality, ProjectRole, SourceProjectStatus } from '@/generated/prisma/enums';
+import { AudioProvider, AudioQuality, DeploymentItemOutcome, ProjectRole, SourceProjectStatus } from '@/generated/prisma/enums';
 import type { LanguageDependents } from './language-delete';
 import {
   buildLanguageDocumentRows,
@@ -32,12 +32,11 @@ export async function getLanguageByCode(code: string) {
   });
 }
 
-export async function createLanguage(code: string, name: string, branchName: string) {
+export async function createLanguage(code: string, name: string) {
   return prisma.language.create({
     data: {
       code,
       name,
-      branchName,
     },
   });
 }
@@ -46,7 +45,6 @@ export async function updateLanguageSettings(
   id: string,
   data: {
     name: string;
-    branchName: string | null;
     audioProvider: AudioProvider | null;
     audioVoice: string | null;
     audioRate: string | null;
@@ -184,12 +182,16 @@ export async function getLanguageProgress(
         versions: { where: { languageId }, select: { status: true }, take: 1 },
       },
     }),
-    // A real timestamp for "last deploy": a commit is written the moment a
-    // version reaches the content repository, where a status has no history.
-    prisma.gitHubCommit.findFirst({
-      where: { documentVersion: { languageId } },
+    // A real timestamp for "last deploy": the last time a commit carried one
+    // of this language's files to the content repository. A status has no
+    // history, and a deploy that found everything up to date published nothing.
+    prisma.deployment.findFirst({
+      where: {
+        commitSha: { not: null },
+        items: { some: { outcome: DeploymentItemOutcome.PUBLISHED, documentVersion: { languageId } } },
+      },
       orderBy: { createdAt: 'desc' },
-      select: { createdAt: true },
+      select: { createdAt: true, finishedAt: true },
     }),
   ]);
 
@@ -207,7 +209,7 @@ export async function getLanguageProgress(
       : [],
   );
 
-  return { ...rollUpLanguageProgress(rows), lastDeployAt: lastDeploy?.createdAt ?? null };
+  return { ...rollUpLanguageProgress(rows), lastDeployAt: lastDeploy ? (lastDeploy.finishedAt ?? lastDeploy.createdAt) : null };
 }
 
 /** The manager names and member count one language's settings page shows. */

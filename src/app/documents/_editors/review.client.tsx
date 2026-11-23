@@ -2,7 +2,7 @@
 
 import { ActivityLog } from '@/components/activity-log';
 import { AudioStatus } from '@/components/audio-status';
-import { GitHubStatus } from '@/components/github-status';
+import { DocumentDeployPanel } from '@/components/deploy/document-deploy-panel';
 import { Button } from '@/components/ui/button';
 import { DocumentEditor } from '@/components/document-editor';
 import { MarkdownGuide } from '@/components/markdown-guide';
@@ -116,9 +116,10 @@ export default function ReviewClient({
               status={initialTargetVersion.status}
               compact
             />
-            <GitHubStatus
+            <DocumentDeployPanel
               documentVersionId={initialTargetVersion.id}
-              isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+              status={initialTargetVersion.status}
+              canDeploy={canDeploy}
               compact
             />
           </>
@@ -131,10 +132,10 @@ export default function ReviewClient({
               status={initialTargetVersion.status}
               frame="section"
             />
-            <GitHubStatus
+            <DocumentDeployPanel
               documentVersionId={initialTargetVersion.id}
-              isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-              frame="section"
+              status={initialTargetVersion.status}
+              canDeploy={canDeploy}
             />
             {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
               <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />

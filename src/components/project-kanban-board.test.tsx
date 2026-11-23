@@ -3,6 +3,7 @@ import test, { afterEach } from 'node:test';
 import { cleanup, render, screen } from '@testing-library/react';
 import { Role } from '@/generated/prisma/enums';
 import type { Language } from '@/generated/prisma/client';
+import { createTestRouter } from '../../tests/next-router';
 import ProjectKanbanBoard, { type ProjectKanbanBoardLoaders } from './project-kanban-board';
 
 /**
@@ -43,16 +44,19 @@ const emptyProject: ProjectKanbanBoardLoaders = {
 };
 
 test('a project with no documents shows an empty board with no filter to clear', async () => {
+  const { TestRouter } = createTestRouter('/projects/autumn');
   render(
-    <ProjectKanbanBoard
+    <TestRouter>
+      <ProjectKanbanBoard
       user={admin}
       languages={[croatian]}
       deployableLanguageIds={[croatian.id]}
       selectedLanguage={croatian.id}
       sourceProjectId="sp-autumn"
       translationProjectId="tp-hr"
-      loaders={emptyProject}
-    />,
+        loaders={emptyProject}
+      />
+    </TestRouter>,
   );
 
   assert.ok(await screen.findByText('No documents found'));

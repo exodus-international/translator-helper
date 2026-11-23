@@ -156,11 +156,16 @@ application code.
 | Module | Stands in for | Pointed at by |
 |---|---|---|
 | `support/openai-mock.mjs` | the chat completions endpoint | `CHATGPT_API_BASE_URL` |
-| `support/github-mock.mjs` | the GitHub REST API, enough of it for one deploy | `GITHUB_API_BASE_URL` |
+| `support/github-mock.mjs` | the GitHub REST API, as a content repository kept in memory | `GITHUB_API_BASE_URL` |
 
-The GitHub stub answers the seven calls a deploy makes: installation token, branch check, file
-lookup, commit, open pull request lookup, pull request creation, and its merge. It always reports
-pull request 42. The suite runs with `GITHUB_MERGE_ON_DEPLOY=true`, so a deploy makes all seven. The app also needs the rest of a GitHub configuration to believe it is configured, and
+The GitHub stub answers the Git data calls a deploy makes: installation token, the branch head and
+its commit, a lookup per file, a new tree, a new commit, and a fast-forward of the branch. It keeps
+what was committed, so a second deploy of the same content finds nothing changed and makes no commit,
+as GitHub would. Steps steer it through `support/github-stub.ts`: `resetGitHubMock()` empties the
+repository, `refuseNextGitHubPush()` makes the next branch update fail with the 403 GitHub gives an
+App that may not push, and `gitHubMockState()` reports how many commits the branch has had. The
+suite runs one worker, so a switch set in one scenario cannot leak into another running beside it.
+The app also needs the rest of a GitHub configuration to believe it is configured, and
 `support/github-stub.ts` supplies it, including an RSA key generated for the run: the app signs a
 token request with it, and the signing needs a key that parses even though nobody checks the
 signature. `playwright.config.ts` passes all of it to the Next server explicitly, so a real
@@ -225,8 +230,9 @@ the status control is named `Document status: <status>`, the editor panes are te
 - **AI translation** — a stubbed model filling an empty translation
 - **Review and suggestions** — approval refused while feedback is open, applying a suggestion,
   approval succeeding once nothing is open, dismissing and reopening a comment
-- **Deploy** — an approved translation deployed against the stubbed GitHub API, its pull request
-  merged and linked, and a translator not offered deploy at all
+- **Deploy** — an approved translation deployed in one commit against the stubbed GitHub API and
+  shown in its deploy history, a redeploy of unchanged content making no commit, a deploy GitHub
+  refuses retried from its message, and a translator on the language's team offered deploy
 - **Administration happy paths** — creating a document by typing and by upload, creating a source
   project, creating an invitation, and the empty states of a new project and a new language
 

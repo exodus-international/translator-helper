@@ -2,9 +2,8 @@ import { DocumentStatus } from '@/generated/prisma/enums';
 
 /**
  * The statuses a version may be published to GitHub from. Only reviewed text
- * leaves the app: APPROVED is the status a deploy starts from, and DEPLOYED is
- * where the "Deploy to GitHub" retry is offered after a deploy that failed or
- * left no commit.
+ * leaves the app: APPROVED is the status a deploy starts from, and a DEPLOYED
+ * version can be deployed again, to republish it after the repository changed.
  */
 const DEPLOYABLE_STATUSES: readonly DocumentStatus[] = [DocumentStatus.APPROVED, DocumentStatus.DEPLOYED];
 

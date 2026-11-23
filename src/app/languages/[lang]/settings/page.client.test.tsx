@@ -5,8 +5,8 @@ import { createTestRouter } from '../../../../../tests/next-router';
 import LanguageSettingsClient from './page.client';
 
 /**
- * The Settings tab of a language that was just added: no team, no branch, no
- * voice, no instructions. The health card is the only place that lists what is
+ * The Settings tab of a language that was just added: no team, no voice, no
+ * instructions. The health card is the only place that lists what is
  * still missing, so each gap has to be named there.
  */
 
@@ -17,7 +17,6 @@ const brandNew = {
   code: 'hr',
   name: 'Croatian',
   isSource: false,
-  branchName: null as string | null,
   audioProvider: null as 'AZURE_SPEECH' | null,
   audioVoice: null as string | null,
   audioRate: null as string | null,
@@ -46,7 +45,7 @@ test('a new language with no team lists every missing piece of setup', () => {
   renderSettings();
 
   assert.ok(screen.getByText('No members yet.', { exact: false }));
-  for (const gap of ['No members', 'No language manager', 'No GitHub branch', 'No voice']) {
+  for (const gap of ['No members', 'No language manager', 'No voice']) {
     assert.ok(screen.getByText(gap), `expected the health card to say "${gap}"`);
   }
 });
@@ -54,7 +53,7 @@ test('a new language with no team lists every missing piece of setup', () => {
 test('the source language reports no gaps, because nothing translates into it', () => {
   renderSettings({ ...brandNew, code: 'en', name: 'English', isSource: true });
 
-  assert.ok(screen.getByText('None of the four checks apply to the source language.'));
+  assert.ok(screen.getByText('None of the three checks apply to the source language.'));
   assert.equal(screen.queryByText('No members'), null);
 });
 
@@ -109,7 +108,7 @@ test('a language with no speech provider has no narration to tune', () => {
 });
 
 test('the page says its changes save themselves, and shows them saved', () => {
-  renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
+  renderSettings(slovak);
 
   const notice = screen.getByText('Changes save automatically').parentElement!;
   assert.equal(within(notice).getByTitle('All changes saved').textContent, 'Saved');
@@ -117,7 +116,7 @@ test('the page says its changes save themselves, and shows them saved', () => {
 });
 
 test('a half-typed value waits with the reason instead of saving', () => {
-  renderSettings({ ...slovak, branchName: 'sk-slovak-translation' });
+  renderSettings(slovak);
 
   fireEvent.change(screen.getByLabelText('Speaking rate'), { target: { value: '5' } });
 

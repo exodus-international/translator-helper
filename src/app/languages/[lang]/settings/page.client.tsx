@@ -41,7 +41,6 @@ interface LanguageSettingsClientProps {
     code: string;
     name: string;
     isSource: boolean;
-    branchName: string | null;
     audioProvider: AudioProvider | null;
     audioVoice: string | null;
     audioRate: string | null;
@@ -59,7 +58,6 @@ interface LanguageSettingsClientProps {
 export default function LanguageSettingsClient({ language, members, deletionPlan }: LanguageSettingsClientProps) {
   const router = useRouter();
   const [name, setName] = useState(language.name);
-  const [branchName, setBranchName] = useState(language.branchName ?? '');
   const [audioProvider, setAudioProvider] = useState<AudioProvider | 'NONE'>(language.audioProvider ?? 'NONE');
   const [audioVoice, setAudioVoice] = useState(language.audioVoice ?? '');
   const [audioRate, setAudioRate] = useState(language.audioRate ?? '');
@@ -102,7 +100,6 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
   const noAudio = audioProvider === 'NONE';
   const settings = {
     name: name.trim(),
-    branchName: branchName.trim() || null,
     audioProvider: noAudio ? null : audioProvider,
     audioVoice: noAudio ? null : audioVoice.trim() || null,
     audioRate: noAudio ? null : audioRate.trim() || null,
@@ -120,7 +117,6 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
     validate: (value) => {
       const parsed = updateLanguageSettingsSchema.safeParse(value);
       if (!parsed.success) return formatIssues(parsed.error);
-      if (!language.isSource && !value.branchName) return 'A GitHub branch is required.';
       return null;
     },
     // No toasts: the sticky notice says saved, saving or why not, and a
@@ -207,23 +203,6 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
                   it, so the action rejects a change rather than trusting this disabled input.
                 </p>
               </div>
-
-              {!language.isSource && (
-                <div>
-                  <Label htmlFor="language-branch">GitHub branch *</Label>
-                  <Input
-                    id="language-branch"
-                    value={branchName}
-                    onChange={(event) => setBranchName(event.target.value)}
-                    placeholder="e.g., hr-croatian-translation"
-                    className="mt-1"
-                  />
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    The branch in the content repository every {language.name} deploy commits to. Required: without it
-                    a deploy throws at the moment it runs.
-                  </p>
-                </div>
-              )}
 
             </CardContent>
           </Card>
@@ -439,7 +418,7 @@ export default function LanguageSettingsClient({ language, members, deletionPlan
             <CardContent className="space-y-3">
               {language.isSource ? (
                 <p className="text-muted-foreground text-xs">
-                  None of the four checks apply to the source language.
+                  None of the three checks apply to the source language.
                 </p>
               ) : (
                 <>

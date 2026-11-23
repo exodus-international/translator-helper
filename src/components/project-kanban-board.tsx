@@ -34,7 +34,7 @@ import { UserAvatar } from '@/components/user-avatar';
 import { DocumentTypeBadge } from '@/components/document-type-badge';
 import { DocumentTypeFilter } from '@/components/document-type-filter';
 import { useActiveLanguage } from '@/components/analytics-project-group';
-import { useDeployConfirm } from '@/components/deploy-confirm';
+import { useDeploy, useFollowDeployment, type DeployActions } from '@/components/deploy/use-deploy';
 import { withStatusChangeFeedback } from '@/components/status-change-feedback';
 import { capture } from '@/lib/analytics';
 import { buildDocumentPath } from '@/domain/document/document-url';
@@ -175,6 +175,8 @@ export interface ProjectKanbanBoardLoaders {
   documents: typeof getDashboardDocumentsAction;
   members: typeof listTranslationProjectMembersAction;
   changeStatus: typeof updateDocumentVersionStatusAction;
+  /** The server actions behind a drop into Deployed; a test hands in fakes. */
+  deploy?: DeployActions;
 }
 
 const serverLoaders: ProjectKanbanBoardLoaders = {
@@ -188,9 +190,9 @@ interface ProjectKanbanBoardProps {
   languages: Language[];
   /**
    * Language ids this person may deploy, resolved on the server: every language
-   * for an administrator, the managed ones for a language manager. The Deployed
-   * column is shown to everyone -- seeing what has shipped is not a privilege --
-   * but moving work into or out of it is not.
+   * for an administrator, their own languages for anyone on a team. The
+   * Deployed column is shown to everyone -- seeing what has shipped is not a
+   * privilege -- but moving work into or out of it is.
    */
   deployableLanguageIds: string[];
   selectedLanguage: string;
@@ -208,7 +210,13 @@ export default function ProjectKanbanBoard({
   translationProjectId,
   loaders = serverLoaders,
 }: ProjectKanbanBoardProps) {
-  const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
+  const followDeployment = useFollowDeployment(loaders.deploy);
+  // A drop into Deployed runs a deploy. The card goes back to Approved until
+  // the deploy publishes it, and the board reloads when it ends.
+  const { requestDeploy, dialog: deployDialog } = useDeploy({
+    actions: loaders.deploy,
+    onFinished: () => void loadDocuments(),
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState('all');
   const [selectedTypes, setSelectedTypes] = useState<DocumentTypeFilterValue[]>([]);
@@ -453,18 +461,26 @@ export default function ProjectKanbanBoard({
           // would otherwise land in the column, fail, and spring back.
           const leavingDeployed = getStatusForColumn(oldCard.column) === DocumentStatus.DEPLOYED;
           if ((newStatus === DocumentStatus.DEPLOYED || leavingDeployed) && !canDeploy) {
-            toast.warning('Only this language\u2019s manager or an administrator can deploy');
+            toast.warning('Only this language\u2019s team or an administrator can deploy');
             await loadDocuments();
             continue;
           }
 
-          if (newStatus === DocumentStatus.DEPLOYED && !(await confirmDeploy(versionId))) {
+          if (newStatus === DocumentStatus.DEPLOYED) {
             await loadDocuments();
+            await requestDeploy({ versionIds: [versionId], via: 'kanban_dnd' });
             continue;
           }
           try {
             await withStatusChangeFeedback(
-              { from: getStatusForColumn(oldCard.column), to: newStatus, via: 'kanban_dnd', documentId: doc.id, versionId },
+              {
+                from: getStatusForColumn(oldCard.column),
+                to: newStatus,
+                via: 'kanban_dnd',
+                documentId: doc.id,
+                versionId,
+                onDeployStarted: (deploymentId) => void followDeployment(deploymentId, `"${doc.title}"`),
+              },
               () => loaders.changeStatus(versionId, newStatus),
             );
             await loadDocuments();

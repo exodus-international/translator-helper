@@ -56,6 +56,7 @@ import {
   ChevronsUpDown,
   FileText,
   FolderKanban,
+  GitCommitHorizontal,
   Languages,
   LayoutDashboard,
   Library,
@@ -77,6 +78,7 @@ import { usePathname, useRouter } from 'next/navigation';
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   documents: 'Documents',
+  deploys: 'Deploys',
   projects: 'Projects',
   translations: 'Translations',
   releases: 'Releases',
@@ -170,6 +172,9 @@ const ROOT_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   // For everyone signed in: translators look passages up while they work.
   { href: '/bible', label: 'Bible', icon: BookOpenText },
+  // For everyone signed in: anyone on a language team deploys its work, and
+  // the page lists only the languages the person is on.
+  { href: '/deploys', label: 'Deploys', icon: GitCommitHorizontal },
 ];
 
 // Editorial rather than administrative: a language's Project Manager writes the

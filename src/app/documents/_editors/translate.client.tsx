@@ -5,7 +5,7 @@ import { AudioStatus } from '@/components/audio-status';
 import { DocumentEditor } from '@/components/document-editor';
 import { MarkdownGuide } from '@/components/markdown-guide';
 import { SaveControl } from '@/components/save-control';
-import { GitHubStatus } from '@/components/github-status';
+import { DocumentDeployPanel } from '@/components/deploy/document-deploy-panel';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -130,9 +130,10 @@ export default function TranslateClient({
                 status={initialTargetVersion.status}
                 compact
               />
-              <GitHubStatus
+              <DocumentDeployPanel
                 documentVersionId={initialTargetVersion.id}
-                isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+                status={initialTargetVersion.status}
+                canDeploy={canDeploy}
                 compact
               />
             </>
@@ -147,10 +148,10 @@ export default function TranslateClient({
                 status={initialTargetVersion.status}
                 frame="section"
               />
-              <GitHubStatus
+              <DocumentDeployPanel
                 documentVersionId={initialTargetVersion.id}
-                isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-                frame="section"
+                status={initialTargetVersion.status}
+                canDeploy={canDeploy}
               />
               {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
                 <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />

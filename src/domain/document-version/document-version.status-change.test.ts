@@ -1,11 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { DocumentStatus } from '@/generated/prisma/enums';
-import { DeploySkippedError } from '../github/github.errors';
 import {
   createStatusChange,
   guardedByOpenSuggestions,
-  involvesDeployed,
+  isDeployMove,
   toStatusChangeRefusal,
   type StatusChangeDeps,
 } from './document-version.status-change';
@@ -27,12 +26,9 @@ function fakeDeps(overrides: Partial<StatusChangeDeps<Version>> = {}) {
     notify: async (input) => {
       calls.push({ fn: 'notify', args: [input.from, input.to] });
     },
-    github: {
-      isConfigured: () => true,
-      deploy: async (id) => {
-        calls.push({ fn: 'deploy', args: [id] });
-        return { prUrl: 'https://github.example/pull/42' };
-      },
+    startAutoDeploy: async (id) => {
+      calls.push({ fn: 'startAutoDeploy', args: [id] });
+      return null;
     },
     startAudio: async (id) => {
       calls.push({ fn: 'startAudio', args: [id] });
@@ -50,10 +46,9 @@ const version = (status: DocumentStatus): Version => ({ id: 'version-1', status 
 const fns = (calls: Call[]) => calls.map((call) => call.fn);
 
 describe('the two decisions the action asks before it loads anything', () => {
-  it('knows a move in or out of DEPLOYED needs the language manager', () => {
-    assert.equal(involvesDeployed(DocumentStatus.APPROVED, DocumentStatus.DEPLOYED), true);
-    assert.equal(involvesDeployed(DocumentStatus.DEPLOYED, DocumentStatus.APPROVED), true);
-    assert.equal(involvesDeployed(DocumentStatus.PENDING_REVIEW, DocumentStatus.APPROVED), false);
+  it('knows only a move into DEPLOYED is a deploy', () => {
+    assert.equal(isDeployMove(DocumentStatus.DEPLOYED), true);
+    assert.equal(isDeployMove(DocumentStatus.APPROVED), false);
   });
 
   it('guards approval and deployment on open suggestions, and nothing else', () => {
@@ -74,8 +69,8 @@ describe('changeStatus', () => {
     assert.deepEqual(fns(calls), ['updateStatus', 'log:status_updated', 'notify']);
     assert.deepEqual(calls[2].args, [DocumentStatus.PENDING_TRANSLATION, DocumentStatus.IN_PROGRESS]);
     assert.equal(result.version.status, DocumentStatus.IN_PROGRESS);
-    assert.equal(result.github, undefined);
     assert.equal(result.audio, undefined);
+    assert.equal(result.deploymentId, undefined);
   });
 
   it('refuses a move the workflow does not allow, before writing anything', async () => {
@@ -109,91 +104,59 @@ describe('changeStatus', () => {
   });
 });
 
-describe('deploying on entering DEPLOYED', () => {
-  it('deploys, logs the deploy, refreshes the page and reports the pull request', async () => {
+describe('DEPLOYED is reached through Deploy', () => {
+  it('refuses a move to DEPLOYED before writing anything, and says to use Deploy', async () => {
     const { changeStatus, calls } = fakeDeps();
-    const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });
-    assert.deepEqual(fns(calls), ['updateStatus', 'log:status_updated', 'notify', 'deploy', 'log:github_deployed', 'revalidate']);
-    assert.deepEqual(result.github, { status: 'success', prUrl: 'https://github.example/pull/42' });
+    const error = await changeStatus({
+      version: version(DocumentStatus.APPROVED),
+      to: DocumentStatus.DEPLOYED,
+      actorId: 'u',
+    }).catch((caught: unknown) => caught);
+    assert.deepEqual(calls, []);
+    assert.match(toStatusChangeRefusal(error, DocumentStatus.APPROVED)?.refused.message ?? '', /Use Deploy/);
   });
 
-  it('reports a merged pull request, in the result and the log', async () => {
-    const { changeStatus, calls } = fakeDeps({
-      github: {
-        isConfigured: () => true,
-        deploy: async () => ({ prUrl: 'https://github.example/pull/42', merge: { merged: true, sha: 'merge-sha' } }),
-      },
-    });
-    const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });
-    assert.deepEqual(result.github, { status: 'success', prUrl: 'https://github.example/pull/42', merged: true });
-    assert.deepEqual(calls.find((call) => call.fn === 'log:github_deployed')?.args, [{ merged: true }]);
-  });
-
-  it('keeps a deploy whose merge did not happen a success, with the reason', async () => {
-    const { changeStatus, calls } = fakeDeps({
-      github: {
-        isConfigured: () => true,
-        deploy: async () => ({
-          prUrl: 'https://github.example/pull/42',
-          merge: { merged: false, reason: 'At least 1 approving review is required' },
-        }),
-      },
-    });
-    const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });
-    assert.deepEqual(result.github, {
-      status: 'success',
-      prUrl: 'https://github.example/pull/42',
-      merged: false,
-      mergeError: 'At least 1 approving review is required',
-    });
-    assert.deepEqual(calls.find((call) => call.fn === 'log:github_deployed')?.args, [
-      { merged: false, mergeError: 'At least 1 approving review is required' },
-    ]);
-  });
-
-  it('skips the deploy when GitHub is not configured, and says so', async () => {
-    const { changeStatus, calls } = fakeDeps({ github: { isConfigured: () => false, deploy: async () => undefined } });
-    const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });
-    assert.deepEqual(result.github, { status: 'skipped' });
-    assert.equal(calls.some((call) => call.fn === 'deploy'), false);
-    // The status change itself still happened.
-    assert.equal(result.version.status, DocumentStatus.DEPLOYED);
-  });
-
-  it('treats a project the deploy declines as skipped, not failed', async () => {
-    const { changeStatus, calls } = fakeDeps({
-      github: {
-        isConfigured: () => true,
-        deploy: async () => {
-          throw new DeploySkippedError('no repository directory');
-        },
-      },
-    });
-    const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });
-    assert.deepEqual(result.github, { status: 'skipped' });
-    assert.equal(calls.some((call) => call.fn.startsWith('log:github')), false);
-  });
-
-  it('reports a failed deploy in the result and the log, and keeps the status', async () => {
-    const { changeStatus, calls } = fakeDeps({
-      github: {
-        isConfigured: () => true,
-        deploy: async () => {
-          throw new Error('branch missing');
-        },
-      },
-    });
-    const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });
-    assert.deepEqual(result.github, { status: 'failed', error: 'branch missing' });
-    assert.ok(calls.some((call) => call.fn === 'log:github_deploy_failed'));
-    assert.equal(result.version.status, DocumentStatus.DEPLOYED);
-  });
-
-  it('does not deploy when leaving DEPLOYED', async () => {
-    const { changeStatus, calls } = fakeDeps();
+  it('lets the team take a version back out of DEPLOYED', async () => {
+    const { changeStatus } = fakeDeps();
     const result = await changeStatus({ version: version(DocumentStatus.DEPLOYED), to: DocumentStatus.APPROVED, actorId: 'u' });
-    assert.equal(calls.some((call) => call.fn === 'deploy'), false);
-    assert.equal(result.github, undefined);
+    assert.equal(result.version.status, DocumentStatus.APPROVED);
+  });
+});
+
+describe('deploying on approval', () => {
+  it('starts the deploy after the recording and hands back the deployment to follow', async () => {
+    const { changeStatus, calls } = fakeDeps({
+      startAutoDeploy: async (id) => {
+        calls.push({ fn: 'startAutoDeploy', args: [id] });
+        return 'deployment-1';
+      },
+    });
+    const result = await changeStatus({ version: version(DocumentStatus.PENDING_REVIEW), to: DocumentStatus.APPROVED, actorId: 'u' });
+    assert.deepEqual(fns(calls), ['updateStatus', 'log:status_updated', 'notify', 'startAudio', 'revalidate', 'startAutoDeploy']);
+    assert.equal(result.deploymentId, 'deployment-1');
+  });
+
+  it('says nothing about a deploy when the project does not deploy on approval', async () => {
+    const { changeStatus } = fakeDeps();
+    const result = await changeStatus({ version: version(DocumentStatus.PENDING_REVIEW), to: DocumentStatus.APPROVED, actorId: 'u' });
+    assert.equal('deploymentId' in result, false);
+  });
+
+  it('keeps the approval when the deploy cannot start', async () => {
+    const { changeStatus } = fakeDeps({
+      startAutoDeploy: async () => {
+        throw new Error('database down');
+      },
+    });
+    const result = await changeStatus({ version: version(DocumentStatus.PENDING_REVIEW), to: DocumentStatus.APPROVED, actorId: 'u' });
+    assert.equal(result.version.status, DocumentStatus.APPROVED);
+    assert.equal(result.deploymentId, undefined);
+  });
+
+  it('does not redeploy a version whose deployment was just revoked', async () => {
+    const { changeStatus, calls } = fakeDeps();
+    await changeStatus({ version: version(DocumentStatus.DEPLOYED), to: DocumentStatus.APPROVED, actorId: 'u' });
+    assert.equal(calls.some((call) => call.fn === 'startAutoDeploy'), false);
   });
 });
 
@@ -201,7 +164,7 @@ describe('recording audio on entering APPROVED', () => {
   it('starts the recording and reports its outcome', async () => {
     const { changeStatus, calls } = fakeDeps();
     const result = await changeStatus({ version: version(DocumentStatus.PENDING_REVIEW), to: DocumentStatus.APPROVED, actorId: 'u' });
-    assert.deepEqual(fns(calls), ['updateStatus', 'log:status_updated', 'notify', 'startAudio', 'revalidate']);
+    assert.deepEqual(fns(calls), ['updateStatus', 'log:status_updated', 'notify', 'startAudio', 'revalidate', 'startAutoDeploy']);
     assert.deepEqual(result.audio, { status: 'success', audioFileId: 'audio-1' });
   });
 

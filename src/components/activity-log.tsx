@@ -29,6 +29,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
+import { formatRelativeTime } from '@/lib/relative-time';
 
 interface ActivityLogEntry {
   id: string;
@@ -89,21 +90,6 @@ const DEFAULT_CONFIG: ActionConfig = {
   colorClass: 'text-muted-foreground',
 };
 
-function formatRelativeTime(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDays = Math.floor(diffHr / 24);
-
-  if (diffSec < 60) return 'just now';
-  if (diffMin < 60) return `${diffMin} min ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDays === 1) return 'yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
 
 
 interface CollapsedEntry {
