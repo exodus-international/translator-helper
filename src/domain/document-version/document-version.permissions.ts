@@ -108,7 +108,8 @@ export function createVersionPermissions<Version extends PermissionVersion>(deps
    * On a language that lets the model draft its documents, the text in review
    * is machine output and the review screen offers direct editing, so changing
    * it there is a reviewer's job: reviewer, editor or the language's manager.
-   * Translators keep leaving suggestions. Languages without the setting keep
+   * Translators only read the review there; leaving feedback in review is a
+   * reviewer's right on every language. Languages without the setting keep
    * the translator rule above. Applying a suggestion is not a direct edit.
    */
   async function assertCanEditInReview(version: Version) {

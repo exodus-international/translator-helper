@@ -41,7 +41,8 @@ interface ReviewClientProps {
    * How a review edits the text in place. `scripture`: only through the
    * Scripture check, as on every project that does not use AI translation.
    * `direct`: an Edit button too, for reviewers on a project that does.
-   * `none`: a translator on such a project, who leaves suggestions instead.
+   * `none`: a translator on such a project, who reads the review; feedback
+   * there is a reviewer's, as on every project.
    */
   reviewEditing?: 'scripture' | 'direct' | 'none';
   /** The model's draft this text started from, when it did. */

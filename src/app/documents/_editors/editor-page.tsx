@@ -74,8 +74,9 @@ export async function DocumentEditorPage({
   if (targetVersion && !isDraftPhase(targetVersion.status)) {
     // On a project that lets the model draft its documents, the review is where
     // the text gets fixed: reviewers and up edit it in place, with the model's
-    // draft to compare against. The server enforces the same rule
-    // (assertCanEditDocumentVersionContent with directEdit).
+    // draft to compare against; a translator only reads it. The server
+    // enforces the same rule (assertCanEditDocumentVersionContent with
+    // directEdit).
     const autoTranslate = translationProject?.autoTranslate ?? false;
     const role = languageAccess.memberships.find((membership) => membership.languageId === language.id)?.role;
     const editsInReview =
