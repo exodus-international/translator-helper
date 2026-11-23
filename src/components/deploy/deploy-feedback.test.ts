@@ -106,19 +106,22 @@ describe('followDeployment', () => {
     assert.deepEqual(toasts.map((t) => t.message), ['Nothing to deploy']);
   });
 
-  it('keeps one toast from "Deploying" to the outcome, with the commit to open', async () => {
+  it('keeps one toast from "Deploying" through queued and publishing to the outcome, with the commit to open', async () => {
     const done = view('SUCCEEDED', ['PUBLISHED'], { commitUrl: 'https://github.example/commit/abc' });
     const { deps, toasts, opened } = fakeDeps([view('QUEUED', ['PENDING']), view('PUBLISHING', ['PENDING']), done]);
     const result = await followDeployment({ deploymentId: 'deployment-1', joined: false }, { label: '"Day 1"' }, deps);
 
     assert.equal(result, done);
-    assert.deepEqual(toasts.map((t) => [t.kind, t.message]), [
-      ['loading', 'Deploying "Day 1"…'],
-      ['success', 'Deployed "Day 1" to GitHub'],
+    assert.deepEqual(toasts.map((t) => [t.kind, t.message, t.options?.description]), [
+      ['loading', 'Deploying "Day 1"…', undefined],
+      ['loading', 'Deploying "Day 1"…', 'Queued, about to start.'],
+      ['loading', 'Deploying "Day 1"…', 'Publishing to GitHub.'],
+      ['success', 'Deployed "Day 1" to GitHub', undefined],
     ]);
-    assert.equal(toasts[1].options?.id, toasts[0].options?.id ?? 'toast-1');
-    assert.equal(toasts[1].options?.action?.label, 'View commit');
-    toasts[1].options?.action?.onClick();
+    assert.ok(toasts.slice(1).every((t) => t.options?.id === 'toast-1'));
+    const success = toasts[3];
+    assert.equal(success.options?.action?.label, 'View commit');
+    success.options?.action?.onClick();
     assert.deepEqual(opened, ['https://github.example/commit/abc']);
   });
 

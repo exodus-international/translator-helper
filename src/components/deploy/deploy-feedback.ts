@@ -73,6 +73,11 @@ export function describeOutcome(view: DeploymentView): { title: string; descript
   return { title: 'Nothing was deployed', description };
 }
 
+const PHASE_TEXT: Partial<Record<DeploymentView['status'], string>> = {
+  QUEUED: 'Queued, about to start.',
+  PUBLISHING: 'Publishing to GitHub.',
+};
+
 /**
  * Follows one deployment in a toast until it finishes. Resolves with the
  * finished deployment, or null when it could not be read or ran past the
@@ -89,9 +94,12 @@ export async function followDeployment(
     return null;
   }
 
-  const id = deps.toast.loading(started.joined ? `Already deploying ${options.label}…` : `Deploying ${options.label}…`);
+  const heading = started.joined ? `Already deploying ${options.label}…` : `Deploying ${options.label}…`;
+  const id = deps.toast.loading(heading);
   const deadline = deps.now() + FOLLOW_LIMIT_MS;
   let view: DeploymentView | null = null;
+  // The toast says which step it is on once the server says: waiting its turn, then publishing.
+  let phase: DeploymentView['status'] | null = null;
 
   for (;;) {
     try {
@@ -105,6 +113,10 @@ export async function followDeployment(
       return null;
     }
     if (view.status === DeploymentStatus.SUCCEEDED || view.status === DeploymentStatus.FAILED) break;
+    if (view.status !== phase) {
+      phase = view.status;
+      deps.toast.loading(heading, { id, description: PHASE_TEXT[view.status] });
+    }
     if (deps.now() > deadline) {
       deps.toast.message('Still deploying', { id, description: 'It carries on without this page. Deploys shows how it ends.' });
       options.onFinished?.(null);

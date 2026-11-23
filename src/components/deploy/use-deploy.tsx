@@ -257,7 +257,7 @@ function DeployDialogBody({ state, onConfirm }: { state: DialogState; onConfirm:
     ('versionIds' in request && request.redeploy) || preview.documents.every((document) => document.status === 'DEPLOYED');
   const verb = redeploy ? 'Redeploy' : 'Deploy';
   const [only] = preview.documents;
-  const title = count === 1 ? `${verb} "${only.title}"?` : `${verb} ${count} documents?`;
+  const title = count === 1 ? `${verb} "${only.title}" (${only.languageName})?` : `${verb} ${count} documents?`;
   const publishing = preview.target ? count - preview.notPublished : 0;
 
   return (

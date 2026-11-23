@@ -48,7 +48,7 @@ When('I choose Deploy from the status menu', async ({ page }) => {
 
 Then('I should be asked to deploy {string} to the content repository', async ({ page }, title: string) => {
   const dialog = confirmDialog(page);
-  await expect(dialog.getByRole('heading', { name: `Deploy "${title}"?` })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: `Deploy "${title}" (` })).toBeVisible();
   await expect(dialog).toContainText(`Publishes to ${GITHUB_STUB.repository} on ${GITHUB_STUB.branch} in one commit.`);
 });
 
@@ -60,7 +60,7 @@ When('I confirm the deploy', async ({ page }) => {
 When('I redeploy it from its Deploy section', async ({ page }) => {
   await openDetails(page);
   await deploySection(page).getByRole('button', { name: 'Redeploy' }).click();
-  await expect(confirmDialog(page).getByRole('heading', { name: /^Redeploy ".+"\?$/ })).toBeVisible();
+  await expect(confirmDialog(page).getByRole('heading', { name: /^Redeploy ".+" \(.+\)\?$/ })).toBeVisible();
   await confirmDialog(page).getByRole('button', { name: 'Redeploy', exact: true }).click();
 });
 

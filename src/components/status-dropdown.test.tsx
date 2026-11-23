@@ -153,7 +153,7 @@ test('Deploy asks first, naming where the document goes, and moves nothing yet',
   await choose(user, 'Approved', /Deploy/);
 
   const dialog = await screen.findByRole('alertdialog');
-  assert.ok(await within(dialog).findByText('Deploy "Day 2"?'));
+  assert.ok(await within(dialog).findByText('Deploy "Day 2" (Czech)?'));
   assert.ok(within(dialog).getByText('exodus/site'));
   assert.deepEqual(deployed, []);
   assert.equal(moves, 0);

@@ -415,7 +415,7 @@ The complete lifecycle of a document from creation to deployment:
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                  DEPLOYED (purple)                                       │
 │  Translation is in Exodus repository, waiting for adding/added into app  │
-│  GitHub commit/PR created (if configured)                                │
+│  Committed to the content repository (if configured)                     │
 │  File available for download (if needed)                                 │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -426,7 +426,7 @@ The complete lifecycle of a document from creation to deployment:
 
 ### Global Roles
 
-Both translators and deployers can create, translate, review, and approve documents. The key difference is that only deployers can deploy and access admin features.
+Both translators and deployers can create, translate, review, and approve documents. Anyone on a language's team can deploy that language's approved translations; only deployers can deploy every language and access admin features.
 
 | Permission                    | Translator | Deployer |
 | ----------------------------- | :--------: | :------: |
@@ -434,7 +434,7 @@ Both translators and deployers can create, translate, review, and approve docume
 | Translate documents           |    Yes     |   Yes    |
 | Review & approve translations |    Yes     |   Yes    |
 | Add comments & suggestions    |    Yes     |   Yes    |
-| Deploy translations           |     No     |   Yes    |
+| Deploy translations           | Own team's |   Yes    |
 | Manage languages              |     No     |   Yes    |
 | Manage projects               |     No     |   Yes    |
 | Manage users                  |     No     |   Yes    |

@@ -353,6 +353,62 @@ describe('deploy history', () => {
     const slovak = await seededLanguage('sk');
     assert.deepEqual(await repository.listDeployments({ documentVersionId: version.id, languageIds: [slovak.id] }), []);
   });
+
+  it('lists a project’s deploys in the selected language only', async () => {
+    const github = harness();
+    const czech = await makeVersion();
+    const slovak = await makeVersion({ language: 'sk' });
+    const otherProject = await makeVersion({ project: 'summer2025' });
+    const { deployment: czechDeploy } = await github.deploy([czech.version.id]);
+    const { deployment: slovakDeploy } = await github.deploy([slovak.version.id]);
+    const { deployment: otherDeploy } = await github.deploy([otherProject.version.id]);
+
+    const project = await seededSourceProject('exodus90');
+    const czechLanguage = await seededLanguage('cs');
+    const ids = (await repository.listDeployments({ sourceProjectId: project.id, languageId: czechLanguage.id })).map((record) => record.id);
+
+    assert.ok(ids.includes(czechDeploy!.id));
+    assert.equal(ids.includes(slovakDeploy!.id), false);
+    assert.equal(ids.includes(otherDeploy!.id), false);
+  });
+});
+
+describe('deploying everything approved in a scope', () => {
+  it('takes only the approved documents of that project and language, and sends them in one commit', async () => {
+    const github = harness();
+    const first = await makeVersion();
+    const second = await makeVersion();
+    const unfinished = await makeVersion({ status: DocumentStatus.IN_PROGRESS });
+    const slovak = await makeVersion({ language: 'sk' });
+    const otherProject = await makeVersion({ project: 'summer2025' });
+
+    const project = await seededSourceProject('exodus90');
+    const czechLanguage = await seededLanguage('cs');
+    const inScope = (await repository.listApprovedVersionsForDeploy({ sourceProjectId: project.id, languageId: czechLanguage.id })).map(
+      (version) => version.id,
+    );
+
+    assert.ok(inScope.includes(first.version.id) && inScope.includes(second.version.id));
+    for (const left of [unfinished, slovak, otherProject]) assert.equal(inScope.includes(left.version.id), false);
+
+    const mine = inScope.filter((id) => id === first.version.id || id === second.version.id);
+    const { deployment } = await github.deploy(mine);
+    assert.equal(deployment?.status, DeploymentStatus.SUCCEEDED);
+    assert.equal(github.commits(), 1);
+    assert.equal(github.files.get(first.path), first.version.content);
+    assert.equal(github.files.get(second.path), second.version.content);
+  });
+
+  it('keeps a team member to their own languages', async () => {
+    const czech = await makeVersion();
+    const slovak = await makeVersion({ language: 'sk' });
+    const slovakLanguage = await seededLanguage('sk');
+
+    const ids = (await repository.listApprovedVersionsForDeploy({ languageIds: [slovakLanguage.id] })).map((version) => version.id);
+
+    assert.ok(ids.includes(slovak.version.id));
+    assert.equal(ids.includes(czech.version.id), false);
+  });
 });
 
 describe('a deploy seen from one language', () => {
