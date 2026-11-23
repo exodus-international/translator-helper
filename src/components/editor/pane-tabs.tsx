@@ -10,6 +10,10 @@ export interface PaneTab<T extends string> {
   icon?: ReactNode;
 }
 
+// 32px tall on one row. In a pane too narrow for every tab the list wraps
+// rather than running past the pane's edge, where the pane would clip it.
+const WRAP = 'h-auto min-h-8 max-w-full flex-wrap';
+
 /**
  * The view switch in a pane header: Markdown or Preview, Edit or Preview,
  * Live or Review.
@@ -32,14 +36,14 @@ export function PaneTabs<T extends string>({
 }) {
   if (!mounted) {
     return (
-      <div className="inline-flex h-8 w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground">
+      <div className={cn('inline-flex w-fit items-center justify-center rounded-lg bg-muted p-[3px] text-muted-foreground', WRAP)}>
         {tabs.map((tab) => (
           <button
             key={tab.value}
             type="button"
             disabled
             className={cn(
-              'relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
+              'relative inline-flex h-[25px] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium',
               value === tab.value && 'bg-background shadow-sm',
             )}
           >
@@ -52,10 +56,10 @@ export function PaneTabs<T extends string>({
   }
 
   return (
-    <Tabs value={value} onValueChange={(next) => onValueChange(next as T)}>
-      <TabsList className="h-8">
+    <Tabs className="min-w-0 max-w-full" value={value} onValueChange={(next) => onValueChange(next as T)}>
+      <TabsList className={WRAP}>
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value}>
+          <TabsTrigger key={tab.value} value={tab.value} className="h-[25px]">
             {tab.icon}
             {tab.label}
           </TabsTrigger>

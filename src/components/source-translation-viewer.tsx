@@ -456,6 +456,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const paneClassName = 'min-h-0 min-w-0 flex-1 gap-0 overflow-hidden rounded-lg border bg-editor p-0 shadow-none';
     const panelStatus = status ? getDocumentStatusConfig(status) : null;
     const bodyClassName = 'relative min-h-0 flex-1 overflow-hidden';
+    // One 44px row while everything fits. A narrow pane (a side panel open, a
+    // small window, a long tab list) wraps the actions onto a second row
+    // instead of clipping them at the pane's edge.
+    const paneHeaderClassName =
+      'flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-3 py-1';
+    const paneActionsClassName = 'ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2';
     // Mobile: only the active pane is displayed; desktop keeps both side by side.
     const paneVisibility = (visible: boolean) => (visible ? 'flex' : 'hidden md:flex');
     const sourcePaneVisible = !isMobile || mobilePane === 'source';
@@ -601,7 +607,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Tabs>
 
           <Card className={cn(paneClassName, paneVisibility(sourcePaneVisible))}>
-            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
+            <div className={paneHeaderClassName}>
               {/* The mobile switcher above already names this pane; the language
                   badge below still travels with the header. */}
               <div className="flex min-w-0 items-center gap-2">
@@ -615,7 +621,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className={paneActionsClassName}>
                 {!isSourceEditing && !isYaml && (
                   <PaneTabs
                     mounted={mounted}
@@ -738,7 +744,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
           </Card>
 
           <Card className={cn(paneClassName, paneVisibility(translationPaneVisible))}>
-            <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b px-3">
+            <div className={paneHeaderClassName}>
               <div className="flex min-w-0 items-center gap-2">
                 <h2 className="hidden min-w-0 truncate text-sm font-medium md:block">Translation</h2>
                 {translationBadge}
@@ -750,7 +756,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   />
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className={paneActionsClassName}>
                 {variant === 'translate' ? (
                   isYaml ? null : (
                     <PaneTabs
