@@ -42,6 +42,17 @@ export default async function ProjectDetailPage({
     .filter((language) => canDeployLanguage(viewer, language.id))
     .map((language) => language.id);
 
+  // AI translation is the language manager's call; the rest of the language
+  // team sees its progress. Resolved here from the memberships the page has
+  // already read, not from the deploy rule above.
+  const isAdmin = user.role === 'ADMIN';
+  const managedLanguageIds = isAdmin
+    ? languages.map((language) => language.id)
+    : userLanguages.filter((membership) => membership.role === 'PROJECT_MANAGER').map((m) => m.languageId);
+  const memberLanguageIds = isAdmin
+    ? languages.map((language) => language.id)
+    : userLanguages.map((membership) => membership.languageId);
+
   // A link can name the language it is about -- the language overview's project
   // rows do. It only counts when the project is actually translated into it;
   // anything else falls back to the usual choice.
@@ -65,6 +76,8 @@ export default async function ProjectDetailPage({
       translationProjects={translationProjects}
       initialLanguageId={initialLanguageId}
       deployableLanguageIds={deployableLanguageIds}
+      managedLanguageIds={managedLanguageIds}
+      memberLanguageIds={memberLanguageIds}
       languageFromUrl={!!requested}
     />
   );

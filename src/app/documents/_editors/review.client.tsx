@@ -37,6 +37,15 @@ interface ReviewClientProps {
   /** Set when this document gets audio; enables the Audio text tab. */
   audioTextVersionId?: string | null;
   initialSuggestions?: any[];
+  /**
+   * How a review edits the text in place. `scripture`: only through the
+   * Scripture check, as on every project that does not use AI translation.
+   * `direct`: an Edit button too, for reviewers on a project that does.
+   * `none`: a translator on such a project, who leaves suggestions instead.
+   */
+  reviewEditing?: 'scripture' | 'direct' | 'none';
+  /** The model's draft this text started from, when it did. */
+  machineTranslation?: { content: string; model: string | null } | null;
 }
 
 const isApprovedOrLater = (tv: any) => tv?.status === DocumentStatus.APPROVED || tv?.status === DocumentStatus.DEPLOYED;
@@ -56,6 +65,8 @@ export default function ReviewClient({
   canChangeStatus,
   audioTextVersionId = null,
   initialSuggestions = [],
+  reviewEditing = 'scripture',
+  machineTranslation = null,
 }: ReviewClientProps) {
   useAnalyticsProjectGroup(document?.sourceProject?.id, document?.sourceProject?.name);
   useActiveLanguage(targetLanguage?.code, targetLanguage?.name);
@@ -69,7 +80,7 @@ export default function ReviewClient({
       languageCode={targetLanguage?.code}
       languageName={targetLanguage?.name}
       sourceContent={sourceVersion?.content ?? ''}
-      editable={initialTargetVersion.status === DocumentStatus.PENDING_REVIEW}
+      editable={initialTargetVersion.status === DocumentStatus.PENDING_REVIEW && reviewEditing !== 'none'}
       requestEditor={showTranslationEditor}
     >
       <DocumentEditor
@@ -90,8 +101,10 @@ export default function ReviewClient({
         canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
         disableReopen={(tv) => isApprovedOrLater(tv)}
         reviewConfig={{
-          canEdit: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW,
+          canEdit: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW && reviewEditing !== 'none',
+          showEditButton: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW && reviewEditing === 'direct',
           renderEditActions: ({ exitEditMode }) => <ReviewEditActions exitEditMode={exitEditMode} />,
+          machineTranslation,
         }}
         onEditSuggestion={async (suggestionId, data) => {
           try {

@@ -28,8 +28,10 @@ import {
   PanelRightOpen,
   Plus,
   Save,
+  Sparkles,
   X,
 } from 'lucide-react';
+import { DiffEditor } from '@/components/editor/diff-editor';
 import { ReactNode, forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ReaderPreview } from '@/components/reader-preview';
 import { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
@@ -59,7 +61,7 @@ export interface SourceTranslationViewerHandle {
 }
 
 /** Formatted and Review are the old pair; Audio text is offered only where audio applies. */
-type TranslationViewMode = 'formatted' | 'review' | 'audio';
+type TranslationViewMode = 'formatted' | 'review' | 'audio' | 'ai-diff';
 
 interface SourceTranslationViewerProps {
   variant: ViewerVariant;
@@ -97,6 +99,10 @@ interface SourceTranslationViewerProps {
     renderEditActions?: (ctx: { exitEditMode: () => void }) => ReactNode;
     editingDefault?: boolean;
     headerExtra?: ReactNode;
+    /** An Edit button on the pane, for projects whose reviewers edit AI drafts in place. */
+    showEditButton?: boolean;
+    /** The model's draft this text started from: an "AI-translated" marker and a diff tab. */
+    machineTranslation?: { content: string; model: string | null } | null;
   };
   // Suggestion props
   suggestions?: SuggestionWithUser[];
@@ -275,6 +281,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     );
     const isZen = layout === 'zen';
     const isYaml = contentLanguage === 'yaml';
+    const machineTranslation = variant === 'review' ? (reviewConfig?.machineTranslation ?? null) : null;
     const { open: sidebarOpen, openMobile, setOpenMobile, toggleSidebar } = useSidebar();
     const isMobile = useIsMobile();
     // Mobile shows one pane at a time; translation is the working pane, so start there.
@@ -782,10 +789,31 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                           </>
                         ),
                       },
+                      ...(machineTranslation ? [{ value: 'ai-diff' as const, label: 'Changes from AI' }] : []),
                       ...(audioTabVersionId ? [{ value: 'audio' as const, label: 'Audio text' }] : []),
                     ]}
                   />
                 ) : null}
+                {machineTranslation && (
+                  <Badge
+                    variant="outline"
+                    className="text-info"
+                    title={
+                      machineTranslation.model
+                        ? `Drafted by ${machineTranslation.model}. Check it before approving.`
+                        : 'Drafted by AI. Check it before approving.'
+                    }
+                  >
+                    <Sparkles aria-hidden />
+                    AI-translated
+                  </Badge>
+                )}
+                {variant === 'review' && reviewConfig?.showEditButton && reviewConfig.canEdit && !isReviewEditing && (
+                  <Button variant="outline" size="sm" onClick={enterReviewEditMode}>
+                    <FileEdit />
+                    Edit
+                  </Button>
+                )}
                 {showTranslationCopy && <CopyAllButton pane="translation" text={translationContent} />}
                 {translationHeaderExtra}
                 {variant === 'review' && reviewConfig?.headerExtra}
@@ -928,6 +956,12 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   onDirtyChange={(dirty) => {
                     audioDraftDirtyRef.current = dirty;
                   }}
+                />
+              ) : machineTranslation && reviewViewMode === 'ai-diff' ? (
+                <DiffEditor
+                  original={machineTranslation.content}
+                  modified={translationContent}
+                  className="rounded-none border-0"
                 />
               ) : !isYaml && reviewViewMode === 'formatted' ? (
                 <ReaderPreview content={translationPreview} />

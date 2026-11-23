@@ -4,7 +4,8 @@ import { getSuggestionsByDocumentVersion } from '@/domain/suggestion/suggestion.
 import { getTranslationProjectBySourceAndLanguage } from '@/domain/translation-project/translation-project.repository';
 import { isDraftPhase } from '@/lib/document-status';
 import { SessionUser } from '@/lib/session';
-import { Role } from '@/generated/prisma/enums';
+import { ProjectRole, Role } from '@/generated/prisma/enums';
+import { getMachineTranslation } from '@/domain/auto-translation/auto-translation.repository';
 import { canChangeLanguageStatus, canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { EDITOR_SIDEBAR_COOKIE_NAME, parseSidebarState } from '@/lib/sidebar-cookie';
@@ -71,6 +72,19 @@ export async function DocumentEditorPage({
   const storedSidebarState = parseSidebarState((await cookies()).get(EDITOR_SIDEBAR_COOKIE_NAME)?.value);
 
   if (targetVersion && !isDraftPhase(targetVersion.status)) {
+    // On a project that lets the model draft its documents, the review is where
+    // the text gets fixed: reviewers and up edit it in place, with the model's
+    // draft to compare against. The server enforces the same rule
+    // (assertCanEditDocumentVersionContent with directEdit).
+    const autoTranslate = translationProject?.autoTranslate ?? false;
+    const role = languageAccess.memberships.find((membership) => membership.languageId === language.id)?.role;
+    const editsInReview =
+      languageAccess.isAdmin ||
+      role === ProjectRole.REVIEWER ||
+      role === ProjectRole.EDITOR ||
+      role === ProjectRole.PROJECT_MANAGER;
+    const machine = await getMachineTranslation(targetVersion.id);
+
     return (
       <SidebarStoredStateProvider cookieName={EDITOR_SIDEBAR_COOKIE_NAME} value={storedSidebarState}>
         <ReviewClient
@@ -84,6 +98,10 @@ export async function DocumentEditorPage({
           canChangeStatus={canChangeStatus}
           audioTextVersionId={audioTextVersionId}
           initialSuggestions={initialSuggestions}
+          reviewEditing={autoTranslate ? (editsInReview ? 'direct' : 'none') : 'scripture'}
+          machineTranslation={
+            machine?.machineContent ? { content: machine.machineContent, model: machine.model } : null
+          }
         />
       </SidebarStoredStateProvider>
     );
