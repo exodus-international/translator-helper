@@ -24,6 +24,11 @@ Then, for each recording session:
 export DATABASE_URL=postgresql://postgres:postgres@localhost:5511/translation_helper_demo
 pnpm prisma migrate deploy && pnpm db:seed && pnpm db:seed:demo
 
+# 1b. The Bible scenes (scripture, bible-chat, bible-admin) need the Bibles they
+#     show, from a bible-api checkout. bible-chat also needs CHATGPT_API in .env,
+#     because the assistant chooses which passages to look up.
+pnpm bible:import ../bible-api/data rsvce-en sar-hr cep-cs
+
 # 2. A server on that database, on port 3300: the `demo` launch configuration,
 #    or the command it runs (see .claude/launch.json).
 
