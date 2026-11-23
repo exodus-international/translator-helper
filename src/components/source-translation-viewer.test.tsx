@@ -263,3 +263,23 @@ test('a reviewer who may not edit is left in review whatever the handle asks', a
   ref.current?.enterTranslationEditMode();
   assert.equal(translationPane().hasAttribute('readonly'), true);
 });
+
+test('a drafted YAML document in review still offers its changes from the AI, without a Live view', async () => {
+  render(
+    <Harness
+      variant="review"
+      contentLanguage="yaml"
+      translationContent={'title: Poziv\n'}
+      reviewConfig={{ canEdit: false, machineTranslation: { content: 'title: Appel\n', model: 'gpt-test' } }}
+    />,
+  );
+
+  assert.ok(await screen.findByRole('tab', { name: 'Changes from AI' }));
+  assert.ok(screen.getByRole('tab', { name: /Review/ }));
+  assert.equal(screen.queryByRole('tab', { name: 'Live' }), null);
+});
+
+test('a YAML document nobody drafted keeps its review without tabs', () => {
+  render(<Harness variant="review" contentLanguage="yaml" translationContent={'title: Poziv\n'} />);
+  assert.equal(screen.queryByRole('tab', { name: /Review/ }), null);
+});

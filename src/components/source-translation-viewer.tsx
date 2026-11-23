@@ -292,7 +292,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
     const [translateTab, setTranslateTab] = useState<'edit' | 'preview'>('edit');
     const [reviewViewMode, setReviewViewMode] = useState<TranslationViewMode>('review');
 
-    // The tab strip is not rendered for a YAML document, so an Audio text pane
+    // A YAML document's tab strip has no Audio text tab, so an Audio text pane
     // there would be one with no way back out. Everything that opens the tab
     // and everything that renders it reads this, not the prop.
     const audioTabVersionId = isYaml ? null : audioTextVersionId;
@@ -763,7 +763,9 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       ]}
                     />
                   )
-                ) : !isReviewEditing && !isYaml ? (
+                ) : !isReviewEditing && (!isYaml || machineTranslation) ? (
+                  // A YAML document has no Live view or audio, but a drafted
+                  // one still needs the way to its changes from the AI.
                   <PaneTabs
                     mounted={mounted}
                     value={reviewViewMode}
@@ -775,7 +777,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                       setReviewViewMode(next);
                     }}
                     tabs={[
-                      { value: 'formatted', label: 'Live' },
+                      ...(isYaml ? [] : [{ value: 'formatted' as const, label: 'Live' }]),
                       {
                         value: 'review',
                         label: (
