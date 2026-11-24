@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildTranslationMessages,
+  modelSamplingParams,
   stripWrappingCodeFence,
   translateWithChatGPT,
   TranslateWithChatGPTParams,
@@ -178,13 +179,36 @@ async function captureRequestBodyForModel(model: string): Promise<any> {
 test('translateWithChatGPT sends temperature for models that support it', async () => {
   const body = await captureRequestBodyForModel('gpt-4o-mini');
   assert.equal(body.temperature, 0.2);
-  assert.equal('reasoning_effort' in body, false, 'reasoning_effort omitted for non-gpt-5 models');
+  assert.equal('reasoning_effort' in body, false, 'reasoning_effort omitted for gpt-4 family models');
 });
 
 test('translateWithChatGPT swaps temperature for reasoning_effort on gpt-5 models', async () => {
   const body = await captureRequestBodyForModel('gpt-5.5');
   assert.equal(body.reasoning_effort, 'low');
   assert.equal('temperature' in body, false, 'temperature omitted for gpt-5 family models');
+});
+
+test('translateWithChatGPT sends reasoning_effort, not temperature, to gpt-6 models', async () => {
+  for (const model of ['gpt-6.1-sol', 'gpt-6-luna', 'gpt-6-astra']) {
+    const body = await captureRequestBodyForModel(model);
+    assert.equal(body.reasoning_effort, 'low', model);
+    assert.equal('temperature' in body, false, `${model} rejects temperature`);
+  }
+});
+
+test('modelSamplingParams keeps temperature only for the gpt-4 and gpt-3.5 families', () => {
+  assert.deepEqual(modelSamplingParams('gpt-4o-mini'), { temperature: 0.2 });
+  assert.deepEqual(modelSamplingParams('gpt-4.1'), { temperature: 0.2 });
+  assert.deepEqual(modelSamplingParams('gpt-3.5-turbo'), { temperature: 0.2 });
+  assert.deepEqual(modelSamplingParams('o4-mini'), { reasoning_effort: 'low' });
+  assert.deepEqual(modelSamplingParams('gpt-7-nova'), { reasoning_effort: 'low' });
+});
+
+test('modelSamplingParams uses a valid configured effort and ignores an invalid one', () => {
+  assert.deepEqual(modelSamplingParams('gpt-6.1-sol', 'medium'), { reasoning_effort: 'medium' });
+  assert.deepEqual(modelSamplingParams('gpt-6.1-sol', ' HIGH '), { reasoning_effort: 'high' });
+  assert.deepEqual(modelSamplingParams('gpt-6.1-sol', 'turbo'), { reasoning_effort: 'low' });
+  assert.deepEqual(modelSamplingParams('gpt-4o-mini', 'medium'), { temperature: 0.2 });
 });
 
 async function translateReturning(content: string, originalFilename?: string): Promise<string> {
