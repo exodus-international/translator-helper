@@ -12,6 +12,12 @@ const githubConfigSchema = z.object({
    * host or a local stand-in sets it.
    */
   apiBaseUrl: z.string().url().optional(),
+  /**
+   * Whether a deploy merges its pull request into main straight away, so
+   * deploying publishes. Off leaves the pull request open for someone to
+   * merge on GitHub.
+   */
+  mergeOnDeploy: z.boolean(),
 });
 
 type GitHubConfig = z.infer<typeof githubConfigSchema>;
@@ -43,6 +49,7 @@ export function getGitHubConfig(): GitHubConfig {
     repoName: process.env.GITHUB_REPO_NAME,
     installationId: process.env.GITHUB_INSTALLATION_ID,
     apiBaseUrl: process.env.GITHUB_API_BASE_URL || undefined,
+    mergeOnDeploy: process.env.GITHUB_MERGE_ON_DEPLOY === 'true',
   });
 
   if (!result.success) {

@@ -1,12 +1,37 @@
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
+// Baseline security headers for every route. A full script/style
+// Content-Security-Policy is deliberately not part of this: it has to be
+// tested live against PostHog, Sentry and inline styles first.
+const securityHeaders = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  // The app never frames itself, so nothing may frame it. X-Frame-Options
+  // covers older browsers; frame-ancestors is the modern equivalent.
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  },
+  // HSTS only makes sense over HTTPS, so keep it out of local development.
+  ...(process.env.NODE_ENV === 'production'
+    ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' }]
+    : []),
+];
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders }];
+  },
   experimental: {
     // Avatars are cropped and downscaled in the browser before they are sent,
     // so uploads land far below this. The headroom is for the server action's
     // own multipart overhead, not for bigger pictures.
     serverActions: { bodySizeLimit: '3mb' },
+    // Tells `next upgrade` this app takes security patch upgrades only.
+    agentUpgrade: 'security',
   },
   // The /releases page reads release-notes/*.md from disk at request time.
   // File tracing only picks up files reachable through static imports/requires,

@@ -41,7 +41,8 @@ const existingSegment = z
   .string()
   .min(2)
   .max(64)
-  .regex(/^[^\s/?#]+$/, 'No spaces, slashes, question marks or hashes')
+  .regex(/^[^\s/\\?#]+$/, 'No spaces, slashes, backslashes, question marks or hashes')
+  .refine((value) => value !== '.' && value !== '..', 'Cannot be a relative path segment')
   .refine(notUuidShaped, notUuidMessage);
 
 /**
@@ -78,3 +79,19 @@ export const updateSourceProjectSchema = z.object({
   // Nullable so an admin can clear the acronym and go back to unprefixed titles.
   acronym: sourceProjectAcronym.optional().nullable(),
 });
+
+/**
+ * The slug is in every URL and the repository directory is where deploys
+ * commit for every language, so only an administrator may change either. A
+ * project manager belongs to one language and may change status only.
+ */
+export function updatesAdminOnlyFields(input: z.infer<typeof updateSourceProjectSchema>) {
+  return (
+    input.name !== undefined ||
+    input.description !== undefined ||
+    input.slug !== undefined ||
+    input.repositoryDirectory !== undefined ||
+    input.audioDocumentTypes !== undefined ||
+    input.acronym !== undefined
+  );
+}

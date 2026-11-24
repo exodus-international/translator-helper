@@ -81,6 +81,37 @@ describe('withStatusChangeFeedback', () => {
     });
   });
 
+  it('reports a merged pull request and still offers to open it', async () => {
+    const { deps, calls } = fakeDeps();
+    await withStatusChangeFeedback(
+      deploy,
+      async () => outcome({ github: { status: 'success', prUrl: 'https://github.example/pull/42', merged: true } }),
+      deps,
+    );
+    const success = calls.find((call) => call.fn === 'toast.success');
+    assert.equal(success?.args[0], 'Deployed and merged into main');
+    assert.equal((success?.args[1] as { action: { label: string } }).action.label, 'Open PR');
+  });
+
+  it('warns that a pull request was left open when its merge did not happen', async () => {
+    const { deps, calls } = fakeDeps();
+    await withStatusChangeFeedback(
+      deploy,
+      async () =>
+        outcome({
+          github: { status: 'success', prUrl: 'https://github.example/pull/42', merged: false, mergeError: 'Merge conflict' },
+        }),
+      deps,
+    );
+    assert.equal(calls.some((call) => call.fn === 'toast.success'), false);
+    const error = calls.find((call) => call.fn === 'toast.error');
+    assert.equal(error?.args[0], 'GitHub PR opened but not merged: Merge conflict');
+    const options = error?.args[1] as { action: { label: string; onClick: () => void }; duration: number };
+    assert.equal(options.duration, 10000);
+    options.action.onClick();
+    assert.deepEqual(calls.at(-1), { fn: 'open', args: ['https://github.example/pull/42'] });
+  });
+
   it('says nothing about a deploy the app skipped', async () => {
     const { deps, calls } = fakeDeps();
     await withStatusChangeFeedback(deploy, async () => outcome({ github: { status: 'skipped' } }), deps);

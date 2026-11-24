@@ -254,9 +254,11 @@ export async function assignDocumentVersion(data: {
   });
 }
 
-/** Just the language a version belongs to, for the checks that gate on it. */
-export async function getDocumentVersionLanguage(id: string): Promise<{ languageId: string } | null> {
-  return prisma.documentVersion.findUnique({ where: { id }, select: { languageId: true } });
+/** Just the language and status of a version, for the checks that gate on them. */
+export async function getDocumentVersionLanguageAndStatus(
+  id: string,
+): Promise<{ languageId: string; status: DocumentStatus } | null> {
+  return prisma.documentVersion.findUnique({ where: { id }, select: { languageId: true, status: true } });
 }
 
 /** Every version a user is assigned to translate, soonest deadline first. */

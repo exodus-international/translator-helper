@@ -1,3 +1,55 @@
+# [1.6.0](https://github.com/exodus-international/translator-helper/compare/v1.5.0...v1.6.0) (2026-11-24)
+
+
+### Bug Fixes
+
+* **auth:** reject control characters in the post-login redirect path ([#319](https://github.com/exodus-international/translator-helper/issues/319)) ([f713498](https://github.com/exodus-international/translator-helper/commit/f713498f64a62093570cae5021223189aefc3fbe))
+* **bible:** address review of the Bible port ([59b6989](https://github.com/exodus-international/translator-helper/commit/59b6989efc607828fcafaaa2d5ad668459fc5a25))
+* **bible:** cap request bodies by the bytes read, not the Content-Length header ([313e1cf](https://github.com/exodus-international/translator-helper/commit/313e1cf3dedfcd19345a36d0b2bf42b06f74fb54))
+* **bible:** cap verses per reference and per request ([57ae037](https://github.com/exodus-international/translator-helper/commit/57ae037de758ab4908452ea414b1f01e16594272))
+* **bible:** charge one verse budget across a reference's parts and a request's references ([16149b9](https://github.com/exodus-international/translator-helper/commit/16149b934e13861ef1fba51c997822146d985167))
+* **bible:** check a translation's reading when its verse_tag is empty ([69e1f6e](https://github.com/exodus-international/translator-helper/commit/69e1f6ec79b209322e7134bfe5df124fc97a7931))
+* **bible:** check verse_tag against the day's main reading, whatever its heading says ([22ff147](https://github.com/exodus-international/translator-helper/commit/22ff14754893c825f5aafe8ca33096f073bc8c78))
+* **bible:** count a book's chapters by its highest chapter, so chapters after a gap can be read ([5ed9421](https://github.com/exodus-international/translator-helper/commit/5ed9421afe12584e7d91af09903e546ceb544806))
+* **bible:** detect single-chapter citations and spaced verse lists ([082f789](https://github.com/exodus-international/translator-helper/commit/082f7890036e9a7b0901aecebe79b99039b32eab))
+* **bible:** drop the admin tab scrollbar and a filter that hides nothing ([0db18d5](https://github.com/exodus-international/translator-helper/commit/0db18d50c6ca5383ccae87f308ac21ae81380304))
+* **bible:** fill a quotation from the Bible only when it quotes the whole passage ([a92cbb5](https://github.com/exodus-international/translator-helper/commit/a92cbb5044859ca21649401d4cc5cf7c9cd5d9b5))
+* **bible:** fill a quotation of a whole cited passage from the Bible, and flag partial ones ([7576016](https://github.com/exodus-international/translator-helper/commit/75760168469a2a6131a506556caefd6085df9ee2))
+* **bible:** import a Bible outside the catalog with only its name ([bab9be7](https://github.com/exodus-international/translator-helper/commit/bab9be76d5b17317864db4185c99a69053ee27b9))
+* **bible:** keep quoted document text and chat questions out of session replays ([3659190](https://github.com/exodus-international/translator-helper/commit/36591902502029c17cf731e79c4f14b6adb3bda0))
+* **bible:** keep the language-name helper private ([16d1b1b](https://github.com/exodus-international/translator-helper/commit/16d1b1baaf39bccffde78e07300330e45c2c8ea1))
+* **bible:** run imports and default changes one at a time, so a language keeps one source and one default ([6835ef2](https://github.com/exodus-international/translator-helper/commit/6835ef2c7429549ade608a0c324ae81bd0410a57))
+* **bible:** say when citations could not be checked, with a retry, instead of reporting them official ([2f7cd6d](https://github.com/exodus-international/translator-helper/commit/2f7cd6db4971d824ee92070b5746e52bbb08e2e0))
+* **bible:** underline a citation in amber when the document's own Bible cannot supply it ([5503b8b](https://github.com/exodus-international/translator-helper/commit/5503b8bd978ed2f0b0cf4cd1cacf982aebf275bf))
+* **deploy:** show the merge outcome in the activity log and never lose a concurrent merge ([74d1382](https://github.com/exodus-international/translator-helper/commit/74d1382d01828e1be0b45ed9a6298febbd145cd5))
+* **deps:** upgrade next 16.4.1 to 16.4.6 for a security advisory ([#324](https://github.com/exodus-international/translator-helper/issues/324)) ([9ad41f8](https://github.com/exodus-international/translator-helper/commit/9ad41f861616613381fc67135f45222eb9b16e64))
+* **deps:** upgrade next, sentry, better-auth, dompurify and nodemailer for security advisories ([#321](https://github.com/exodus-international/translator-helper/issues/321)) ([3dfa942](https://github.com/exodus-international/translator-helper/commit/3dfa9428128ce16fa2631f88f236d3080b42c4c4))
+* **editor:** keep the mobile suggestion sheet above the iOS keyboard ([4ca9ad5](https://github.com/exodus-international/translator-helper/commit/4ca9ad5c335a0b845124877cebb791f57040b225))
+* **editor:** let the feedback window be dragged off the text ([e7d55ea](https://github.com/exodus-international/translator-helper/commit/e7d55ead098f26d66f1b30a2a713bfb259688f99))
+* **lint:** accept a frontmatter key the source has ([b936a50](https://github.com/exodus-international/translator-helper/commit/b936a50a7995640ba51e5a48820ecdece8ffd5ff))
+* neutralise CSV formulas and trust localhost only outside production ([#316](https://github.com/exodus-international/translator-helper/issues/316)) ([39867d5](https://github.com/exodus-international/translator-helper/commit/39867d5f425d25fe87bf012ef66a723a59f02f2d))
+* **review:** touch-sized status, assignment, deadline and workflow controls in the document panel on phones ([7ee6f08](https://github.com/exodus-international/translator-helper/commit/7ee6f081a9626464760cf6bdf148f2c6e84b0f4f))
+* **review:** touch-sized thread actions and reply input on phones ([03e58ea](https://github.com/exodus-international/translator-helper/commit/03e58eada36fd03caa69194b3edab118055b17fc))
+* **security:** gate suggestion replies, edits and label toggles by team; validate suggestion filters ([#317](https://github.com/exodus-international/translator-helper/issues/317)) ([138e923](https://github.com/exodus-international/translator-helper/commit/138e923f4e050359b8475f6e9c8512f0e2fdf572))
+* **security:** gate version edits, deletes and deploys on membership and status ([#320](https://github.com/exodus-international/translator-helper/issues/320)) ([f00c79e](https://github.com/exodus-international/translator-helper/commit/f00c79eb1882d39712a15e3dd503870f3e92d6f0))
+* **source-project:** make slug and repository directory admin-only and reject . and .. segments ([#318](https://github.com/exodus-international/translator-helper/issues/318)) ([a032f2d](https://github.com/exodus-international/translator-helper/commit/a032f2d7c18fb6c79e75f04602d5e79274db8d05))
+* **test:** run test files whose path contains brackets ([#304](https://github.com/exodus-international/translator-helper/issues/304)) ([b0be21c](https://github.com/exodus-international/translator-helper/commit/b0be21c2e497cb4a02dfc0cb22032abf82654afc))
+* **threads:** typing a reply no longer jumps to the passage and closes the sheet ([6fc428c](https://github.com/exodus-international/translator-helper/commit/6fc428c7caa991cf48cc67c879a35efa8dcb819c))
+* **viewer:** tapping a thread from Live or Audio text switches to the editor first ([b9907f9](https://github.com/exodus-international/translator-helper/commit/b9907f9f3534d17eae6d51abfafac71e30283e18))
+
+
+### Features
+
+* **bible:** admin pages to import Bibles and review their versification ([d2cc3bf](https://github.com/exodus-international/translator-helper/commit/d2cc3bf7e5b32a99813c97f4d50bb43ea2786dba))
+* **bible:** Bible assistant chat that answers with the official text ([b9f6c59](https://github.com/exodus-international/translator-helper/commit/b9f6c594cecc6037641be4faac5d691e6f8b43de))
+* **bible:** check and replace Scripture citations in the editor ([7e70e2b](https://github.com/exodus-international/translator-helper/commit/7e70e2b03c5d8c4711f0020a39b8a0cd74c432b5))
+* **bible:** find a reading with no verse_tag by its text ([3037d64](https://github.com/exodus-international/translator-helper/commit/3037d64860df3c1d66342b0f4d150939b115efd1))
+* **bible:** in-app Bible with import, versification and passage resolver ([c098f1b](https://github.com/exodus-international/translator-helper/commit/c098f1b7c0cb4b27be051cb23642247a0d2d6f2c))
+* **bible:** open the chat in the Bible of the user's own language ([54ab9d9](https://github.com/exodus-international/translator-helper/commit/54ab9d98ea5acd99e5537d078a6ee776fd23b8f7))
+* **deploy:** merge the pull request on deploy when GITHUB_MERGE_ON_DEPLOY is set ([afcd871](https://github.com/exodus-international/translator-helper/commit/afcd871ce0a2c70c7f4f2a9ef472fdfd6e5b8af9))
+* **review:** dock selection actions and open the suggestion form as a bottom sheet on phones ([3b89444](https://github.com/exodus-international/translator-helper/commit/3b89444c870ad79114d30fa07532df238d4efe5e))
+* **review:** one-tap comments button with open count and a pane header that fits on phones ([9cd629d](https://github.com/exodus-international/translator-helper/commit/9cd629d6fc13a1a90d923d5cfdc59af2168265cc))
+* **translation:** Scripture comes from the Bible API, not the model ([f0d08bc](https://github.com/exodus-international/translator-helper/commit/f0d08bcf526ef042279e5f73f82247d6a776b1c1))
 # [1.5.0](https://github.com/exodus-international/translator-helper/compare/v1.4.2...v1.5.0) (2026-10-28)
 
 

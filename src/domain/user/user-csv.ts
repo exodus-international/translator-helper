@@ -62,12 +62,25 @@ export function userCsvValue(user: UserCsvRow, columnId: string): string {
   }
 }
 
-/** Quotes a field when it contains a comma, quote, or newline (RFC 4180). */
+/**
+ * Neutralises spreadsheet formula injection: a field starting with `=`, `+`,
+ * `-`, `@`, tab or carriage return is prefixed with a single quote so Excel and
+ * similar tools show it as text instead of evaluating it.
+ */
+function neutraliseFormula(value: string): string {
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+/**
+ * Prepares a field for CSV: neutralises formulas, then quotes the field when it
+ * contains a comma, quote, or newline (RFC 4180).
+ */
 export function escapeCsvField(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const safe = neutraliseFormula(value);
+  if (/[",\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safe;
 }
 
 /**

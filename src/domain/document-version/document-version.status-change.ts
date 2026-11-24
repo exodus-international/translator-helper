@@ -1,6 +1,7 @@
 import { DocumentStatus } from '@/generated/prisma/enums';
 import type { AudioGenerationOutcome } from '../audio/audio.types';
 import { DeploySkippedError } from '../github/github.errors';
+import type { MergeOutcome } from '../github/github.merge';
 import { refuse, type Refusal } from '@/lib/action-refusal';
 import { StatusTransitionRefusedError, validateTransition } from './document-version.transitions';
 
@@ -28,6 +29,13 @@ export interface GitHubOutcome {
   status: 'success' | 'failed' | 'skipped';
   error?: string;
   prUrl?: string;
+  /**
+   * Set only when deploys merge their pull request: whether this one did.
+   * A deploy whose merge did not happen still succeeded, with its pull
+   * request left open, and `mergeError` says why.
+   */
+  merged?: boolean;
+  mergeError?: string;
 }
 
 export interface StatusChangeResult<Version> {
@@ -64,7 +72,7 @@ export interface StatusChangeDeps<Version> {
   notify: (input: { versionId: string; actorId: string; from: DocumentStatus; to: DocumentStatus }) => Promise<void>;
   github: {
     isConfigured: () => boolean;
-    deploy: (versionId: string) => Promise<{ prUrl: string } | undefined>;
+    deploy: (versionId: string) => Promise<{ prUrl: string; merge?: MergeOutcome } | undefined>;
   };
   startAudio: (versionId: string, userId: string) => Promise<AudioGenerationOutcome>;
   /** Drops the cached document page, once something the page shows has changed. */
@@ -122,9 +130,11 @@ async function deployAfterStatusChange<Version>(
   }
   try {
     const deployed = await deps.github.deploy(versionId);
-    await deps.log({ documentVersionId: versionId, userId: actorId, action: 'github_deployed', details: {} });
+    const merge = deployed?.merge;
+    const mergeFacts = merge ? { merged: merge.merged, ...(!merge.merged && { mergeError: merge.reason }) } : {};
+    await deps.log({ documentVersionId: versionId, userId: actorId, action: 'github_deployed', details: mergeFacts });
     deps.revalidateDocumentPage();
-    return { status: 'success', prUrl: deployed?.prUrl };
+    return { status: 'success', prUrl: deployed?.prUrl, ...mergeFacts };
   } catch (error) {
     if (error instanceof DeploySkippedError) {
       return { status: 'skipped' };

@@ -5,6 +5,7 @@ import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
+import { assertCanEditDocumentVersionContent } from '../document-version/document-version.permissions';
 import { resolveTranslationProject } from '../document-version/resolve-translation-project';
 import { createApplySuggestion, refuseClosedSuggestion } from './suggestion.apply';
 import { notifySuggestionAdded, notifySuggestionReply } from '../notification/notification.service';
@@ -14,6 +15,7 @@ import {
   createSuggestionSchema,
   dismissSuggestionSchema,
   editSuggestionSchema,
+  getSuggestionsSchema,
   reopenSuggestionSchema,
 } from './suggestion.types';
 import {
@@ -29,9 +31,10 @@ function truncate(text: string, max = 80) {
   return text.length > max ? text.slice(0, max) + '…' : text;
 }
 
-export async function getSuggestionsByDocumentVersionAction(documentVersionId: string, filters?: any) {
+export async function getSuggestionsByDocumentVersionAction(documentVersionId: unknown, filters?: unknown) {
   await authorize('authenticated');
-  return await getSuggestionsByDocumentVersion(documentVersionId, filters);
+  const validated = getSuggestionsSchema.parse({ documentVersionId, filters });
+  return await getSuggestionsByDocumentVersion(validated.documentVersionId, validated.filters);
 }
 
 export async function createSuggestionAction(input: unknown) {
@@ -117,6 +120,10 @@ export async function applySuggestionAction(input: unknown) {
   } else {
     await authorize('admin');
   }
+
+  // Applying rewrites the version's text, so it answers to the same rule as
+  // editing it: no changes to APPROVED or DEPLOYED text except by an admin.
+  await assertCanEditDocumentVersionContent(suggestion.documentVersionId, user);
 
   return applySuggestion({
     suggestion,
@@ -211,6 +218,11 @@ export async function reopenSuggestionAction(input: unknown) {
     const revertedContent = currentContent.replace(suggestion.proposedText, suggestion.originalText);
 
     if (revertedContent !== currentContent) {
+      // Reverting rewrites the version's text: the edit rule applies, so
+      // approved or deployed text stays as it is. A reopen that writes no
+      // text is not frozen.
+      await assertCanEditDocumentVersionContent(suggestion.documentVersionId, user);
+
       const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, revertedContent, user.id);
 
       // Clear originalText and set status to OPEN
@@ -264,6 +276,15 @@ export async function editSuggestionAction(input: unknown) {
     throw new Error('Forbidden: You can only edit your own suggestions');
   }
 
+  const { translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
+
+  // Writing on a suggestion needs a seat on the language the version is in.
+  if (translationProject) {
+    await authorize({ project: translationProject.id, role: 'member' });
+  } else {
+    await authorize('admin');
+  }
+
   if (suggestion.status !== SuggestionStatus.OPEN) {
     return refuseClosedSuggestion();
   }
@@ -300,6 +321,15 @@ export async function createSuggestionReplyAction(input: unknown) {
   const suggestion = await getSuggestionById(validated.suggestionId);
   if (!suggestion) {
     throw new Error('Suggestion not found');
+  }
+
+  const { translationProject } = await resolveTranslationProject(suggestion.documentVersionId);
+
+  // Writing on a suggestion needs a seat on the language the version is in.
+  if (translationProject) {
+    await authorize({ project: translationProject.id, role: 'member' });
+  } else {
+    await authorize('admin');
   }
 
   const reply = await createSuggestionReply({

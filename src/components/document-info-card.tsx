@@ -84,7 +84,7 @@ export function DocumentInfoCard({
                 <div className="-mr-1.5 flex items-center gap-0.5">
                   <button
                     onClick={onAssignTranslator}
-                    className="group flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted"
+                    className="group flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 max-md:min-h-11 transition-colors hover:bg-muted"
                     title="Change translator"
                   >
                     <UserAvatar name={translator.name} image={translator.image} email={translator.email} size="xs" />
@@ -94,7 +94,7 @@ export function DocumentInfoCard({
                   {onUnassignTranslator && (
                     <button
                       onClick={onUnassignTranslator}
-                      className="cursor-pointer rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      className="flex cursor-pointer items-center justify-center rounded-md p-0.5 text-muted-foreground max-md:size-11 transition-colors hover:bg-destructive/10 hover:text-destructive"
                       title="Unassign translator"
                     >
                       <UserMinus className="size-3" />
@@ -108,7 +108,7 @@ export function DocumentInfoCard({
                 </div>
               )
             ) : onAssignTranslator ? (
-              <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs" onClick={onAssignTranslator}>
+              <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs max-md:h-11" onClick={onAssignTranslator}>
                 <UserPlus className="size-3" />
                 Assign
               </Button>
@@ -124,7 +124,7 @@ export function DocumentInfoCard({
                 <div className="-mr-1.5 flex items-center gap-0.5">
                   <button
                     onClick={onAssignReviewer}
-                    className="group flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted"
+                    className="group flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 max-md:min-h-11 transition-colors hover:bg-muted"
                     title="Change reviewer"
                   >
                     <UserAvatar name={reviewer.name} image={reviewer.image} email={reviewer.email} size="xs" />
@@ -134,7 +134,7 @@ export function DocumentInfoCard({
                   {onUnassignReviewer && (
                     <button
                       onClick={onUnassignReviewer}
-                      className="cursor-pointer rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      className="flex cursor-pointer items-center justify-center rounded-md p-0.5 text-muted-foreground max-md:size-11 transition-colors hover:bg-destructive/10 hover:text-destructive"
                       title="Unassign reviewer"
                     >
                       <UserMinus className="size-3" />
@@ -148,7 +148,7 @@ export function DocumentInfoCard({
                 </div>
               )
             ) : onAssignReviewer ? (
-              <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs" onClick={onAssignReviewer}>
+              <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs max-md:h-11" onClick={onAssignReviewer}>
                 <UserPlus className="size-3" />
                 Assign
               </Button>
@@ -164,7 +164,7 @@ export function DocumentInfoCard({
               // can be changed, and the pencil only says so on hover.
               <button
                 onClick={onEditDeadline}
-                className="group -mr-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted"
+                className="group -mr-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 max-md:min-h-11 transition-colors hover:bg-muted"
                 title="Change deadline"
               >
                 {deadline ? (
@@ -187,7 +187,7 @@ export function DocumentInfoCard({
               {onAssignReviewer ? (
                 <button
                   onClick={onAssignReviewer}
-                  className="group -mr-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-muted"
+                  className="group -mr-1.5 flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-0.5 max-md:min-h-11 transition-colors hover:bg-muted"
                   title="Change review deadline"
                 >
                   <span className="text-xs font-medium">{new Date(reviewDeadline).toLocaleDateString()}</span>

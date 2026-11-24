@@ -1,6 +1,7 @@
 'use client';
 
 import { ActivityLog } from '@/components/activity-log';
+import { cn } from '@/lib/utils';
 import { AudioStatus } from '@/components/audio-status';
 import { GitHubStatus } from '@/components/github-status';
 import { Button } from '@/components/ui/button';
@@ -12,13 +13,15 @@ import { editSuggestionAction } from '@/domain/suggestion/suggestion.actions';
 import { capture } from '@/lib/analytics';
 import { isRefusal } from '@/lib/action-refusal';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
+import { ScriptureProvider } from '@/components/editor/scripture-context';
+import type { SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import { useEditorStore } from '@/lib/stores/editor-provider';
 import { DocumentStatus } from '@/generated/prisma/enums';
 import { Download, FileCheck, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface ReviewClientProps {
@@ -57,78 +60,91 @@ export default function ReviewClient({
 }: ReviewClientProps) {
   useAnalyticsProjectGroup(document?.sourceProject?.id, document?.sourceProject?.name);
   useActiveLanguage(targetLanguage?.code, targetLanguage?.name);
+  const viewerRef = useRef<SourceTranslationViewerHandle>(null);
+  const showTranslationEditor = useCallback(() => viewerRef.current?.enterTranslationEditMode(), []);
 
+  // Reviewers check Scripture too; only a review they can edit lets the panel change the text.
+  // This is the status the page opened with; the editor keeps it current as the status changes.
   return (
-    <DocumentEditor
-      document={document}
-      sourceVersion={sourceVersion}
-      targetVersion={initialTargetVersion}
-      initialSuggestions={initialSuggestions}
-      translationProjectId={translationProjectId}
-      targetLanguageId={initialTargetVersion.languageId ?? ''}
-      user={user}
-      canDeploy={canDeploy}
-      canChangeStatus={canChangeStatus}
-      audioTextVersionId={audioTextVersionId}
-      variant="review"
-      targetLanguageName={targetLanguage?.name ?? null}
-      canEditSource={(tv) => isAdminClient(user) && !isApprovedOrLater(tv)}
-      canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
-      disableReopen={(tv) => isApprovedOrLater(tv)}
-      reviewConfig={{
-        canEdit: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW,
-        renderEditActions: ({ exitEditMode }) => <ReviewEditActions exitEditMode={exitEditMode} />,
-      }}
-      onEditSuggestion={async (suggestionId, data) => {
-        try {
-          const result = await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
-          if (isRefusal(result)) {
-            toast.error(result.refused.message);
-            return;
+    <ScriptureProvider
+      languageCode={targetLanguage?.code}
+      languageName={targetLanguage?.name}
+      sourceContent={sourceVersion?.content ?? ''}
+      editable={initialTargetVersion.status === DocumentStatus.PENDING_REVIEW}
+      requestEditor={showTranslationEditor}
+    >
+      <DocumentEditor
+        viewerRef={viewerRef}
+        document={document}
+        sourceVersion={sourceVersion}
+        targetVersion={initialTargetVersion}
+        initialSuggestions={initialSuggestions}
+        translationProjectId={translationProjectId}
+        targetLanguageId={initialTargetVersion.languageId ?? ''}
+        user={user}
+        canDeploy={canDeploy}
+        canChangeStatus={canChangeStatus}
+        audioTextVersionId={audioTextVersionId}
+        variant="review"
+        targetLanguageName={targetLanguage?.name ?? null}
+        canEditSource={(tv) => isAdminClient(user) && !isApprovedOrLater(tv)}
+        canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
+        disableReopen={(tv) => isApprovedOrLater(tv)}
+        reviewConfig={{
+          canEdit: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW,
+          renderEditActions: ({ exitEditMode }) => <ReviewEditActions exitEditMode={exitEditMode} />,
+        }}
+        onEditSuggestion={async (suggestionId, data) => {
+          try {
+            const result = await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
+            if (isRefusal(result)) {
+              toast.error(result.refused.message);
+              return;
+            }
+            capture('suggestion_edited');
+            toast.success('Suggestion updated!');
+          } catch (error: any) {
+            toast.error(error.message || 'Failed to edit suggestion');
           }
-          capture('suggestion_edited');
-          toast.success('Suggestion updated!');
-        } catch (error: any) {
-          toast.error(error.message || 'Failed to edit suggestion');
+        }}
+        hideDetails
+        sidebarActions={<ReviewWorkflowActions document={document} />}
+        sidebarSummary={
+          <>
+            <AudioStatus
+              documentVersionId={initialTargetVersion.id}
+              currentVersion={initialTargetVersion.version}
+              status={initialTargetVersion.status}
+              compact
+            />
+            <GitHubStatus
+              documentVersionId={initialTargetVersion.id}
+              isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+              compact
+            />
+          </>
         }
-      }}
-      hideDetails
-      sidebarActions={<ReviewWorkflowActions document={document} />}
-      sidebarSummary={
-        <>
-          <AudioStatus
-            documentVersionId={initialTargetVersion.id}
-            currentVersion={initialTargetVersion.version}
-            status={initialTargetVersion.status}
-            compact
-          />
-          <GitHubStatus
-            documentVersionId={initialTargetVersion.id}
-            isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-            compact
-          />
-        </>
-      }
-      sidebarDetails={
-        <>
-          <AudioStatus
-            documentVersionId={initialTargetVersion.id}
-            currentVersion={initialTargetVersion.version}
-            status={initialTargetVersion.status}
-            frame="section"
-          />
-          <GitHubStatus
-            documentVersionId={initialTargetVersion.id}
-            isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-            frame="section"
-          />
-          {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
-            <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />
-          )}
-        </>
-      }
-      sidebarDetailsDefaultOpen={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-    />
+        sidebarDetails={
+          <>
+            <AudioStatus
+              documentVersionId={initialTargetVersion.id}
+              currentVersion={initialTargetVersion.version}
+              status={initialTargetVersion.status}
+              frame="section"
+            />
+            <GitHubStatus
+              documentVersionId={initialTargetVersion.id}
+              isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+              frame="section"
+            />
+            {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
+              <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />
+            )}
+          </>
+        }
+        sidebarDetailsDefaultOpen={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+      />
+    </ScriptureProvider>
   );
 }
 
@@ -190,7 +206,7 @@ function ReviewWorkflowActions({ document }: { document: any }) {
           // Not the outline variant: its dark:bg-input and dark:border-input
           // outrank an unprefixed bg-success, which left dark text on a dark
           // button in the dark theme.
-          className={waitingForFinalLabel ? 'bg-success text-background hover:bg-success/90' : ''}
+          className={cn('max-md:h-11', waitingForFinalLabel && 'bg-success text-background hover:bg-success/90')}
         >
           {waitingForFinalLabel ? <FileCheck /> : <FilePlus />}
           {waitingForFinalLabel ? 'Waiting for final approval' : 'Request final approval'}
@@ -200,7 +216,7 @@ function ReviewWorkflowActions({ document }: { document: any }) {
         <Button
           variant="outline"
           size="sm"
-          className="w-full justify-start"
+          className="w-full justify-start max-md:h-11"
           onClick={handleDownload}
           disabled={isAnyLoading}
         >

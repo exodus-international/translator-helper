@@ -117,6 +117,40 @@ describe('deploying on entering DEPLOYED', () => {
     assert.deepEqual(result.github, { status: 'success', prUrl: 'https://github.example/pull/42' });
   });
 
+  it('reports a merged pull request, in the result and the log', async () => {
+    const { changeStatus, calls } = fakeDeps({
+      github: {
+        isConfigured: () => true,
+        deploy: async () => ({ prUrl: 'https://github.example/pull/42', merge: { merged: true, sha: 'merge-sha' } }),
+      },
+    });
+    const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });
+    assert.deepEqual(result.github, { status: 'success', prUrl: 'https://github.example/pull/42', merged: true });
+    assert.deepEqual(calls.find((call) => call.fn === 'log:github_deployed')?.args, [{ merged: true }]);
+  });
+
+  it('keeps a deploy whose merge did not happen a success, with the reason', async () => {
+    const { changeStatus, calls } = fakeDeps({
+      github: {
+        isConfigured: () => true,
+        deploy: async () => ({
+          prUrl: 'https://github.example/pull/42',
+          merge: { merged: false, reason: 'At least 1 approving review is required' },
+        }),
+      },
+    });
+    const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });
+    assert.deepEqual(result.github, {
+      status: 'success',
+      prUrl: 'https://github.example/pull/42',
+      merged: false,
+      mergeError: 'At least 1 approving review is required',
+    });
+    assert.deepEqual(calls.find((call) => call.fn === 'log:github_deployed')?.args, [
+      { merged: false, mergeError: 'At least 1 approving review is required' },
+    ]);
+  });
+
   it('skips the deploy when GitHub is not configured, and says so', async () => {
     const { changeStatus, calls } = fakeDeps({ github: { isConfigured: () => false, deploy: async () => undefined } });
     const result = await changeStatus({ version: version(DocumentStatus.APPROVED), to: DocumentStatus.DEPLOYED, actorId: 'u' });

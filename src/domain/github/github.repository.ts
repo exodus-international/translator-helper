@@ -35,3 +35,11 @@ export async function updateGitHubCommitPRStatus(id: string, prStatus: GitHubPRS
     data: { prStatus },
   });
 }
+
+/** Marks every deploy recorded against pull request `prNumber` as merged. */
+export async function markPullRequestMerged(prNumber: number) {
+  return prisma.gitHubCommit.updateMany({
+    where: { prNumber },
+    data: { prStatus: GitHubPRStatus.MERGED },
+  });
+}

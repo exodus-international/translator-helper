@@ -2,6 +2,8 @@ import { expect } from '@playwright/test';
 import { When, Then } from './fixtures';
 import { changeStatus, openStatusMenu } from '../support/status';
 import { applyThread, dismissThread, showResolved, openThreadCount, reopenThread, threadContaining, threads, waitForFeedback } from '../support/threads';
+import { selectTranslationLine } from '../support/editor';
+import { dragSuggestionWindow, suggestionWindow, suggestionWindowBox } from '../support/floating-window';
 
 // Steps match on their wording, not on the keyword, so this one definition
 // serves both the `Then` that asserts it and the `And` that relies on it.
@@ -47,6 +49,67 @@ Then('I should be able to scroll to the last piece of feedback', async ({ page }
 
 When('I apply the suggestion proposing {string}', async ({ page }, proposed: string) => {
   await applyThread(page, proposed);
+});
+
+When('I select a line and suggest an edit', async ({ page }) => {
+  await selectTranslationLine(page, 3);
+  await page.getByRole('button', { name: 'Suggest edit' }).click();
+});
+
+Then('the suggestion window should be open', async ({ page }) => {
+  await expect(suggestionWindow(page)).toBeVisible();
+});
+
+Then('the comment field should have the caret', async ({ page }) => {
+  await expect(suggestionWindow(page).getByLabel('Comment')).toBeFocused();
+});
+
+When('I move the suggestion window out of the way', async ({ page, world }) => {
+  world.suggestionBefore = JSON.stringify(await suggestionWindowBox(page));
+  await dragSuggestionWindow(page, -200, 200);
+});
+
+Then('it should have moved with the pointer', async ({ page, world }) => {
+  const before = JSON.parse(world.suggestionBefore) as { x: number; y: number };
+  const after = await suggestionWindowBox(page);
+  // The drag was -200/+200; a clamp may absorb some of it, but not all.
+  expect(before.x - after.x).toBeGreaterThanOrEqual(100);
+  expect(after.y - before.y).toBeGreaterThanOrEqual(100);
+  await expect(suggestionWindow(page)).toBeVisible();
+});
+
+When('I write {string} in the suggestion window', async ({ page }, text: string) => {
+  await suggestionWindow(page).getByLabel('Comment').fill(text);
+});
+
+Then('the suggestion window should hold {string}', async ({ page }, text: string) => {
+  await expect(suggestionWindow(page).getByLabel('Comment')).toHaveValue(text);
+  await expect(suggestionWindow(page)).toBeVisible();
+});
+
+When('I drag the suggestion window far off the screen', async ({ page }) => {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('The page has no viewport size.');
+  await dragSuggestionWindow(page, viewport.width, viewport.height);
+});
+
+Then('it should stay on screen', async ({ page }) => {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('The page has no viewport size.');
+  const box = await suggestionWindowBox(page);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+});
+
+When('I save the suggestion', async ({ page }) => {
+  await suggestionWindow(page).getByRole('button', { name: 'Save' }).click();
+});
+
+Then('the feedback should mention {string}', async ({ page }, text: string) => {
+  await waitForFeedback(page);
+  await expect(threadContaining(page, text)).toBeVisible();
 });
 
 When('I approve the translation', async ({ page }) => {

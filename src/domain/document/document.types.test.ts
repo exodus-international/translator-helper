@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DocumentType } from '@/generated/prisma/enums';
-import { createDocumentSchema, updateDocumentSchema } from './document.types';
+import { createDocumentSchema, toggleDocumentLabelSchema, updateDocumentSchema } from './document.types';
 
 const validCreate = {
   slug: 'some-doc',
@@ -46,4 +46,15 @@ test('updateDocumentSchema rejects setting ROOT_FILE without a filename', () => 
 test('updateDocumentSchema ignores filename rules when type is absent', () => {
   const result = updateDocumentSchema.safeParse({ title: 'Renamed' });
   assert.equal(result.success, true);
+});
+
+test('toggleDocumentLabelSchema takes a uuid and a trimmed non-empty label', () => {
+  const documentId = '11111111-1111-4111-8111-111111111111';
+  const ok = toggleDocumentLabelSchema.safeParse({ documentId, label: '  Waiting for final label ' });
+  assert.equal(ok.success, true);
+  assert.equal(ok.success && ok.data.label, 'Waiting for final label');
+  assert.equal(toggleDocumentLabelSchema.safeParse({ documentId: 'nope', label: 'x' }).success, false);
+  assert.equal(toggleDocumentLabelSchema.safeParse({ documentId, label: '   ' }).success, false);
+  assert.equal(toggleDocumentLabelSchema.safeParse({ documentId, label: 'x'.repeat(101) }).success, false);
+  assert.equal(toggleDocumentLabelSchema.safeParse({ documentId, label: { $ne: 1 } }).success, false);
 });

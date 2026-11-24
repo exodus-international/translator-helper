@@ -21,7 +21,8 @@ import {
   updateDocument,
   type DocumentOverviewSort,
 } from './document.repository';
-import { createDocumentSchema, updateDocumentSchema } from './document.types';
+import { canAccessSourceProject } from '@/lib/permissions';
+import { createDocumentSchema, toggleDocumentLabelSchema, updateDocumentSchema } from './document.types';
 
 export async function listDocumentsAction(filters?: {
   sourceProjectId?: string;
@@ -148,35 +149,33 @@ export async function getDashboardDocumentsAction(languageId: string, sourceProj
   return await getDashboardDocuments(languageId, sourceProjectId);
 }
 
-export async function toggleDocumentLabelAction(documentId: string, label: string) {
-  await authorize('authenticated');
+export async function toggleDocumentLabelAction(documentId: unknown, label: unknown) {
+  const { user } = await authorize('authenticated');
+  const validated = toggleDocumentLabelSchema.parse({ documentId, label });
 
-  // Get the document to check its current labels
-  const document = await getDocumentById(documentId);
+  const document = await getDocumentById(validated.documentId);
   if (!document) {
     throw new Error('Document not found');
   }
 
-  // Check if label exists
+  // Labels live on the document, shared by every language, so the gate is the
+  // source project: an admin, or someone on a language team translating it.
+  if (!document.sourceProjectId || !(await canAccessSourceProject(user, document.sourceProjectId))) {
+    throw new Error('Forbidden: requires membership of a team working on this document');
+  }
+
   const currentLabels = document.labels || [];
-  const hasLabel = currentLabels.includes(label);
+  const hasLabel = currentLabels.includes(validated.label);
+  const newLabels = hasLabel ? currentLabels.filter((l) => l !== validated.label) : [...currentLabels, validated.label];
 
-  // Toggle the label
-  const newLabels = hasLabel ? currentLabels.filter((l) => l !== label) : [...currentLabels, label];
-
-  // Update the document directly (bypassing deployer check for label toggling)
-  // This allows reviewers to toggle labels when documents are in PENDING_REVIEW
+  // Written directly (no deployer check) so reviewers can toggle labels while a
+  // document is in PENDING_REVIEW. Only the labels go back to the caller.
   const updated = await prisma.document.update({
-    where: { id: documentId },
+    where: { id: validated.documentId },
     data: { labels: newLabels },
-    include: {
-      folder: true,
-      sourceProject: true,
-      versions: true,
-    },
+    select: { id: true, labels: true },
   });
 
-  // Revalidate paths
   revalidatePath('/dashboard');
   revalidatePath('/documents/[project]/[slug]/[lang]', 'page');
 

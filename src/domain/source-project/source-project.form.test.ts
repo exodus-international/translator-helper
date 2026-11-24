@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createSourceProjectSchema, updateSourceProjectSchema } from './source-project.types';
+import { createSourceProjectSchema, updateSourceProjectSchema, updatesAdminOnlyFields } from './source-project.types';
 import {
   EMPTY_PROJECT_FORM,
   isProjectFormComplete,
@@ -186,5 +186,33 @@ describe('isProjectFormComplete', () => {
 
   it('does not require a description or an acronym', () => {
     assert.equal(isProjectFormComplete({ ...defaults, description: '', acronym: '' }), true);
+  });
+});
+
+describe('updateSourceProjectSchema path segments', () => {
+  const accepts = (slug: string) => updateSourceProjectSchema.safeParse({ slug, repositoryDirectory: slug }).success;
+
+  it('rejects relative segments and backslashes', () => {
+    for (const bad of ['..', '.', 'a\\b', '..\\x', 'a/b', 'a b', 'a?b', 'a#b']) {
+      assert.equal(accepts(bad), false, bad);
+    }
+  });
+
+  it('still accepts existing plausible values', () => {
+    for (const ok of ['exodus-90', 'october_2026', 'Exodus90', 'v1.2', 'a..b', '.hidden']) {
+      assert.equal(accepts(ok), true, ok);
+    }
+  });
+});
+
+describe('updatesAdminOnlyFields', () => {
+  it('lets a status-only update through', () => {
+    assert.equal(updatesAdminOnlyFields({ status: 'COMPLETE' }), false);
+  });
+
+  it('flags slug and repositoryDirectory, including a null clear', () => {
+    assert.equal(updatesAdminOnlyFields({ slug: 'x-y' }), true);
+    assert.equal(updatesAdminOnlyFields({ repositoryDirectory: 'x-y' }), true);
+    assert.equal(updatesAdminOnlyFields({ repositoryDirectory: null }), true);
   });
 });

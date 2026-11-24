@@ -67,6 +67,40 @@ Vyberte si dnes jednu věc kromě jídla, od které se budete postit:
 Strávte deset minut v tichu s tímto úryvkem. Nechte skutečnost Kristova utrpení dotknout se vašeho srdce.
 `;
 
+/**
+ * A draft that still cites Scripture the English way, which is what the
+ * Scripture demo fixes on camera: "Mark 1:12" and "Ps 23:4" become the
+ * Czech Bible's own notation, and the verse from Mark is not yet the official
+ * wording.
+ * The Scripture card only has something to check once a Czech Bible is
+ * imported (see demos/README.md).
+ */
+const DESERT_CS = `# Den 14 – Poušť
+
+> "Duch ho ihned vyhnal na poušť." — Mark 1:12
+
+## Ranní rozjímání
+
+Dva týdny za námi. Počáteční nadšení možná slábne. Právě tady vás Bůh chce mít: na poušti, kde rozptýlení odpadá a zůstáváte tváří v tvář sami sobě i jemu.
+
+### Přijměte vyprahlost
+
+Nelekejte se, když je modlitba suchá nebo těžká. Otcové pouště tomu říkali *acedie*, duchovní ochablost. Je to znamení, že jdete hlouběji, od citové útěchy k podstatě víry.
+
+## Písmo k rozjímání
+
+> I když půjdu údolím stínu smrti,
+> nebudu se bát zlého, vždyť ty jsi se mnou.
+> Tvůj prut a tvá hůl mě potěšují.
+> — Ps 23:4
+
+## Večerní zpytování
+
+- Jsem v pokušení to vzdát? Pojmenujte to pokušení poctivě.
+- Kde jsem dnes našel nečekanou sílu?
+- Ozval jsem se tento týden svým bratrům?
+`;
+
 async function user(email: string) {
   return prisma.user.findUniqueOrThrow({ where: { email }, select: { id: true, name: true } });
 }
@@ -114,7 +148,7 @@ async function main() {
   });
   await prisma.documentVersion.update({
     where: { id: desertCs.id },
-    data: { deadline: tomorrow, assignedById: admin.id, assignedAt: daysAgo(9) },
+    data: { deadline: tomorrow, assignedById: admin.id, assignedAt: daysAgo(9), content: DESERT_CS },
   });
   await prisma.documentVersion.update({
     where: { id: fastingCs.id },

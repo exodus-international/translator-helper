@@ -34,5 +34,8 @@ export function githubStubEnv(): Record<string, string> {
     GITHUB_REPO_NAME: 'content',
     GITHUB_WEBHOOK_SECRET: 'stub-webhook-secret',
     GITHUB_PRIVATE_KEY: privateKey,
+    // Deploys merge their pull request, which runs every call a deploy
+    // without merging makes and one more.
+    GITHUB_MERGE_ON_DEPLOY: 'true',
   };
 }

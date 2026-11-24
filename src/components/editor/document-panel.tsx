@@ -15,9 +15,21 @@ import {
 } from '@/components/ui/sidebar';
 import type { DocumentStatusConfig } from '@/constants/document-status';
 import type { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
-import { AlertCircle, BookOpen, ChevronDown, Maximize2, MessageSquare, Minimize2, PanelRightClose, PanelRightOpen } from 'lucide-react';
-import type { ReactNode } from 'react';
+import {
+  AlertCircle,
+  BookMarked,
+  BookOpen,
+  ChevronDown,
+  Maximize2,
+  MessageSquare,
+  Minimize2,
+  PanelRightClose,
+  PanelRightOpen,
+} from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { ThreadSidebar } from '../thread-sidebar';
+import { ScriptureCheckCard } from './scripture-check-card';
+import { useScriptureHost } from './scripture-context';
 
 export interface DocumentPanelProps {
   /** Folded, the panel is a rail; this is what the rail says and offers. */
@@ -80,7 +92,10 @@ export function DocumentPanel({
   onViewChange,
   threads,
 }: DocumentPanelProps) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, open: panelOpen } = useSidebar();
+  // Only a page that knows the translation's language offers the check.
+  const scripture = useScriptureHost();
+  const [scriptureOpen, setScriptureOpen] = useState(false);
 
   return (
     <Sidebar
@@ -134,6 +149,20 @@ export function DocumentPanel({
               )}
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {scripture && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Scripture check"
+                onClick={() => {
+                  setScriptureOpen(true);
+                  if (!panelOpen) toggleSidebar();
+                }}
+              >
+                <BookMarked />
+                <span>Scripture</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Markdown guide" onClick={onOpenGuide}>
               <BookOpen />
@@ -208,8 +237,10 @@ export function DocumentPanel({
             </Card>
           )}
 
+          {scripture && <ScriptureCheckCard open={scriptureOpen} onOpenChange={setScriptureOpen} />}
+
           {threads.show && (
-            <div className="flex min-h-[16rem] flex-1 flex-col">
+            <div id="document-panel-threads" className="flex min-h-[16rem] scroll-mt-3 flex-1 flex-col">
               <ThreadSidebar
                 suggestions={threads.suggestions}
                 currentUserId={threads.currentUserId}

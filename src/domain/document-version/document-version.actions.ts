@@ -3,7 +3,6 @@
 import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { authorize } from '@/lib/authorize';
-import { type SessionUser } from '@/lib/session';
 import { DocumentStatus, Role } from '@/generated/prisma/enums';
 import { revalidatePath } from 'next/cache';
 import { isGitHubConfigured } from '@/lib/github-config';
@@ -20,32 +19,9 @@ import {
   notifyStatusChange,
   notifyTranslatorAssignment,
 } from '../notification/notification.service';
-
-/**
- * Load a version + its language and assert the caller may edit/delete a source
- * (English) version. For non-source versions returns successfully — caller is
- * responsible for any further project-scoped permission check.
- */
-async function loadVersionAndGateSourceEdits(id: string, user: SessionUser) {
-  const version = await getDocumentVersionById(id);
-  if (!version) {
-    throw new Error('Document version not found');
-  }
-
-  const language = await getLanguageById(version.languageId);
-  if (!language) {
-    throw new Error('Language not found');
-  }
-
-  if (language.code === 'en' && user.role !== Role.ADMIN) {
-    throw new Error('Forbidden: Only deployers can edit source (English) document versions');
-  }
-
-  return { version, language, isSourceEnglish: language.code === 'en' };
-}
 import { coalesceEditLog, createActivityLog } from '../activity-log/activity-log.repository';
 import { countOpenSuggestions } from '../suggestion/suggestion.repository';
-import { assertCanEditDocumentVersion } from './document-version.permissions';
+import { assertCanDeleteDocumentVersion, assertCanEditDocumentVersionContent } from './document-version.permissions';
 import { validateTransition } from './document-version.transitions';
 import { getDocumentById } from '../document/document.repository';
 import { getLanguageById } from '../language/language.repository';
@@ -186,7 +162,8 @@ export async function updateDocumentVersionAction(id: string, input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = updateDocumentVersionSchema.parse(input);
 
-  await assertCanEditDocumentVersion(id, user);
+  // Language membership, and no edits once the text has passed review.
+  await assertCanEditDocumentVersionContent(id, user);
 
   const version = await updateDocumentVersion(id, validated.content, user.id);
 
@@ -261,8 +238,8 @@ export async function submitForReviewAction(input: unknown) {
 
 export async function deleteDocumentVersionAction(id: string) {
   const { user } = await authorize('authenticated');
-  await loadVersionAndGateSourceEdits(id, user);
-  // For translation versions, allow deletion (or add appropriate checks if needed)
+  // The edit rule, and only drafts unless the caller manages the language.
+  await assertCanDeleteDocumentVersion(id, user);
   return await deleteDocumentVersion(id);
 }
 

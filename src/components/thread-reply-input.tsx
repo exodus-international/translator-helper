@@ -47,14 +47,15 @@ export function ThreadReplyInput({ onSubmit, disabled }: ThreadReplyInputProps) 
         placeholder="Reply..."
         disabled={disabled}
         rows={1}
-        className="flex-1 text-xs px-2 py-1.5 rounded border border-border bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-none overflow-hidden"
+        className="flex-1 text-xs max-md:min-h-11 max-md:text-base px-2 py-1.5 rounded border border-border bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-none overflow-hidden"
       />
       <Button
         size="sm"
         variant="ghost"
         onClick={handleSubmit}
         disabled={disabled || !value.trim()}
-        className="h-7 w-7 p-0 shrink-0"
+        aria-label="Send reply"
+        className="h-7 w-7 p-0 shrink-0 max-md:size-11"
       >
         <Send className="h-3.5 w-3.5" />
       </Button>

@@ -73,9 +73,13 @@ export function GitHubStatus({ documentVersionId, isDeployed, compact = false, f
   const handleRetry = async () => {
     setRetrying(true);
     try {
-      await deployToGitHubAction(documentVersionId);
+      const { merge } = await deployToGitHubAction(documentVersionId);
       capture('github_deploy_retried');
-      toast.success('GitHub deploy successful!');
+      if (merge && !merge.merged) {
+        toast.error(`GitHub PR opened but not merged: ${merge.reason}`);
+      } else {
+        toast.success(merge ? 'Deployed and merged into main' : 'GitHub deploy successful!');
+      }
       await loadCommits();
     } catch (error: any) {
       console.error('GitHub retry failed:', error);

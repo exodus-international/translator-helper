@@ -86,6 +86,28 @@ describe('escapeCsvField', () => {
   it('quotes values containing newlines', () => {
     assert.equal(escapeCsvField('line1\nline2'), '"line1\nline2"');
   });
+
+  it('prefixes values starting with a formula character with a single quote', () => {
+    assert.equal(escapeCsvField('=1+1'), "'=1+1");
+    assert.equal(escapeCsvField('+47 123'), "'+47 123");
+    assert.equal(escapeCsvField('-5'), "'-5");
+    assert.equal(escapeCsvField('@SUM(A1)'), "'@SUM(A1)");
+    assert.equal(escapeCsvField('\tindented'), "'\tindented");
+    assert.equal(escapeCsvField('\rcarriage'), `"'\rcarriage"`);
+  });
+
+  it('prefixes and quotes a formula value that also contains a comma', () => {
+    assert.equal(escapeCsvField('=a,b'), `"'=a,b"`);
+  });
+
+  it('leaves values unchanged when the formula character is not leading', () => {
+    assert.equal(escapeCsvField('a=b'), 'a=b');
+    assert.equal(escapeCsvField('Anna-Maria'), 'Anna-Maria');
+  });
+
+  it('leaves a normal name unchanged', () => {
+    assert.equal(escapeCsvField('Anna Horak'), 'Anna Horak');
+  });
 });
 
 describe('buildUserCsv', () => {

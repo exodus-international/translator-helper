@@ -51,12 +51,14 @@ import { useTrailStore, type TrailCrumb } from '@/lib/page-trail';
 import { SessionUser } from '@/lib/session';
 import {
   Bell,
+  BookOpenText,
   Bug,
   ChevronsUpDown,
   FileText,
   FolderKanban,
   Languages,
   LayoutDashboard,
+  Library,
   LifeBuoy,
   LogOut,
   Megaphone,
@@ -79,6 +81,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   translations: 'Translations',
   releases: 'Releases',
   admin: 'Admin',
+  bible: 'Bible',
   instructions: 'AI instructions',
   languages: 'Languages',
   settings: 'Settings',
@@ -163,7 +166,11 @@ interface NavItem {
 // Grouped by route prefix, and sorted by href inside each group. The group
 // labels are the same ones the breadcrumb uses for those segments, so the trail
 // in the topbar names the section the sidebar highlights.
-const ROOT_NAV_ITEMS: NavItem[] = [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }];
+const ROOT_NAV_ITEMS: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  // For everyone signed in: translators look passages up while they work.
+  { href: '/bible', label: 'Bible', icon: BookOpenText },
+];
 
 // Editorial rather than administrative: a language's Project Manager writes the
 // guidance and everyone on the language can read it, so it sits with the work
@@ -187,6 +194,8 @@ const LANGUAGES_NAV_ITEM: NavItem = { href: '/languages', label: 'Languages', ic
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: FileText },
   LANGUAGES_NAV_ITEM,
+  // Not "Bible": the root group already has the reading page by that name.
+  { href: '/admin/bible', label: 'Bible texts', icon: Library },
   { href: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { href: '/admin/users', label: 'Users', icon: Users },
 ];
