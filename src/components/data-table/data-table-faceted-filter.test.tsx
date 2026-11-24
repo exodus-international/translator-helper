@@ -4,7 +4,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import type { ColumnDef } from '@tanstack/react-table';
-import { useDataTable } from '@/hooks/use-data-table';
+import { useDataTable, type DataTableFeatures } from '@/hooks/use-data-table';
 import { DataTableFacetedFilter } from './data-table-faceted-filter';
 
 /**
@@ -19,7 +19,7 @@ interface Row {
   role: string;
 }
 
-const columns: ColumnDef<Row, unknown>[] = [
+const columns: ColumnDef<DataTableFeatures, Row>[] = [
   {
     id: 'role',
     accessorKey: 'role',
@@ -41,7 +41,7 @@ const options = [
 ];
 
 function Harness() {
-  const { table } = useDataTable<Row>({ data, columns: columns as never });
+  const { table } = useDataTable<Row>({ data, columns });
   return <DataTableFacetedFilter column={table.getColumn('role')} title="Role" options={options} />;
 }
 

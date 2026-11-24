@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import type { ColumnDef } from '@tanstack/react-table';
-import { useDataTable } from '@/hooks/use-data-table';
+import { useDataTable, type DataTableFeatures } from '@/hooks/use-data-table';
 import { DataTableViewOptions } from './data-table-view-options';
 
 /**
@@ -19,14 +19,14 @@ interface Row {
   email: string;
 }
 
-const columns: ColumnDef<Row, unknown>[] = [
+const columns: ColumnDef<DataTableFeatures, Row>[] = [
   { id: 'name', accessorKey: 'name', meta: { label: 'Name' } },
   { id: 'email', accessorKey: 'email', meta: { label: 'Email' } },
 ];
 const data: Row[] = [{ name: 'Ada', email: 'ada@example.org' }];
 
 function Harness() {
-  const { table } = useDataTable<Row>({ data, columns: columns as never });
+  const { table } = useDataTable<Row>({ data, columns });
   const visible = table
     .getAllColumns()
     .filter((column) => column.getIsVisible())
