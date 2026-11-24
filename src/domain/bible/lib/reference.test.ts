@@ -68,3 +68,21 @@ test('normalizeBook folds case, spaces, punctuation and diacritics', () => {
   assert.equal(normalizeBook('Đelo'), 'djelo')
   assert.equal(normalizeBook('Ž'), 'z')
 })
+
+test('normalizeBook keeps the letters of a book written in Cyrillic', () => {
+  assert.equal(normalizeBook('Ів.'), 'ів')
+  assert.equal(normalizeBook('Буття'), 'буття')
+  // The number alone used to be all that was left, so every numbered book was "1" or "2".
+  assert.equal(normalizeBook('1 Кор'), '1кор')
+  assert.equal(normalizeBook('2 Кор.'), '2кор')
+  assert.notEqual(normalizeBook('1 Кор'), normalizeBook('1 Сам'))
+  // й and ї are letters of the alphabet, not и and і with an accent.
+  assert.equal(normalizeBook('Йов'), 'йов')
+  assert.equal(normalizeBook('Єзекиїл'), 'єзекиїл')
+  assert.equal(normalizeBook("Об'явлення"), 'обявлення')
+})
+
+test('a Ukrainian citation parses like any continental one', () => {
+  assert.deepEqual(parseReference('Ів. 3, 16-18'), [{ book: 'Ів', ranges: [v(3, 16, 3, 18)] }])
+  assert.deepEqual(parseReference('1 Кор 13,4-7'), [{ book: '1 Кор', ranges: [v(13, 4, 13, 7)] }])
+})

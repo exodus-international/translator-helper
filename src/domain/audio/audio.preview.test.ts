@@ -34,3 +34,9 @@ test('the default and a blank are stored as no sample, so a corrected default re
   assert.equal(storedPreviewText('sk', ''), null);
   assert.equal(storedPreviewText('sk', 'Vlastný text.'), 'Vlastný text.');
 });
+
+test('Ukrainian has a default voice and a sample written in Ukrainian', () => {
+  assert.match(DEFAULT_AUDIO_VOICES.uk, /^uk-UA-/);
+  assert.match(defaultPreviewText('uk'), /\p{Script=Cyrillic}/u);
+  assert.notEqual(defaultPreviewText('uk'), DEFAULT_PREVIEW_TEXTS.en);
+});

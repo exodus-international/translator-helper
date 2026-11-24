@@ -101,6 +101,9 @@ describe('formatting actions', () => {
     // read an intraword `_` as emphasis either.
     assert.equal(run('the **sort_order** key', 0, 22, 'clear').text, 'the sort_order key');
     assert.equal(run('_really_ snake_case_here', 0, 24, 'clear').text, 'really snake_case_here');
+    // The letters beside it need not be ASCII: a Ukrainian or Czech filename is a word too.
+    assert.equal(run('**день_1** файл', 0, 10, 'clear').text, 'день_1 файл');
+    assert.equal(run('_příloha_ den_česky', 0, 19, 'clear').text, 'příloha den_česky');
   });
 
   it('clears a single-tilde strikethrough, but not a lone tilde', () => {

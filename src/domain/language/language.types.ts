@@ -149,4 +149,5 @@ export const DEFAULT_AUDIO_VOICES: Record<string, string> = {
   pl: 'pl-PL-MarekNeural',
   sk: 'sk-SK-LukasNeural',
   sl: 'sl-SI-RokNeural',
+  uk: 'uk-UA-OstapNeural',
 };
