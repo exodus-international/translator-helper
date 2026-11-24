@@ -54,7 +54,6 @@ export function DataTableViewOptions<TData extends RowData>({
         View
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-48">
-        {/* GroupLabel (what DropdownMenuLabel wraps) requires Menu.Group context. */}
         <DropdownMenuGroup>
           <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
         </DropdownMenuGroup>
