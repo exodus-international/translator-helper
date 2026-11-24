@@ -1,11 +1,9 @@
-# [1.6.0](https://github.com/exodus-international/translator-helper/compare/v1.4.2...v1.6.0) (2026-11-24)
+# [1.6.0](https://github.com/exodus-international/translator-helper/compare/v1.5.0...v1.6.0) (2026-11-24)
 
 
 ### Bug Fixes
 
-* **auth:** re-issue the session cookie when the session is renewed ([#277](https://github.com/exodus-international/translator-helper/issues/277)) ([35f15c6](https://github.com/exodus-international/translator-helper/commit/35f15c6b60460f0c6c67ec74c7ec8f6c6d8b549d))
 * **auth:** reject control characters in the post-login redirect path ([#319](https://github.com/exodus-international/translator-helper/issues/319)) ([f713498](https://github.com/exodus-international/translator-helper/commit/f713498f64a62093570cae5021223189aefc3fbe))
-* **auth:** send expired-session server actions to login and keep unsaved text ([#276](https://github.com/exodus-international/translator-helper/issues/276)) ([06cc0f4](https://github.com/exodus-international/translator-helper/commit/06cc0f40cf58457d59b94c5a175702b0a64de504))
 * **bible:** address review of the Bible port ([59b6989](https://github.com/exodus-international/translator-helper/commit/59b6989efc607828fcafaaa2d5ad668459fc5a25))
 * **bible:** cap request bodies by the bytes read, not the Content-Length header ([313e1cf](https://github.com/exodus-international/translator-helper/commit/313e1cf3dedfcd19345a36d0b2bf42b06f74fb54))
 * **bible:** cap verses per reference and per request ([57ae037](https://github.com/exodus-international/translator-helper/commit/57ae037de758ab4908452ea414b1f01e16594272))
@@ -28,17 +26,13 @@
 * **deps:** upgrade next, sentry, better-auth, dompurify and nodemailer for security advisories ([#321](https://github.com/exodus-international/translator-helper/issues/321)) ([3dfa942](https://github.com/exodus-international/translator-helper/commit/3dfa9428128ce16fa2631f88f236d3080b42c4c4))
 * **editor:** keep the mobile suggestion sheet above the iOS keyboard ([4ca9ad5](https://github.com/exodus-international/translator-helper/commit/4ca9ad5c335a0b845124877cebb791f57040b225))
 * **editor:** let the feedback window be dragged off the text ([e7d55ea](https://github.com/exodus-international/translator-helper/commit/e7d55ead098f26d66f1b30a2a713bfb259688f99))
-* **editor:** offer "Start translation" on a document that is Not Started ([#272](https://github.com/exodus-international/translator-helper/issues/272)) ([0266d36](https://github.com/exodus-international/translator-helper/commit/0266d36a6e7bf15e6c72887841388700ce4e9df4))
 * **lint:** accept a frontmatter key the source has ([b936a50](https://github.com/exodus-international/translator-helper/commit/b936a50a7995640ba51e5a48820ecdece8ffd5ff))
 * neutralise CSV formulas and trust localhost only outside production ([#316](https://github.com/exodus-international/translator-helper/issues/316)) ([39867d5](https://github.com/exodus-international/translator-helper/commit/39867d5f425d25fe87bf012ef66a723a59f02f2d))
-* **release:** read the bumped version from package.json ([#308](https://github.com/exodus-international/translator-helper/issues/308)) ([768e078](https://github.com/exodus-international/translator-helper/commit/768e078e1edce51fc988d37186bdf91ce19d9c68))
-* return stale-state conflicts from suggestion and status actions ([#274](https://github.com/exodus-international/translator-helper/issues/274)) ([4a493a9](https://github.com/exodus-international/translator-helper/commit/4a493a9a83c8fdde571b2d7a7bd2907c9f52ee42))
 * **review:** touch-sized status, assignment, deadline and workflow controls in the document panel on phones ([7ee6f08](https://github.com/exodus-international/translator-helper/commit/7ee6f081a9626464760cf6bdf148f2c6e84b0f4f))
 * **review:** touch-sized thread actions and reply input on phones ([03e58ea](https://github.com/exodus-international/translator-helper/commit/03e58eada36fd03caa69194b3edab118055b17fc))
 * **security:** gate suggestion replies, edits and label toggles by team; validate suggestion filters ([#317](https://github.com/exodus-international/translator-helper/issues/317)) ([138e923](https://github.com/exodus-international/translator-helper/commit/138e923f4e050359b8475f6e9c8512f0e2fdf572))
 * **security:** gate version edits, deletes and deploys on membership and status ([#320](https://github.com/exodus-international/translator-helper/issues/320)) ([f00c79e](https://github.com/exodus-international/translator-helper/commit/f00c79eb1882d39712a15e3dd503870f3e92d6f0))
 * **source-project:** make slug and repository directory admin-only and reject . and .. segments ([#318](https://github.com/exodus-international/translator-helper/issues/318)) ([a032f2d](https://github.com/exodus-international/translator-helper/commit/a032f2d7c18fb6c79e75f04602d5e79274db8d05))
-* **status:** let anyone on the language team move a version ([#275](https://github.com/exodus-international/translator-helper/issues/275)) ([df425dc](https://github.com/exodus-international/translator-helper/commit/df425dc132d6d69e161eb61ae2a18deb2424595f))
 * **test:** run test files whose path contains brackets ([#304](https://github.com/exodus-international/translator-helper/issues/304)) ([b0be21c](https://github.com/exodus-international/translator-helper/commit/b0be21c2e497cb4a02dfc0cb22032abf82654afc))
 * **threads:** typing a reply no longer jumps to the passage and closes the sheet ([6fc428c](https://github.com/exodus-international/translator-helper/commit/6fc428c7caa991cf48cc67c879a35efa8dcb819c))
 * **viewer:** tapping a thread from Live or Audio text switches to the editor first ([b9907f9](https://github.com/exodus-international/translator-helper/commit/b9907f9f3534d17eae6d51abfafac71e30283e18))
@@ -46,10 +40,6 @@
 
 ### Features
 
-* **audio:** per-language 48 kHz output quality ([#305](https://github.com/exodus-international/translator-helper/issues/305)) ([1be408d](https://github.com/exodus-international/translator-helper/commit/1be408d94fd0b1a510d1330dcbab2cbaa5f8e29b)), closes [#297](https://github.com/exodus-international/translator-helper/issues/297)
-* **audio:** per-language sentence and comma pauses ([#303](https://github.com/exodus-international/translator-helper/issues/303)) ([1449a4f](https://github.com/exodus-international/translator-helper/commit/1449a4f2a148bf16cc6d9f99cfee74b8e3c41b14)), closes [#296](https://github.com/exodus-international/translator-helper/issues/296)
-* **audio:** per-language speaking rate and pitch ([#301](https://github.com/exodus-international/translator-helper/issues/301)) ([dd9f3aa](https://github.com/exodus-international/translator-helper/commit/dd9f3aa15a92374d48e81d7ad4cafb6945342834)), closes [#295](https://github.com/exodus-international/translator-helper/issues/295) [#295](https://github.com/exodus-international/translator-helper/issues/295)
-* **audio:** preview narration settings in the Audio card ([#306](https://github.com/exodus-international/translator-helper/issues/306)) ([a130229](https://github.com/exodus-international/translator-helper/commit/a13022919ed467614c0b53fa4ef5891d1cc89ff8)), closes [#298](https://github.com/exodus-international/translator-helper/issues/298) [#299](https://github.com/exodus-international/translator-helper/issues/299)
 * **bible:** admin pages to import Bibles and review their versification ([d2cc3bf](https://github.com/exodus-international/translator-helper/commit/d2cc3bf7e5b32a99813c97f4d50bb43ea2786dba))
 * **bible:** Bible assistant chat that answers with the official text ([b9f6c59](https://github.com/exodus-international/translator-helper/commit/b9f6c594cecc6037641be4faac5d691e6f8b43de))
 * **bible:** check and replace Scripture citations in the editor ([7e70e2b](https://github.com/exodus-international/translator-helper/commit/7e70e2b03c5d8c4711f0020a39b8a0cd74c432b5))
