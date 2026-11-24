@@ -95,7 +95,9 @@ export function DataTableFacetedFilter<TData extends RowData, TValue>({
         ) : (
           <PlusCircle />
         )}
-        {title}
+        {/* Keep the title in an element. Browser page translation replaces bare
+            text nodes, and React then fails to insert the icon before one. */}
+        <span>{title}</span>
         {selectedValues?.size > 0 && (
           <>
             <Separator
