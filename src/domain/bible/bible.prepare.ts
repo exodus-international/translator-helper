@@ -91,13 +91,33 @@ export function prepareTranslation(
     const chapters = book.chapters
       .map((c) => ({ ...c, verses: c.verses.filter((v) => HAS_TEXT.test(v.text)) }))
       .filter((c) => c.verses.length > 0);
-    if (chapters.length === 0) return;
+
+    // A file can list the same chapter twice (for example, a chapter split
+    // around a Greek addition). Merge those entries so their verses share one
+    // chapter row instead of colliding on the database's unique key.
+    const chaptersByNumber = new Map<number, (typeof chapters)[number]>();
+    for (const chapter of chapters) {
+      const existing = chaptersByNumber.get(chapter.number);
+      if (!existing) {
+        chaptersByNumber.set(chapter.number, {
+          ...chapter,
+          verses: [...chapter.verses],
+          headers: chapter.headers ? [...chapter.headers] : undefined,
+        });
+        continue;
+      }
+      warnings.push(`${usfm} ${chapter.number} appears more than once in the file; the copies were merged.`);
+      existing.verses.push(...chapter.verses);
+      if (chapter.headers?.length) existing.headers = [...(existing.headers ?? []), ...chapter.headers];
+    }
+    const mergedChapters = [...chaptersByNumber.values()].sort((a, b) => a.number - b.number);
+    if (mergedChapters.length === 0) return;
     seenBooks.add(usfm);
 
     const verses: PreparedVerse[] = [];
     const headers: PreparedBook['headers'] = [];
     const counts: number[] = [];
-    for (const chapter of chapters) {
+    for (const chapter of mergedChapters) {
       const seen = new Set<number>();
       for (const v of chapter.verses) {
         if (seen.has(v.number)) continue; // duplicate verse in the source: keep the first
@@ -126,9 +146,9 @@ export function prepareTranslation(
       testament: book.testament === 'new' ? 'NT' : 'OT',
       order: CANON_ORDER_BY_USFM.get(book.usfm) ?? bi + 1,
       // The highest chapter, not how many the file has: a file may skip chapters.
-      chapterCount: Math.max(0, ...chapters.map((c) => c.number)),
+      chapterCount: Math.max(0, ...mergedChapters.map((c) => c.number)),
       verseCount: bookVerses,
-      chapterVerseCounts: Array.from({ length: Math.max(0, ...chapters.map((c) => c.number)) }, (_, i) => counts[i] ?? 0),
+      chapterVerseCounts: Array.from({ length: Math.max(0, ...mergedChapters.map((c) => c.number)) }, (_, i) => counts[i] ?? 0),
       verses,
       headers,
     });
