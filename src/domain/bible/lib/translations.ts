@@ -51,6 +51,13 @@ export const TRANSLATIONS: TranslationDef[] = [
     role: 'target',
   },
   {
+    code: 'utt-uk',
+    name: 'Переклад Р. Турконяка (УТТ)',
+    language: 'uk',
+    languageName: 'Українська',
+    role: 'target',
+  },
+  {
     code: 'ssp-sl',
     name: 'Slovenski standardni prevod (SSP)',
     language: 'sl',
