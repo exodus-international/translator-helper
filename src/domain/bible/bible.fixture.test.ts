@@ -85,6 +85,20 @@ describe('prepare', () => {
     assert.equal(searchKey('Đakon: »Ljubav je strpljiva«!'), 'djakon ljubav je strpljiva');
   });
 
+  it('merges chapters that share a number instead of creating duplicate rows', () => {
+    const file = parseTranslationFile(fixture('rsvce-en.json'));
+    const psalms = file.books.find((b) => b.usfm === 'PSA')!;
+    const original = psalms.chapters[0]!;
+    psalms.chapters.push({ ...original, verses: original.verses.map((v) => ({ ...v, text: `${v.text} (second copy)` })) });
+
+    const prepared = prepareTranslation(file, resolveMeta('rsvce-en', {}));
+    const book = prepared.books.find((b) => b.usfm === 'PSA')!;
+    const chapter = original.number;
+    assert.equal(book.verses.filter((v) => v.chapter === chapter).length, original.verses.length);
+    assert.equal(book.chapterVerseCounts[chapter - 1], original.verses.length);
+    assert.match(prepared.warnings.join('\n'), /PSA \d+ appears more than once/);
+  });
+
   it('turns unmappable chapters into rows before map rows', () => {
     const rows = prepareDeclarations({
       translation: 'x-hr',
