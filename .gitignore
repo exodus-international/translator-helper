@@ -65,3 +65,7 @@ generated-images/
 
 # Raw demo recordings (demos/README.md)
 /demos/output/
+
+# Claude Code: agent worktrees, and the plans and run ledgers it writes
+/.claude/worktrees/
+/.claude/plans/
