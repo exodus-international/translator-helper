@@ -33,3 +33,12 @@ export function useEditorStore<T>(selector: (state: EditorStore) => T): T {
   }
   return useStore(store, selector);
 }
+
+/**
+ * The editor's store, or null outside an editor: for a control that renders in
+ * the editor's sidebar and elsewhere, and reads or moves the version's status
+ * where there is an editor to tell.
+ */
+export function useEditorStoreApi(): EditorStoreApi | null {
+  return useContext(EditorStoreContext);
+}

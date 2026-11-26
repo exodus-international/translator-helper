@@ -254,13 +254,6 @@ export async function assignDocumentVersion(data: {
   });
 }
 
-/** Just the language and status of a version, for the checks that gate on them. */
-export async function getDocumentVersionLanguageAndStatus(
-  id: string,
-): Promise<{ languageId: string; status: DocumentStatus } | null> {
-  return prisma.documentVersion.findUnique({ where: { id }, select: { languageId: true, status: true } });
-}
-
 /** Every version a user is assigned to translate, soonest deadline first. */
 /**
  * A user's active work: versions where they are the translator or the reviewer,

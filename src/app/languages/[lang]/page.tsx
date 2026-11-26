@@ -2,7 +2,12 @@ import { notFound, redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { getLanguageByCode, getLanguageProgress } from '@/domain/language/language.repository';
 import { ProjectRole } from '@/generated/prisma/enums';
-import { canAdministerLanguages, canViewLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
+import {
+  canAdministerLanguages,
+  canDeployLanguage,
+  canViewLanguage,
+  resolveLanguageViewer,
+} from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { languageHealth } from '@/domain/language/language-health';
 import { listLanguageMembers } from '@/domain/user-language/user-language.repository';
@@ -27,10 +32,11 @@ export default async function LanguageOverviewPage({ params }: { params: Promise
     notFound();
   }
 
-  const viewer = resolveLanguageViewer({
+  const access = {
     isAdmin: user.role === 'ADMIN',
     memberships: user.role === 'ADMIN' ? [] : await getUserLanguages(user.id),
-  });
+  };
+  const viewer = resolveLanguageViewer(access);
 
   if (!canViewLanguage(viewer, language.id)) {
     redirect('/dashboard');
@@ -48,8 +54,9 @@ export default async function LanguageOverviewPage({ params }: { params: Promise
 
   return (
     <LanguageOverviewClient
-      language={{ code: language.code, name: language.name }}
+      language={{ id: language.id, code: language.code, name: language.name }}
       canAdminister={canAdministerLanguages(viewer)}
+      canDeploy={canDeployLanguage(access, language.id)}
       progress={progress}
       lastDeployAt={progress.lastDeployAt?.toISOString() ?? null}
       pills={languageHealth({

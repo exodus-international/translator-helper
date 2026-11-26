@@ -4,7 +4,6 @@ import { countHealthProblems, languageHealth, type LanguageHealthInput } from '.
 
 const HEALTHY: LanguageHealthInput = {
   isSource: false,
-  branchName: 'hr-croatian-translation',
   audioVoice: 'hr-HR-SreckoNeural',
   translationInstructions: 'Use the Jeruzalemska Biblija for scripture quotations.',
   memberCount: 7,
@@ -20,7 +19,6 @@ describe('languageHealth', () => {
   it('reports every check as ok for a fully configured language', () => {
     assert.deepEqual(labels({}), [
       'Manager: Toma Z.',
-      'Branch hr-croatian-translation',
       'Voice hr-HR-SreckoNeural',
       'AI Instructions written',
     ]);
@@ -39,22 +37,6 @@ describe('languageHealth', () => {
       label: 'No language manager',
       detail: 'nobody can manage this language',
     });
-  });
-
-  it('says a missing branch fails at deploy', () => {
-    const pill = languageHealth({ ...HEALTHY, branchName: null }).find((p) => p.key === 'branch');
-    assert.deepEqual(pill, {
-      key: 'branch',
-      state: 'missing',
-      label: 'No GitHub branch',
-      detail: 'deploy will fail',
-    });
-  });
-
-  it('requires a branch of every target language, deploying project or not', () => {
-    // Every language has at least one deploying project in practice, so the
-    // check is unconditional: there is no "not applicable" state to fall into.
-    assert.equal(countHealthProblems(languageHealth({ ...HEALTHY, branchName: null })), 1);
   });
 
   it('says a missing voice means approvals generate no audio', () => {
@@ -95,10 +77,9 @@ describe('languageHealth', () => {
     });
   });
 
-  it('reports a language with nothing configured as five problems', () => {
+  it('reports a language with nothing configured as four problems', () => {
     const pills = languageHealth({
       isSource: false,
-      branchName: null,
       audioVoice: null,
       translationInstructions: null,
       memberCount: 0,
@@ -108,11 +89,10 @@ describe('languageHealth', () => {
     assert.deepEqual(pills.map((pill) => pill.label), [
       'No members',
       'No language manager',
-      'No GitHub branch',
       'No voice',
       'No AI instructions',
     ]);
-    assert.equal(countHealthProblems(pills), 5);
+    assert.equal(countHealthProblems(pills), 4);
   });
 
   it('checks nothing on the source language', () => {
@@ -121,7 +101,6 @@ describe('languageHealth', () => {
     assert.deepEqual(
       languageHealth({
         isSource: true,
-        branchName: null,
         audioVoice: null,
         translationInstructions: null,
         memberCount: 0,

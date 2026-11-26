@@ -1,4 +1,4 @@
-import { DocumentStatus } from '@/generated/prisma/enums';
+import type { DocumentStatus } from '@/generated/prisma/enums';
 import type { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import type { StatusChangeRefusal } from '@/domain/document-version/document-version.status-change';
 import { isRefusal } from '@/lib/action-refusal';
@@ -22,30 +22,27 @@ export type StatusChangeOutcome = Exclude<StatusChangeResponse, StatusChangeRefu
 export type StatusChangeVia = 'dropdown' | 'kanban_dnd';
 
 export interface StatusChangeFeedbackDeps {
-  toast: Pick<typeof toast, 'loading' | 'dismiss' | 'success' | 'error'>;
+  toast: Pick<typeof toast, 'error'>;
   capture: (event: AnalyticsEvent, properties?: AnalyticsProperties) => void;
-  /** Opens the pull request; the browser's window.open in the app. */
-  open: (url: string) => void;
 }
 
-const defaultDeps: StatusChangeFeedbackDeps = {
-  toast,
-  capture,
-  open: (url) => window.open(url, '_blank'),
-};
+const defaultDeps: StatusChangeFeedbackDeps = { toast, capture };
 
 /**
- * Wraps one status change: a loading toast while a deploy is out, then the
- * GitHub and audio results as toasts and the analytics events for the move.
+ * Wraps one status change: the audio result as a toast, the deploy that
+ * approval started (where the project deploys on approval) handed to
+ * `onDeployStarted` to follow, and the analytics events for the move.
+ *
+ * Moving a version into DEPLOYED is not a status change: Deploy does it, and
+ * the controls call Deploy for it instead of coming here.
  *
  * When the server refuses the move, usually because the page is stale, the
  * refusal is shown as an error toast and returned, and no analytics is sent.
  * The caller reloads what it shows.
  *
- * `change` is the call itself. When it throws, the loading toast is cleared
- * and the error is rethrown for the caller, which decides what the control
- * does next; the error message is the caller's to show, because the two
- * controls word it differently.
+ * `change` is the call itself. When it throws, the error is rethrown for the
+ * caller, which decides what the control does next; the error message is the
+ * caller's to show, because the two controls word it differently.
  */
 export async function withStatusChangeFeedback(
   input: {
@@ -54,46 +51,19 @@ export async function withStatusChangeFeedback(
     via: StatusChangeVia;
     documentId: string | null;
     versionId: string;
+    /** Follows a deploy the move started; approval in a project that deploys on approval. */
+    onDeployStarted?: (deploymentId: string) => void;
   },
   change: () => Promise<StatusChangeResponse>,
   deps: StatusChangeFeedbackDeps = defaultDeps,
 ): Promise<StatusChangeResponse> {
   const { from, to, via, documentId, versionId } = input;
 
-  // GitHub takes a few seconds, and the control would otherwise look stuck.
-  const deployToastId = to === DocumentStatus.DEPLOYED ? deps.toast.loading('Deploying to GitHub...') : undefined;
-
-  let result: StatusChangeResponse;
-  try {
-    result = await change();
-  } catch (error) {
-    if (deployToastId !== undefined) deps.toast.dismiss(deployToastId);
-    throw error;
-  }
-
-  if (deployToastId !== undefined) deps.toast.dismiss(deployToastId);
+  const result = await change();
 
   if (isRefusal(result)) {
     deps.toast.error(result.refused.message);
     return result;
-  }
-
-  if (result.github?.status === 'success') {
-    const { prUrl, merged, mergeError } = result.github;
-    const action = prUrl ? { label: 'Open PR', onClick: () => deps.open(prUrl) } : undefined;
-    if (merged === false) {
-      // Deployed, but the pull request is still open, so nothing is live yet.
-      deps.toast.error(`GitHub PR opened but not merged: ${mergeError}`, { action, duration: 10000 });
-    } else if (merged) {
-      deps.toast.success('Deployed and merged into main', { action, duration: 8000 });
-    } else {
-      deps.toast.success(prUrl ? 'GitHub PR created successfully' : 'Deployed to GitHub successfully', {
-        action,
-        duration: 8000,
-      });
-    }
-  } else if (result.github?.status === 'failed') {
-    deps.toast.error(`GitHub deploy failed: ${result.github.error}`, { duration: 10000 });
   }
 
   if (result.audio?.status === 'success') {
@@ -103,11 +73,10 @@ export async function withStatusChangeFeedback(
     deps.toast.error(`Audio generation failed: ${result.audio.error}`, { duration: 10000 });
   }
 
+  if (result.deploymentId) input.onDeployStarted?.(result.deploymentId);
+
   const ids = { documentId, documentVersionId: versionId };
   deps.capture('document_status_changed', { from, to, via, ...ids });
-  if (to === DocumentStatus.DEPLOYED) {
-    deps.capture('document_deployed', { via, ...ids });
-  }
 
   return result;
 }

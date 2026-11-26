@@ -1,6 +1,7 @@
 'use client';
 
 import ProjectKanbanBoard from '@/components/project-kanban-board';
+import { DeploysPanel } from '@/components/deploy/deploys-panel';
 import ProjectStatisticsTab from '@/components/project-statistics-tab';
 import ProjectTeamTab from '@/components/project-team-tab';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 import { updateSourceProjectAction } from '@/domain/source-project/source-project.actions';
 import { buildProjectPath } from '@/domain/source-project/source-project-url';
 import { DeployOffWarning } from '@/components/project-form';
@@ -19,7 +19,7 @@ import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analyt
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
 import type { Language } from '@/generated/prisma/client';
-import { BarChart3, CheckCircle2, LayoutDashboard, Settings, Users } from 'lucide-react';
+import { BarChart3, CheckCircle2, GitCommitHorizontal, LayoutDashboard, Settings, Users } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -52,6 +52,8 @@ interface ProjectDetailClientProps {
   translationProjects: {
     id: string;
     languageId: string;
+    /** Whether approving a document in this language deploys it. */
+    autoDeploy: boolean;
     sourceProject: any;
     language: {
       id: string;
@@ -62,7 +64,7 @@ interface ProjectDetailClientProps {
   }[];
   /** Resolved server-side from the user's assigned languages and this project's translation projects. */
   initialLanguageId: string;
-  /** Language ids this person may deploy: all of them for an admin, their own for a manager. */
+  /** Language ids this person may deploy: all of them for an admin, their own for anyone on a team. */
   deployableLanguageIds: string[];
   /** True when the URL named the language, which then outranks the stored choice. */
   languageFromUrl: boolean;
@@ -127,6 +129,7 @@ export default function ProjectDetailClient({
 
   // Find the translation project for the selected language
   const selectedTranslationProject = translationProjects.find((tp) => tp.languageId === selectedLanguage);
+  const selectedLanguageName = selectedLang?.name ?? '';
 
   const handleSaveSettings = async () => {
     // The slug is this project's URL, and the repository directory is where it
@@ -209,12 +212,7 @@ export default function ProjectDetailClient({
 
       <div className="px-4 py-4">
         <Tabs defaultValue="dashboard">
-          <TabsList
-            className={cn(
-              'grid w-full grid-cols-3 sm:inline-flex sm:w-fit',
-              isAdminClient(user) && 'max-sm:grid-cols-4',
-            )}
-          >
+          <TabsList className="flex w-full justify-start overflow-x-auto sm:inline-flex sm:w-fit">
             <TabsTrigger value="dashboard" className="flex items-center gap-1.5">
               <LayoutDashboard className="hidden size-4 sm:block" />
               Dashboard
@@ -226,6 +224,10 @@ export default function ProjectDetailClient({
             <TabsTrigger value="statistics" className="flex items-center gap-1.5">
               <BarChart3 className="hidden size-4 sm:block" />
               Statistics
+            </TabsTrigger>
+            <TabsTrigger value="deploys" className="flex items-center gap-1.5">
+              <GitCommitHorizontal className="hidden size-4 sm:block" />
+              Deploys
             </TabsTrigger>
             {isAdminClient(user) && (
               <TabsTrigger value="settings" className="flex items-center gap-1.5">
@@ -261,6 +263,28 @@ export default function ProjectDetailClient({
               selectedLanguage={selectedLanguage}
               translationProject={selectedTranslationProject || null}
             />
+          </TabsContent>
+
+          <TabsContent value="deploys" className="mt-4">
+            <div className="max-w-3xl">
+              <DeploysPanel
+                description={`What went out to GitHub from ${sourceProject.name} in ${selectedLanguageName || 'this language'}, newest first.`}
+                filter={{ sourceProjectId: sourceProject.id, languageId: selectedLanguage }}
+                scope={{ sourceProjectId: sourceProject.id, languageId: selectedLanguage }}
+                via="project"
+                canDeploy={deployableLanguageIds.includes(selectedLanguage)}
+                autoDeploy={
+                  selectedTranslationProject
+                    ? {
+                        translationProjectId: selectedTranslationProject.id,
+                        enabled: selectedTranslationProject.autoDeploy,
+                        languageName: selectedLanguageName,
+                      }
+                    : null
+                }
+                emptyText={`Nothing from this project has been deployed in ${selectedLanguageName || 'this language'} yet.`}
+              />
+            </div>
           </TabsContent>
 
           {isAdminClient(user) && (

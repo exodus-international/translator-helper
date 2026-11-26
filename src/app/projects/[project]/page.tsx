@@ -3,7 +3,7 @@
 import { listTranslationProjectsAction } from '@/domain/translation-project/translation-project.actions';
 import { listTargetLanguages } from '@/domain/language/language.repository';
 import { resolveInitialLanguage } from '@/domain/language/resolve-initial-language';
-import { canDeployLanguage, resolveLanguageViewer } from '@/domain/language/language-access';
+import { canDeployLanguage } from '@/domain/language/language-access';
 import { getUserLanguages } from '@/domain/user-language/user-language.repository';
 import { canAccessSourceProject } from '@/lib/permissions';
 import { getCurrentUser } from '@/lib/session';
@@ -33,13 +33,13 @@ export default async function ProjectDetailPage({
   const userLanguages = await getUserLanguages(user.id);
 
   // Deploying publishes a language's work, so who may do it is decided per
-  // language: every one for an administrator, the managed ones for a manager.
-  const viewer = resolveLanguageViewer({
+  // language: every one for an administrator, their own for anyone on a team.
+  const languageAccess = {
     isAdmin: user.role === 'ADMIN',
     memberships: user.role === 'ADMIN' ? [] : userLanguages,
-  });
+  };
   const deployableLanguageIds = languages
-    .filter((language) => canDeployLanguage(viewer, language.id))
+    .filter((language) => canDeployLanguage(languageAccess, language.id))
     .map((language) => language.id);
 
   // A link can name the language it is about -- the language overview's project

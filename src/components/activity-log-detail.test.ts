@@ -3,7 +3,18 @@ import assert from 'node:assert/strict';
 import { getDetailText } from './activity-log-detail';
 
 describe('getDetailText for a GitHub deploy', () => {
-  it('says a merged deploy reached main', () => {
+  it('names the commit a deploy made', () => {
+    assert.equal(
+      getDetailText('github_deployed', { deploymentId: 'd1', commitSha: '0123456789abcdef', commitUrl: 'https://x' }),
+      'commit 0123456',
+    );
+  });
+
+  it('says a deploy found the file already up to date', () => {
+    assert.equal(getDetailText('github_deployed', { deploymentId: 'd1', unchanged: true }), 'already up to date');
+  });
+
+  it('says a merged deploy from before in-app deploy reached main', () => {
     assert.equal(getDetailText('github_deployed', { merged: true }), 'merged into main');
   });
 
@@ -19,7 +30,7 @@ describe('getDetailText for a GitHub deploy', () => {
     assert.equal(detail, `PR left open: ${'x'.repeat(60)}...`);
   });
 
-  it('shows nothing for a deploy that leaves its pull request open by design', () => {
+  it('shows nothing for an old deploy that left its pull request open by design', () => {
     assert.equal(getDetailText('github_deployed', {}), null);
   });
 

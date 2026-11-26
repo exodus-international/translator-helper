@@ -28,7 +28,8 @@ const FORWARD_GUARDED_STATUSES: DocumentStatus[] = [DocumentStatus.APPROVED, Doc
 export class StatusTransitionRefusedError extends Error {
   constructor(
     message: string,
-    readonly reason: 'not_allowed' | 'open_suggestions',
+    /** `use_deploy`: DEPLOYED is reached by publishing, never by a status move. */
+    readonly reason: 'not_allowed' | 'open_suggestions' | 'use_deploy',
   ) {
     super(message);
     this.name = 'StatusTransitionRefusedError';

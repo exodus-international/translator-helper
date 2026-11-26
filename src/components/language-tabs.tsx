@@ -25,7 +25,7 @@ export function LanguageTabs({
   memberCount?: number;
   /** The source language has no team: nothing is translated into it. */
   includeTeam?: boolean;
-  /** Branch, voice, code and deletion are an administrator's to change. */
+  /** Voice, code and deletion are an administrator's to change. */
   includeSettings?: boolean;
 }) {
   const pathname = usePathname();

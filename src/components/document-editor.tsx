@@ -284,7 +284,6 @@ function EditorViewer({
               <StatusDropdown
                 currentStatus={targetVersion.status}
                 versionId={targetVersion.id}
-                user={user}
                 canDeploy={canDeploy}
                 canChangeStatus={canChangeStatus}
                 documentId={documentId}

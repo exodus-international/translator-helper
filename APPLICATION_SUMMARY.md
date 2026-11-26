@@ -11,7 +11,7 @@ The application manages the complete lifecycle of document translations:
 1. **Document Creation**: Create source documents (English) via upload or in-app editor
 2. **Translation**: Translate documents into target languages
 3. **Review**: Review translations with comments and approval workflow
-4. **Deployment**: Deploy approved translations and download files
+4. **Deployment**: Publish approved translations to the content repository on GitHub, from the app itself
 
 ## Key Features
 
@@ -20,7 +20,8 @@ The application manages the complete lifecycle of document translations:
 - Email/password authentication using Better-auth
 - Two user roles:
   - **Translator** (default): Can create, translate, review, and comment on documents
-  - **Deployer**: All translator permissions + deploy translations, manage languages/folders, access admin panel
+  - **Deployer**: All translator permissions + manage languages/folders, access admin panel
+- Deploying belongs to the language's team: any member of a language, and any administrator, can deploy its approved documents
 
 ### 2. Dashboard
 
@@ -28,7 +29,7 @@ The application manages the complete lifecycle of document translations:
   - "Needs Translation" - Documents requiring translation in selected language
   - "Needs Review" - Translations pending review
   - "My Translations" - User's own translation work
-  - "Ready to Deploy" - Approved translations (Deployers only)
+  - "Ready to Deploy" - Approved translations waiting to go out
 - **Language selector**: Filter documents by target language
 - **Folder filter**: Organize documents by folders
 - **Search**: Search documents by title or slug
@@ -97,7 +98,8 @@ The application manages the complete lifecycle of document translations:
   - **Request Final Approval**: Toggle "Waiting for final label" on documents in PENDING_REVIEW status; visible on Kanban board for workflow tracking
   - **Approve**: Mark as approved (status: APPROVED)
   - **Request Changes**: Revert to PENDING_TRANSLATION status
-  - **Deploy** (Deployers only): Change status to DEPLOYED and download file
+  - **Deploy** (the language's team): Publish to GitHub after a confirmation; status becomes DEPLOYED once the file is published
+  - **Redeploy**: Publish a deployed document again
 - **Comments system**: View and add comments on translations
 - **Activity log**: Track all changes with user attribution
 
@@ -145,6 +147,9 @@ The application manages the complete lifecycle of document translations:
   - User (translator)
 - **Comment**: Review comments on translations
 - **ActivityLog**: Audit trail for all actions
+- **Deployment**: One deploy: who started it, how (manual, redeploy, retry, on approval), its status (QUEUED, PUBLISHING, SUCCEEDED, FAILED), the commit and branch, and any error
+- **DeploymentItem**: One document version in a deployment, with its outcome (PUBLISHED, UNCHANGED, NOT_PUBLISHED, SKIPPED, FAILED) and file path
+- **TranslationProject.autoDeploy**: Deploy on approval for one project in one language (off by default)
 
 ### Status Workflow
 
@@ -205,15 +210,20 @@ PENDING_TRANSLATION → PENDING_REVIEW → APPROVED → DEPLOYED
 3. Compares source and translation side-by-side
 4. Adds comments or edits directly
 5. Approves or requests changes
-6. If approved, appears in "Ready to Deploy" (for Deployers)
+6. If approved, appears in "Ready to Deploy" for the language's team, or deploys at once when Deploy on approval is on
 
 ### Workflow 3: Deploy
 
-1. Deployer views "Ready to Deploy" tab
-2. Opens document review page
-3. Clicks "Deploy" button
-4. Status changes to DEPLOYED
-5. File downloads automatically
+1. Anyone on the language's team (or an administrator) chooses **Deploy**: from the document's status menu or Deploy section, by dragging its card into Deployed, or with **Deploy approved** for a project, a language, or everything on the Deploys page
+2. A confirmation names the documents, the repository and branch, and anything to know first (missing audio, unpublished projects, deploys already running)
+3. On **Deploy**, the app queues a deployment and publishes it in the background: every changed file goes into **one commit** on the deploy branch through the GitHub App, with no pull request or webhook. Unchanged files make no commit, so deploys are idempotent
+4. A toast follows the deploy and reports the outcome with a link to the commit; each published document becomes DEPLOYED
+5. A failure keeps the documents APPROVED, says why, and offers **Retry**, which sends only the documents that did not go out
+6. Every deploy is in the deploy history on the document, the project's Deploys tab, the language page and the Deploys page
+
+With **Deploy on approval** switched on for a project's language, approving a document deploys it straight away.
+
+Concurrency: a document is in at most one running deploy (a second request joins it), and the branch only ever moves by fast-forward, so two deploys at once cannot lose each other's files: the later one rebuilds its commit on the new head.
 
 ## Current UI Characteristics
 

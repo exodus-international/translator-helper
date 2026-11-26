@@ -87,7 +87,9 @@ export type AnalyticsEvent =
   // ── Workflow / status ────────────────────────────────────────────────
   | 'document_status_changed'
   | 'document_deployed'
-  | 'github_deploy_retried'
+  | 'deploy_started'
+  | 'deploy_retried'
+  | 'auto_deploy_toggled'
   // ── Audio ────────────────────────────────────────────────────────────
   | 'audio_generation_triggered'
   | 'audio_regeneration_triggered'

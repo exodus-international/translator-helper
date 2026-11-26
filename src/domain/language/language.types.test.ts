@@ -10,7 +10,6 @@ import {
 
 const SETTINGS = {
   name: 'Croatian',
-  branchName: 'hr-croatian-translation',
   audioProvider: null,
   audioVoice: null,
 };
@@ -88,7 +87,6 @@ describe('updateLanguageSettingsSchema', () => {
     });
 
     assert.equal(parsed.name, 'Croatian');
-    assert.equal(parsed.branchName, 'hr-croatian-translation');
     assert.equal(parsed.audioVoice, 'hr-HR-SreckoNeural');
   });
 
@@ -99,22 +97,17 @@ describe('updateLanguageSettingsSchema', () => {
   it('reads a blank voice as no voice', () => {
     assert.equal(updateLanguageSettingsSchema.parse({ ...SETTINGS, audioVoice: '   ' }).audioVoice, null);
   });
-
-  it('rejects a blank branch name', () => {
-    assert.throws(() => updateLanguageSettingsSchema.parse({ ...SETTINGS, branchName: '  ' }));
-  });
 });
 
 describe('createLanguageSchema', () => {
-  it('requires a branch at creation, so a deploy cannot be the first to find out', () => {
-    assert.throws(() => createLanguageSchema.parse({ code: 'pl', name: 'Polish' }));
+  it('accepts a code and a name', () => {
+    assert.deepEqual(createLanguageSchema.parse({ code: 'pl', name: 'Polish' }), { code: 'pl', name: 'Polish' });
   });
 
-  it('accepts a code, a name and a branch', () => {
-    assert.deepEqual(createLanguageSchema.parse({ code: 'pl', name: 'Polish', branchName: 'pl-polish-translation' }), {
+  it('no longer asks for a branch: every deploy goes to the one deploy branch', () => {
+    assert.deepEqual(createLanguageSchema.parse({ code: 'pl', name: 'Polish', branchName: 'pl-polish' }), {
       code: 'pl',
       name: 'Polish',
-      branchName: 'pl-polish-translation',
     });
   });
 });
@@ -133,13 +126,6 @@ describe('the messages these rules reject with', () => {
     assert.equal(messageFor({ ...SETTINGS, name: 'X' }), 'name: must be at least two characters');
   });
 
-  it('says why a branch matters', () => {
-    assert.equal(
-      messageFor({ ...SETTINGS, branchName: '' }),
-      'branchName: is required: without a branch, every deploy of this language fails',
-    );
-  });
-
   it('lets a whole-object rule speak without a field name', () => {
     assert.equal(
       messageFor({ ...SETTINGS, audioProvider: 'AZURE_SPEECH', audioVoice: null }),
@@ -148,7 +134,7 @@ describe('the messages these rules reject with', () => {
   });
 
   it('says a code is two to five characters', () => {
-    const result = createLanguageSchema.safeParse({ code: 'h', name: 'Croatian', branchName: 'x' });
+    const result = createLanguageSchema.safeParse({ code: 'h', name: 'Croatian' });
     assert.equal(result.success, false);
     assert.equal(
       result.success === false && formatIssues(result.error),

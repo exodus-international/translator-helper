@@ -27,11 +27,11 @@ export async function createLanguageAction(input: unknown) {
   await authorize('can:manage-languages');
 
   const validated = parseInput(createLanguageSchema, input);
-  return await createLanguage(validated.code, validated.name, validated.branchName);
+  return await createLanguage(validated.code, validated.name);
 }
 
 /**
- * Name, branch, voice and narration are saved together: they are one form, and saving them
+ * Name, voice and narration are saved together: they are one form, and saving them
  * one action at a time is how the old admin dialog left a language half-updated
  * when the second call failed. `code` is not accepted -- the schema is strict,
  * so an attempt to change the URL is rejected here rather than relied upon to
@@ -47,12 +47,11 @@ export async function updateLanguageSettingsAction(id: string, input: unknown) {
 
   const validated = parseInput(updateLanguageSettingsSchema, input);
 
-  // Nothing deploys into the source language and nothing is spoken in it, so
-  // its branch and voice stay null rather than being editable and inert.
+  // Nothing is spoken in the source language, so its voice stays null rather
+  // than being editable and inert.
   if (language.isSource) {
     return await updateLanguageSettings(id, {
       name: validated.name,
-      branchName: null,
       audioProvider: null,
       audioVoice: null,
       audioRate: null,
@@ -61,10 +60,6 @@ export async function updateLanguageSettingsAction(id: string, input: unknown) {
       audioCommaPauseMs: null,
       audioQuality: null,
     });
-  }
-
-  if (!validated.branchName) {
-    throw new Error('A GitHub branch is required: without one, every deploy of this language fails.');
   }
 
   return await updateLanguageSettings(id, validated);

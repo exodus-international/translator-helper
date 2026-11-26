@@ -1,8 +1,7 @@
 /**
- * Four things decide whether a language can produce anything, and all four fail
- * at the point of use rather than at configuration time: a deploy throws when
- * `branchName` is unset, approval returns `no_voice_for_language` silently when
- * `audioVoice` is, an AI translation quietly falls back to the base prompt
+ * Three things decide whether a language can produce anything, and all three
+ * fail at the point of use rather than at configuration time: approval returns
+ * `no_voice_for_language` silently when `audioVoice` is unset, an AI translation quietly falls back to the base prompt
  * without instructions, and a language whose members are all translators has
  * nobody `authorize({ project, role: 'manager' })` will let manage it.
  *
@@ -10,7 +9,7 @@
  * is written once and the wording is the same wherever it shows.
  */
 
-export type LanguageHealthKey = 'members' | 'manager' | 'branch' | 'voice' | 'instructions';
+export type LanguageHealthKey = 'members' | 'manager' | 'voice' | 'instructions';
 
 export interface LanguageHealthPill {
   key: LanguageHealthKey;
@@ -23,7 +22,6 @@ export interface LanguageHealthPill {
 
 export interface LanguageHealthInput {
   isSource: boolean;
-  branchName: string | null;
   audioVoice: string | null;
   translationInstructions: string | null;
   memberCount: number;
@@ -31,10 +29,6 @@ export interface LanguageHealthInput {
   managerNames: string[];
 }
 
-/**
- * Every language deploys in practice -- a source project is set up for all of
- * them -- so a missing branch is always a failure, never "not applicable".
- */
 export function languageHealth(language: LanguageHealthInput): LanguageHealthPill[] {
   // Nothing translates into the source language: it has no team, no voice and
   // no instructions by design, so reporting four gaps would be reporting noise.
@@ -52,12 +46,6 @@ export function languageHealth(language: LanguageHealthInput): LanguageHealthPil
     language.managerNames.length > 0
       ? { key: 'manager', state: 'ok', label: `Manager: ${language.managerNames[0]}` }
       : { key: 'manager', state: 'missing', label: 'No language manager', detail: 'nobody can manage this language' },
-  );
-
-  pills.push(
-    language.branchName
-      ? { key: 'branch', state: 'ok', label: `Branch ${language.branchName}` }
-      : { key: 'branch', state: 'missing', label: 'No GitHub branch', detail: 'deploy will fail' },
   );
 
   pills.push(

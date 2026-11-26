@@ -10,9 +10,8 @@ import { ProjectRole } from '@/generated/prisma/enums';
  * and the settings that decide what the app *does* with a language stay with
  * administrators.
  *
- * The split is by consequence, not by seniority. A branch name decides where
- * content is published, a voice decides what gets generated, a code is in every
- * URL, and a deletion cannot be undone. A manager who gets one of those wrong
+ * The split is by consequence, not by seniority. A voice decides what gets
+ * generated, a code is in every URL, and a deletion cannot be undone. A manager who gets one of those wrong
  * breaks something outside their language; a manager who gets the team wrong
  * inconveniences their own.
  */
@@ -58,7 +57,7 @@ export function canViewLanguage(viewer: LanguageViewer, languageId: string): boo
 /**
  * Creating and deleting a language, and everything on its settings tab, is
  * administration. A manager sees the same configuration verdict on the
- * overview -- knowing the branch is missing is exactly what makes them ask.
+ * overview -- knowing the voice is missing is exactly what makes them ask.
  */
 export function canAdministerLanguages(viewer: LanguageViewer): boolean {
   return viewer.kind === 'admin';
@@ -67,14 +66,17 @@ export function canAdministerLanguages(viewer: LanguageViewer): boolean {
 /**
  * Deploying publishes a language's approved work to the content repository.
  *
- * It is the same set of people as `canViewLanguage` and for a related reason:
- * the manager answers for that language's work, and deploying is the act of
- * finishing it rather than a change to how the app treats the language. The
- * settings that decide *where* it lands stay with administrators -- a manager
- * publishes through configuration they cannot alter.
+ * It is open to the same people as moving a version: everyone on that
+ * language's team, in any role, and administrators. Only approved work can go
+ * out, and the review that approved it is the check; deploying is finishing
+ * that work, not a change to how the app treats the language. The server asks
+ * the same question with `authorize({ language, role: 'member' })`.
  */
-export function canDeployLanguage(viewer: LanguageViewer, languageId: string): boolean {
-  return canViewLanguage(viewer, languageId);
+export function canDeployLanguage(
+  params: { isAdmin: boolean; memberships: LanguageMembership[] },
+  languageId: string,
+): boolean {
+  return canChangeLanguageStatus(params, languageId);
 }
 
 /**

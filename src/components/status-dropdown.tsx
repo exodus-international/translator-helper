@@ -3,12 +3,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
-import { useDeployConfirm } from '@/components/deploy-confirm';
+import { DEPLOY_ACTIONS, useDeploy, useFollowDeployment, type DeployActions } from '@/components/deploy/use-deploy';
 import { withStatusChangeFeedback } from '@/components/status-change-feedback';
 import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
 import { VALID_TRANSITIONS } from '@/domain/document-version/document-version.transitions';
 import { useStatusTransitionPending, useStatusTransitionStore } from '@/lib/stores/status-transition';
-import { SessionUser } from '@/lib/session';
 import { isRefusal } from '@/lib/action-refusal';
 import { cn } from '@/lib/utils';
 import { DocumentStatus } from '@/generated/prisma/enums';
@@ -19,16 +18,15 @@ import * as React from 'react';
 import { toast } from 'sonner';
 
 /** Shown wherever deploying is refused, so the reason is the same everywhere. */
-const DEPLOY_DENIED = 'Only this language\u2019s manager or an administrator can deploy';
+const DEPLOY_DENIED = 'Only this language\u2019s team or an administrator can deploy';
 
 interface StatusDropdownProps {
   currentStatus: DocumentStatus | null;
   versionId: string;
-  user: SessionUser;
   /**
    * Resolved on the server against this version's language: an administrator,
-   * or that language's manager. The client cannot answer it from the session
-   * alone, which is why it arrives as a prop.
+   * or anyone on that language's team. The client cannot answer it from the
+   * session alone, which is why it arrives as a prop.
    */
   canDeploy: boolean;
   /**
@@ -46,12 +44,13 @@ interface StatusDropdownProps {
   openSuggestionsCount?: number;
   /** The server action behind a move; a test hands in a fake. */
   changeStatus?: typeof updateDocumentVersionStatusAction;
+  /** The server actions behind Deploy; a test hands in fakes. */
+  deployActions?: DeployActions;
 }
 
 export function StatusDropdown({
   currentStatus,
   versionId,
-  user,
   canDeploy,
   canChangeStatus = true,
   documentId,
@@ -61,9 +60,21 @@ export function StatusDropdown({
   disabled = false,
   openSuggestionsCount = 0,
   changeStatus = updateDocumentVersionStatusAction,
+  deployActions = DEPLOY_ACTIONS,
 }: StatusDropdownProps) {
   const router = useRouter();
-  const { confirmDeploy, dialog: deployDialog } = useDeployConfirm();
+  const followDeployment = useFollowDeployment(deployActions);
+  // Choosing Deploy runs a deploy rather than a status move: the version
+  // becomes DEPLOYED once it is published, and the page refreshes then. The
+  // server's status decides: text edited while it ran stays Approved.
+  const { requestDeploy, dialog: deployDialog } = useDeploy({
+    actions: deployActions,
+    onFinished: (view) => {
+      if (!view?.items.find((item) => item.documentVersionId === versionId)?.versionDeployed) return;
+      setDisplayedStatus(DocumentStatus.DEPLOYED);
+      onStatusChange?.(DocumentStatus.DEPLOYED);
+    },
+  });
   // Shared with every other mount for this version, so whichever control is
   // clicked disables all of them rather than only itself.
   const loading = useStatusTransitionPending(versionId);
@@ -119,7 +130,7 @@ export function StatusDropdown({
     [DocumentStatus.PENDING_TRANSLATION]: 'Back to pending',
     [DocumentStatus.IN_PROGRESS]: 'Return to translation',
     [DocumentStatus.PENDING_REVIEW]: 'Request new review',
-    [DocumentStatus.APPROVED]: 'Revoke deployment',
+    [DocumentStatus.APPROVED]: 'Move back to Approved',
   };
 
   const getTransitionLabel = (from: DocumentStatus | null | undefined, to: DocumentStatus) => {
@@ -142,11 +153,6 @@ export function StatusDropdown({
       return;
     }
 
-    if (displayedStatus === DocumentStatus.DEPLOYED && !canDeploy) {
-      toast.warning('Deployed work can only be moved back by this language\u2019s manager or an administrator');
-      return;
-    }
-
     // Intercept PENDING_REVIEW transition to let parent show reviewer picker
     // Only when moving forward (from IN_PROGRESS), not when going back (from APPROVED)
     if (newStatus === DocumentStatus.PENDING_REVIEW && onReviewRequested && currentStatus !== DocumentStatus.APPROVED) {
@@ -155,7 +161,9 @@ export function StatusDropdown({
       return;
     }
 
-    if (newStatus === DocumentStatus.DEPLOYED && !(await confirmDeploy(versionId))) {
+    if (newStatus === DocumentStatus.DEPLOYED) {
+      setOpen(false);
+      await requestDeploy({ versionIds: [versionId], via: 'status_menu' });
       return;
     }
 
@@ -166,7 +174,14 @@ export function StatusDropdown({
 
     try {
       const result = await withStatusChangeFeedback(
-        { from: displayedStatus, to: newStatus, via: 'dropdown', documentId: documentId ?? null, versionId },
+        {
+          from: displayedStatus,
+          to: newStatus,
+          via: 'dropdown',
+          documentId: documentId ?? null,
+          versionId,
+          onDeployStarted: (deploymentId) => void followDeployment(deploymentId, 'this document'),
+        },
         () => changeStatus(versionId, newStatus),
       );
       // A refused move means this page was stale: show the status the server
@@ -194,9 +209,6 @@ export function StatusDropdown({
     }
   };
 
-  const translatorCannotChangeDeployedDocumentStatus =
-    user.role === 'USER' && displayedStatus === DocumentStatus.DEPLOYED;
-
   const triggerButton = (
     <Button
       variant="outline"
@@ -205,7 +217,7 @@ export function StatusDropdown({
       // does, and carrying the status inside that name, gives screen readers
       // "Document status: Texts in Review" instead of a bare badge.
       aria-label={`Document status: ${currentStatusConfig.name}`}
-      disabled={disabled || loading || !canChangeStatus || translatorCannotChangeDeployedDocumentStatus}
+      disabled={disabled || loading || !canChangeStatus}
       className={cn(
         'h-auto max-w-[9.5rem] py-1.5 px-3 sm:max-w-none max-md:min-h-11',
         currentStatusConfig.color.badgeClass,
@@ -253,7 +265,6 @@ export function StatusDropdown({
             const isDisabled =
               isCurrentStatus ||
               loading ||
-              (user.role === 'USER' && status === DocumentStatus.DEPLOYED) ||
               isBlockedByOpenSuggestions;
 
             return (

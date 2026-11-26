@@ -75,10 +75,45 @@ enum TShirtSize {
   XXXL
 }
 
+/// Read by nothing since deploys commit straight to the deploy branch; kept
+/// with `GitHubCommit` until a later release drops both.
 enum GitHubPRStatus {
   OPEN
   MERGED
   CLOSED
+}
+
+/// Where one deployment is. QUEUED until the publisher claims it, PUBLISHING
+/// while it talks to GitHub, then one of the two outcomes.
+enum DeploymentStatus {
+  QUEUED
+  PUBLISHING
+  SUCCEEDED
+  FAILED
+}
+
+/// Why a deployment was made: a click, a redeploy of something already out, a
+/// retry of a failed one, or a language project that deploys on approval.
+enum DeploymentTrigger {
+  MANUAL
+  REDEPLOY
+  RETRY
+  AUTO
+}
+
+/// What happened to one version in a deployment.
+enum DeploymentItemOutcome {
+  /// Not decided yet: the deployment has not finished.
+  PENDING
+  /// Written in this deployment's commit.
+  PUBLISHED
+  /// The deploy branch already had exactly this text, so nothing was written.
+  UNCHANGED
+  /// Marked deployed without a commit: the project, or the app, does not publish to GitHub.
+  NOT_PUBLISHED
+  /// Left out: by publish time the version was no longer approved.
+  SKIPPED
+  FAILED
 }
 
 enum AudioProvider {
@@ -162,6 +197,7 @@ model User {
   notificationsCaused    Notification[]           @relation("NotificationActor")
   notificationPrefs      NotificationPreference[]
   bibleImports           BibleTranslation[]       @relation("BibleTranslationImports")
+  deployments            Deployment[]
 
   @@map("user")
 }
@@ -245,6 +281,7 @@ model Language {
   translationProjects     TranslationProject[]
   users                   UserLanguage[]
   invitations             InvitationLanguage[]
+  deployments             Deployment[]
 
   @@map("language")
 }
@@ -272,6 +309,7 @@ model SourceProject {
   updatedAt           DateTime             @updatedAt
   documents           Document[]
   translationProjects TranslationProject[]
+  deployments         Deployment[]
 
   @@map("source_project")
 }
@@ -283,6 +321,8 @@ model TranslationProject {
   sourceProject   SourceProject @relation(fields: [sourceProjectId], references: [id], onDelete: Cascade)
   languageId      String
   language        Language      @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  /// Deploy each document of this project in this language the moment it is approved.
+  autoDeploy      Boolean       @default(false)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -316,18 +356,18 @@ model Document {
 }
 
 model DocumentVersion {
-  id             String         @id @default(uuid())
+  id             String           @id @default(uuid())
   documentId     String
-  document       Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document       Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
   languageId     String
-  language       Language       @relation(fields: [languageId], references: [id], onDelete: Cascade)
-  content        String         @db.Text // Markdown content
-  status         DocumentStatus @default(PENDING_TRANSLATION)
-  version        Int            @default(1)
+  language       Language         @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  content        String           @db.Text // Markdown content
+  status         DocumentStatus   @default(PENDING_TRANSLATION)
+  version        Int              @default(1)
   userId         String?
-  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   reviewerId     String?
-  reviewer       User?          @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewer       User?            @relation("ReviewedBy", fields: [reviewerId], references: [id], onDelete: SetNull)
   // Assignment lives here rather than in a separate record, so a document's
   // translator, reviewer, deadline and status can never drift apart.
   deadline       DateTime?
@@ -335,22 +375,23 @@ model DocumentVersion {
   // version waits for review.
   reviewDeadline DateTime?
   assignedById   String?
-  assignedBy     User?          @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  assignedBy     User?            @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
   assignedAt     DateTime?
   // Hand-edited SSML for the speech provider, sent verbatim in place of the
   // script derived from `content`. Null means "derive it", which is what every
   // version does until someone edits the Audio text tab.
-  audioSsml      String?        @db.Text
+  audioSsml      String?          @db.Text
   // Fingerprint of the SSML that would have been derived when `audioSsml` was
   // saved. Comparing it against a fresh derivation is how an edited transcript
   // learns that the words moved on without it.
   audioSsmlBase  String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
   comments       Comment[]
   activityLogs   ActivityLog[]
   suggestions    Suggestion[]
   githubCommits  GitHubCommit[]
+  deployItems    DeploymentItem[]
   audioFiles     AudioFile[]
   notifications  Notification[]
 
@@ -461,6 +502,9 @@ model SuggestionReply {
   @@map("suggestion_reply")
 }
 
+/// The pull-request era's deploy record. Its rows were copied into
+/// `Deployment` when that replaced it; nothing reads or writes it now, and a
+/// later release drops it (expand, then contract: see docs/RELEASE.md).
 model GitHubCommit {
   id                String          @id @default(uuid())
   documentVersionId String
@@ -482,6 +526,58 @@ model GitHubCommit {
 /// One row per audio generation attempt. Never overwritten: a regeneration
 /// creates a new row and a new object, so a copied URL keeps pointing at the
 /// file it pointed at when it was copied.
+/// One deploy: a single version or a batch, published together in one commit
+/// to the content repository's deploy branch.
+model Deployment {
+  id              String            @id @default(uuid())
+  status          DeploymentStatus  @default(QUEUED)
+  trigger         DeploymentTrigger @default(MANUAL)
+  requestedById   String?
+  requestedBy     User?             @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  /// Set when every item is in this project; null for a batch across projects.
+  sourceProjectId String?
+  sourceProject   SourceProject?    @relation(fields: [sourceProjectId], references: [id], onDelete: SetNull)
+  /// Set when every item is in this language; null for a batch across languages.
+  languageId      String?
+  language        Language?         @relation(fields: [languageId], references: [id], onDelete: SetNull)
+  /// The failed deployment this one retries.
+  retryOfId       String?
+  retryOf         Deployment?       @relation("DeploymentRetry", fields: [retryOfId], references: [id], onDelete: SetNull)
+  retries         Deployment[]      @relation("DeploymentRetry")
+  branch          String?
+  /// Null when nothing needed a commit: every file was already up to date, or nothing publishes to GitHub.
+  commitSha       String?
+  commitUrl       String?
+  error           String?           @db.Text
+  createdAt       DateTime          @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  items           DeploymentItem[]
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([languageId, createdAt])
+  @@index([sourceProjectId, languageId, createdAt])
+  @@map("deployment")
+}
+
+model DeploymentItem {
+  id                String                @id @default(uuid())
+  deploymentId      String
+  deployment        Deployment            @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  documentVersionId String
+  documentVersion   DocumentVersion       @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+  outcome           DeploymentItemOutcome @default(PENDING)
+  /// Repository path the version is written to, once it is resolved.
+  filePath          String?
+  error             String?               @db.Text
+  createdAt         DateTime              @default(now())
+
+  @@unique([deploymentId, documentVersionId])
+  @@index([documentVersionId, createdAt])
+  @@map("deployment_item")
+}
+
 model AudioFile {
   id                String          @id @default(uuid())
   documentVersionId String

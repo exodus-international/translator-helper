@@ -21,8 +21,8 @@ import { capture } from '@/lib/analytics';
 
 /**
  * The index is the capability the old admin list never had: today nothing says
- * a language will throw at deploy or produce no audio until it does. Every
- * language is listed with the four checks that decide whether it can produce
+ * a language has nobody to manage it or will produce no audio until it does.
+ * Every language is listed with the three checks that decide whether it can produce
  * anything, and how much of its work has shipped.
  */
 export default function LanguagesIndexClient({
@@ -37,7 +37,6 @@ export default function LanguagesIndexClient({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
-  const [branchName, setBranchName] = useState('');
   const [creating, setCreating] = useState(false);
 
   const rows = useMemo(
@@ -52,13 +51,12 @@ export default function LanguagesIndexClient({
     setCreating(true);
 
     try {
-      const created = await createLanguageAction({ code, name, branchName });
+      const created = await createLanguageAction({ code, name });
       capture('language_created', { code: created.code });
       toast.success(`${created.name} added`);
       setDialogOpen(false);
       setCode('');
       setName('');
-      setBranchName('');
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to add the language');
@@ -111,20 +109,6 @@ export default function LanguagesIndexClient({
                     required
                   />
                 </div>
-                <div>
-                  <Label htmlFor="branchName">GitHub branch *</Label>
-                  <Input
-                    id="branchName"
-                    value={branchName}
-                    onChange={(event) => setBranchName(event.target.value)}
-                    placeholder="e.g., hr-croatian-translation"
-                    required
-                  />
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    Branch in the content repository. Required from the start, so a deploy is never the first thing to
-                    find out it is missing.
-                  </p>
-                </div>
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Cancel
@@ -148,8 +132,8 @@ export default function LanguagesIndexClient({
               <span className="font-semibold">
                 {unhealthy.length} {unhealthy.length === 1 ? 'language is' : 'languages are'} not fully configured.
               </span>{' '}
-              A missing branch fails at deploy, a missing voice generates no audio, and a language with no language
-              manager cannot be managed by anyone.
+              A missing voice generates no audio, and a language with no language manager cannot be managed by
+              anyone.
             </p>
           </div>
         )}
@@ -184,7 +168,7 @@ export default function LanguagesIndexClient({
               {language.isSource ? (
                 <p className="text-muted-foreground text-xs">
                   Nothing translates <em>into</em> English, so it has no team, no voice and no instructions — none of
-                  the four checks apply.
+                  the three checks apply.
                 </p>
               ) : (
                 <LanguageHealthPills pills={pills} />

@@ -22,9 +22,11 @@ const SEEDED = [
   { title: 'Day 2 - Discipline of Prayer', projectSlug: 'exodus90', slug: 'ex90-day-2', languageCode: 'sk' },
   { title: 'Day 1 - The Call', projectSlug: 'exodus90', slug: 'ex90-day-1', languageCode: 'hr' },
   { title: 'Day 3 - Fasting and Freedom', projectSlug: 'exodus90', slug: 'ex90-day-3', languageCode: 'cs' },
-  // Approved in the seed, so deploy is the next step. Czech is deployed by
-  // the admin; Slovak only shows a translator what is not offered.
+  // Approved in the seed, so deploy is the next step. The admin deploys the
+  // two Czech ones (one deploys cleanly, one is refused once by GitHub); the
+  // Slovak one shows a translator on that team is offered deploy too.
   { title: 'Day 2 - Discipline of Prayer', projectSlug: 'exodus90', slug: 'ex90-day-2', languageCode: 'cs' },
+  { title: 'Ash Wednesday Reflection', projectSlug: 'lent2026', slug: 'lent-ash-wednesday', languageCode: 'cs' },
   { title: 'Day 1 - The Call', projectSlug: 'exodus90', slug: 'ex90-day-1', languageCode: 'sk' },
 ] as const;
 

@@ -1,74 +1,158 @@
 /**
- * A stand-in for the GitHub REST API, enough of it for one deploy.
+ * A stand-in for the GitHub REST API: a small content repository in memory,
+ * with one branch, that a deploy can commit to.
  *
- * Deploying runs inside a server action, so the calls leave the Next process
- * rather than the browser and `page.route` cannot see them. The service reads
- * its API host from GITHUB_API_BASE_URL, so pointing that here stubs the calls
- * without a test-only branch in application code. No request reaches
- * github.com and no pull request is ever opened.
+ * Deploying runs on the server, so the calls leave the Next process rather
+ * than the browser and `page.route` cannot see them. The app reads its API
+ * host from GITHUB_API_BASE_URL, so pointing that here stubs the calls without
+ * a test-only branch in application code. No request reaches github.com.
  *
- * It answers the sequence `deployToGitHub` makes: an installation token, a
- * branch check, a look for the existing file, the commit, a look for an open
- * pull request, the pull request itself, and its merge. Anything else is a 404 with a
- * log line, so a new call in the service shows up as a failed deploy rather
- * than a hang.
+ * It answers the Git data calls a deploy makes: an installation token, the
+ * branch head and its commit, a look for each file, a new tree, a new commit,
+ * and moving the branch. The repository keeps what was committed, so
+ * deploying the same content again finds nothing changed, as GitHub would.
+ * Anything else is a 404 with a log line, so a new call in the app shows up
+ * as a failed deploy rather than a hang.
  *
- * The numbers here are repeated in `github-stub.ts` for the test process.
+ * Tests steer it through two endpoints of its own:
+ *   POST /__mock/fail-next   the next branch update is refused, once, the way
+ *                            GitHub refuses an App that may not push there
+ *   POST /__mock/reset       back to an empty repository, nothing failing
+ *   GET  /__mock/state       the branch head and how many commits it has
+ *
+ * The port is repeated in `github-stub.ts` for the test process.
  */
+import crypto from 'node:crypto';
 import { createServer } from 'node:http';
 
 const PORT = Number(process.env.GITHUB_MOCK_PORT || 3198);
+const BRANCH = 'main';
 
-const PR_NUMBER = 42;
-const PR_URL = `https://github.example/stub/content/pull/${PR_NUMBER}`;
-const COMMIT_SHA = '0123456789abcdef0123456789abcdef01234567';
-const MERGE_SHA = '89abcdef0123456789abcdef0123456789abcdef';
+// GitHub's words when an App may not write to a branch. A 403 is also one
+// octokit does not retry, so a single refusal fails the deploy.
+const REFUSED_MESSAGE = 'Resource not accessible by integration';
+
+const sha1 = (...parts) => {
+  const hash = crypto.createHash('sha1');
+  for (const part of parts) hash.update(part);
+  return hash.digest('hex');
+};
+
+/** The SHA git gives a blob, which is what the app compares its files against. */
+const blobSha = (content) => {
+  const body = Buffer.from(content, 'utf8');
+  return sha1(`blob ${body.length}\0`, body);
+};
+
+/** trees: sha → Map(path → blob sha); commits: sha → { tree, parent, message }. */
+let state;
+function reset() {
+  const emptyTree = sha1('tree', 'empty');
+  const root = sha1('commit', 'root');
+  state = {
+    trees: new Map([[emptyTree, new Map()]]),
+    commits: new Map([[root, { tree: emptyTree, parent: null, message: 'Initial commit' }]]),
+    head: root,
+    root,
+    failNextUpdate: 0,
+  };
+}
+reset();
+
+const repoPath = (rest) => new RegExp(`^/repos/[^/]+/[^/]+${rest}$`);
+const commitUrl = (sha) => `https://github.example/stub/content/commit/${sha}`;
+const json = (status, body) => ({ status, body });
+const notFound = () => json(404, { message: 'Not Found' });
 
 const ROUTES = [
   {
     method: 'POST',
     path: /^\/app\/installations\/\d+\/access_tokens$/,
-    status: 201,
-    body: () => ({
-      token: 'ghs_stub_installation_token',
-      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      permissions: { contents: 'write', pull_requests: 'write' },
-      repository_selection: 'all',
-    }),
+    handle: () =>
+      json(201, {
+        token: 'ghs_stub_installation_token',
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        permissions: { contents: 'write' },
+        repository_selection: 'all',
+      }),
   },
   {
     method: 'GET',
-    path: /^\/repos\/[^/]+\/[^/]+\/branches\/.+$/,
-    status: 200,
-    body: (url) => ({ name: decodeURIComponent(url.pathname.split('/branches/')[1]), commit: { sha: COMMIT_SHA } }),
+    path: repoPath('/git/ref/heads/(.+)'),
+    handle: ({ match }) =>
+      match[1] === BRANCH
+        ? json(200, { ref: `refs/heads/${BRANCH}`, object: { sha: state.head, type: 'commit' } })
+        : notFound(),
   },
-  // The file is never there yet, so every deploy is a create.
-  { method: 'GET', path: /^\/repos\/[^/]+\/[^/]+\/contents\/.+$/, status: 404, body: () => ({ message: 'Not Found' }) },
   {
-    method: 'PUT',
-    path: /^\/repos\/[^/]+\/[^/]+\/contents\/.+$/,
-    status: 201,
-    body: () => ({ content: { sha: COMMIT_SHA }, commit: { sha: COMMIT_SHA } }),
+    method: 'GET',
+    path: repoPath('/git/commits/([0-9a-f]{40})'),
+    handle: ({ match }) => {
+      const commit = state.commits.get(match[1]);
+      return commit ? json(200, { sha: match[1], tree: { sha: commit.tree }, html_url: commitUrl(match[1]) }) : notFound();
+    },
   },
-  // No open pull request for the branch, so one is created.
-  { method: 'GET', path: /^\/repos\/[^/]+\/[^/]+\/pulls$/, status: 200, body: () => [] },
+  {
+    method: 'GET',
+    path: repoPath('/contents/(.+)'),
+    handle: ({ match, url }) => {
+      const commit = state.commits.get(url.searchParams.get('ref') || state.head);
+      const path = match[1];
+      const sha = commit && state.trees.get(commit.tree)?.get(path);
+      return sha ? json(200, { type: 'file', path, sha }) : notFound();
+    },
+  },
   {
     method: 'POST',
-    path: /^\/repos\/[^/]+\/[^/]+\/pulls$/,
-    status: 201,
-    body: () => ({ number: PR_NUMBER, html_url: PR_URL }),
+    path: repoPath('/git/trees'),
+    handle: ({ body }) => {
+      const base = state.trees.get(body.base_tree);
+      if (!base) return json(422, { message: 'base_tree is not a tree' });
+      const files = new Map(base);
+      for (const entry of body.tree ?? []) files.set(entry.path, blobSha(entry.content ?? ''));
+      const sha = sha1('tree', JSON.stringify([...files].sort()));
+      state.trees.set(sha, files);
+      return json(201, { sha });
+    },
   },
   {
-    method: 'PUT',
-    path: /^\/repos\/[^/]+\/[^/]+\/pulls\/\d+\/merge$/,
-    status: 200,
-    body: () => ({ sha: MERGE_SHA, merged: true, message: 'Pull Request successfully merged' }),
+    method: 'POST',
+    path: repoPath('/git/commits'),
+    handle: ({ body }) => {
+      const [parent] = body.parents ?? [];
+      if (!state.trees.has(body.tree) || !state.commits.has(parent)) return json(422, { message: 'Unknown tree or parent' });
+      const sha = sha1('commit', body.tree, parent, body.message ?? '', String(state.commits.size));
+      state.commits.set(sha, { tree: body.tree, parent, message: body.message });
+      return json(201, { sha, html_url: commitUrl(sha), tree: { sha: body.tree } });
+    },
   },
   {
     method: 'PATCH',
-    path: /^\/repos\/[^/]+\/[^/]+\/pulls\/\d+$/,
-    status: 200,
-    body: () => ({ number: PR_NUMBER, html_url: PR_URL }),
+    path: repoPath('/git/refs/heads/(.+)'),
+    handle: ({ match, body }) => {
+      if (match[1] !== BRANCH) return notFound();
+      if (state.failNextUpdate > 0) {
+        state.failNextUpdate -= 1;
+        return json(403, { message: REFUSED_MESSAGE });
+      }
+      // Only a fast-forward, the way GitHub answers without `force`.
+      if (!body.force && state.commits.get(body.sha)?.parent !== state.head) {
+        return json(422, { message: 'Update is not a fast forward' });
+      }
+      state.head = body.sha;
+      return json(200, { ref: `refs/heads/${BRANCH}`, object: { sha: body.sha, type: 'commit' } });
+    },
+  },
+  { method: 'POST', path: /^\/__mock\/fail-next$/, handle: () => ((state.failNextUpdate = 1), json(200, { ok: true })) },
+  { method: 'POST', path: /^\/__mock\/reset$/, handle: () => (reset(), json(200, { ok: true })) },
+  {
+    method: 'GET',
+    path: /^\/__mock\/state$/,
+    handle: () => {
+      let commits = 0;
+      for (let sha = state.head; sha !== state.root; sha = state.commits.get(sha).parent) commits += 1;
+      return json(200, { head: state.head, commits, files: [...state.trees.get(state.commits.get(state.head).tree).keys()] });
+    },
   },
 ];
 
@@ -81,18 +165,28 @@ const server = createServer((req, res) => {
     return;
   }
 
-  // Drain the body: leaving it unread stalls the socket on some Node versions.
-  req.resume();
+  const chunks = [];
+  req.on('data', (chunk) => chunks.push(chunk));
   req.on('end', () => {
-    const route = ROUTES.find((r) => r.method === req.method && r.path.test(url.pathname));
-    if (!route) {
-      console.log(`github mock: no route for ${req.method} ${url.pathname}`);
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ message: `github mock: no route for ${req.method} ${url.pathname}` }));
-      return;
+    let body = {};
+    try {
+      body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
+    } catch {
+      body = {};
     }
-    res.writeHead(route.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(route.body(url)));
+
+    // Octokit sends a ref as `heads%2Fmain` and GitHub reads it either way, so
+    // routes match the decoded path.
+    const pathname = decodeURIComponent(url.pathname);
+    let match = null;
+    const route = ROUTES.find((r) => r.method === req.method && (match = pathname.match(r.path)));
+    const result = route
+      ? route.handle({ match, url, body })
+      : (console.log(`github mock: no route for ${req.method} ${pathname}`),
+        json(404, { message: `github mock: no route for ${req.method} ${pathname}` }));
+
+    res.writeHead(result.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result.body));
   });
 });
 
