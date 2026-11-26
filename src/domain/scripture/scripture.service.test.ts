@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { findCitations } from './citations';
 import {
   applyVerseTag,
   findReadings,
@@ -225,6 +226,39 @@ test('prepareScripture finds citations of one-chapter books', async () => {
   const scripture = await prepareScripture('As Jude 5 and Philemon 4-7, 10 say. Day 9 at 5:30.\n', 'hr', lookup);
   assert.deepEqual(calls[0].refs, ['Jude 5', 'Philemon 4-7, 10']);
   assert.equal(scripture.restore(scripture.content).content, 'As Jd 5 and Flm 4-7.10 say. Day 9 at 5:30.\n');
+});
+
+test('prepareScripture finds the citations the editor check finds: en dashes, non-ASCII book names', async () => {
+  const source = [
+    'See Hebrews 2:14 – 15, Žid 4:12 and Jude 5–7. Day 9 at 5:30.',
+    '',
+    '<span style="display:block;color:#CC0000;">Ézéchiel 36:26</span>',
+    '',
+    '*A new heart I will give you.*',
+    '',
+  ].join('\n');
+  const { lookup, calls } = fromTable({
+    'Hebrews 2:14 – 15': { ref: 'Hebrews 2:14 – 15', status: 'ok', rendered: 'Heb 2,14-15', verses: [{ text: 'Budući da djeca.' }] },
+    'Žid 4:12': { ref: 'Žid 4:12', status: 'ok', rendered: 'Heb 4,12', verses: [{ text: 'Živa je riječ Božja.' }] },
+    'Jude 5–7': { ref: 'Jude 5–7', status: 'ok', rendered: 'Jd 5-7', verses: [{ text: 'Podsjetiti vas hoću.' }] },
+    'Ézéchiel 36:26': { ref: 'Ézéchiel 36:26', status: 'ok', rendered: 'Ez 36,26', verses: [{ text: 'Dat ću vam novo srce.' }] },
+  });
+  const scripture = await prepareScripture(source, 'hr', lookup);
+
+  // The reading's citation comes first, then the inline ones in order: the same set the check resolves.
+  assert.deepEqual(new Set(calls[0].refs), new Set(findCitations(source).map((c) => c.text)));
+  assert.deepEqual(calls[0].refs, ['Ézéchiel 36:26', 'Hebrews 2:14 – 15', 'Žid 4:12', 'Jude 5–7']);
+  assert.equal(
+    scripture.restore(scripture.content).content,
+    [
+      'See Heb 2,14-15, Heb 4,12 and Jd 5-7. Day 9 at 5:30.',
+      '',
+      '<span style="display:block;color:#CC0000;">Ez 36,26</span>',
+      '',
+      '*Dat ću vam novo srce.*',
+      '',
+    ].join('\n'),
+  );
 });
 
 test('prepareScripture swaps a quotation of the whole passage for the official text', async () => {
