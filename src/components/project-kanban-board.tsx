@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from '@/components/ui/shadcn-io/kanban';
-import { boardStatus, DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
+import { DOCUMENT_STATUS_CONFIGS } from '@/constants/document-status';
 import {
   DocumentTypeFilterValue,
   matchesDocumentTypeFilter,
@@ -44,7 +44,15 @@ import { toast } from 'sonner';
 import type { Language } from '@/generated/prisma/client';
 import { DocumentStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import { allowedTransitions } from '@/domain/document-version/document-version.transitions';
-import { aiCardStep, type AiCardTone } from '@/domain/ai-workflow/ai-workflow.board';
+import {
+  aiCardStep,
+  BOARD_COLUMN_STATUS,
+  boardColumnFor,
+  boardColumns,
+  type AiCardTone,
+  type BoardColumnId,
+} from '@/domain/ai-workflow/ai-workflow.board';
+import { AI_ACTOR_LABEL } from '@/domain/ai-workflow/ai-workflow.steps';
 import { AlertCircle, FileCheck, FileText, Sparkles, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useEffect, useMemo, useState } from 'react';
@@ -112,63 +120,16 @@ type KanbanColumn = {
   status?: DocumentStatus | null;
 };
 
-const getColumnForStatus = (status: DocumentStatus | null | undefined, hasVersion: boolean): string => {
-  if (!hasVersion || !status) return 'pending';
-
-  // The AI workflow's own steps sit in the column they stand in for.
-  switch (boardStatus(status)) {
-    case DocumentStatus.PENDING_TRANSLATION:
-      return 'pending';
-    case DocumentStatus.IN_PROGRESS:
-      return 'in-progress';
-    case DocumentStatus.PENDING_REVIEW:
-      return 'review';
-    case DocumentStatus.APPROVED:
-      return 'approved';
-    case DocumentStatus.DEPLOYED:
-      return 'deployed';
-    default:
-      return 'pending';
-  }
+const toColumn = (id: BoardColumnId): KanbanColumn => {
+  const status = BOARD_COLUMN_STATUS[id];
+  // Everything a reader sees about a status -- its name and its colour -- comes
+  // from the one config it is named after, so a column cannot say "Texts in
+  // review" while the chip beside it says "In Review".
+  return { id, name: DOCUMENT_STATUS_CONFIGS[status].name, color: DOCUMENT_STATUS_CONFIGS[status].color.hex, status };
 };
 
-const getStatusForColumn = (columnId: string): DocumentStatus | null => {
-  switch (columnId) {
-    case 'pending':
-      return DocumentStatus.PENDING_TRANSLATION;
-    case 'in-progress':
-      return DocumentStatus.IN_PROGRESS;
-    case 'review':
-      return DocumentStatus.PENDING_REVIEW;
-    case 'approved':
-      return DocumentStatus.APPROVED;
-    case 'deployed':
-      return DocumentStatus.DEPLOYED;
-    default:
-      return null;
-  }
-};
-
-// The board's own ids, in board order; everything a reader sees about a status
-// -- its name and its colour -- comes from the one config it is named after, so
-// a column cannot say "Texts in review" while the chip beside it says
-// "In Review".
-const COLUMN_IDS: { id: string; status: DocumentStatus }[] = [
-  { id: 'pending', status: DocumentStatus.PENDING_TRANSLATION },
-  { id: 'in-progress', status: DocumentStatus.IN_PROGRESS },
-  { id: 'review', status: DocumentStatus.PENDING_REVIEW },
-  { id: 'approved', status: DocumentStatus.APPROVED },
-  { id: 'deployed', status: DocumentStatus.DEPLOYED },
-];
-
-const columns: KanbanColumn[] = COLUMN_IDS.map(({ id, status }) => ({
-  id,
-  name: DOCUMENT_STATUS_CONFIGS[status].name,
-  color: DOCUMENT_STATUS_CONFIGS[status].color.hex,
-  status,
-}));
-
-const activeColumnIds = new Set(columns.map((column) => column.id));
+const getStatusForColumn = (columnId: string): DocumentStatus | null =>
+  BOARD_COLUMN_STATUS[columnId as BoardColumnId] ?? null;
 
 const AI_TONE_VARIANT: Record<AiCardTone, 'secondary' | 'warning' | 'destructive' | 'outline'> = {
   working: 'secondary',
@@ -242,6 +203,15 @@ export default function ProjectKanbanBoard({
   // Register the active language as a PostHog super property (selectedLanguage prop is a language id)
   const selectedLang = languages.find((lang) => lang.id === selectedLanguage);
   useActiveLanguage(selectedLang?.code, selectedLang?.name);
+
+  // The columns follow the language's workflow, and are worked out from every
+  // document rather than the filtered ones, so a search never removes a column.
+  const languageWorkflow = selectedLang?.workflow;
+  const columns = useMemo(
+    () => boardColumns(languageWorkflow, documents.map((doc) => doc.versions?.[0]?.status)).map(toColumn),
+    [languageWorkflow, documents],
+  );
+  const activeColumnIds = useMemo(() => new Set(columns.map((column) => column.id)), [columns]);
 
   useEffect(() => {
     loadDocuments();
@@ -412,7 +382,7 @@ export default function ProjectKanbanBoard({
       const hasVersion = doc.versions && doc.versions.length > 0;
       const version = hasVersion ? doc.versions[0] : null;
       const status = version?.status || null;
-      const column = getColumnForStatus(status, hasVersion);
+      const column = boardColumnFor(hasVersion ? status : null, languageWorkflow);
 
       return {
         id: doc.id,
@@ -467,6 +437,13 @@ export default function ProjectKanbanBoard({
             !allowedTransitions(version.status, TranslationWorkflow.AI).includes(newStatus)
           ) {
             toast.warning('This document is in the AI workflow, which moves it on its own');
+            await loadDocuments();
+            continue;
+          }
+
+          // The other way round: a version a person translates has no audio review.
+          if (version.workflow !== TranslationWorkflow.AI && newStatus === DocumentStatus.AUDIO_REVIEW) {
+            toast.warning('This document is not in the AI workflow, so it has no audio review');
             await loadDocuments();
             continue;
           }
@@ -730,7 +707,7 @@ export default function ProjectKanbanBoard({
                                 {aiStep && (
                                   <Badge variant={AI_TONE_VARIANT[aiStep.tone]}>
                                     {aiStep.tone === 'failed' ? <AlertCircle /> : <Sparkles />}
-                                    {aiStep.label}
+                                    {aiStep.actor ? `${AI_ACTOR_LABEL[aiStep.actor]}: ${aiStep.label}` : aiStep.label}
                                   </Badge>
                                 )}
                                 <DocumentTypeBadge type={doc.type} />
