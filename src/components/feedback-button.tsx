@@ -7,9 +7,19 @@ import { usePathname } from 'next/navigation';
 
 export const SUPPORT_URL = 'https://exodus90.atlassian.net/servicedesk/customer/portal/1';
 
-/** Pre-fills the service-desk ticket with the page the reporter was on. */
-export function bugReportUrl(pathname: string) {
-  return `https://exodus90.atlassian.net/servicedesk/customer/portal/1/group/1/create/10009?customfield_10043=https://exodus-translations.ff0000.cz/${pathname}`;
+/**
+ * Pre-fills the service-desk ticket with the page the reporter was on, on this
+ * environment's own origin, so a bug from staging doesn't claim production.
+ * The origin comes from NEXT_PUBLIC_APP_URL rather than `window.location`
+ * because these links also render on the server.
+ */
+export function bugReportUrl(
+  pathname: string,
+  origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+) {
+  const url = new URL('https://exodus90.atlassian.net/servicedesk/customer/portal/1/group/1/create/10009');
+  url.searchParams.set('customfield_10043', new URL(pathname, origin).href);
+  return url.href;
 }
 
 /**
