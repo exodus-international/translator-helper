@@ -17,3 +17,12 @@ Feature: Standard translations
     When I open the standard translations
     Then there should be a "Slovak" tab
     And there should be no "Czech" tab
+
+  @translator @stubbed
+  Scenario: AI translation writes a standard translation as the team keeps it
+    Given I open the standard translations for Czech
+    And I add the standard translation "Morning heading" of "Morning Reflection" as "Ranní zamyšlení"
+    And I open "Day 45 - Midpoint Reflection" in Czech
+    And the translation has been started
+    When I ask the AI to translate
+    Then the translation should read "## Ranní zamyšlení"

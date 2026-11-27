@@ -14,6 +14,10 @@
  * one `resolve_passages` call for John 3:16; once a tool result is in the
  * conversation it gets a short final answer. Requests without tools are
  * answered exactly as before.
+ *
+ * A translation request whose source holds standard translation placeholders
+ * (`{{std:1}}`) gets each of them back on its own line after the stub text, as
+ * a model that keeps them would, so the app's own restore can be asserted.
  */
 import { createServer } from 'node:http';
 
@@ -44,6 +48,14 @@ function chatReply(body) {
   };
 }
 
+/** The standard translation placeholders in the request's source, in order, each once. */
+function standardPlaceholders(body) {
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  const source = messages.map((m) => (typeof m?.content === 'string' ? m.content : '')).join('\n');
+  const at = source.lastIndexOf('Source content:');
+  return [...new Set(source.slice(at === -1 ? 0 : at).match(/\{\{std:\d+\}\}/g) ?? [])];
+}
+
 const server = createServer((req, res) => {
   // Playwright probes the port with a GET before the suite starts.
   if (req.method !== 'POST') {
@@ -69,7 +81,7 @@ const server = createServer((req, res) => {
     }
     res.end(
       JSON.stringify({
-        choices: [{ message: { content: STUB_TRANSLATION } }],
+        choices: [{ message: { content: [STUB_TRANSLATION, ...standardPlaceholders(body)].join('\n\n') } }],
       }),
     );
   });
