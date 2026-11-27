@@ -145,6 +145,7 @@ Only these know about the DOM. Steps call them; scenarios never touch a selector
 | `support/editor.ts` | the editor library, entirely |
 | `support/status.ts` | the status control, its menu and its labels |
 | `support/threads.ts` | the feedback panel and thread cards |
+| `support/standard-translations.ts` | the standard translations page, its table and its dialog |
 
 ## Stubs
 
@@ -214,7 +215,7 @@ the status control is named `Document status: <status>`, the editor panes are te
 
 ## Coverage today
 
-36 checks: 4 sign-ins during setup, then
+43 checks: 4 sign-ins during setup, then
 
 - **Authentication and onboarding** — sign in, wrong password, and three protected routes
   redirecting a signed-out visitor
@@ -223,6 +224,8 @@ the status control is named `Document status: <status>`, the editor panes are te
 - **Registration** — an invited person registering, and four invitations that are no longer good
 - **Translation lifecycle** — starting a translation, a save surviving a reload, submitting for review
 - **AI translation** — a stubbed model filling an empty translation
+- **Standard translations** — a translator adding and editing an entry, and another language's
+  team not seeing it
 - **Review and suggestions** — approval refused while feedback is open, applying a suggestion,
   approval succeeding once nothing is open, dismissing and reopening a comment
 - **Deploy** — an approved translation deployed against the stubbed GitHub API, its pull request
