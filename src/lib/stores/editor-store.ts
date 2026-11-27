@@ -30,7 +30,7 @@ import { clearDraft, readDraft, writeDraft, type Draft, type DraftStorage } from
 import { isRefusal } from '@/lib/action-refusal';
 
 /** Scripture notices shown one toast each after an AI draft; the rest are counted. */
-const MAX_SCRIPTURE_NOTICES = 3;
+const MAX_DRAFT_NOTICES = 3;
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -417,11 +417,15 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
         set({ content: result.translatedContent, ...removeLoading(get(), 'aiTranslate') });
         track('ai_translate_triggered', { overwrite: before.trim().length > 0 });
         deps.notify.success('AI translation generated successfully!');
-        // Scripture the Bible API could not supply, or the model mishandled.
+        // Scripture and standard translations the draft could not use as
+        // they are, or the model mishandled.
         const { notices } = result;
-        for (const notice of notices.slice(0, MAX_SCRIPTURE_NOTICES)) deps.notify.warning(notice);
-        if (notices.length > MAX_SCRIPTURE_NOTICES) {
-          deps.notify.warning(`${notices.length - MAX_SCRIPTURE_NOTICES} more Scripture references need checking.`);
+        for (const notice of notices.slice(0, MAX_DRAFT_NOTICES)) deps.notify.warning(notice);
+        if (notices.length > MAX_DRAFT_NOTICES) {
+          const more = notices.length - MAX_DRAFT_NOTICES;
+          deps.notify.warning(
+            more === 1 ? '1 more note on the draft needs checking.' : `${more} more notes on the draft need checking.`,
+          );
         }
       } catch (error: any) {
         set(removeLoading(get(), 'aiTranslate'));

@@ -352,7 +352,7 @@ describe('translateWithAi', () => {
     assert.equal(store.getState().isLoading('aiTranslate'), false);
   });
 
-  it('warns about the Scripture the Bible API could not supply, a few at a time', async () => {
+  it('warns about what the draft could not use as it is, a few at a time', async () => {
     const notices = ['A', 'B', 'C', 'D', 'E'].map((n) => `${n} 1:1: not in the Bible API`);
     const { deps, toasts } = fakeDeps({
       translateDocument: (async () => ({ translatedContent: 'AI draft', notices })) as EditorStoreDeps['translateDocument'],
@@ -364,7 +364,7 @@ describe('translateWithAi', () => {
       [
         ['success', 'AI translation generated successfully!'],
         ...notices.slice(0, 3).map((n) => ['warning', n]),
-        ['warning', '2 more Scripture references need checking.'],
+        ['warning', '2 more notes on the draft need checking.'],
       ],
     );
   });
