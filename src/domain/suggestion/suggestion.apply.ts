@@ -27,7 +27,7 @@ export class SuggestionNotOpenError extends Error {
  * a change saved with the new wording in its comment looks like. Applying it
  * would report a change that never happened.
  */
-export class SuggestionChangesNothingError extends Error {
+class SuggestionChangesNothingError extends Error {
   constructor() {
     super('This suggestion proposes the text that is already there. Edit its proposed replacement, then apply it.');
     this.name = 'SuggestionChangesNothingError';
@@ -38,7 +38,7 @@ export class SuggestionChangesNothingError extends Error {
  * The words the suggestion was made on are no longer where it points, and are
  * not anywhere else exactly once: someone rewrote them.
  */
-export class SuggestionTextChangedError extends Error {
+class SuggestionTextChangedError extends Error {
   constructor() {
     super('The text this suggestion was made on has changed since. Dismiss it, or make a new suggestion on the text as it is now.');
     this.name = 'SuggestionTextChangedError';
