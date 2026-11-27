@@ -955,6 +955,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                         <SuggestionForm
                           type={suggestionFormType}
                           initialProposedText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
+                          currentText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
                           onSubmit={handleSuggestionFormSubmit}
                           onCancel={() => requestCloseSuggestionForm()}
                           onDirtyChange={(dirty) => {
@@ -1045,6 +1046,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                             initialProposedText={
                               suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined
                             }
+                            currentText={suggestionFormType === SuggestionType.CHANGE ? selectedText : undefined}
                             onSubmit={handleSuggestionFormSubmit}
                             onCancel={() => requestCloseSuggestionForm()}
                             onDirtyChange={(dirty) => {

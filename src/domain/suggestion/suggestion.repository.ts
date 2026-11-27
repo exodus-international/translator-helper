@@ -65,6 +65,7 @@ export async function createSuggestion(data: {
   startColumn?: number | null;
   endLine?: number | null;
   endColumn?: number | null;
+  anchorText?: string | null;
   type: SuggestionType;
   comment: string;
   proposedText?: string | null;
@@ -84,6 +85,8 @@ export async function updateSuggestionStatus(
   status: SuggestionStatus,
   dismissedReason?: string | null,
   originalText?: string | null,
+  /** Where the suggestion's text is after the write that changed its status. */
+  range?: { startLine: number; startColumn: number; endLine: number; endColumn: number },
 ) {
   return prisma.suggestion.update({
     where: { id },
@@ -91,6 +94,7 @@ export async function updateSuggestionStatus(
       status,
       dismissedReason: dismissedReason ?? null,
       ...(originalText !== undefined ? { originalText } : {}),
+      ...(range ?? {}),
     },
     include: {
       user: { select: userSelect },

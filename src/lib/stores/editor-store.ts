@@ -613,6 +613,9 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
     createSuggestion: async (data) => {
       const { targetVersion } = get();
       if (!targetVersion) return;
+      // The server records the words at the range from the stored text, so
+      // the stored text has to be the text the selection was made in.
+      if (!(await flushPendingEdits(get))) return;
       try {
         await deps.createSuggestion({
           documentVersionId: targetVersion.id,

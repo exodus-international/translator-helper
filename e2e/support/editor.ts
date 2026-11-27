@@ -83,3 +83,15 @@ export async function selectTranslationLine(page: Page, line: number) {
   await page.keyboard.press('Home');
   await page.keyboard.press('Shift+End');
 }
+
+/**
+ * Selects the row of the translation that shows some text, from where the row
+ * starts to where it ends. A long line wraps into several rows and the arrow
+ * keys count rows, not lines, so a row is found by what it reads instead of by
+ * its number.
+ */
+export async function selectTranslationRow(page: Page, text: string) {
+  await translationPane(page).getByText(text).first().click();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+End');
+}

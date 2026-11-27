@@ -145,6 +145,7 @@ export function ThreadCard({
             type={suggestion.type}
             initialComment={suggestion.comment ?? ''}
             initialProposedText={suggestion.proposedText ?? ''}
+            currentText={isAnchored ? getTextFromRange(suggestion, translationContent) || undefined : undefined}
             isSubmitting={isEditSubmitting}
             onSubmit={async (data) => {
               setIsEditSubmitting(true);

@@ -5,7 +5,8 @@
  */
 import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DocumentStatus } from '@/generated/prisma/enums';
+import { DocumentStatus, SuggestionType } from '@/generated/prisma/enums';
+import { extractTextAtRange } from '@/lib/text-range';
 import prisma from '@/lib/db';
 import { SEEDED_USERS, seededDocument, seededLanguage, seededUser, seededVersion } from '../../../tests/seeded';
 import {
@@ -132,6 +133,87 @@ describe('claimDocumentVersion', () => {
         where: { id: day14.id },
         data: { userId: day14.userId, status: day14.status },
       });
+    }
+  });
+});
+
+describe('updateDocumentVersion and the suggestions on the version', () => {
+  const text = ['The call came early.', 'Nobody answered it.', 'So it came again.'].join('\n');
+
+  /** A version with one suggestion on "call" (line 1), one on "again" (line 3) and one on no text. */
+  async function versionWithSuggestions() {
+    const reference = await seededDocument('ex90-markdown-reference');
+    const croatian = await seededLanguage('hr');
+    const translator = await seededUser(SEEDED_USERS.translator);
+    const version = await createDocumentVersion({
+      documentId: reference.id,
+      languageId: croatian.id,
+      content: text,
+      status: DocumentStatus.IN_PROGRESS,
+      userId: translator.id,
+    });
+    const suggest = (anchorText: string | null, line: number | null, from: number | null, to: number | null) =>
+      prisma.suggestion.create({
+        data: {
+          documentVersionId: version.id,
+          userId: translator.id,
+          type: SuggestionType.COMMENT,
+          comment: 'A note.',
+          version: 1,
+          anchorText,
+          startLine: line,
+          endLine: line,
+          startColumn: from,
+          endColumn: to,
+        },
+      });
+    const call = await suggest('call', 1, 5, 9);
+    const again = await suggest('again', 3, 12, 17);
+    const general = await suggest(null, null, null, null);
+    return { version, translator, call, again, general };
+  }
+
+  /** What the suggestion's range holds in the version's text as stored now. */
+  async function held(suggestionId: string) {
+    const suggestion = await prisma.suggestion.findUniqueOrThrow({
+      where: { id: suggestionId },
+      include: { documentVersion: true },
+    });
+    const { startLine, startColumn, endLine, endColumn } = suggestion;
+    if (startLine == null || startColumn == null || endLine == null || endColumn == null) return null;
+    return extractTextAtRange(suggestion.documentVersion.content, { startLine, startColumn, endLine, endColumn });
+  }
+
+  it('moves each suggestion with the edit, so its range still holds its words', async () => {
+    const { version, translator, call, again, general } = await versionWithSuggestions();
+    try {
+      await updateDocumentVersion(version.id, text.replace('Nobody', 'For a long while\nnobody'), translator.id);
+      // The edit is on line 2: line 1 stays, line 3 is now line 4.
+      assert.equal((await prisma.suggestion.findUniqueOrThrow({ where: { id: call.id } })).startLine, 1);
+      assert.equal((await prisma.suggestion.findUniqueOrThrow({ where: { id: again.id } })).startLine, 4);
+      assert.equal(await held(call.id), 'call');
+      assert.equal(await held(again.id), 'again');
+      assert.equal(await held(general.id), null);
+    } finally {
+      await prisma.documentVersion.delete({ where: { id: version.id } });
+    }
+  });
+
+  it('keeps suggestions on their words when two saves arrive at once', async () => {
+    const { version, translator, call, again } = await versionWithSuggestions();
+    try {
+      // An autosave and an applied suggestion, each made from the text as it was.
+      await Promise.all([
+        updateDocumentVersion(version.id, `A new opening line.\n${text}`, translator.id),
+        updateDocumentVersion(version.id, text.replace('early', 'very early'), translator.id),
+      ]);
+      const stored = await prisma.documentVersion.findUniqueOrThrow({ where: { id: version.id } });
+      // Neither write is lost from the counter, whichever text ended up stored.
+      assert.equal(stored.version, 3);
+      assert.equal(await held(call.id), 'call');
+      assert.equal(await held(again.id), 'again');
+    } finally {
+      await prisma.documentVersion.delete({ where: { id: version.id } });
     }
   });
 });

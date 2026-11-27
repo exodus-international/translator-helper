@@ -2,6 +2,7 @@
 
 import { authorize } from '@/lib/authorize';
 import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
+import { applyTextEditAtRange, offsetsToRange, rangeToOffsets } from '@/lib/text-range';
 import { revalidatePath } from 'next/cache';
 import { createActivityLog } from '../activity-log/activity-log.repository';
 import { getDocumentVersionById, updateDocumentVersion } from '../document-version/document-version.repository';
@@ -41,7 +42,7 @@ export async function createSuggestionAction(input: unknown) {
   const { user } = await authorize('authenticated');
   const validated = createSuggestionSchema.parse(input);
 
-  const { translationProject } = await resolveTranslationProject(validated.documentVersionId);
+  const { version, translationProject } = await resolveTranslationProject(validated.documentVersionId);
 
   if (translationProject) {
     await authorize({ project: translationProject.id, role: 'reviewer' });
@@ -59,8 +60,17 @@ export async function createSuggestionAction(input: unknown) {
     throw new Error('Proposed text should not be provided for COMMENT type suggestions');
   }
 
+  // The words the suggestion is made on, kept so its range can follow them
+  // through later edits and applying can tell when they were rewritten.
+  const { startLine, startColumn, endLine, endColumn } = validated;
+  const offsets =
+    startLine != null && startColumn != null && endLine != null && endColumn != null
+      ? rangeToOffsets(version.content, { startLine, startColumn, endLine, endColumn })
+      : null;
+
   const suggestion = await createSuggestion({
     ...validated,
+    anchorText: offsets ? version.content.slice(offsets.start, offsets.end) : null,
     comment: validated.comment ?? '',
     userId: user.id,
     startLine: validated.startLine ?? null,
@@ -99,7 +109,8 @@ export async function createSuggestionAction(input: unknown) {
 /** Applying a suggestion as the app wires it: the real repository writes. */
 const applySuggestion = createApplySuggestion({
   updateVersion: updateDocumentVersion,
-  markApplied: (suggestionId, originalText) => updateSuggestionStatus(suggestionId, SuggestionStatus.APPLIED, null, originalText),
+  markApplied: (suggestionId, originalText, appliedRange) =>
+    updateSuggestionStatus(suggestionId, SuggestionStatus.APPLIED, null, originalText, appliedRange),
   log: createActivityLog,
   revalidateDocumentPage: () => revalidatePath('/documents/[project]/[slug]/[lang]', 'page'),
 });
@@ -215,7 +226,22 @@ export async function reopenSuggestionAction(input: unknown) {
     suggestion.proposedText != null
   ) {
     const currentContent = documentVersion.content;
-    const revertedContent = currentContent.replace(suggestion.proposedText, suggestion.originalText);
+    // The range has followed the proposed text since it was applied. Put the
+    // old text back there, and only fall back to the first place the proposed
+    // text appears for a change applied before ranges were kept up to date.
+    const { startLine, startColumn, endLine, endColumn } = suggestion;
+    const applied =
+      startLine != null && startColumn != null && endLine != null && endColumn != null
+        ? { startLine, startColumn, endLine, endColumn }
+        : null;
+    const offsets = applied && rangeToOffsets(currentContent, applied);
+    const holdsProposedText = offsets != null && currentContent.slice(offsets.start, offsets.end) === suggestion.proposedText;
+    const revertedContent = holdsProposedText
+      ? applyTextEditAtRange(currentContent, applied!, suggestion.originalText)
+      : currentContent.replace(suggestion.proposedText, suggestion.originalText);
+    const revertedRange = holdsProposedText
+      ? offsetsToRange(revertedContent, offsets.start, offsets.start + suggestion.originalText.length)
+      : undefined;
 
     if (revertedContent !== currentContent) {
       // Reverting rewrites the version's text: the edit rule applies, so
@@ -225,8 +251,8 @@ export async function reopenSuggestionAction(input: unknown) {
 
       const updatedVersion = await updateDocumentVersion(suggestion.documentVersionId, revertedContent, user.id);
 
-      // Clear originalText and set status to OPEN
-      await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.OPEN, null, null);
+      // Clear originalText, set status to OPEN and point at the restored text
+      await updateSuggestionStatus(validated.suggestionId, SuggestionStatus.OPEN, null, null, revertedRange);
 
       await createActivityLog({
         documentVersionId: suggestion.documentVersionId,
