@@ -28,6 +28,8 @@ import { markdownSupport } from './cm-markdown';
 import { editorHighlighting, editorTheme } from './cm-theme';
 import { rescanScripture, scriptureExtension } from './cm-scripture';
 import { useScriptureHost } from './scripture-context';
+import { rescanStandard, standardExtension } from './cm-standard';
+import { useStandardHost } from './standard-context';
 
 const setHighlightLine = StateEffect.define<number | null>();
 
@@ -198,6 +200,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   const placeholderCompartment = useRef(new Compartment()).current;
   const lintCompartment = useRef(new Compartment()).current;
   const scriptureCompartment = useRef(new Compartment()).current;
+  const standardCompartment = useRef(new Compartment()).current;
   // One object for the editor's whole life, mutated in place. `contentLinter`
   // captures it when the compartment is configured but reads `disabled` at
   // lint time, so replacing the object here would leave the linter holding the
@@ -279,6 +282,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       highlightLineField,
       suggestionExtension((suggestion) => callbacks.current.onSuggestionClick?.(suggestion)),
       scriptureCompartment.of([]),
+      standardCompartment.of([]),
       lintCompartment.of(
         lintEnabled
           ? [contentLinter(lintOptions.current, { onOpenGuide: () => callbacks.current.onOpenGuide?.() }), lintGutter()]
@@ -432,6 +436,42 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   useEffect(() => {
     if (scriptureEnabled) viewRef.current?.dispatch({ effects: rescanScripture.of(null) });
   }, [scriptureBible, scriptureEnabled]);
+
+  // Standard translations likewise: marked in the translation only, against
+  // the source it is written line for line from.
+  const standard = useStandardHost();
+  const standardRef = useRef(standard);
+  standardRef.current = standard;
+  const standardEnabled = !!standard && !isSource && sourceContent !== undefined && lintsAsMarkdown(language);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: standardCompartment.reconfigure(
+        standardEnabled
+          ? standardExtension({
+              host: () => standardRef.current,
+              // The Standard translations page selects a language by its code,
+              // which only the Scripture host carries.
+              languageCode: () => scriptureRef.current?.language || null,
+            })
+          : [],
+      ),
+    });
+  }, [standardEnabled, standardCompartment, ready]);
+
+  const registerStandardView = standardEnabled && !readOnly ? standard.registerView : undefined;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !registerStandardView) return;
+    return registerStandardView(view);
+  }, [registerStandardView, ready]);
+
+  // A saved entry, or a source that changed, is checked again at once.
+  const standardEntries = standard?.entries;
+  const standardSource = standard?.sourceContent;
+  useEffect(() => {
+    if (standardEnabled) viewRef.current?.dispatch({ effects: rescanStandard.of(null) });
+  }, [standardEntries, standardSource, standardEnabled]);
 
   // Turning a rule off changes no text, so CodeMirror has no reason to lint
   // again on its own: without this the squiggles and gutter markers keep the
