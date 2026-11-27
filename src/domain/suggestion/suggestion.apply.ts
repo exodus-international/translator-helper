@@ -1,6 +1,6 @@
 import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 import { refuse, type Refusal } from '@/lib/action-refusal';
-import { applyTextEditAtRange, extractTextAtRange, isRangeWithinBounds } from '@/lib/text-range';
+import { applyTextEditAtRange, extractTextAtRange, occurrencesOf, offsetsToRange, rangeToOffsets } from '@/lib/text-range';
 
 /**
  * Applying a suggestion: replacing the text it points at with the text it
@@ -22,6 +22,29 @@ export class SuggestionNotOpenError extends Error {
   }
 }
 
+/**
+ * The suggestion proposes the text that is already in its range, which is what
+ * a change saved with the new wording in its comment looks like. Applying it
+ * would report a change that never happened.
+ */
+export class SuggestionChangesNothingError extends Error {
+  constructor() {
+    super('This suggestion proposes the text that is already there. Edit its proposed replacement, then apply it.');
+    this.name = 'SuggestionChangesNothingError';
+  }
+}
+
+/**
+ * The words the suggestion was made on are no longer where it points, and are
+ * not anywhere else exactly once: someone rewrote them.
+ */
+export class SuggestionTextChangedError extends Error {
+  constructor() {
+    super('The text this suggestion was made on has changed since. Dismiss it, or make a new suggestion on the text as it is now.');
+    this.name = 'SuggestionTextChangedError';
+  }
+}
+
 /** What the suggestion actions return when the suggestion is no longer open. */
 export function refuseClosedSuggestion(): Refusal {
   return refuse('This suggestion is no longer open. The list now shows its current state.');
@@ -32,6 +55,8 @@ export interface ApplicableSuggestion {
   status: SuggestionStatus;
   type: SuggestionType;
   proposedText: string | null;
+  /** The words selected when the suggestion was made. Null on suggestions older than the column. */
+  anchorText?: string | null;
   startLine: number | null;
   startColumn: number | null;
   endLine: number | null;
@@ -46,7 +71,10 @@ export interface TextRange {
 }
 
 export interface SuggestionApplication {
+  /** Where the change was made: the stored range, or where its words were found. */
   range: TextRange;
+  /** What the range holds once the change is in, so a reopen can put the old text back. */
+  appliedRange: TextRange;
   /** What the range held before, kept so the change can be reverted. */
   originalText: string;
   newContent: string;
@@ -72,26 +100,51 @@ export function planSuggestionApplication(suggestion: ApplicableSuggestion, cont
     throw new Error('Cannot apply a suggestion without a text range');
   }
 
-  const range = {
+  const stored = {
     startLine: suggestion.startLine,
     startColumn: suggestion.startColumn,
     endLine: suggestion.endLine,
     endColumn: suggestion.endColumn,
   };
-  if (!isRangeWithinBounds(range, content.split('\n').length)) {
-    throw new Error('Suggestion range is out of bounds');
+  const range = locateSuggestedText(stored, suggestion.anchorText, content);
+
+  const originalText = extractTextAtRange(content, range);
+  if (originalText === suggestion.proposedText) {
+    throw new SuggestionChangesNothingError();
   }
 
+  const newContent = applyTextEditAtRange(content, range, suggestion.proposedText);
+  const start = rangeToOffsets(content, range)!.start;
   return {
     range,
-    originalText: extractTextAtRange(content, range),
-    newContent: applyTextEditAtRange(content, range, suggestion.proposedText),
+    appliedRange: offsetsToRange(newContent, start, start + suggestion.proposedText.length),
+    originalText,
+    newContent,
   };
+}
+
+/**
+ * The range to change. The stored one when it still holds the words the
+ * suggestion was made on. Saving the text moves stored ranges along with it,
+ * so a miss means those words were edited: they are then used only where they
+ * appear exactly once. A suggestion with no record of its words is taken at
+ * its stored range, as long as that range exists.
+ */
+function locateSuggestedText(stored: TextRange, anchorText: string | null | undefined, content: string): TextRange {
+  const offsets = rangeToOffsets(content, stored);
+  if (anchorText == null) {
+    if (!offsets) throw new Error('Suggestion range is out of bounds');
+    return stored;
+  }
+  if (offsets && content.slice(offsets.start, offsets.end) === anchorText) return stored;
+  const found = occurrencesOf(content, anchorText);
+  if (found.length !== 1) throw new SuggestionTextChangedError();
+  return offsetsToRange(content, found[0], found[0] + anchorText.length);
 }
 
 export interface ApplySuggestionDeps<Version> {
   updateVersion: (versionId: string, content: string, userId: string) => Promise<Version>;
-  markApplied: (suggestionId: string, originalText: string) => Promise<unknown>;
+  markApplied: (suggestionId: string, originalText: string, appliedRange: TextRange) => Promise<unknown>;
   log: (entry: {
     documentVersionId: string;
     userId: string;
@@ -106,7 +159,8 @@ export function createApplySuggestion<Version>(deps: ApplySuggestionDeps<Version
   /**
    * Applying a suggestion that is already applied writes nothing and returns
    * the version as it is, so a retried request succeeds. One that was
-   * dismissed is refused.
+   * dismissed, that proposes the text already there, or whose words were
+   * rewritten, is refused.
    */
   return async function applySuggestion(input: {
     suggestion: ApplicableSuggestion;
@@ -126,11 +180,14 @@ export function createApplySuggestion<Version>(deps: ApplySuggestionDeps<Version
       plan = planSuggestionApplication(suggestion, content);
     } catch (error) {
       if (error instanceof SuggestionNotOpenError) return refuseClosedSuggestion();
+      if (error instanceof SuggestionChangesNothingError || error instanceof SuggestionTextChangedError) {
+        return refuse(error.message);
+      }
       throw error;
     }
 
     const version = await deps.updateVersion(versionId, plan.newContent, actorId);
-    await deps.markApplied(suggestion.id, plan.originalText);
+    await deps.markApplied(suggestion.id, plan.originalText, plan.appliedRange);
     await deps.log({
       documentVersionId: versionId,
       userId: actorId,

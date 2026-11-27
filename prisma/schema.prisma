@@ -424,6 +424,10 @@ model Suggestion {
   startColumn Int?
   endLine     Int?
   endColumn   Int?
+  // The words the range held when the suggestion was made. The range follows
+  // them as the text is edited, and applying checks they are still there.
+  // Null on suggestions made before this column.
+  anchorText  String? @db.Text
 
   // Typ suggestion
   type SuggestionType @default(COMMENT)

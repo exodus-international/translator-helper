@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 import { When, Then } from './fixtures';
 import { changeStatus, openStatusMenu } from '../support/status';
 import { applyThread, dismissThread, showResolved, openThreadCount, reopenThread, threadContaining, threads, waitForFeedback } from '../support/threads';
-import { selectTranslationLine } from '../support/editor';
+import { selectTranslationLine, selectTranslationRow, translationText } from '../support/editor';
 import { dragSuggestionWindow, suggestionWindow, suggestionWindowBox } from '../support/floating-window';
 
 // Steps match on their wording, not on the keyword, so this one definition
@@ -60,8 +60,43 @@ Then('the suggestion window should be open', async ({ page }) => {
   await expect(suggestionWindow(page)).toBeVisible();
 });
 
-Then('the comment field should have the caret', async ({ page }) => {
-  await expect(suggestionWindow(page).getByLabel('Comment')).toBeFocused();
+When('I select the row reading {string} and suggest an edit', async ({ page }, text: string) => {
+  await selectTranslationRow(page, text);
+  await page.getByRole('button', { name: 'Suggest edit' }).click();
+  await expect(suggestionWindow(page)).toBeVisible();
+});
+
+Then('the replacement field should have the caret', async ({ page }) => {
+  await expect(suggestionWindow(page).getByLabel('Proposed replacement')).toBeFocused();
+});
+
+Then('saving the suggestion should not be allowed yet', async ({ page }) => {
+  // The replacement still equals the selected text: saving it would propose no change.
+  await expect(suggestionWindow(page).getByRole('button', { name: 'Save' })).toBeDisabled();
+});
+
+// Typed from the keyboard without clicking a field first, the way a reviewer
+// does when the window opens: the text lands wherever the caret was put.
+When('I type {string} over the replacement', async ({ page }, text: string) => {
+  await expect(suggestionWindow(page).getByLabel('Proposed replacement')).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type(text);
+});
+
+When('I propose {string} as the replacement', async ({ page }, text: string) => {
+  await suggestionWindow(page).getByLabel('Proposed replacement').fill(text);
+});
+
+When('I type the lines {string} and {string} over the replacement', async ({ page }, first: string, second: string) => {
+  await expect(suggestionWindow(page).getByLabel('Proposed replacement')).toBeFocused();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type(first);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type(second);
+});
+
+Then('the translation should not read {string}', async ({ page }, text: string) => {
+  await expect.poll(() => translationText(page)).not.toContain(text);
 });
 
 When('I move the suggestion window out of the way', async ({ page, world }) => {

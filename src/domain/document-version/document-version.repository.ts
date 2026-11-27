@@ -1,3 +1,4 @@
+import { followContentChange } from '@/domain/suggestion/suggestion.follow';
 import { userBrief } from '@/domain/user/user.select';
 import prisma from '@/lib/db';
 import { Prisma } from '@/generated/prisma/client';
@@ -151,22 +152,45 @@ export async function updateDocumentVersion(id: string, content: string, userId:
     throw new Error('Document version not found');
   }
 
+  // Suggestions point at the text by line and column: move them with the edit.
+  const suggestions =
+    content === current.content
+      ? []
+      : await prisma.suggestion.findMany({
+          where: { documentVersionId: id, startLine: { not: null } },
+          select: {
+            id: true,
+            status: true,
+            startLine: true,
+            startColumn: true,
+            endLine: true,
+            endColumn: true,
+            anchorText: true,
+            proposedText: true,
+          },
+        });
+  const moved = followContentChange(current.content, content, suggestions);
+
   // Update with incremented version (status unchanged — transitions are explicit)
-  return prisma.documentVersion.update({
-    where: { id },
-    data: {
-      content,
-      userId,
-      version: current.version + 1,
-      updatedAt: new Date(),
-    },
-    include: {
-      document: true,
-      language: true,
-      user: userBrief,
-      reviewer: userBrief,
-    },
-  });
+  const [updated] = await prisma.$transaction([
+    prisma.documentVersion.update({
+      where: { id },
+      data: {
+        content,
+        userId,
+        version: current.version + 1,
+        updatedAt: new Date(),
+      },
+      include: {
+        document: true,
+        language: true,
+        user: userBrief,
+        reviewer: userBrief,
+      },
+    }),
+    ...moved.map(({ id: suggestionId, ...range }) => prisma.suggestion.update({ where: { id: suggestionId }, data: range })),
+  ]);
+  return updated;
 }
 
 export async function updateDocumentVersionStatus(id: string, status: DocumentStatus, reviewerId?: string) {

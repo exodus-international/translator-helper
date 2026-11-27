@@ -1,6 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyTextEditAtRange, extractTextAtRange, isRangeWithinBounds } from './text-range';
+import {
+  applyTextEditAtRange,
+  extractTextAtRange,
+  followEdit,
+  isRangeWithinBounds,
+  offsetsToRange,
+  rangeToOffsets,
+} from './text-range';
 
 // Three lines, so a range can start, span and end on different lines.
 const content = ['The call came early.', 'Nobody answered it.', 'So it came again.'].join('\n');
@@ -74,5 +81,74 @@ describe('isRangeWithinBounds', () => {
 
   it('rejects an end line past the last', () => {
     assert.equal(isRangeWithinBounds({ startLine: 1, startColumn: 1, endLine: 4, endColumn: 1 }, 3), false);
+  });
+});
+
+describe('rangeToOffsets and offsetsToRange', () => {
+  const call = { startLine: 1, startColumn: 5, endLine: 1, endColumn: 9 };
+  const acrossLines = { startLine: 1, startColumn: 10, endLine: 3, endColumn: 3 };
+
+  it('agree with each other, on one line and across lines', () => {
+    for (const range of [call, acrossLines]) {
+      const offsets = rangeToOffsets(content, range)!;
+      assert.equal(content.slice(offsets.start, offsets.end), extractTextAtRange(content, range));
+      assert.deepEqual(offsetsToRange(content, offsets.start, offsets.end), range);
+    }
+  });
+
+  it('has no offsets for a column past the end of its line, or a line past the text', () => {
+    assert.equal(rangeToOffsets('Dawn.', call), null);
+    assert.equal(rangeToOffsets(content, { ...call, startLine: 4, endLine: 4 }), null);
+  });
+});
+
+describe('followEdit', () => {
+  const call = { startLine: 1, startColumn: 5, endLine: 1, endColumn: 9 };
+  const held = (after: string, range: ReturnType<typeof followEdit>) => range && extractTextAtRange(after, range);
+
+  it('leaves the range alone when the edit is after it', () => {
+    const after = content.replace('early', 'late');
+    assert.deepEqual(followEdit(content, after, call), call);
+  });
+
+  it('moves the range along its line when words are typed before it', () => {
+    const after = content.replace('The call', 'The first call');
+    assert.equal(held(after, followEdit(content, after, call)), 'call');
+  });
+
+  it('moves the range down when a line is added above, and up when one is removed', () => {
+    const added = `A new opening line.\n${content}`;
+    assert.deepEqual(followEdit(content, added, call), { ...call, startLine: 2, endLine: 2 });
+    assert.deepEqual(followEdit(added, content, { ...call, startLine: 2, endLine: 2 }), call);
+  });
+
+  it('keeps typing right before or right after the range out of it', () => {
+    const before = content.replace('call', 'phone-call');
+    assert.equal(held(before, followEdit(content, before, call)), 'call');
+    const after = content.replace('call', 'calls');
+    assert.equal(held(after, followEdit(content, after, call)), 'call');
+  });
+
+  it('grows the range around an edit inside it', () => {
+    const after = content.replace('call', 'caXll');
+    assert.equal(held(after, followEdit(content, after, call)), 'caXll');
+  });
+
+  it('finds the words again when one save changed the text on both sides', () => {
+    const after = content.replace('The', 'That first').replace('again', 'once more');
+    assert.equal(followEdit(content, after, call), null);
+    assert.equal(held(after, followEdit(content, after, call, 'call')), 'call');
+  });
+
+  it('takes the occurrence nearest the old place when the words appear more than once', () => {
+    const twice = `${content}\nThe call came late.`;
+    const after = twice.replace('The', 'That first').replace('late', 'later');
+    const range = followEdit(twice, after, call, 'call');
+    assert.deepEqual(range, { startLine: 1, startColumn: 12, endLine: 1, endColumn: 16 });
+  });
+
+  it('cannot place a range whose words are gone', () => {
+    const after = content.replace('The call came', 'A ring was heard');
+    assert.equal(followEdit(content, after, call, 'call'), null);
   });
 });

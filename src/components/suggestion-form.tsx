@@ -10,6 +10,8 @@ interface SuggestionFormProps {
   type: SuggestionType;
   initialComment?: string;
   initialProposedText?: string;
+  /** The text a change would replace. A replacement equal to it changes nothing and cannot be saved. */
+  currentText?: string;
   onSubmit: (data: { comment: string; proposedText?: string }) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -20,6 +22,7 @@ export function SuggestionForm({
   type,
   initialComment = '',
   initialProposedText = '',
+  currentText,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -58,33 +61,25 @@ export function SuggestionForm({
     }
   }, [initialProposedText, type, autoResize]);
 
+  const isChange = type === SuggestionType.CHANGE;
+  const changesNothing = isChange && currentText !== undefined && proposedText === currentText;
+  const cannotSave = isChange && (!proposedText.trim() || changesNothing);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (type === SuggestionType.CHANGE && !proposedText.trim()) {
+    if (cannotSave) {
       return;
     }
 
     onSubmit({
       comment: comment.trim(),
-      proposedText: type === SuggestionType.CHANGE ? proposedText : undefined,
+      proposedText: isChange ? proposedText : undefined,
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor={commentId}>Comment</Label>
-        <Textarea
-          id={commentId}
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="Add a comment..."
-          rows={1}
-          className="mt-1 min-h-10"
-        />
-      </div>
-
-      {type === SuggestionType.CHANGE && (
+      {isChange && (
         <div>
           <Label htmlFor={proposedTextId}>Proposed replacement</Label>
           <Textarea
@@ -100,15 +95,31 @@ export function SuggestionForm({
             required
             className="mt-1 font-mono overflow-hidden"
           />
-          <p className="text-[11px] text-muted-foreground mt-1">Whitespace and spaces are preserved as-is.</p>
+          {changesNothing ? (
+            <p className="text-[11px] text-warning mt-1">This is the text as it is now. Write the new wording here.</p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground mt-1">Whitespace and spaces are preserved as-is.</p>
+          )}
         </div>
       )}
+
+      <div>
+        <Label htmlFor={commentId}>{isChange ? 'Comment (optional)' : 'Comment'}</Label>
+        <Textarea
+          id={commentId}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Add a comment..."
+          rows={1}
+          className="mt-1 min-h-10"
+        />
+      </div>
 
       <div className="flex gap-2 justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="max-md:h-11">
           Cancel
         </Button>
-        <Button type="submit" className="max-md:h-11" disabled={isSubmitting || (type === SuggestionType.CHANGE && !proposedText.trim())}>
+        <Button type="submit" className="max-md:h-11" disabled={isSubmitting || cannotSave}>
           {isSubmitting ? 'Saving...' : 'Save'}
         </Button>
       </div>

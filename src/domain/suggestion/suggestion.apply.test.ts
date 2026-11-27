@@ -50,6 +50,13 @@ describe('planSuggestionApplication', () => {
     assert.throws(() => planSuggestionApplication({ ...change, endColumn: null }, content), /without a text range/);
   });
 
+  it('refuses a change that proposes the text already there, and says so', () => {
+    assert.throws(
+      () => planSuggestionApplication({ ...change, proposedText: 'call' }, content),
+      /proposes the text that is already there/,
+    );
+  });
+
   it('refuses a range past the end of the text as it is now', () => {
     assert.throws(() => planSuggestionApplication({ ...change, startLine: 4, endLine: 4 }, content), /out of bounds/);
   });
@@ -63,8 +70,8 @@ describe('applySuggestion', () => {
         calls.push({ fn: 'updateVersion', args: [versionId, text, userId] });
         return { id: versionId, content: text };
       },
-      markApplied: async (suggestionId, originalText) => {
-        calls.push({ fn: 'markApplied', args: [suggestionId, originalText] });
+      markApplied: async (suggestionId, originalText, appliedRange) => {
+        calls.push({ fn: 'markApplied', args: [suggestionId, originalText, appliedRange] });
       },
       log: async (entry) => {
         calls.push({ fn: 'log', args: [entry] });
@@ -89,7 +96,8 @@ describe('applySuggestion', () => {
       calls.map((call) => call.fn),
       ['updateVersion', 'markApplied', 'log', 'revalidate'],
     );
-    assert.deepEqual(calls[1].args, ['s1', 'call']);
+    // The stored range now covers 'summons', so a reopen can put 'call' back.
+    assert.deepEqual(calls[1].args, ['s1', 'call', { startLine: 1, startColumn: 5, endLine: 1, endColumn: 12 }]);
     assert.deepEqual(calls[2].args, [
       {
         documentVersionId: 'v1',
@@ -145,6 +153,20 @@ describe('applySuggestion', () => {
     });
     assert.ok(isRefusal(result));
     assert.match(result.refused.message, /no longer open/);
+    assert.deepEqual(writes, []);
+  });
+
+  it('refuses a change that proposes the text already there, and writes nothing', async () => {
+    const { writes, applySuggestion } = recordingWrites();
+    const result = await applySuggestion({
+      suggestion: { ...change, proposedText: 'call' },
+      versionId: 'v1',
+      content,
+      currentVersion: { id: 'v1', content },
+      actorId: 'me',
+    });
+    assert.ok(isRefusal(result));
+    assert.match(result.refused.message, /already there/);
     assert.deepEqual(writes, []);
   });
 
