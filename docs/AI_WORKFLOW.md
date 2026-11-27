@@ -74,7 +74,9 @@ The AI workflow panel in the editor's sidebar lists the steps in order, each
 tagged with who does it: **AI** for the draft and the audio text, **Team** for
 the two reviews, **App** for the recording, the deploy and the merge. A done
 step keeps what it left behind: how many notes the AI wrote, and who approved
-the text. The step the document stands on holds its action, so **Approve
+the text. The text review shows the two things a reviewer does, in order: resolve
+the comments, with a button that scrolls to them, then approve the text. The
+step the document stands on holds its action, so **Approve
 text**, **Approve audio text** and **Retry** are all in the one place. A
 document that gets no audio shows three steps, without the two audio ones.
 

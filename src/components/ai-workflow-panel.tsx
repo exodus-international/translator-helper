@@ -9,6 +9,7 @@ import {
   Circle,
   CircleDot,
   Loader2,
+  MessageSquare,
   RotateCcw,
   Sparkles,
   ThumbsUp,
@@ -161,6 +162,11 @@ export function AiWorkflowPanel({
     }
   };
 
+  /** Brings the feedback list, further down the same sidebar, into view. */
+  const showComments = () => {
+    document.getElementById('document-panel-threads')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleRetry = async () => {
     setBusy(true);
     try {
@@ -194,36 +200,56 @@ export function AiWorkflowPanel({
 
   const currentBody = (id: AiStepId) => {
     if (id === 'text-review') {
+      const resolved = openCount === 0;
       return (
-        <>
-          <p className="text-muted-foreground">
-            {approverIds.length} of {required} approvals. The text moves on when {required} people approve it.
-          </p>
-          {approvals && approvals.approvals.length > 0 && (
-            <ul className="flex flex-col gap-1" aria-label="Approved by">
-              {approvals.approvals.map(({ user: approver }) => (
-                <li key={approver.id} className="flex items-center gap-2">
-                  <UserAvatar name={approver.name} email={approver.email} image={approver.image} size="xs" />
-                  {approver.name}
-                </li>
-              ))}
-            </ul>
-          )}
-          <Button
-            size="sm"
-            variant={approvedByMe ? 'outline' : 'default'}
-            onClick={handleApprove}
-            disabled={busy || (!approvedByMe && openCount > 0)}
-          >
-            <ThumbsUp />
-            {approvedByMe ? 'Withdraw my approval' : 'Approve text'}
-          </Button>
-          {!approvedByMe && openCount > 0 && (
+        // The two things a reviewer does, in the order they have to happen:
+        // the approval is refused while a comment is open, so the comments
+        // come first rather than as a note under a button that will not press.
+        <ol className="flex flex-col gap-3" aria-label="Review the text">
+          <li className="flex flex-col gap-1.5" aria-current={resolved ? undefined : 'step'}>
+            <SubStepTitle number={1} done={resolved}>
+              Resolve the comments
+            </SubStepTitle>
             <p className="text-xs text-muted-foreground">
-              Resolve the {openCount} open comment{openCount === 1 ? '' : 's'} first, including the AI&apos;s.
+              {resolved
+                ? 'No open comments.'
+                : `${openCount} open comment${openCount === 1 ? '' : 's'}, including the AI's. Apply or dismiss each one.`}
             </p>
-          )}
-        </>
+            {!resolved && (
+              <Button size="sm" variant="outline" onClick={showComments}>
+                <MessageSquare />
+                Show the comments
+              </Button>
+            )}
+          </li>
+          <li className="flex flex-col gap-1.5" aria-current={resolved ? 'step' : undefined}>
+            <SubStepTitle number={2} done={false} waiting={!resolved}>
+              Approve the text
+            </SubStepTitle>
+            <p className="text-xs text-muted-foreground">
+              {approverIds.length} of {required} approvals. The text moves on when {required} people approve it.
+            </p>
+            {approvals && approvals.approvals.length > 0 && (
+              <ul className="flex flex-col gap-1" aria-label="Approved by">
+                {approvals.approvals.map(({ user: approver }) => (
+                  <li key={approver.id} className="flex items-center gap-2">
+                    <UserAvatar name={approver.name} email={approver.email} image={approver.image} size="xs" />
+                    {approver.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button
+              size="sm"
+              variant={approvedByMe ? 'outline' : 'default'}
+              onClick={handleApprove}
+              disabled={busy || (!approvedByMe && !resolved)}
+            >
+              <ThumbsUp />
+              {approvedByMe ? 'Withdraw my approval' : 'Approve text'}
+            </Button>
+          </li>
+        </ol>
       );
     }
     if (id === 'audio-review') {
@@ -335,6 +361,37 @@ const STATE_LABEL: Record<AiStepState, string> = {
   failed: 'failed',
   upcoming: 'not started',
 };
+
+/** The heading of one of the two things to do inside the text review: its number, or a check once it is done. */
+function SubStepTitle({
+  number,
+  done,
+  waiting = false,
+  children,
+}: {
+  number: number;
+  done: boolean;
+  /** Not possible yet, because the one before it is still open. */
+  waiting?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <p className={cn('flex items-center gap-1.5', waiting && 'text-muted-foreground')}>
+      {done ? (
+        <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />
+      ) : (
+        <span
+          className="flex size-4 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none"
+          aria-hidden
+        >
+          {number}
+        </span>
+      )}
+      <span className={cn(!done && !waiting && 'font-medium')}>{children}</span>
+      <span className="sr-only">({done ? 'done' : waiting ? 'waits for the step before it' : 'to do'})</span>
+    </p>
+  );
+}
 
 /** The mark on the step's rail. A step the AI or the app is running spins; one that waits on people does not. */
 function StepMark({ state, working }: { state: AiStepState; working: boolean }) {

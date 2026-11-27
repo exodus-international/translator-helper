@@ -103,7 +103,7 @@ function aiPanel(page: import('@playwright/test').Page) {
 Then(
   "the AI workflow should show the AI's draft as done and the team's text review as the current step",
   async ({ page }) => {
-    const steps = aiPanel(page).getByRole('list', { name: 'Steps' }).getByRole('listitem');
+    const steps = aiPanel(page).getByRole('list', { name: 'Steps' }).locator('> li');
     const draft = steps.filter({ hasText: 'Draft the translation' });
     await expect(draft).toContainText('AI');
     await expect(draft).toContainText('(done)');
@@ -115,7 +115,8 @@ Then(
 
 Then('approving the text should wait for the open comments', async ({ page }) => {
   await expect(aiPanel(page).getByRole('button', { name: 'Approve text' })).toBeDisabled();
-  await expect(aiPanel(page).getByText(/Resolve the 1 open comment first/)).toBeVisible();
+  await expect(aiPanel(page).getByText(/1 open comment, including the AI's/)).toBeVisible();
+  await expect(aiPanel(page).getByRole('button', { name: 'Show the comments' })).toBeVisible();
 });
 
 When('I approve the text', async ({ page }) => {
