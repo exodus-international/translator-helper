@@ -7,9 +7,17 @@ import { usePathname } from 'next/navigation';
 
 export const SUPPORT_URL = 'https://exodus90.atlassian.net/servicedesk/customer/portal/1';
 
-/** Pre-fills the service-desk ticket with the page the reporter was on. */
+const APP_ORIGIN = 'https://exodus-translations.ff0000.cz';
+const BUG_REPORT_FORM = 'https://exodus90.atlassian.net/servicedesk/customer/portal/1/group/1/create/10009';
+
+/**
+ * Pre-fills the service-desk ticket with the page the reporter was on.
+ * `pathname` starts with a slash, so it is resolved against the origin, not
+ * appended to it: appending gave `…ff0000.cz//documents`.
+ */
 export function bugReportUrl(pathname: string) {
-  return `https://exodus90.atlassian.net/servicedesk/customer/portal/1/group/1/create/10009?customfield_10043=https://exodus-translations.ff0000.cz/${pathname}`;
+  const page = new URL(pathname.replace(/^\/+/, '/'), APP_ORIGIN).toString();
+  return `${BUG_REPORT_FORM}?customfield_10043=${encodeURIComponent(page)}`;
 }
 
 /**
