@@ -94,13 +94,14 @@ const SINGLE_TILDE_PAIR = /(?<!~)~(?=[^\s~])([^~]*?[^\s~])~(?!~)/g;
  *
  * An underscore inside a word is not a marker: `sort_order` and `snake_case`
  * are keys this library is full of, and CommonMark does not read an intraword
- * `_` as emphasis either, so a selected key keeps its name.
+ * `_` as emphasis either, so a selected key keeps its name. A letter is one in
+ * any alphabet: `день_1` is a word as much as `day_1` is.
  */
 function stripInlineMarkers(selected: string): string {
   const unstruck = selected.replace(SINGLE_TILDE_PAIR, '$1');
   return unstruck.replace(INLINE_MARKERS, (marker, offset: number) => {
     if (marker[0] !== '_') return '';
-    const isWord = (character: string | undefined) => !!character && /\w/.test(character);
+    const isWord = (character: string | undefined) => !!character && /[\p{L}\p{N}\p{M}_]/u.test(character);
     return isWord(unstruck[offset - 1]) && isWord(unstruck[offset + marker.length]) ? marker : '';
   });
 }

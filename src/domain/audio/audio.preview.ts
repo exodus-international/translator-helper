@@ -21,6 +21,7 @@ export const DEFAULT_PREVIEW_TEXTS: Record<string, string> = {
   nl: 'Sta vandaag stil en wees in stilte bij de Heer. Je hoeft niets te bewijzen, het is genoeg om aanwezig te zijn. Vraag jezelf aan het eind van de dag: waar heb ik God vandaag ontmoet?',
   pl: 'Zatrzymaj się dziś i trwaj w ciszy z Panem. Nie musisz niczego udowadniać, wystarczy być obecnym. Na koniec dnia zapytaj siebie: gdzie dziś spotkałem Boga?',
   sk: 'Dnes sa zastav a buď v tichu s Pánom. Nemusíš nič dokazovať, stačí byť prítomný. Na konci dňa si polož otázku: kde som dnes stretol Boha?',
+  uk: 'Сьогодні зупинись і побудь у тиші з Господом. Тобі не треба нічого доводити, достатньо бути присутнім. Наприкінці дня запитай себе: де я сьогодні зустрів Бога?',
   sl: 'Danes se ustavi in bodi v tišini z Gospodom. Ničesar ti ni treba dokazovati, dovolj je, da si navzoč. Ob koncu dneva se vprašaj: kje sem danes srečal Boga?',
 };
 

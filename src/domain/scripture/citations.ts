@@ -39,15 +39,16 @@ const EN_RANGE = String.raw`\d{1,3}(?::\d{1,3})?[a-z]?(?:${DASH}\d{1,3}(?::\d{1,
 const ENGLISH = String.raw`\d{1,3}:\d{1,3}[a-z]?(?:${DASH}\d{1,3}(?::\d{1,3})?[a-z]?)?(?:${SP}?[,;]${SP}?${EN_RANGE}(?![\d:]|${SP}?\p{Lu}))*`;
 // Continental: "3,16", "3,16-18", "3,16-4,2", ".20" or ". 20" (Croatian) for a
 // verse list and "; 6,1" for another chapter. A list item is never the number
-// of the next book or chapter ("Iv 3,16. 2 Kor 5,17", "Mt 5,3. 6,1").
+// of the next book or chapter ("Iv 3,16. 2 Kor 5,17", "Mt 5,3. 6,1"). The comma
+// may have a space after it, as Ukrainian writes it ("Ів. 3, 16").
 const LIST_ITEM = String.raw`\d{1,3}[a-z]?(?:[-–]\d{1,3}[a-z]?)?(?![\d,:]|${SP}?\p{Lu})`;
-const EU_VERSES = String.raw`\d{1,3}[a-z]?(?:${DASH}\d{1,3}(?:,\d{1,3})?[a-z]?)?(?:\.${SP}?${LIST_ITEM})*`;
-const CONTINENTAL = String.raw`\d{1,3},${EU_VERSES}(?:;${SP}?\d{1,3},${EU_VERSES})*`;
+const EU_VERSES = String.raw`\d{1,3}[a-z]?(?:${DASH}\d{1,3}(?:,${SP}?\d{1,3})?[a-z]?)?(?:\.${SP}?${LIST_ITEM})*`;
+const CONTINENTAL = String.raw`\d{1,3},${SP}?${EU_VERSES}(?:;${SP}?\d{1,3},${SP}?${EU_VERSES})*`;
 
 // Books of one chapter are cited by verse alone ("Jude 5", "Jd 5-13", "Flm 4-7. 10"),
 // as every Bible here writes them. Only these names, so "Mt 5" or "Day 9" never
 // becomes a citation.
-const ONE_CHAPTER_BOOK = String.raw`(?:[23]\.?${SP}?(?:John|Jn|Iv|Ivanova|Joh|Johannes|J|Janův|Jánov|Janez|János)|Jude|Judas|Juda|Jud|Júdás|Júd|Jd|Ju|Obadiah|Obad|Obadija|Obadja|Obd|Ob|Abdiáša|Abdiáš|Abdijáš|Abdiás|Abdija|Abd|Philemon|Philem|Phlm|Filemonovi|Filemonu|Filemon|Filem|Flm|Fm)\.?`;
+const ONE_CHAPTER_BOOK = String.raw`(?:[23]\.?${SP}?(?:John|Jn|Iv|Ivanova|Joh|Johannes|J|Janův|Jánov|Janez|János|Івана|Іван|Ів|Йоана|Йоан|Йо)|Jude|Judas|Juda|Jud|Júdás|Júd|Jd|Ju|Obadiah|Obad|Obadija|Obadja|Obd|Ob|Abdiáša|Abdiáš|Abdijáš|Abdiás|Abdija|Abd|Philemon|Philem|Phlm|Filemonovi|Filemonu|Filemon|Filem|Flm|Fm|Юди|Юда|Юд|Авдія|Авдій|Авд|Овдія|Овдій|Овд|Филимона|Филимон|Филим|Флм)\.?`;
 const VERSES_ONLY = String.raw`\d{1,3}[a-z]?(?:${DASH}\d{1,3}[a-z]?)?(?:[.,]${SP}?${LIST_ITEM})*`;
 
 const CITATION = new RegExp(

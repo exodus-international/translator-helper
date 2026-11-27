@@ -28,13 +28,23 @@ export interface ParsedPassage {
   ranges: VerseRange[]
 }
 
+/**
+ * The key a book name is looked up by: lower case, no spaces or punctuation,
+ * and no accents on Latin letters ("Röm" is "rom", "1 Kor." is "1kor").
+ *
+ * Letters of every script are kept. Keeping only a-z left "1 Кор" and "1 Сам"
+ * both as "1", so a Ukrainian citation resolved to whichever numbered book came
+ * first. Accents come off Latin letters alone, because й and ї are letters of
+ * the Ukrainian alphabet and not и and і with a mark.
+ */
 export function normalizeBook(value: string): string {
   return value
     .toLowerCase()
     .replace(/đ/g, 'dj')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]/g, '')
+    .replace(/(\p{Script=Latin})\p{M}+/gu, '$1')
+    .normalize('NFC')
+    .replace(/[^\p{L}\p{N}]/gu, '')
 }
 
 const BOOK_AND_SPEC = /^((?:[1-4]\s*\.?\s*)?\p{L}[\p{L}\s.]*?)\.?\s*(\d.*)$/u

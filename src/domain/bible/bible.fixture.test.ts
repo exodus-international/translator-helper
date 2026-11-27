@@ -150,3 +150,54 @@ describe('a Bible that lacks a book', () => {
     assert.equal((await resolvePassage(partial, 'John 3:16', partial.findTranslation('hr')!, DEFAULT_INCLUDE)).status, 'ok');
   });
 });
+
+describe('a Bible whose book names are in Cyrillic', () => {
+  const book = (usfm: string, name: string, abbreviation: string, testament: 'old' | 'new') => ({
+    usfm,
+    name,
+    shortName: name,
+    abbreviation,
+    slug: usfm.toLowerCase(),
+    testament,
+    chapters: [{ number: 1, verses: [{ number: 1, text: 'Текст першого вірша.' }] }],
+  });
+  const ukrainian = prepareTranslation(
+    parseTranslationFile(
+      JSON.stringify({
+        code: 'khm-uk',
+        books: [
+          book('1SA', 'Перша книга Самуїла', '1 Сам', 'old'),
+          book('JHN', 'Євангелія від Івана', 'Ів', 'new'),
+          book('1CO', 'Перше послання до Корінтян', '1 Кор', 'new'),
+          book('2CO', 'Друге послання до Корінтян', '2 Кор', 'new'),
+        ],
+      }),
+    ),
+    resolveMeta('khm-uk', { name: 'Святе Письмо (Хоменко)' }),
+  );
+  const withUkrainian = memoryBible([source, target, ukrainian]);
+  const uk = withUkrainian.findTranslation('uk')!;
+
+  it('resolves each book by its own name', () => {
+    assert.equal(withUkrainian.resolveBook('Ів', uk), 'JHN');
+    assert.equal(withUkrainian.resolveBook('Ів.', uk), 'JHN');
+    assert.equal(withUkrainian.resolveBook('Євангелія від Івана', uk), 'JHN');
+  });
+
+  it('tells the numbered books apart', () => {
+    // All three were the key "1" or "2", so "1 Кор" resolved to 1 Samuel.
+    assert.equal(withUkrainian.resolveBook('1 Сам', uk), '1SA');
+    assert.equal(withUkrainian.resolveBook('1 Кор', uk), '1CO');
+    assert.equal(withUkrainian.resolveBook('2 Кор.', uk), '2CO');
+  });
+
+  it('does not take a bare number or an unknown name for a book', () => {
+    assert.equal(withUkrainian.resolveBook('1', uk), null);
+    assert.equal(withUkrainian.resolveBook('Кор', uk), null);
+  });
+
+  it('still reads English and Croatian names', () => {
+    assert.equal(withUkrainian.resolveBook('John', uk), 'JHN');
+    assert.equal(withUkrainian.resolveBook('Iv', hr), 'JHN');
+  });
+});

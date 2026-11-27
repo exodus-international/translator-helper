@@ -40,6 +40,22 @@ test('books of one chapter are cited by verse alone', () => {
   assert.deepEqual(texts('Iv 5 i Mt 5, Day 9'), []);
 });
 
+test('Ukrainian citations, in Cyrillic and with a space after the comma', () => {
+  assert.deepEqual(texts('Пор. Ів 3,16 і Пс 51,3-5.'), ['Ів 3,16', 'Пс 51,3-5']);
+  assert.deepEqual(texts('Як сказано в Ів. 3, 16 та Мт. 5, 3-12.'), ['Ів. 3, 16', 'Мт. 5, 3-12']);
+  assert.deepEqual(texts('1 Кор 13, 4-7; 15, 3 і Буття 1,1'), ['1 Кор 13, 4-7; 15, 3', 'Буття 1,1']);
+  assert.deepEqual(texts('(Йо. 3:16-18)'), ['Йо. 3:16-18']);
+  // The spaced comma is the same citation in the alphabets already supported.
+  assert.deepEqual(texts('Usp. Iv 3, 16-18 i Mt 5, 3'), ['Iv 3, 16-18', 'Mt 5, 3']);
+});
+
+test('Ukrainian books of one chapter are cited by verse alone', () => {
+  assert.deepEqual(texts('Юд 5-13, Флм 4-7 і Авд. 3'), ['Юд 5-13', 'Флм 4-7', 'Авд. 3']);
+  assert.deepEqual(texts('3 Ів 2 та 2 Йо. 5'), ['3 Ів 2', '2 Йо. 5']);
+  // Every other book still needs a chapter and a verse.
+  assert.deepEqual(texts('Ів 5 і Мт 5, День 9'), []);
+});
+
 test('verse lists spaced after the full stop, up to the next citation or sentence', () => {
   assert.deepEqual(texts('Dn 13,1-9. 15-18'), ['Dn 13,1-9. 15-18']);
   assert.deepEqual(texts('Iv 3,16. 2 Kor 5,17'), ['Iv 3,16', '2 Kor 5,17']);
