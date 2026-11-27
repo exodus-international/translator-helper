@@ -145,6 +145,8 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     deleteStandardTranslationAction: ['authenticated'],
     getStandardTranslationMoveConflictAction: ['authenticated'],
     moveStandardTranslationToGeneralAction: ['authenticated'],
+    // The language's team reads the entries its documents' editors check.
+    getStandardTranslationsForDocumentAction: ['language:member'],
   },
   'suggestion/suggestion.actions.ts': {
     getSuggestionsByDocumentVersionAction: ['authenticated'],

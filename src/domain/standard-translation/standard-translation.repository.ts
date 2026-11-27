@@ -68,6 +68,32 @@ export async function listEntriesForTranslation(
   });
 }
 
+const editorSelect = {
+  ...rowSelect,
+  sourceKey: true,
+  sourceProjectId: true,
+} satisfies Prisma.StandardTranslationSelect;
+
+/** An entry as the translation editor shows it: matched, and named in its cards with who changed it last. */
+export type StandardTranslationEditorEntry = Prisma.StandardTranslationGetPayload<{ select: typeof editorSelect }>;
+
+/**
+ * What the translation editor needs for a document: the entries it can use
+ * (the language's general ones and its project's, as AI translation reads
+ * them) and the language's projects, for the dialog's scope.
+ */
+export async function listEditorEntries(languageId: string, sourceProjectId: string | null) {
+  const [entries, projects] = await Promise.all([
+    prisma.standardTranslation.findMany({
+      where: { languageId, OR: [{ sourceProjectId: null }, ...(sourceProjectId ? [{ sourceProjectId }] : [])] },
+      select: editorSelect,
+      orderBy: { id: 'asc' },
+    }),
+    listScopeProjects(languageId),
+  ]);
+  return { entries, projects };
+}
+
 /** A project of the language, as the Scope filter lists it. */
 interface ScopeProject {
   id: string;

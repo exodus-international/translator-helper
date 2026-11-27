@@ -53,6 +53,9 @@ export const updateStandardTranslationSchema = z.strictObject(entryFields);
 
 export type UpdateStandardTranslationInput = z.output<typeof updateStandardTranslationSchema>;
 
+/** A document's editor asking for the entries it can use. */
+export const documentEntriesSchema = z.object({ documentId: z.uuid(), languageId: z.uuid() });
+
 /**
  * Moving a project entry to all projects. `keep` answers the clash with a
  * general entry of the same source, and is only needed when there is one.
