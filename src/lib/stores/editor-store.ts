@@ -401,6 +401,7 @@ export function createEditorStore(config: EditorStoreConfig, deps: EditorStoreDe
           sourceContent: config.sourceContent,
           currentTranslation: before || undefined,
           originalFilename: config.originalFilename ?? undefined,
+          documentId: config.documentId,
         });
         // A whole document takes the model tens of seconds and the pane stays
         // editable the entire time. Whoever kept translating while they waited

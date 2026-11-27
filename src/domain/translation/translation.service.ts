@@ -11,6 +11,8 @@ export interface TranslateWithChatGPTParams {
   originalFilename?: string | null;
   /** What the model is told about the Scripture placeholders in `sourceContent`. */
   scripturePrompt?: string;
+  /** What the model is told about the standard translations in `sourceContent`. */
+  standardPrompt?: string;
 }
 
 /**
@@ -34,6 +36,7 @@ export function buildTranslationMessages({
   currentTranslation,
   originalFilename,
   scripturePrompt,
+  standardPrompt,
 }: TranslateWithChatGPTParams) {
   const format = promptFormatFor(originalFilename);
   const isYaml = format === 'yaml';
@@ -53,6 +56,7 @@ export function buildTranslationMessages({
       : 'Return only the translated Markdown. Do not add explanations.',
     currentTranslation ? `Existing translation draft (use as reference if it is helpful):\n${currentTranslation}` : '',
     scripturePrompt ?? '',
+    standardPrompt ?? '',
     'Source content:',
     sourceContent,
   ]

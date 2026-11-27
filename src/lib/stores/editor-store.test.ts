@@ -326,6 +326,14 @@ describe('translateWithAi', () => {
     assert.equal(store.getState().content, 'AI draft');
   });
 
+  it('names the document, so its project’s standard translations are used', async () => {
+    const { deps, calls } = fakeDeps();
+    const store = createEditorStore(CONFIG, deps);
+    await store.getState().translateWithAi();
+    const request = calls.find((call) => call.fn === 'translateDocument')!.args[0] as { documentId?: string };
+    assert.equal(request.documentId, 'doc-1');
+  });
+
   it('keeps what was typed while the model was working instead of replacing it', async () => {
     const model = deferred<{ translatedContent: string; notices: string[] }>();
     const { deps, toasts } = fakeDeps({

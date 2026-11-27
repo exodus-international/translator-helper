@@ -7,5 +7,7 @@ export const translateDocumentSchema = z.object({
   sourceContent: z.string().min(1),
   currentTranslation: z.string().optional(),
   originalFilename: z.string().optional(),
+  /** The document being translated: its project's standard translations are used too. */
+  documentId: z.string().uuid().optional(),
 });
 

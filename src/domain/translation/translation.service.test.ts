@@ -257,3 +257,17 @@ test('buildTranslationMessages puts the Scripture instructions just before the s
   });
   assert.ok(user.content.endsWith('Scripture: keep {{bible:1}}.\n\nSource content:\n\nRead {{bible:1}}.'));
 });
+
+test('buildTranslationMessages puts the standard translations section beside the Scripture one', () => {
+  const [, user] = buildTranslationMessages({
+    ...promptBase,
+    sourceContent: 'Read {{bible:1}}.\n\n{{std:1}}',
+    scripturePrompt: 'Scripture: keep {{bible:1}}.',
+    standardPrompt: 'Standard translations: keep {{std:1}}.',
+  });
+  assert.ok(
+    user.content.endsWith(
+      'Scripture: keep {{bible:1}}.\n\nStandard translations: keep {{std:1}}.\n\nSource content:\n\nRead {{bible:1}}.\n\n{{std:1}}',
+    ),
+  );
+});
