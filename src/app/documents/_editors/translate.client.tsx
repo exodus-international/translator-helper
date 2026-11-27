@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { ScriptureProvider } from '@/components/editor/scripture-context';
+import { StandardProvider } from '@/components/editor/standard-context';
 import { deleteDocumentVersionAction } from '@/domain/document-version/document-version.actions';
 import { capture } from '@/lib/analytics';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
@@ -94,72 +95,78 @@ export default function TranslateClient({
       sourceContent={sourceVersion?.content ?? ''}
       requestEditor={showTranslationEditor}
     >
-      <DocumentEditor
-        document={document}
-        sourceVersion={sourceVersion}
-        targetVersion={initialTargetVersion}
-        initialSuggestions={initialSuggestions}
-        translationProjectId={translationProject?.id ?? null}
-        targetLanguageId={targetLanguageId}
-        user={user}
-        canDeploy={canDeploy}
-        canChangeStatus={canChangeStatus}
-        variant="translate"
-        layout={zenMode ? 'zen' : 'default'}
-        fullscreen={zenMode}
-        viewerRef={viewerRef}
-        header={<TranslateZenBar document={document} zenMode={zenMode} setZenMode={setZenMode} />}
-        panelActions={<TranslatePanelActions zenMode={zenMode} setZenMode={setZenMode} />}
-        onToggleZen={() => {
-          capture('zen_mode_toggled', { enabled: !zenMode });
-          setZenMode(!zenMode);
-        }}
-        targetLanguageName={targetLanguage?.name ?? null}
-        canEditSource={isAdminClient(user)}
-        translationPlaceholder="Enter your translation here..."
-        translationPreviewEmptyText="*No content yet...*"
-        hideDetails
-        autoSaveDelayMs={3000}
-        sidebarActions={<TranslateWorkflowActions user={user} targetLanguageId={targetLanguageId} />}
-        sidebarSummary={
-          initialTargetVersion ? (
-            <>
-              <AudioStatus
-                documentVersionId={initialTargetVersion.id}
-                currentVersion={initialTargetVersion.version}
-                status={initialTargetVersion.status}
-                compact
-              />
-              <GitHubStatus
-                documentVersionId={initialTargetVersion.id}
-                isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-                compact
-              />
-            </>
-          ) : undefined
-        }
-        sidebarDetails={
-          initialTargetVersion ? (
-            <>
-              <AudioStatus
-                documentVersionId={initialTargetVersion.id}
-                currentVersion={initialTargetVersion.version}
-                status={initialTargetVersion.status}
-                frame="section"
-              />
-              <GitHubStatus
-                documentVersionId={initialTargetVersion.id}
-                isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-                frame="section"
-              />
-              {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
-                <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />
-              )}
-            </>
-          ) : undefined
-        }
-        sidebarDetailsDefaultOpen={initialTargetVersion?.status === DocumentStatus.DEPLOYED}
-      />
+      <StandardProvider
+        documentId={document.id}
+        language={targetLanguage ? { id: targetLanguageId, name: targetLanguage.name } : null}
+        sourceContent={sourceVersion?.content ?? ''}
+      >
+        <DocumentEditor
+          document={document}
+          sourceVersion={sourceVersion}
+          targetVersion={initialTargetVersion}
+          initialSuggestions={initialSuggestions}
+          translationProjectId={translationProject?.id ?? null}
+          targetLanguageId={targetLanguageId}
+          user={user}
+          canDeploy={canDeploy}
+          canChangeStatus={canChangeStatus}
+          variant="translate"
+          layout={zenMode ? 'zen' : 'default'}
+          fullscreen={zenMode}
+          viewerRef={viewerRef}
+          header={<TranslateZenBar document={document} zenMode={zenMode} setZenMode={setZenMode} />}
+          panelActions={<TranslatePanelActions zenMode={zenMode} setZenMode={setZenMode} />}
+          onToggleZen={() => {
+            capture('zen_mode_toggled', { enabled: !zenMode });
+            setZenMode(!zenMode);
+          }}
+          targetLanguageName={targetLanguage?.name ?? null}
+          canEditSource={isAdminClient(user)}
+          translationPlaceholder="Enter your translation here..."
+          translationPreviewEmptyText="*No content yet...*"
+          hideDetails
+          autoSaveDelayMs={3000}
+          sidebarActions={<TranslateWorkflowActions user={user} targetLanguageId={targetLanguageId} />}
+          sidebarSummary={
+            initialTargetVersion ? (
+              <>
+                <AudioStatus
+                  documentVersionId={initialTargetVersion.id}
+                  currentVersion={initialTargetVersion.version}
+                  status={initialTargetVersion.status}
+                  compact
+                />
+                <GitHubStatus
+                  documentVersionId={initialTargetVersion.id}
+                  isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+                  compact
+                />
+              </>
+            ) : undefined
+          }
+          sidebarDetails={
+            initialTargetVersion ? (
+              <>
+                <AudioStatus
+                  documentVersionId={initialTargetVersion.id}
+                  currentVersion={initialTargetVersion.version}
+                  status={initialTargetVersion.status}
+                  frame="section"
+                />
+                <GitHubStatus
+                  documentVersionId={initialTargetVersion.id}
+                  isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+                  frame="section"
+                />
+                {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
+                  <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />
+                )}
+              </>
+            ) : undefined
+          }
+          sidebarDetailsDefaultOpen={initialTargetVersion?.status === DocumentStatus.DEPLOYED}
+        />
+      </StandardProvider>
     </ScriptureProvider>
   );
 }
