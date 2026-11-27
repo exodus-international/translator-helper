@@ -7,6 +7,7 @@
 
 import type { EditorView } from '@codemirror/view';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import { StandardTranslationDialog } from '@/components/standard-translation-dialog';
 import { getStandardTranslationsForDocumentAction } from '@/domain/standard-translation/standard-translation.actions';
 import type { StandardTranslationEditorEntry } from '@/domain/standard-translation/standard-translation.repository';
@@ -52,9 +53,15 @@ export function StandardProvider({
     if (!languageId) return;
     let cancelled = false;
     load({ documentId, languageId }).then(
+      // Null for someone outside the language's team: no tools.
       (data) => !cancelled && setLoaded({ key, data }),
-      // Not on the language's team, or the entries could not be read: no tools, rather than an error over the editor.
-      () => !cancelled && setLoaded({ key, data: null }),
+      (error) => {
+        if (cancelled) return;
+        console.error('Standard translations could not be read', error);
+        // A re-read that fails keeps the entries already on screen; a first read leaves the editor without the tools.
+        setLoaded((current) => (current?.key === key && current.data ? current : { key, data: null }));
+        if (attempt > 0) toast.error('The standard translations could not be refreshed; reload the page to see the latest.');
+      },
     );
     return () => {
       cancelled = true;
