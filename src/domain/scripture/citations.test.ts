@@ -7,6 +7,7 @@ import {
   findQuotedText,
   formatInlineQuote,
   formatReading,
+  readingLayout,
   plainText,
   untaggedReading,
   type Citation,
@@ -126,8 +127,9 @@ test('a quotation too far from the citation is not its text', () => {
 });
 
 test('readings and quotations are written as Markdown', () => {
-  assert.equal(formatReading(['A *b*.', 'C  d.'], true), '*A \\*b\\*.\nC d.*');
-  assert.equal(formatReading(['A.', 'B.'], false), '*A. B.*');
+  assert.equal(formatReading(['A *b*.', 'C  d.'], readingLayout(['*x', 'y*'])), '*A \\*b\\*.\nC d.*');
+  assert.equal(formatReading(['A.', 'B.'], readingLayout(['*x y*'])), '*A. B.*');
+  assert.equal(formatReading(['A.', 'B.'], []), '*A. B.*');
   assert.equal(formatInlineQuote(['A_b', 'c.']), 'A\\_b c.');
   assert.equal(plainText('*A \\*b\\* <br> c*'), 'A *b* c');
 });
@@ -169,4 +171,37 @@ test('untaggedReading is the one "A Reading" text of a day whose verse_tag is em
   assert.equal(untaggedReading(`---\nverse_tag: Romans 8:35-39\n---\n${body}`), null);
   assert.equal(untaggedReading(`${body}\n# A Reading from Exodus\n\n*More*\n`), null);
   assert.equal(untaggedReading('# A Reading from Romans\n\nNot italic.\n'), null);
+});
+
+test('a reading keeps the paragraphs of the document', () => {
+  const layout = readingLayout(['*One two three four. Five six.*', '', '*Seven eight nine ten.*']);
+  const english = ['One two three four.', 'Five six.', 'Seven eight nine ten.'];
+  assert.equal(formatReading(['Jedna.', 'Dva.', 'Tři.'], layout, english), '*Jedna. Dva.*\n\n*Tři.*');
+});
+
+test('a reading keeps the stanzas and <br> line breaks of the document', () => {
+  const layout = readingLayout([
+    '*Praise the Lord! <br>',
+    'For it is good to sing. <br>',
+    'The Lord builds up Jerusalem.*',
+    '',
+    '*He heals the brokenhearted, <br>',
+    'he gives them names.*',
+  ]);
+  const english = ['Praise the Lord! For it is good to sing.', 'The Lord builds up Jerusalem.', 'He heals the brokenhearted,', 'he gives them names.'];
+  assert.equal(
+    formatReading(['A.', 'B.', 'C.', 'D.'], layout, english),
+    '*A. <br>\nB.*\n\n*C. <br>\nD.*',
+  );
+});
+
+test('a paragraph break inside a verse moves to the nearest verse boundary', () => {
+  const layout = readingLayout(['*One two three four five.*', '', '*Six. Seven eight nine ten.*']);
+  assert.equal(formatReading(['A.', 'B.'], layout, ['One two three four five six.', 'Seven eight nine ten.']), '*A.*\n\n*B.*');
+});
+
+test('a reading whose Bibles count the verses differently still fills every paragraph once', () => {
+  const layout = readingLayout(['*One two.*', '', '*Three four.*']);
+  assert.equal(formatReading(['A.', 'B.', 'C.', 'D.'], layout, ['One two.', 'Three four.']), '*A. B.*\n\n*C. D.*');
+  assert.equal(formatReading(['A.'], layout, ['One two.', 'Three four.']), '*A.*');
 });

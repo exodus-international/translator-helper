@@ -122,7 +122,7 @@ export interface PassageResult {
   rendered?: string;
   verses?: Array<{ text: string }>;
   notes?: string[];
-  source?: { text?: string };
+  source?: { text?: string; verses?: Array<{ text: string }> };
 }
 
 type Resolved = PassageResult & { rendered: string; verses: Array<{ text: string }> };
@@ -156,9 +156,16 @@ const noIdentify: PassageIdentify = async () => null;
 
 // ─── Text ─────────────────────────────────────────────────
 
-/** The reading as an italic block, a verse per line when the source had one. */
-const formatResolvedReading = (passage: Resolved, linePerVerse: boolean) =>
-  formatReading(passage.verses.map((v) => v.text), linePerVerse);
+/**
+ * The reading as italic text, in the paragraphs and line breaks of the source.
+ * The RSV-CE verses say which verses each source paragraph holds.
+ */
+const formatResolvedReading = (passage: Resolved, reading: Reading) =>
+  formatReading(
+    passage.verses.map((v) => v.text),
+    reading.layout,
+    passage.source?.verses?.map((v) => v.text),
+  );
 
 // ─── Preparing and restoring ──────────────────────────────
 
@@ -278,7 +285,7 @@ export async function prepareScripture(
         `${reading.citation}: the English reading is shortened or from another translation. The full ${result.rendered} was inserted; trim it to match.`,
       );
     }
-    placed.push({ key: fill(formatResolvedReading(result, reading.linePerVerse), `the reading ${result.rendered}`), reading });
+    placed.push({ key: fill(formatResolvedReading(result, reading), `the reading ${result.rendered}`), reading });
   }
   const body = [...lines];
   for (const { key, reading } of placed.sort((a, b) => b.reading.start - a.reading.start)) {

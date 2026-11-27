@@ -210,7 +210,7 @@ function checkQuote(
     similarity: similarity(quote.plain, official),
     matches,
     diff: matches ? [] : diffWords(quote.plain, official),
-    replacement: quote.kind === 'reading' ? formatReading(verses, quote.linePerVerse) : formatInlineQuote(verses),
+    replacement: quote.kind === 'reading' ? formatReading(verses, quote.layout) : formatInlineQuote(verses),
   };
 }
 

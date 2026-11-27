@@ -94,7 +94,39 @@ export interface Reading {
   end: number;
   /** The source prints a verse per line rather than one paragraph. */
   linePerVerse: boolean;
+  /** How the source sets the text: its paragraphs and line breaks. */
+  layout: ReadingBlock[];
   text: string;
+}
+
+/** One paragraph or stanza of a reading: the lines between two blank lines. */
+export interface ReadingBlock {
+  lines: number;
+  words: number;
+  /** The `<br>` the block ends its lines with, as written; null when it has none. */
+  lineBreak: string | null;
+}
+
+const LINE_BREAK = /<br\s*\/?>/i;
+
+/** The paragraphs and stanzas of a reading, from its lines as written. */
+export function readingLayout(lines: string[]): ReadingBlock[] {
+  const blocks: ReadingBlock[] = [];
+  let open: ReadingBlock | null = null;
+  for (const line of lines) {
+    if (!line.trim()) {
+      open = null;
+      continue;
+    }
+    if (!open) {
+      open = { lines: 0, words: 0, lineBreak: null };
+      blocks.push(open);
+    }
+    open.lines++;
+    open.words += words(plainText(line)).length;
+    open.lineBreak ??= line.match(LINE_BREAK)?.[0] ?? null;
+  }
+  return blocks;
 }
 
 const READING_END = /^\s*(?:#{1,6}\s|<span\b|(?:-{3,}|\*{3,})\s*$)/;
@@ -113,15 +145,68 @@ export function readingAfter(lines: string[], citation: string, line: number): R
     if (lines[i].trim()) end = i + 1;
   }
   const text = lines.slice(start, end).filter((l) => l.trim());
-  return { citation, start, end, linePerVerse: text.length > 1, text: text.join(' ') };
+  return {
+    citation,
+    start,
+    end,
+    linePerVerse: text.length > 1,
+    layout: readingLayout(lines.slice(start, end)),
+    text: text.join(' '),
+  };
 }
 
 const escapeMarkdown = (text: string) => text.replace(/([\\*_`])/g, '\\$1');
 
-/** Verses as an italic reading block, a verse per line when the document had one. */
-export function formatReading(verses: string[], linePerVerse: boolean): string {
-  const lines = verses.map((v) => escapeMarkdown(v.replace(/\s+/g, ' ').trim()));
-  return `*${lines.join(linePerVerse ? '\n' : ' ')}*`;
+/** The share of the words that lies before each cut: `[0, …, 1]`, one entry more than `sizes`. */
+function shares(sizes: number[]): number[] {
+  const total = sizes.reduce((sum, n) => sum + n, 0);
+  let sum = 0;
+  return [0, ...sizes.map((n) => (total ? (sum += n) / total : 1))];
+}
+
+/**
+ * How many of `count` verses are printed by the end of each block. A block
+ * ends at the verse boundary nearest to where it ends in `weights`, the same
+ * passage in the language of the layout; a block never ends inside a verse.
+ */
+function blockEnds(layout: ReadingBlock[], weights: string[], count: number): number[] {
+  const blockAt = shares(layout.map((b) => b.words));
+  const verseAt = shares(weights.map((w) => words(w).length));
+  let from = 0;
+  return layout.map((_, i) => {
+    if (i === layout.length - 1) return count;
+    let nearest = from;
+    for (let k = from; k < verseAt.length; k++) {
+      if (Math.abs(verseAt[k] - blockAt[i + 1]) < Math.abs(verseAt[nearest] - blockAt[i + 1])) nearest = k;
+    }
+    from = nearest;
+    // The two Bibles may count the passage's verses differently.
+    return weights.length === count ? nearest : Math.round((nearest * count) / weights.length);
+  });
+}
+
+/**
+ * Verses as an italic reading, set like `layout`: the same paragraphs and
+ * stanzas, a verse per line where the document breaks lines (with its `<br>`
+ * when it uses one), a paragraph otherwise. An empty layout is one paragraph.
+ *
+ * `weights` is the passage verse by verse in the language of the layout, when
+ * `verses` is in another: it says which verses each paragraph holds.
+ */
+export function formatReading(verses: string[], layout: ReadingBlock[], weights: string[] = verses): string {
+  const text = verses.map((v) => escapeMarkdown(v.replace(/\s+/g, ' ').trim()));
+  const blocks = layout.length ? layout : [{ lines: 1, words: 0, lineBreak: null }];
+  const ends = blockEnds(blocks, weights, text.length);
+  const out: string[] = [];
+  let from = 0;
+  blocks.forEach((block, i) => {
+    const part = text.slice(from, ends[i]);
+    from = Math.max(from, ends[i]);
+    if (part.length === 0) return;
+    const separator = block.lineBreak ? ` ${block.lineBreak}\n` : block.lines > 1 ? '\n' : ' ';
+    out.push(`*${part.join(separator)}*`);
+  });
+  return out.join('\n\n');
 }
 
 /** Official text for inside a quotation: one line, Markdown escaped. */
@@ -150,6 +235,8 @@ export interface QuotedText {
   plain: string;
   /** A reading printed a verse per line. */
   linePerVerse: boolean;
+  /** A reading's paragraphs and line breaks. */
+  layout: ReadingBlock[];
 }
 
 // Closing mark → the opening marks it closes, for English, Croatian, German,
@@ -188,7 +275,7 @@ function isCitationLine(line: string, citation: string): boolean {
 
 function quoted(text: string, from: number, to: number, kind: QuotedText['kind'], linePerVerse = false): QuotedText {
   const raw = text.slice(from, to);
-  return { kind, from, to, raw, plain: plainText(raw), linePerVerse };
+  return { kind, from, to, raw, plain: plainText(raw), linePerVerse, layout: readingLayout(raw.split('\n')) };
 }
 
 /**

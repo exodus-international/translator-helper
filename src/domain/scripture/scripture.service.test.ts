@@ -416,3 +416,43 @@ test('prepareScripture does not look for a reading by its text when the language
   assert.equal(searched, 0);
   assert.deepEqual(scripture.restore('draft'), { content: 'draft', notices: [] });
 });
+
+test('prepareScripture sets a reading in the paragraphs and line breaks of the source', async () => {
+  const psalm = ['Praise the Lord! For it is good to sing praises to our God;', 'The Lord builds up Jerusalem;', 'He heals the brokenhearted,', 'He determines the number of the stars,'];
+  const isaiah = ['Yes, O people in Zion, you shall weep no more.', 'And your ears shall hear a word behind you.', 'And he will give rain for the seed.'];
+  const source = `# Responsorial Psalm
+<span style="display:block;color:#CC0000;" data-read="false">Psalm 147:1-4</span>
+
+*Praise the Lord! <br>
+For it is good to sing praises to our God; <br>
+The Lord builds up Jerusalem;*
+
+*He heals the brokenhearted, <br>
+He determines the number of the stars,*
+
+---
+
+# A Reading from the Book of the Prophet Isaiah
+<span style="display:block;color:#CC0000;" data-read="false">Isaiah 30:19-20, 23</span>
+
+*${isaiah[0]} ${isaiah[1]}*
+
+*${isaiah[2]}*
+`;
+  const passage = (ref: string, rendered: string, english: string[]): PassageResult => ({
+    ref,
+    status: 'ok',
+    rendered,
+    verses: english.map((_, i) => ({ text: `${rendered} v${i + 1}.` })),
+    source: { text: english.join(' '), verses: english.map((text) => ({ text })) },
+  });
+  const { lookup } = fromTable({
+    'Psalm 147:1-4': passage('Psalm 147:1-4', 'Ž 147,1-4', psalm),
+    'Isaiah 30:19-20, 23': passage('Isaiah 30:19-20, 23', 'Iz 30,19-20.23', isaiah),
+  });
+  const scripture = await prepareScripture(source, 'cs', lookup);
+  const { content } = scripture.restore(scripture.content);
+
+  assert.ok(content.includes('*Ž 147,1-4 v1. <br>\nŽ 147,1-4 v2.*\n\n*Ž 147,1-4 v3. <br>\nŽ 147,1-4 v4.*\n\n---'));
+  assert.ok(content.includes('*Iz 30,19-20.23 v1. Iz 30,19-20.23 v2.*\n\n*Iz 30,19-20.23 v3.*'));
+});
