@@ -28,7 +28,7 @@ function insertEdit(doc: string, citation: Citation, verses: string[], language:
   const lineEnd = newline === -1 ? doc.length : newline;
   const line = doc.slice(lineStart, lineEnd);
   const alone = !/[\p{L}\p{N}]/u.test(line.replace(citation.raw, ' ').replace(/<[^>]*>/g, ' '));
-  if (alone) return { from: lineEnd, to: lineEnd, insert: `\n\n${formatReading(verses, false)}`, expected: '' };
+  if (alone) return { from: lineEnd, to: lineEnd, insert: `\n\n${formatReading(verses, [])}`, expected: '' };
   const [open, close] = QUOTE_MARKS[language] ?? ['“', '”'];
   return { from: citation.to, to: citation.to, insert: ` ${open}${formatInlineQuote(verses)}${close}`, expected: '' };
 }

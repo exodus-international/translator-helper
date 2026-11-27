@@ -141,6 +141,8 @@ describe('resolvePassage (bible-api data)', { skip }, async () => {
     const r = await resolve('John 3:16', hr, { ...DEFAULT_INCLUDE, source: true })
     assert.equal(r.source?.rendered, 'John 3:16')
     assert.ok(r.source?.text?.startsWith('For God so loved the world'))
+    // AI translation lays a reading out by these verses.
+    assert.deepEqual(r.source?.verses?.map((v) => v.id), ['JHN.3.16'])
   })
 
   test('validateReference normalizes to the source convention', async () => {
