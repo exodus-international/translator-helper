@@ -53,8 +53,9 @@ upload ─▶ AI Translating ─▶ In Review ─▶ AI Preparing Audio ─▶ A
    refused, and the step retried, when the voice changed or a pause went
    missing. It is stored as an edited audio text, so the Audio text tab shows
    it.
-4. **Audio Review.** One person checks the Audio text tab, edits it if needed,
-   and chooses **Approve audio text** in the status menu. Text edits made here
+4. **Audio Review.** One person opens the Audio text tab (**Open the audio
+   text** in the AI workflow panel), edits it if needed, and presses
+   **Approve audio text** in the panel. The status menu has the same move. Text edits made here
    do not send the document back: the team trusts that they are for the audio.
 5. **Approved.** Approval starts the recording, as in the manual workflow. The
    app waits for the recording to finish, then checks the document: a YAML
@@ -66,6 +67,44 @@ upload ─▶ AI Translating ─▶ In Review ─▶ AI Preparing Audio ─▶ A
 A document that gets no audio (the language has no voice, or the project does
 not record that document type) skips steps 3 and 4: the second text approval
 moves it straight to Approved.
+
+## Who does what, in the editor
+
+The AI workflow panel in the editor's sidebar lists the steps in order, each
+tagged with who does it: **AI** for the draft and the audio text, **Team** for
+the two reviews, **App** for the recording, the deploy and the merge. A done
+step keeps what it left behind: how many notes the AI wrote, and who approved
+the text. The step the document stands on holds its action, so **Approve
+text**, **Approve audio text** and **Retry** are all in the one place. A
+document that gets no audio shows three steps, without the two audio ones.
+
+An AI-workflow document has no translator, reviewer or deadline rows in the
+sidebar. Nobody is assigned in this workflow, so those rows only ever read "AI
+Translator", "Not assigned" and "Not set".
+
+## The board
+
+A project's board follows the workflow of the language it shows. A language in
+the AI workflow has four columns: In Review, Audio Review, Approved and
+Deployed. A document there is drafted as soon as it is uploaded, so the board
+starts at the first step that waits on a person. The draft the AI is still
+writing shows in In Review, tagged "AI: Drafting", for the few minutes it
+takes. The AI preparing the audio text and the check after it share the Audio
+Review column.
+
+Two columns come back while something sits in them, so no document drops off
+the board. Not Started holds a document uploaded before the language switched,
+which waits for its manager to hand it to the AI. In Progress holds a version
+a translator started in the manual workflow before the switch.
+
+A manual language keeps its five columns, and an AI version on such a board
+sits in the column its step stands in for.
+
+Each AI card carries a tag that says who it waits on: "AI: Drafting",
+"Team: 1/2 approvals", "AI: Preparing audio", "Team: Audio check",
+"App: Deploying". A person can drag an AI card only where the status menu
+would let them move it: from Audio Review to Approved, and between Approved
+and Deployed.
 
 ## When a step fails
 
@@ -154,5 +193,7 @@ language, so it cannot sign in and never shows in a team.
 - `src/domain/ai-workflow/ai-workflow.llm.ts`: the two prompts.
 - `src/domain/ai-workflow/ai-workflow.runtime.ts`: the real wiring and the
   sweep.
+- `src/domain/ai-workflow/ai-workflow.steps.ts`: the steps the panel lists, who
+  does each one, and which one a status stands on.
 - `src/components/ai-workflow-panel.tsx`: the editor panel.
 - `e2e/features/ai-workflow.feature`: the scenario from AI draft to deploy.
