@@ -19,6 +19,7 @@ import {
   deleteStandardTranslation,
   getMoveConflict,
   getStandardTranslationById,
+  listEntriesForTranslation,
   listStandardTranslations,
   moveStandardTranslationToGeneral,
   updateStandardTranslation,
@@ -512,6 +513,39 @@ describe('moveStandardTranslationToGeneral', () => {
       const general = await d.add({ sourceText: 'Glory Be' });
       await assert.rejects(moveStandardTranslationToGeneral(general.id, undefined, d.user.id), /already applies to all projects/);
     } finally {
+      await d.cleanup();
+    }
+  });
+});
+
+describe('listEntriesForTranslation', () => {
+  it("gives a document the general entries and its own project's, never another project's", async () => {
+    const d = await dictionary();
+    try {
+      await d.add({ sourceText: 'Glory Be' });
+      await d.add({ sourceText: 'Amen', sourceProjectId: d.alpha.id });
+      await d.add({ sourceText: 'Our Father', sourceProjectId: d.beta.id });
+      await d.add({ sourceText: 'Hail Mary', sourceProjectId: d.done.id });
+
+      const sources = async (projectId: string | null) =>
+        (await listEntriesForTranslation(d.language.id, projectId)).map((entry) => entry.sourceText).sort();
+
+      assert.deepEqual(await sources(d.alpha.id), ['Amen', 'Glory Be']);
+      assert.deepEqual(await sources(d.done.id), ['Glory Be', 'Hail Mary']);
+      assert.deepEqual(await sources(null), ['Glory Be']);
+    } finally {
+      await d.cleanup();
+    }
+  });
+
+  it("leaves out other languages' entries", async () => {
+    const d = await dictionary();
+    const other = await dictionary();
+    try {
+      await other.add({ sourceText: 'Glory Be' });
+      assert.deepEqual(await listEntriesForTranslation(d.language.id, null), []);
+    } finally {
+      await other.cleanup();
       await d.cleanup();
     }
   });
