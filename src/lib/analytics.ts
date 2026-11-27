@@ -119,6 +119,11 @@ export type AnalyticsEvent =
   | 'source_project_updated'
   | 'source_project_deleted'
   | 'source_project_status_toggled'
+  // ── Standard translations ───────────────────────────────────────────
+  | 'standard_translation_created'
+  | 'standard_translation_updated'
+  | 'standard_translation_deleted'
+  | 'standard_translation_moved'
   | 'translation_project_created'
   | 'project_settings_saved'
   | 'language_member_added'

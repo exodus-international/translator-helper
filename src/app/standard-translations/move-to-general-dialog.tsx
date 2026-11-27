@@ -17,6 +17,7 @@ import {
 import { moveStandardTranslationToGeneralAction } from '@/domain/standard-translation/standard-translation.actions';
 import type { StandardTranslationRow } from '@/domain/standard-translation/standard-translation.repository';
 import type { MoveKeep } from '@/domain/standard-translation/standard-translation.types';
+import { capture } from '@/lib/analytics';
 import { entryLabel } from './entry-label';
 
 /** A project entry about to become general, and the general entry with the same source, if any. */
@@ -54,6 +55,7 @@ export function MoveToGeneralDialog({
     setMoving(true);
     try {
       await move(pending.entry.id, keep ? { keep } : {});
+      capture('standard_translation_moved', { kept: keep ?? 'project' });
       toast.success(
         keep === 'general'
           ? `Kept the general standard translation of “${entryLabel(pending.conflict ?? pending.entry)}”`

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { BookMarked, MoreHorizontal, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { capture } from '@/lib/analytics';
 
 import { ListPagination } from '@/components/list-pagination';
 import { ListSearchInput } from '@/components/list-search-input';
@@ -113,6 +114,7 @@ export default function StandardTranslationsClient({
   const changeScope = (selection: ScopeSelection) => navigate({ scope: scopeParam(selection, projects), page: null });
 
   const handleSaved = () => {
+    capture(editing.target ? 'standard_translation_updated' : 'standard_translation_created');
     toast.success(editing.target ? 'Standard translation saved' : 'Standard translation added');
     editing.hide();
     router.refresh();
@@ -121,6 +123,7 @@ export default function StandardTranslationsClient({
   const handleDelete = async (entry: StandardTranslationRow) => {
     try {
       await deleteStandardTranslationAction(entry.id);
+      capture('standard_translation_deleted');
       toast.success(`“${entryLabel(entry)}” deleted`);
       router.refresh();
     } catch (error) {
