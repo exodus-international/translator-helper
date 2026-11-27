@@ -45,7 +45,7 @@ import type {
 import type { ScopeSelection } from '@/domain/standard-translation/standard-translation.types';
 import { formatExactDateTime, formatLastActive } from '@/lib/format';
 import { buildListSearchParams, DEFAULT_PAGE_SIZE } from '@/lib/list-params';
-import { entryLabel } from './entry-label';
+import { entryLabel } from '@/domain/standard-translation/entry-label';
 import { MoveToGeneralDialog, type PendingMove } from './move-to-general-dialog';
 import { scopeParam, withCompletedProjects } from './scope';
 import { ScopeFilter } from './scope-filter';

@@ -2,6 +2,7 @@ import { diffWords, similarity } from '@/domain/scripture/citations';
 // Scripture's threshold: below it, a line is another text, not a variant of the entry.
 import { MIN_SIMILARITY } from '@/domain/scripture/scripture.service';
 import { frontmatterBlock } from '@/lib/frontmatter';
+import { entryLabel } from './entry-label';
 import { renderInLayout, type LayoutNotice } from './layout';
 import { findOccurrences, type Occurrence } from './match';
 import { sourceKeyOf, stripLayout } from './match-form';
@@ -27,7 +28,6 @@ import { findTermOccurrences } from './stem';
 // A near miss on a shorter entry would mostly be noise: "Hail Mary" is like many short lines.
 const MIN_NEAR_MISS_WORDS = 4;
 const MAX_NEAR_MISS_PAIRS = 200_000;
-const MAX_LABEL_LENGTH = 60;
 
 const PLACEHOLDER_PREFIX = '{{std:';
 const PLACEHOLDERS = /\{\{std:\d+\}\}/g;
@@ -49,13 +49,6 @@ const unchanged = (content: string, notices: string[] = []): PreparedStandardTra
   prompt: '',
   restore: (translation) => ({ content: translation, notices }),
 });
-
-/** How a warning names an entry: its name, or the start of its source. */
-function labelOf(entry: StandardTranslationMatch): string {
-  if (entry.name) return entry.name;
-  const source = entry.sourceText.replace(/\s+/g, ' ').trim();
-  return source.length > MAX_LABEL_LENGTH ? `${source.slice(0, MAX_LABEL_LENGTH - 1)}…` : source;
-}
 
 const LAYOUT_WARNINGS: Record<LayoutNotice, (label: string) => string> = {
   'pause-moved': (label) => `A pause marker inside "${label}" was moved to its end; check where it belongs.`,
@@ -177,7 +170,7 @@ export function prepareStandardTranslations(
       write(translation.slice(at));
 
       for (const [key, { entry, lines, comments }] of fills) {
-        const label = labelOf(entry);
+        const label = entryLabel(entry);
         if (!filledKeys.has(key)) {
           restoreNotices.push(`The AI dropped the standard translation of "${label}"; add it where it belongs.`);
         } else if (lines === null) {
@@ -196,7 +189,7 @@ export function prepareStandardTranslations(
       const drafted = translation.replace(PLACEHOLDERS, '');
       for (const entry of terms.values()) {
         if (findTermOccurrences(drafted, entry.targetText).length === 0) {
-          restoreNotices.push(`The AI may not have used the standard term "${labelOf(entry)}".`);
+          restoreNotices.push(`The AI may not have used the standard term "${entryLabel(entry)}".`);
         }
       }
       return { content: filled, notices: restoreNotices };
@@ -262,7 +255,7 @@ function missedEntries(
     const inOriginal = new Set(findOccurrences(originalBody, entries).map((o) => o.entry.sourceKey));
     for (const key of [...missed.keys()].filter((key) => inOriginal.has(key))) {
       notices.push(
-        `"${labelOf(missed.get(key)!)}" contains a Scripture citation, so the Bible was used for it; the standard translation wasn't applied.`,
+        `"${entryLabel(missed.get(key)!)}" contains a Scripture citation, so the Bible was used for it; the standard translation wasn't applied.`,
       );
       missed.delete(key);
     }
@@ -383,7 +376,7 @@ function nearMisses(
     if (!best) continue;
     const changed = changedWords(best.key, entry.sourceKey);
     notices.push(
-      `"${labelOf(entry)}" looks like a standard translation but differs (${changed} word${changed === 1 ? '' : 's'}); the AI translated it.`,
+      `"${entryLabel(entry)}" looks like a standard translation but differs (${changed} word${changed === 1 ? '' : 's'}); the AI translated it.`,
     );
   }
   return notices;
