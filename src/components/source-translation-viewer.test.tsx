@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { EditorSelection, EditorState } from '@codemirror/state';
+import type { EditorView } from '@codemirror/view';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createRef, forwardRef, useImperativeHandle } from 'react';
-import { SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
+import { createRef, forwardRef, useImperativeHandle, useRef } from 'react';
+import { SourceProjectStatus, SuggestionStatus, SuggestionType } from '@/generated/prisma/enums';
 import type { SuggestionWithUser } from '@/domain/suggestion/suggestion.types';
 import { EditorProvider } from '@/lib/stores/editor-provider';
 import type { EditorStoreDeps } from '@/lib/stores/editor-store';
 import type { CodeEditorHandle } from './editor/code-editor';
 import { EditorImplementationProvider, type EditorComponent } from './editor/editor-implementation';
+import { StandardProvider } from './editor/standard-context';
 import { SourceTranslationViewer, type SourceTranslationViewerHandle } from './source-translation-viewer';
 
 /**
@@ -61,8 +64,13 @@ const openChange: SuggestionWithUser = {
 const SOURCE = '# The Call\n\nThe call came early.';
 const TRANSLATION = '# Poziv\n\nPoziv je dosao rano.';
 
-function Harness(props: Partial<React.ComponentProps<typeof SourceTranslationViewer>> & { viewerRef?: React.Ref<SourceTranslationViewerHandle> }) {
-  const { viewerRef, ...rest } = props;
+function Harness(
+  props: Partial<React.ComponentProps<typeof SourceTranslationViewer>> & {
+    viewerRef?: React.Ref<SourceTranslationViewerHandle>;
+    editor?: EditorComponent;
+  },
+) {
+  const { viewerRef, editor = textareaEditor, ...rest } = props;
   return (
     // The Markdown guide dialog inside the viewer reads the editor store, so the
     // store has to exist; nothing here reaches its actions.
@@ -79,7 +87,7 @@ function Harness(props: Partial<React.ComponentProps<typeof SourceTranslationVie
       audioTextVersionId={null}
       deps={{} as EditorStoreDeps}
     >
-      <EditorImplementationProvider editor={textareaEditor}>
+      <EditorImplementationProvider editor={editor}>
         <SourceTranslationViewer
           ref={viewerRef}
           variant="translate"
@@ -278,4 +286,127 @@ test('on a phone the translation pane opens the comments in one tap, with the op
   } finally {
     Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: desktopWidth });
   }
+});
+
+/**
+ * A textarea that also reports its selection, the way the code editor does,
+ * and answers for it with an editor state: what the selection toolbars read.
+ * It has nothing on screen to measure, so a toolbar is found but not placed.
+ */
+const selectingEditor: EditorComponent = forwardRef<CodeEditorHandle, Parameters<EditorComponent>[0]>(
+  function SelectingEditor({ value, onChange, readOnly, ariaLabel, onSelectionChange }, ref) {
+    const box = useRef<HTMLTextAreaElement>(null);
+    useImperativeHandle(ref, () => ({
+      editor: null,
+      get view() {
+        const textarea = box.current;
+        if (!textarea) return null;
+        return {
+          state: EditorState.create({
+            doc: textarea.value,
+            selection: EditorSelection.single(textarea.selectionStart, textarea.selectionEnd),
+          }),
+          coordsAtPos: () => null,
+          scrollDOM: textarea,
+          contentDOM: textarea,
+        } as unknown as EditorView;
+      },
+      fixAll: () => ({ fixed: 0, remaining: 0 }),
+    }));
+    return (
+      <textarea
+        ref={box}
+        aria-label={ariaLabel}
+        value={value}
+        readOnly={readOnly}
+        onChange={(event) => onChange?.(event.target.value)}
+        onSelect={(event) => {
+          const { selectionStart, selectionEnd } = event.currentTarget;
+          onSelectionChange?.(
+            selectionStart === selectionEnd
+              ? null
+              : { startLine: 1, startColumn: selectionStart + 1, endLine: 1, endColumn: selectionEnd + 1 },
+          );
+        }}
+      />
+    );
+  },
+);
+
+const croatian = { id: 'lang-hr', name: 'Croatian' };
+const exodus = { id: 'project-exodus', name: 'Exodus 90', status: SourceProjectStatus.ACTIVE, count: 0 };
+
+/**
+ * The viewer as the language's team sees it: entries loaded, so the standard
+ * translation tools are on. The provider renders the dialog, which has an
+ * editor of its own to stand in for.
+ */
+async function renderForTeam(props: React.ComponentProps<typeof Harness> = {}) {
+  render(
+    <EditorImplementationProvider editor={selectingEditor}>
+      <StandardProvider
+        documentId="doc-1"
+        language={croatian}
+        sourceContent={SOURCE}
+        load={async () => ({
+          entries: [],
+          projects: [exodus, { ...exodus, id: 'project-lent', name: 'Lent 2026' }],
+          sourceProjectId: exodus.id,
+        })}
+      >
+        <Harness editor={selectingEditor} {...props} />
+      </StandardProvider>
+    </EditorImplementationProvider>,
+  );
+  // The entries are read after the first render.
+  await act(async () => {});
+}
+
+/** Selects `text` in the source pane, as a drag over it would. */
+function selectInSource(text: string) {
+  const pane = sourcePane() as HTMLTextAreaElement;
+  const from = pane.value.indexOf(text);
+  pane.setSelectionRange(from, from + text.length);
+  fireEvent.select(pane);
+}
+
+const addStandard = () => screen.queryByRole('button', { name: 'Add standard translation' });
+
+test('a selection in the source offers to add it as a standard translation, starting from the same lines', async () => {
+  await renderForTeam();
+
+  selectInSource('The call came early.');
+  fireEvent.click(addStandard()!);
+
+  const dialog = await screen.findByRole('dialog');
+  assert.equal(
+    (within(dialog).getByLabelText('Source · English') as HTMLTextAreaElement).value,
+    'The call came early.',
+  );
+  assert.equal(
+    (within(dialog).getByLabelText('Standard translation · Croatian') as HTMLTextAreaElement).value,
+    'Poziv je dosao rano.',
+  );
+  assert.ok(within(dialog).getByText('Taken from line 3 of the translation. Check it before saving.'));
+  // As designed: it starts on all projects, and offers this document's project as the other choice.
+  assert.equal((within(dialog).getByRole('radio', { name: /All projects/ }) as HTMLInputElement).checked, true);
+  assert.equal((within(dialog).getByRole('radio', { name: /Only Exodus 90/ }) as HTMLInputElement).checked, false);
+  assert.equal(within(dialog).getAllByRole('radio').length, 2);
+});
+
+test('the source offers nothing for a selection with nothing selected, or to someone outside the team', async () => {
+  await renderForTeam();
+  selectInSource('');
+  assert.equal(addStandard(), null);
+  cleanup();
+
+  render(<Harness editor={selectingEditor} />);
+  selectInSource('The call came early.');
+  assert.equal(addStandard(), null);
+});
+
+test('a YAML source offers no standard translation for a selection', async () => {
+  await renderForTeam({ contentLanguage: 'yaml' });
+  selectInSource('The call came early.');
+  assert.equal(addStandard(), null);
 });

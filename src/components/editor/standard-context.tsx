@@ -125,10 +125,13 @@ export function StandardProvider({
 
   if (!value) return <>{children}</>;
   const prefill = dialog && 'prefill' in dialog ? dialog.prefill : null;
-  // Only a project the dialog offers can be where it starts.
-  const documentProject = value.projects.some((project) => project.id === value.sourceProjectId)
-    ? value.sourceProjectId
-    : null;
+  const editing = dialog && 'entry' in dialog ? dialog.entry : null;
+  // From a document the choice is the design's: all projects (where an entry
+  // starts) or this document's project, plus the project an edited entry
+  // already belongs to.
+  const offered = value.projects.filter(
+    (project) => project.id === value.sourceProjectId || project.id === editing?.sourceProjectId,
+  );
   return (
     <StandardContext.Provider value={value}>
       {children}
@@ -136,9 +139,9 @@ export function StandardProvider({
         open={dialog !== null}
         onOpenChange={(open) => !open && setDialog(null)}
         language={value.language}
-        projects={value.projects}
-        entry={dialog && 'entry' in dialog ? dialog.entry : null}
-        initial={prefill ? { ...prefill, sourceProjectId: documentProject } : undefined}
+        projects={offered}
+        entry={editing}
+        initial={prefill ? { ...prefill, sourceProjectId: null } : undefined}
         hint={prefill?.hint}
         onSaved={() => {
           setDialog(null);
