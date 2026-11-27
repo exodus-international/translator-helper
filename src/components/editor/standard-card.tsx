@@ -9,7 +9,7 @@ import type { StandardCheckItem } from '@/domain/standard-translation/standard-t
 import type { StandardTranslationEditorEntry } from '@/domain/standard-translation/standard-translation.repository';
 import { formatLastActive } from '@/lib/format';
 import { ArrowUpRight, Check, ChevronRight, Pencil, Replace, X } from 'lucide-react';
-import type { StandardHost } from './standard-context';
+import type { StandardHost } from './standard-host';
 import { diffLines } from './standard-lines';
 import { WordDiff } from './scripture-parts';
 
@@ -30,8 +30,6 @@ function standardEntryHref(entry: StandardTranslationEditorEntry, languageCode: 
 export interface StandardCardProps {
   item: StandardItem;
   host: StandardHost | null;
-  /** The target language's code, for the link to the entry. */
-  languageCode: string | null;
   /** The translation can't be changed here: no Use standard text. */
   readOnly: boolean;
   /** Opened by a click, so it stays until closed. */
@@ -45,7 +43,7 @@ export interface StandardCardProps {
  * the team's standard wording, how it differs when it is not, and the one
  * click that writes the standard text in, keeping each line's layout.
  */
-export function StandardCard({ item, host, languageCode, readOnly, pinned, onUse, onClose }: StandardCardProps) {
+export function StandardCard({ item, host, readOnly, pinned, onUse, onClose }: StandardCardProps) {
   if (!host) return null;
   const { entry } = item;
   const changed = item.state === 'changed';
@@ -144,7 +142,7 @@ export function StandardCard({ item, host, languageCode, readOnly, pinned, onUse
           variant="ghost"
           className="ml-auto"
           nativeButton={false}
-          render={<a href={standardEntryHref(entry, languageCode)} target="_blank" rel="noreferrer" />}
+          render={<a href={standardEntryHref(entry, host?.language.code ?? null)} target="_blank" rel="noreferrer" />}
         >
           {use ? 'Open' : 'Open in Standard translations'}
           <ArrowUpRight data-icon="inline-end" />

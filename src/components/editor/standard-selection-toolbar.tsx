@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { CodeEditorHandle } from './code-editor';
 import { standardPrefill } from './standard-selection-prefill';
-import { useStandardHost } from './standard-context';
+import { useStandardHost } from './standard-host';
 import { selectionBox, useFollowSelection, useToolbarPlacement, type SelectionBox } from './toolbar-placement';
 
 /**

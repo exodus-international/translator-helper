@@ -12,7 +12,7 @@ import { EditorDialogs } from '@/components/editor-dialogs';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { SourceTranslationViewer, SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { useScriptureHost } from '@/components/editor/scripture-context';
-import { useStandardHost } from '@/components/editor/standard-context';
+import { useStandardHost } from '@/components/editor/standard-host';
 import { Badge } from '@/components/ui/badge';
 import {
   Stepper,

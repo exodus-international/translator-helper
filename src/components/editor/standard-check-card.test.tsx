@@ -11,7 +11,7 @@ import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import type { EditorStoreDeps } from '@/lib/stores/editor-store';
 import { StandardCheckCard, useStandardCheck } from './standard-check-card';
 import type { StandardRowItem } from './standard-check-rows';
-import type { StandardHost } from './standard-context';
+import type { StandardHost } from './standard-host';
 
 /**
  * The standard translations card in the document panel: what it lists for
@@ -222,7 +222,7 @@ function CheckCount({ host }: { host: StandardHost | null }) {
 }
 
 const host = (sourceContent: string): StandardHost => ({
-  language: { id: 'lang-hr', name: 'Croatian' },
+  language: { id: 'lang-hr', code: 'hr', name: 'Croatian' },
   entries: [
     {
       id: 'entry-sign',

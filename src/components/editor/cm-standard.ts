@@ -19,7 +19,7 @@ import type { Edit } from '@/domain/scripture/scripture-check';
 import { buildStandardCheck } from '@/domain/standard-translation/standard-translation.check';
 import { applyEdits } from './cm-scripture';
 import { StandardCard, type StandardItem } from './standard-card';
-import type { StandardHost } from './standard-context';
+import type { StandardHost } from './standard-host';
 import { wordingSpans, type Span } from './standard-lines';
 
 /**
@@ -42,8 +42,6 @@ const SCROLL_SCAN_DELAY_MS = 120;
 export interface StandardExtensionConfig {
   /** Read at use, so the card sees the host as it is now. */
   host: () => StandardHost | null;
-  /** The target language's code, for the card's link to the entry. */
-  languageCode: () => string | null;
 }
 
 /** Asks the scanner to look again: the entries or the source changed. */
@@ -185,7 +183,6 @@ function cardTooltip(found: Found, config: StandardExtensionConfig, pinned: bool
         createElement(StandardCard, {
           item: found.item,
           host,
-          languageCode: config.languageCode(),
           readOnly: view.state.readOnly || !host?.editable,
           pinned,
           onUse: (edit: Edit) => {

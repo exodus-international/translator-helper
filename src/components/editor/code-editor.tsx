@@ -29,7 +29,7 @@ import { editorHighlighting, editorTheme } from './cm-theme';
 import { rescanScripture, scriptureExtension } from './cm-scripture';
 import { useScriptureHost } from './scripture-context';
 import { rescanStandard, standardExtension } from './cm-standard';
-import { useStandardHost } from './standard-context';
+import { useStandardHost } from './standard-host';
 
 const setHighlightLine = StateEffect.define<number | null>();
 
@@ -450,9 +450,6 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
         standardEnabled
           ? standardExtension({
               host: () => standardRef.current,
-              // The Standard translations page selects a language by its code,
-              // which only the Scripture host carries.
-              languageCode: () => scriptureRef.current?.language || null,
             })
           : [],
       ),

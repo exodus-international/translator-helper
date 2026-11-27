@@ -12,7 +12,7 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { applyEdits, revealRange } from './cm-scripture';
 import { applyToText, standardRowDetail, standardRowName, type StandardRowItem } from './standard-check-rows';
-import type { StandardHost } from './standard-context';
+import type { StandardHost } from './standard-host';
 
 /**
  * The standard translation check of the translation as it is now: every

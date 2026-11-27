@@ -97,7 +97,7 @@ export default function TranslateClient({
     >
       <StandardProvider
         documentId={document.id}
-        language={targetLanguage ? { id: targetLanguageId, name: targetLanguage.name } : null}
+        language={targetLanguage ? { id: targetLanguageId, code: targetLanguage.code, name: targetLanguage.name } : null}
         sourceContent={sourceVersion?.content ?? ''}
       >
         <DocumentEditor

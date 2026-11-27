@@ -333,7 +333,7 @@ const selectingEditor: EditorComponent = forwardRef<CodeEditorHandle, Parameters
   },
 );
 
-const croatian = { id: 'lang-hr', name: 'Croatian' };
+const croatian = { id: 'lang-hr', code: 'hr', name: 'Croatian' };
 const exodus = { id: 'project-exodus', name: 'Exodus 90', status: SourceProjectStatus.ACTIVE, count: 0 };
 
 /**

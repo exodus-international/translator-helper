@@ -8,7 +8,7 @@ import { sourceKeyOf } from '@/domain/standard-translation/match-form';
 import { buildStandardCheck } from '@/domain/standard-translation/standard-translation.check';
 import type { StandardTranslationEditorEntry } from '@/domain/standard-translation/standard-translation.repository';
 import { StandardCard, type StandardCardProps, type StandardItem } from './standard-card';
-import type { StandardHost } from './standard-context';
+import type { StandardHost } from './standard-host';
 
 /**
  * The card over a standard translation in the translation editor: what it
@@ -76,7 +76,7 @@ function itemOf(e: StandardTranslationEditorEntry): StandardItem {
 function renderCard(props: Partial<StandardCardProps> & { item: StandardItem }) {
   const calls = { use: [] as Edit[], edit: [] as StandardTranslationEditorEntry[], close: 0 };
   const host: StandardHost = {
-    language: { id: 'hr', name: 'Croatian' },
+    language: { id: 'hr', code: 'hr', name: 'Croatian' },
     entries: [props.item.entry],
     projects: [],
     sourceProjectId: null,
@@ -91,7 +91,6 @@ function renderCard(props: Partial<StandardCardProps> & { item: StandardItem }) 
   render(
     <StandardCard
       host={host}
-      languageCode="hr"
       readOnly={false}
       pinned={false}
       onUse={(edit) => calls.use.push(edit)}

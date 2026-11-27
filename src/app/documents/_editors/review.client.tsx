@@ -76,7 +76,11 @@ export default function ReviewClient({
     >
       <StandardProvider
         documentId={document.id}
-        language={targetLanguage ? { id: initialTargetVersion.languageId, name: targetLanguage.name } : null}
+        language={
+            targetLanguage
+              ? { id: initialTargetVersion.languageId, code: targetLanguage.code, name: targetLanguage.name }
+              : null
+          }
         sourceContent={sourceVersion?.content ?? ''}
         editable={initialTargetVersion.status === DocumentStatus.PENDING_REVIEW}
       >

@@ -32,7 +32,7 @@ import { ThreadSidebar } from '../thread-sidebar';
 import { ScriptureCheckCard } from './scripture-check-card';
 import { useScriptureHost } from './scripture-context';
 import { StandardCheckCard, useStandardCheck } from './standard-check-card';
-import { useStandardHost } from './standard-context';
+import { useStandardHost } from './standard-host';
 
 export interface DocumentPanelProps {
   /** Folded, the panel is a rail; this is what the rail says and offers. */
@@ -265,8 +265,7 @@ export function DocumentPanel({
             <StandardCheckCard
               host={standard}
               items={standardItems}
-              // The Scripture host is the page's one source of the language's code.
-              languageCode={scripture?.language || null}
+              languageCode={standard.language.code}
               open={standardOpen}
               onOpenChange={setStandardOpen}
             />
