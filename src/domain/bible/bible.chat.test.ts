@@ -45,29 +45,31 @@ function backend(overrides: Partial<BibleBackend> = {}): BibleBackend & { resolv
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
+// Replies in the shape of the Responses API: a list of output items.
 const toolCall = (id: string, name: string, args: unknown) => ({
-  choices: [
-    {
-      message: {
-        content: null,
-        tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }],
-      },
-    },
-  ],
+  output: [{ type: 'function_call', call_id: id, name, arguments: JSON.stringify(args) }],
 });
 
-const answer = (content: string) => ({ choices: [{ message: { content } }] });
+const answer = (content: string) => ({
+  output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: content }] }],
+});
+
+type InputItem = { role?: string; type?: string; content?: string; call_id?: string; name?: string; output?: string };
+const inputOf = (body: Record<string, unknown>) => body.input as InputItem[];
+const toolOutput = (body: Record<string, unknown>) => inputOf(body).find((i) => i.type === 'function_call_output')!;
 
 /** A fetch that answers from a script and records what it was sent. */
 function scripted(replies: Array<(body: Record<string, unknown>) => Response>) {
   const bodies: Array<Record<string, unknown>> = [];
-  const fetchFn = (async (_url: string | URL | Request, init?: RequestInit) => {
+  const urls: string[] = [];
+  const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    urls.push(String(url));
     bodies.push(body);
     const reply = replies[Math.min(bodies.length - 1, replies.length - 1)]!;
     return reply(body);
   }) as typeof fetch;
-  return { fetchFn, bodies };
+  return { fetchFn, bodies, urls };
 }
 
 async function collect(gen: AsyncGenerator<ChatEvent>) {
@@ -76,10 +78,11 @@ async function collect(gen: AsyncGenerator<ChatEvent>) {
   return events;
 }
 
-const deps = (fetchFn: typeof fetch, bible: BibleBackend, logs: unknown[] = []): ChatDeps => ({
+const deps = (fetchFn: typeof fetch, bible: BibleBackend, logs: unknown[] = [], model = 'gpt-4o-mini'): ChatDeps => ({
   fetch: fetchFn,
   bible,
-  env: { apiKey: 'test-key', endpoint: 'http://model.test/v1/chat/completions', model: 'gpt-4o-mini' },
+  // The endpoint AI Translate is configured with; the chat derives its own from it.
+  env: { apiKey: 'test-key', endpoint: 'http://model.test/v1/chat/completions', model },
   log: (message, detail) => logs.push([message, detail]),
 });
 
@@ -107,11 +110,15 @@ test('a tool round trip sends the official passage to the UI and the tool result
   assert.equal(bodies.length, 2);
   assert.ok(Array.isArray(bodies[0]!.tools));
   assert.equal(bodies[0]!.tool_choice, 'auto');
-  const second = bodies[1]!.messages as Array<{ role: string; content: string | null; tool_call_id?: string }>;
+  const second = inputOf(bodies[1]!);
   assert.equal(second[0]!.role, 'system');
-  const tool = second.find((m) => m.role === 'tool')!;
-  assert.equal(tool.tool_call_id, 'call_1');
-  const content = JSON.parse(tool.content!);
+  // The model's own call goes back ahead of its result, or the result has nothing to answer.
+  const call = second.find((i) => i.type === 'function_call')!;
+  assert.deepEqual(call, { type: 'function_call', call_id: 'call_1', name: 'resolve_passages', arguments: '{"refs":["John 3:16"]}' });
+  const tool = toolOutput(bodies[1]!);
+  assert.equal(tool.call_id, 'call_1');
+  assert.ok(second.indexOf(call) < second.indexOf(tool));
+  const content = JSON.parse(tool.output!);
   assert.equal(content.passages[0].citation, 'Iv 3,16');
   assert.equal(content.passages[0].text, OFFICIAL);
 });
@@ -158,18 +165,81 @@ test('a network failure is reported the same way', async () => {
   );
 });
 
-test('streamed replies yield text as it arrives and assemble tool calls', async () => {
-  const sse = (chunks: unknown[]) =>
-    new Response(chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n', {
-      headers: { 'Content-Type': 'text/event-stream' },
-    });
+const sse = (events: unknown[]) =>
+  new Response(events.map((e) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`).join(''), {
+    headers: { 'Content-Type': 'text/event-stream' },
+  });
+
+test('the request goes to the Responses endpoint, the only one where a reasoning model takes tools', async () => {
+  const { fetchFn, bodies, urls } = scripted([() => json(answer('ok'))]);
+  await collect(runBibleChat(ask('John 3:16'), deps(fetchFn, backend(), [], 'gpt-6.1-sol')));
+
+  assert.deepEqual(urls, ['http://model.test/v1/responses']);
+  const body = bodies[0]!;
+  assert.deepEqual(body.reasoning, { effort: 'low' });
+  // gpt-6 answers 400 to either of these.
+  assert.equal('temperature' in body, false);
+  assert.equal('reasoning_effort' in body, false);
+  assert.equal('messages' in body, false);
+  assert.equal(body.store, false);
+  const tools = body.tools as Array<Record<string, unknown>>;
+  assert.deepEqual(
+    tools.map((t) => [t.type, t.name]),
+    [
+      ['function', 'resolve_passages'],
+      ['function', 'search_bible'],
+      ['function', 'get_chapter'],
+      ['function', 'list_translations'],
+    ],
+  );
+  assert.ok(tools.every((t) => typeof t.description === 'string' && typeof t.parameters === 'object' && !('function' in t)));
+});
+
+test('a gpt-4 model gets a temperature and no reasoning', async () => {
+  const { fetchFn, bodies } = scripted([() => json(answer('ok'))]);
+  await collect(runBibleChat(ask('John 3:16'), deps(fetchFn, backend())));
+  assert.equal(bodies[0]!.temperature, 0.2);
+  assert.equal('reasoning' in bodies[0]!, false);
+});
+
+test('a stream the model fails half way is an error, and the detail is only logged', async () => {
+  const logs: unknown[] = [];
   const { fetchFn } = scripted([
     () =>
       sse([
-        { choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'resolve_', arguments: '{"refs":' } }] } }] },
-        { choices: [{ delta: { tool_calls: [{ index: 0, function: { name: 'passages', arguments: '["John 3:16"]}' } }] } }] },
+        { type: 'response.output_text.delta', delta: 'Iv ' },
+        { type: 'response.failed', response: { error: { code: 'server_error', message: 'upstream blew up' } } },
       ]),
-    () => sse([{ choices: [{ delta: { content: 'Iv ' } }] }, { choices: [{ delta: { content: '3,16' } }] }]),
+  ]);
+  const events = await collect(runBibleChat(ask('John 3:16'), deps(fetchFn, backend(), logs)));
+  assert.deepEqual(
+    events.map((e) => e.type),
+    ['text', 'error', 'done'],
+  );
+  assert.doesNotMatch((events[1] as Extract<ChatEvent, { type: 'error' }>).message, /upstream/);
+  assert.match(JSON.stringify(logs), /upstream blew up/);
+});
+
+test('streamed replies yield text as it arrives and assemble tool calls', async () => {
+  const { fetchFn } = scripted([
+    () =>
+      sse([
+        { type: 'response.created' },
+        { type: 'response.function_call_arguments.delta', delta: '{"refs":' },
+        { type: 'response.function_call_arguments.delta', delta: '["John 3:16"]}' },
+        {
+          type: 'response.output_item.done',
+          item: { type: 'function_call', id: 'fc_1', call_id: 'c1', name: 'resolve_passages', arguments: '{"refs":["John 3:16"]}' },
+        },
+        { type: 'response.completed' },
+      ]),
+    () =>
+      sse([
+        { type: 'response.output_text.delta', delta: 'Iv ' },
+        { type: 'response.output_text.delta', delta: '3,16' },
+        { type: 'response.output_item.done', item: { type: 'message', content: [{ type: 'output_text', text: 'Iv 3,16' }] } },
+        { type: 'response.completed' },
+      ]),
   ]);
 
   const events = await collect(runBibleChat(ask('John 3:16'), deps(fetchFn, backend())));
@@ -190,8 +260,7 @@ test('invalid tool arguments go back to the model as an error, not to the UI', a
     events.map((e) => e.type),
     ['text', 'done'],
   );
-  const tool = (bodies[1]!.messages as Array<{ role: string; content: string }>).find((m) => m.role === 'tool')!;
-  assert.match(tool.content, /Invalid arguments/);
+  assert.match(toolOutput(bodies[1]!).output!, /Invalid arguments/);
 });
 
 test('an unknown translation is refused before the model is called', async () => {
@@ -239,7 +308,7 @@ test('a search shows the verses it found and sends them to the model', async () 
   assert.deepEqual(events[0], { type: 'tool', name: 'search_bible', args: { query: 'ljubio svijet', translation: 'sar-hr', book: 'JHN' } });
   const passages = events.find((e) => e.type === 'passages') as Extract<ChatEvent, { type: 'passages' }>;
   assert.equal(passages.passages[0]!.text, OFFICIAL);
-  const tool = (bodies[1]!.messages as Array<{ role: string; content: string }>).find((m) => m.role === 'tool')!;
+  const tool = { content: toolOutput(bodies[1]!).output! };
   assert.equal(JSON.parse(tool.content).passages[0].citation, 'Iv 3,16');
 });
 
@@ -252,7 +321,7 @@ test('a search that finds nothing tells the model so', async () => {
   const events = await collect(runBibleChat(ask('Find nepostojeća riječ'), deps(fetchFn, backend())));
 
   assert.equal(events.some((e) => e.type === 'passages' && e.passages.length > 0), false);
-  const tool = (bodies[1]!.messages as Array<{ role: string; content: string }>).find((m) => m.role === 'tool')!;
+  const tool = { content: toolOutput(bodies[1]!).output! };
   assert.equal(JSON.parse(tool.content).note, 'No verse contains all of these words.');
 });
 
@@ -284,6 +353,6 @@ test('a chapter goes to the model with verse numbers and to the UI as one passag
   assert.deepEqual(asked, [['sar-hr', 'JHN', 3]]);
   const passages = events.find((e) => e.type === 'passages') as Extract<ChatEvent, { type: 'passages' }>;
   assert.equal(passages.passages[0]!.text, 'Prvi redak. Drugi redak.');
-  const tool = (bodies[1]!.messages as Array<{ role: string; content: string }>).find((m) => m.role === 'tool')!;
+  const tool = { content: toolOutput(bodies[1]!).output! };
   assert.equal(JSON.parse(tool.content).passages[0].text, '[1] Prvi redak. [2] Drugi redak.');
 });

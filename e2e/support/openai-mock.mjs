@@ -9,7 +9,8 @@
  *
  * It answers in the shape the service reads: choices[0].message.content.
  *
- * The Scripture chat sends `tools`. Its first turn (no tool results yet) gets
+ * The Scripture chat sends `tools` and talks to the Responses endpoint, so it
+ * is answered with `output` items. Its first turn (no tool results yet) gets
  * one `resolve_passages` call for John 3:16; once a tool result is in the
  * conversation it gets a short final answer. Requests without tools are
  * answered exactly as before.
@@ -25,25 +26,19 @@ export const STUB_TRANSLATION = 'AI STUB: preklad vygenerovany testom.';
 export const STUB_CHAT_ANSWER = 'AI STUB: the passage is shown below.';
 
 function chatReply(body) {
-  const messages = Array.isArray(body?.messages) ? body.messages : [];
-  if (messages.some((m) => m?.role === 'tool')) {
-    return { choices: [{ message: { role: 'assistant', content: STUB_CHAT_ANSWER }, finish_reason: 'stop' }] };
+  const input = Array.isArray(body?.input) ? body.input : [];
+  if (input.some((item) => item?.type === 'function_call_output')) {
+    return {
+      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: STUB_CHAT_ANSWER }] }],
+    };
   }
   return {
-    choices: [
+    output: [
       {
-        message: {
-          role: 'assistant',
-          content: null,
-          tool_calls: [
-            {
-              id: 'call_stub_1',
-              type: 'function',
-              function: { name: 'resolve_passages', arguments: JSON.stringify({ refs: ['John 3:16'] }) },
-            },
-          ],
-        },
-        finish_reason: 'tool_calls',
+        type: 'function_call',
+        call_id: 'call_stub_1',
+        name: 'resolve_passages',
+        arguments: JSON.stringify({ refs: ['John 3:16'] }),
       },
     ],
   };

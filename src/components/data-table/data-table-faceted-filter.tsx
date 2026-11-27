@@ -95,7 +95,7 @@ export function DataTableFacetedFilter<TData extends RowData, TValue>({
         ) : (
           <PlusCircle />
         )}
-        {title}
+        <span>{title}</span>
         {selectedValues?.size > 0 && (
           <>
             <Separator
