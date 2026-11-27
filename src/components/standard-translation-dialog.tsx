@@ -47,6 +47,15 @@ interface StandardTranslationProject {
   status: SourceProjectStatus;
 }
 
+export interface StandardTranslationInitial {
+  sourceText: string;
+  targetText: string;
+  /** The layout taken out of either text before it got here, which the dialog still owes a mention. */
+  removed?: LayoutPart[];
+  /** The project to limit it to; all projects without one. */
+  sourceProjectId?: string | null;
+}
+
 interface StandardTranslationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,6 +65,14 @@ interface StandardTranslationDialogProps {
   projects: StandardTranslationProject[];
   /** The entry to edit; without one the dialog adds a new entry. */
   entry?: StandardTranslationRow | null;
+  /**
+   * What a new entry starts from, when it is added from text picked out of a
+   * document rather than typed: the texts, already without their layout, what
+   * was taken out of them, and the scope. Ignored with an `entry`.
+   */
+  initial?: StandardTranslationInitial;
+  /** A line under the translation saying where its starting text came from. */
+  hint?: string | null;
   /** Called with what the action returned, once it is saved. */
   onSaved?: (saved: StandardTranslationRow) => void;
   /** The actions, replaceable so a test sees what would be sent. */
@@ -70,7 +87,9 @@ interface StandardTranslationDialogProps {
  *
  * An entry stores wording only: both texts go through `stripLayout` before
  * they are sent, and the dialog says what that leaves out as soon as the
- * typed text has any layout, rather than refusing to save.
+ * typed text has any layout, rather than refusing to save. Text picked out
+ * of a document arrives without its layout already (`initial`), so what was
+ * taken out of it is passed along for the same notice.
  */
 export function StandardTranslationDialog({ open, onOpenChange, ...props }: StandardTranslationDialogProps) {
   return (
@@ -87,6 +106,8 @@ function EntryForm({
   language,
   projects,
   entry,
+  initial,
+  hint,
   onSaved,
   onCancel,
   create = createStandardTranslationAction,
@@ -94,9 +115,10 @@ function EntryForm({
 }: Omit<StandardTranslationDialogProps, 'open' | 'onOpenChange'> & { onCancel: () => void }) {
   const id = useId();
   const [name, setName] = useState(entry?.name ?? '');
-  const [sourceText, setSourceText] = useState(entry?.sourceText ?? '');
-  const [targetText, setTargetText] = useState(entry?.targetText ?? '');
-  const [scope, setScope] = useState(entry?.sourceProject?.id ?? GENERAL);
+  const start = entry ? null : initial;
+  const [sourceText, setSourceText] = useState(entry?.sourceText ?? start?.sourceText ?? '');
+  const [targetText, setTargetText] = useState(entry?.targetText ?? start?.targetText ?? '');
+  const [scope, setScope] = useState((entry ? entry.sourceProject?.id : start?.sourceProjectId) ?? GENERAL);
   const [fixedForm, setFixedForm] = useState(entry?.fixedForm ?? false);
   const [note, setNote] = useState(entry?.note ?? '');
   const [saving, setSaving] = useState(false);
@@ -104,7 +126,7 @@ function EntryForm({
 
   const source = stripLayout(sourceText);
   const target = stripLayout(targetText);
-  const removed = [...new Set<LayoutPart>([...source.removed, ...target.removed])];
+  const removed = [...new Set<LayoutPart>([...(start?.removed ?? []), ...source.removed, ...target.removed])];
   const layoutNotice = describeRemovedLayout(removed);
   const complete = source.text.trim() !== '' && target.text.trim() !== '';
 
@@ -183,6 +205,7 @@ function EntryForm({
                 <MarkdownPreview content={target.text} className="prose h-40 overflow-y-auto rounded-md border p-3" />
               </TabsContent>
             </Tabs>
+            {hint && <FieldDescription>{hint}</FieldDescription>}
           </Field>
         </div>
 

@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { StandardTranslationDialog } from '@/components/standard-translation-dialog';
 import { getStandardTranslationsForDocumentAction } from '@/domain/standard-translation/standard-translation.actions';
 import type { StandardTranslationEditorEntry } from '@/domain/standard-translation/standard-translation.repository';
+import type { StandardPrefill } from './standard-selection-prefill';
 
 /**
  * What the standard translation tools in a translation editor share: the
@@ -35,7 +36,16 @@ export interface StandardHost {
   reportEditable: (editable: boolean) => void;
   /** Opens the dialog on an entry; on save the entries are read again. */
   editEntry: (entry: StandardTranslationEditorEntry) => void;
+  /**
+   * Opens the dialog on a new entry that starts from text picked out of the
+   * document, limited to the document's project; on save the entries are read
+   * again.
+   */
+  addEntry: (prefill: StandardPrefill) => void;
 }
+
+/** What the provider's dialog is open on, if anything. */
+type DialogState = { entry: StandardTranslationEditorEntry } | { prefill: StandardPrefill } | null;
 
 const StandardContext = createContext<StandardHost | null>(null);
 
@@ -48,6 +58,7 @@ export function StandardProvider({
   language,
   sourceContent,
   editable = true,
+  load = getStandardTranslationsForDocumentAction,
   children,
 }: {
   documentId: string;
@@ -55,11 +66,13 @@ export function StandardProvider({
   language: { id: string; name: string } | null;
   sourceContent: string;
   editable?: boolean;
+  /** The action that reads the entries, replaceable so a test can provide them. */
+  load?: typeof getStandardTranslationsForDocumentAction;
   children: ReactNode;
 }) {
   const [loaded, setLoaded] = useState<{ key: string; data: Loaded | null }>();
   const [view, setView] = useState<EditorView | null>(null);
-  const [editing, setEditing] = useState<StandardTranslationEditorEntry | null>(null);
+  const [dialog, setDialog] = useState<DialogState>(null);
   const [attempt, setAttempt] = useState(0);
   const [reportedEditable, reportEditable] = useState<boolean>();
   const canEdit = reportedEditable ?? editable;
@@ -70,7 +83,7 @@ export function StandardProvider({
   useEffect(() => {
     if (!languageId) return;
     let cancelled = false;
-    getStandardTranslationsForDocumentAction({ documentId, languageId }).then(
+    load({ documentId, languageId }).then(
       (data) => !cancelled && setLoaded({ key, data }),
       // Not on the language's team, or the entries could not be read: no tools, rather than an error over the editor.
       () => !cancelled && setLoaded({ key, data: null }),
@@ -78,9 +91,12 @@ export function StandardProvider({
     return () => {
       cancelled = true;
     };
-  }, [documentId, languageId, key, attempt]);
+  }, [documentId, languageId, key, attempt, load]);
 
   const data = loaded?.key === key ? loaded.data : null;
+
+  const editEntry = useCallback((entry: StandardTranslationEditorEntry) => setDialog({ entry }), []);
+  const addEntry = useCallback((prefill: StandardPrefill) => setDialog({ prefill }), []);
 
   const registerView = useCallback((next: EditorView) => {
     setView(next);
@@ -100,24 +116,32 @@ export function StandardProvider({
             registerView,
             editable: canEdit,
             reportEditable,
-            editEntry: setEditing,
+            editEntry,
+            addEntry,
           }
         : null,
-    [language, data, sourceContent, view, registerView, canEdit],
+    [language, data, sourceContent, view, registerView, canEdit, editEntry, addEntry],
   );
 
   if (!value) return <>{children}</>;
+  const prefill = dialog && 'prefill' in dialog ? dialog.prefill : null;
+  // Only a project the dialog offers can be where it starts.
+  const documentProject = value.projects.some((project) => project.id === value.sourceProjectId)
+    ? value.sourceProjectId
+    : null;
   return (
     <StandardContext.Provider value={value}>
       {children}
       <StandardTranslationDialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
+        open={dialog !== null}
+        onOpenChange={(open) => !open && setDialog(null)}
         language={value.language}
         projects={value.projects}
-        entry={editing}
+        entry={dialog && 'entry' in dialog ? dialog.entry : null}
+        initial={prefill ? { ...prefill, sourceProjectId: documentProject } : undefined}
+        hint={prefill?.hint}
         onSaved={() => {
-          setEditing(null);
+          setDialog(null);
           setAttempt((n) => n + 1);
         }}
       />
