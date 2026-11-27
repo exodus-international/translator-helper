@@ -88,7 +88,9 @@ const bible: BibleBackend = {
 };
 
 const model = (async () =>
-  Response.json({ choices: [{ message: { content: 'Iv 3,16.' } }] })) as unknown as typeof fetch;
+  Response.json({
+    output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Iv 3,16.' }] }],
+  })) as unknown as typeof fetch;
 
 const deps = { fetch: model, bible, env: { apiKey: 'test-key', endpoint: 'http://model.test', model: 'm' }, log: () => {} };
 
