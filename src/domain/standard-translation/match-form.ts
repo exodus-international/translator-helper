@@ -381,3 +381,16 @@ export function readLines(raw: string): LineLayout[] {
     };
   });
 }
+
+/**
+ * The emphasis inside wording, as the length of each delimiter run in order:
+ * "Pray, **Mother of God**, *now*" gives [2, 2, 1, 1]. `*` and `_` count
+ * alike: either spelling is the same formatting.
+ */
+export function emphasisOf(text: string): number[] {
+  const runs: number[] = [];
+  for (const run of text.matchAll(DELIMITER_RUN)) {
+    if (isDelimiter(text, run.index, run.index + run[0].length)) runs.push(run[0].length);
+  }
+  return runs;
+}
