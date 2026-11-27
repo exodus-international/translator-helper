@@ -1,9 +1,13 @@
 import { z } from 'zod';
+import { modelSamplingParams } from '@/domain/translation/translation.service';
 import type { PassageResult } from './bible.types';
 
 /**
- * The Scripture chat: a tool loop over the chat completions endpoint the AI
- * translation already uses (CHATGPT_API, CHATGPT_API_BASE_URL, CHATGPT_MODEL).
+ * The Scripture chat: a tool loop over the Responses endpoint, with the key,
+ * host and model the AI translation already uses (CHATGPT_API,
+ * CHATGPT_API_BASE_URL, CHATGPT_MODEL). It cannot share the translation's chat
+ * completions endpoint: there a reasoning model such as gpt-6.1-sol refuses
+ * function tools at every reasoning effort it accepts.
  * The model never sees the database; it calls tools that run here, and every
  * passage a tool returns is handed to the UI as it came from the Bible, so the
  * cards show the official text whatever the model writes around them.
@@ -213,12 +217,57 @@ interface ModelReply {
 
 function modelConfig(deps: ChatDeps) {
   const env = deps.env ?? {};
+  const configured = (env.endpoint ?? process.env.CHATGPT_API_BASE_URL)?.replace(/\/$/, '');
   return {
     apiKey: env.apiKey ?? process.env.CHATGPT_API,
-    endpoint:
-      (env.endpoint ?? process.env.CHATGPT_API_BASE_URL)?.replace(/\/$/, '') || 'https://api.openai.com/v1/chat/completions',
+    // CHATGPT_API_BASE_URL names the chat completions endpoint, for AI
+    // Translate. The Responses endpoint is its sibling on the same host.
+    endpoint: configured?.replace(/\/chat\/completions$/, '/responses') || 'https://api.openai.com/v1/responses',
     model: env.model ?? (process.env.CHATGPT_MODEL || 'gpt-4o-mini'),
   };
+}
+
+/** The tools as the Responses API lists them: name and schema beside `type`, not under `function`. */
+const RESPONSE_TOOLS = CHAT_TOOLS.map((tool) => ({ type: tool.type, ...tool.function }));
+
+/**
+ * The conversation as Responses input items. A tool call and its result are
+ * items of their own, paired by `call_id`, where chat completions hung the
+ * calls on the assistant message.
+ */
+type InputItem =
+  | { role: 'system' | 'user' | 'assistant'; content: string }
+  | { type: 'function_call'; call_id: string; name: string; arguments: string }
+  | { type: 'function_call_output'; call_id: string; output: string };
+
+function toInput(messages: ApiMessage[]): InputItem[] {
+  return messages.flatMap((message): InputItem[] => {
+    if (message.role === 'tool') {
+      return [{ type: 'function_call_output', call_id: message.tool_call_id, output: message.content }];
+    }
+    if (message.role !== 'assistant') return [{ role: message.role, content: message.content }];
+    const said: InputItem[] = message.content ? [{ role: 'assistant', content: message.content }] : [];
+    const called: InputItem[] = (message.tool_calls ?? []).map((call) => ({
+      type: 'function_call',
+      call_id: call.id,
+      name: call.function.name,
+      arguments: call.function.arguments,
+    }));
+    return [...said, ...called];
+  });
+}
+
+/** One finished item of a response: a message's text, or a call to one of the tools. */
+interface OutputItem {
+  type?: string;
+  call_id?: string;
+  name?: string;
+  arguments?: string;
+  content?: Array<{ type?: string; text?: string }>;
+}
+
+function toToolCall(item: OutputItem): ToolCall {
+  return { id: item.call_id ?? '', type: 'function', function: { name: item.name ?? '', arguments: item.arguments ?? '' } };
 }
 
 /** One model turn. Yields text as it streams and returns the whole reply. */
@@ -232,13 +281,19 @@ async function* callModel(
 
   const timeout = AbortSignal.timeout(deps.timeoutMs ?? CHAT_LIMITS.requestTimeoutMs);
   const signal = deps.signal ? AbortSignal.any([deps.signal, timeout]) : timeout;
+  // The same rule as AI Translate for which models take a temperature. The
+  // rest reason, and `low` keeps a lookup quick; the Responses API spells it
+  // `reasoning.effort`.
+  const sampling = modelSamplingParams(model);
   const body = {
     model,
-    messages,
-    tools: CHAT_TOOLS,
+    input: toInput(messages),
+    tools: RESPONSE_TOOLS,
     tool_choice: toolChoice,
     stream: true,
-    ...(model.includes('gpt-5') ? { reasoning_effort: 'low' as const } : { temperature: 0.2 }),
+    // The whole conversation is sent every turn, so nothing needs keeping there.
+    store: false,
+    ...('temperature' in sampling ? sampling : { reasoning: { effort: 'low' as const } }),
   };
 
   let response: Response;
@@ -265,14 +320,15 @@ async function* callModel(
     if (response.headers.get('content-type')?.includes('text/event-stream') && response.body) {
       return yield* readStream(response.body);
     }
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>;
-    };
-    const message = payload.choices?.[0]?.message;
-    if (!message) throw new ChatFailure(UNAVAILABLE, 'model reply had no message');
-    const content = message.content ?? '';
+    const payload = (await response.json()) as { output?: OutputItem[] };
+    if (!Array.isArray(payload.output)) throw new ChatFailure(UNAVAILABLE, 'model reply had no output');
+    const content = payload.output
+      .filter((item) => item.type === 'message')
+      .flatMap((item) => item.content ?? [])
+      .map((part) => (part.type === 'output_text' ? (part.text ?? '') : ''))
+      .join('');
     if (content) yield { type: 'text', text: content };
-    return { content, toolCalls: message.tool_calls ?? [] };
+    return { content, toolCalls: payload.output.filter((item) => item.type === 'function_call').map(toToolCall) };
   } catch (error) {
     throw abortFailure(error, deps, timeout);
   }
@@ -285,7 +341,10 @@ function abortFailure(error: unknown, deps: ChatDeps, timeout: AbortSignal): unk
   return new ChatFailure(UNAVAILABLE, error);
 }
 
-/** Server-sent chat completion chunks: text deltas and tool calls assembled by index. */
+/**
+ * Server-sent Responses events: text as it is written, and each tool call once
+ * it is whole. A failure after the 200 arrives as an event, not a status.
+ */
 async function* readStream(stream: ReadableStream<Uint8Array>): AsyncGenerator<ChatEvent, ModelReply> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -302,35 +361,24 @@ async function* readStream(stream: ReadableStream<Uint8Array>): AsyncGenerator<C
       if (!line.startsWith('data:')) continue;
       const data = line.slice(5).trim();
       if (!data || data === '[DONE]') continue;
-      let chunk: {
-        choices?: Array<{
-          delta?: {
-            content?: string | null;
-            tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }>;
-          };
-        }>;
-      };
+      let event: { type?: string; delta?: string; item?: OutputItem };
       try {
-        chunk = JSON.parse(data);
+        event = JSON.parse(data);
       } catch {
         continue;
       }
-      const delta = chunk.choices?.[0]?.delta;
-      if (delta?.content) {
-        content += delta.content;
-        yield { type: 'text', text: delta.content };
-      }
-      for (const part of delta?.tool_calls ?? []) {
-        const i = part.index ?? calls.length;
-        const call = (calls[i] ??= { id: '', type: 'function', function: { name: '', arguments: '' } });
-        if (part.id) call.id = part.id;
-        if (part.function?.name) call.function.name += part.function.name;
-        if (part.function?.arguments) call.function.arguments += part.function.arguments;
+      if (event.type === 'response.output_text.delta' && event.delta) {
+        content += event.delta;
+        yield { type: 'text', text: event.delta };
+      } else if (event.type === 'response.output_item.done' && event.item?.type === 'function_call') {
+        calls.push(toToolCall(event.item));
+      } else if (event.type === 'response.failed' || event.type === 'error') {
+        throw new ChatFailure(UNAVAILABLE, `model stream failed: ${data.slice(0, 500)}`);
       }
     }
     if (done) break;
   }
-  return { content, toolCalls: calls.filter(Boolean) };
+  return { content, toolCalls: calls };
 }
 
 // ---------------------------------------------------------------------------

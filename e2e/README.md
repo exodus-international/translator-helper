@@ -155,7 +155,7 @@ application code.
 
 | Module | Stands in for | Pointed at by |
 |---|---|---|
-| `support/openai-mock.mjs` | the chat completions endpoint | `CHATGPT_API_BASE_URL` |
+| `support/openai-mock.mjs` | the chat completions endpoint, and the Responses endpoint the Scripture chat calls | `CHATGPT_API_BASE_URL` |
 | `support/github-mock.mjs` | the GitHub REST API, enough of it for one deploy | `GITHUB_API_BASE_URL` |
 
 The GitHub stub answers the seven calls a deploy makes: installation token, branch check, file
