@@ -16,6 +16,7 @@ Feature: AI workflow
     And I open "Day 3 - Fasting and Freedom" in Croatian
     When I hand the document to the AI workflow
     Then the AI's draft should show up without a reload
+    And the AI workflow should show the AI's draft as done and the team's text review as the current step
     And the feedback should mention "AI STUB: not sure about this word."
     And approving the text should wait for the open comments
     When I dismiss the comment mentioning "AI STUB"

@@ -35,6 +35,13 @@ interface DocumentInfoCardProps {
   onUnassignTranslator?: () => void;
   onAssignReviewer?: () => void;
   onUnassignReviewer?: () => void;
+  /**
+   * An AI-workflow version: the AI drafts it and the whole team reviews it,
+   * so nobody is assigned and no deadline is set. The translator, reviewer
+   * and deadline rows would only ever read "AI Translator", "Not assigned"
+   * and "Not set", and the AI workflow panel says who does what instead.
+   */
+  teamOwned?: boolean;
 }
 
 /**
@@ -57,6 +64,7 @@ export function DocumentInfoCard({
   onUnassignTranslator,
   onAssignReviewer,
   onUnassignReviewer,
+  teamOwned = false,
 }: DocumentInfoCardProps) {
   const statusConfig = getDocumentStatusConfig(status);
 
@@ -77,6 +85,8 @@ export function DocumentInfoCard({
           {/* Language */}
           {language && <Row icon={Languages} label="Language" value={language} />}
 
+          {!teamOwned && (
+            <>
           {/* Translator */}
           <Row icon={User} label="Translator">
             {translator ? (
@@ -197,6 +207,8 @@ export function DocumentInfoCard({
                 <span className="text-xs font-medium">{new Date(reviewDeadline).toLocaleDateString()}</span>
               )}
             </Row>
+          )}
+            </>
           )}
         </CardContent>
       </Card>

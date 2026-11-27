@@ -23,7 +23,7 @@ import {
   StepperTrigger,
 } from '@/components/ui/stepper';
 import { DOCUMENT_STATUS_SEQUENCE, getDocumentStatusConfig } from '@/constants/document-status';
-import { SuggestionStatus } from '@/generated/prisma/enums';
+import { SuggestionStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import { getStatusStep, isDraftPhase, isStepCompleted, isTranslationStarted } from '@/lib/document-status';
 import { isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -303,6 +303,7 @@ function EditorViewer({
             ) : undefined
           }
           status={targetVersion?.status}
+          teamOwned={targetVersion?.workflow === TranslationWorkflow.AI}
           translator={targetVersion?.user ?? null}
           reviewer={targetVersion?.reviewer}
           language={targetVersion?.language?.name}

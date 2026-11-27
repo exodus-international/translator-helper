@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Loader2, RotateCcw, Sparkles, ThumbsUp } from 'lucide-react';
+import {
+  AlertCircle,
+  AudioLines,
+  CheckCircle2,
+  Circle,
+  CircleDot,
+  Loader2,
+  RotateCcw,
+  Sparkles,
+  ThumbsUp,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/user-avatar';
@@ -12,11 +22,22 @@ import {
   retryAiStepAction,
   withdrawTextApprovalAction,
 } from '@/domain/ai-workflow/ai-workflow.actions';
+import { AI_USER_ID } from '@/domain/ai-workflow/ai-workflow.rules';
+import {
+  AI_ACTOR_LABEL,
+  aiWorkflowSteps,
+  type AiStepActor,
+  type AiStepId,
+  type AiStepState,
+} from '@/domain/ai-workflow/ai-workflow.steps';
+import { updateDocumentVersionStatusAction } from '@/domain/document-version/document-version.actions';
+import { withStatusChangeFeedback } from '@/components/status-change-feedback';
 import { DocumentStatus, SuggestionStatus, TranslationWorkflow } from '@/generated/prisma/enums';
 import { isRefusal } from '@/lib/action-refusal';
 import { capture } from '@/lib/analytics';
 import { SessionUser } from '@/lib/session';
 import { useEditorStore } from '@/lib/stores/editor-provider';
+import { cn } from '@/lib/utils';
 
 interface Approvals {
   required: number;
@@ -25,22 +46,39 @@ interface Approvals {
 
 /** Steps the app is running on its own; the page reloads itself while one runs. */
 const RUNNING: Partial<Record<DocumentStatus, string>> = {
-  [DocumentStatus.AI_TRANSLATING]: 'The AI is translating this document.',
-  [DocumentStatus.AI_PREPARING_AUDIO]: 'The AI is preparing the audio text.',
-  [DocumentStatus.APPROVED]: 'Approved. The document deploys on its own once the recording is ready.',
+  [DocumentStatus.AI_TRANSLATING]: 'The AI is translating. This page updates when the draft is ready.',
+  [DocumentStatus.AI_PREPARING_AUDIO]: 'The AI is taking out what a narrator should not read.',
+  [DocumentStatus.APPROVED]: 'The app waits for the recording, checks the file, then deploys and merges it.',
 };
 
 const POLL_MS = 10_000;
 
 /**
- * Where an AI-workflow version stands and what the person looking at it can
- * do about it: approve the text, see who already has, retry a failed step.
- * Renders nothing on a manual-workflow version.
+ * The AI workflow as a list of steps, each tagged with who does it (the AI,
+ * the team, the app), and under the step the version stands on, what the
+ * person looking at it can do: approve the text, approve the audio text,
+ * retry a failed step. Renders nothing on a manual-workflow version.
  */
-export function AiWorkflowPanel({ user, canManage }: { user: SessionUser; canManage: boolean }) {
+export function AiWorkflowPanel({
+  user,
+  canManage,
+  canReview,
+  hasAudio,
+}: {
+  user: SessionUser;
+  /** The language's manager or an administrator: may retry a failed step. */
+  canManage: boolean;
+  /** On the language's team: may approve the audio text. */
+  canReview: boolean;
+  /** Whether this document gets audio, and so has the two audio steps. */
+  hasAudio: boolean;
+}) {
   const router = useRouter();
   const targetVersion = useEditorStore((s) => s.targetVersion);
   const suggestions = useEditorStore((s) => s.suggestions);
+  const requestTranslationView = useEditorStore((s) => s.requestTranslationView);
+  const setStatus = useEditorStore((s) => s.handleStatusChange);
+  const documentId = useEditorStore((s) => s.documentId);
   const openCount = useMemo(() => suggestions.filter((s) => s.status === SuggestionStatus.OPEN).length, [suggestions]);
   const [approvals, setApprovals] = useState<Approvals | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,7 +87,6 @@ export function AiWorkflowPanel({ user, canManage }: { user: SessionUser; canMan
   const status: DocumentStatus | undefined = targetVersion?.status;
   const versionId: string | undefined = targetVersion?.id;
   const aiError: string | null = targetVersion?.aiError ?? null;
-  const inTextReview = isAi && status === DocumentStatus.PENDING_REVIEW;
   const running = isAi && status ? RUNNING[status] : undefined;
 
   const loadApprovals = useCallback(async () => {
@@ -101,6 +138,29 @@ export function AiWorkflowPanel({ user, canManage }: { user: SessionUser; canMan
     }
   };
 
+  const handleApproveAudio = async () => {
+    setBusy(true);
+    try {
+      const result = await withStatusChangeFeedback(
+        {
+          from: status,
+          to: DocumentStatus.APPROVED,
+          via: 'ai_panel',
+          documentId,
+          versionId,
+        },
+        () => updateDocumentVersionStatusAction(versionId, DocumentStatus.APPROVED),
+      );
+      // A refusal means the page was stale; show the status the server has.
+      setStatus(isRefusal(result) ? result.refused.currentStatus : DocumentStatus.APPROVED);
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to approve the audio text');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleRetry = async () => {
     setBusy(true);
     try {
@@ -119,37 +179,22 @@ export function AiWorkflowPanel({ user, canManage }: { user: SessionUser; canMan
     }
   };
 
-  return (
-    <section aria-label="AI workflow" className="flex flex-col gap-2 rounded-lg border bg-card p-3 text-sm">
-      <div className="flex items-center gap-2 font-medium">
-        <Sparkles className="size-4 text-hue-blue" aria-hidden />
-        AI workflow
-      </div>
+  const steps = aiWorkflowSteps({ status, hasAudio, aiError });
+  const aiNoteCount = suggestions.filter((s) => s.user?.id === AI_USER_ID).length;
+  const approverNames = approvals?.approvals.map(({ user: approver }) => approver.name || approver.email) ?? [];
 
-      {running && !aiError && (
-        <p className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          {running}
-        </p>
-      )}
+  /** What a step that is over left behind: the AI's notes, the people who approved. */
+  const doneNote = (id: AiStepId): string | null => {
+    if (id === 'draft' && aiNoteCount > 0) {
+      return `Left ${aiNoteCount} note${aiNoteCount === 1 ? '' : 's'} for the reviewers.`;
+    }
+    if (id === 'text-review' && approverNames.length > 0) return `Approved by ${approverNames.join(' and ')}.`;
+    return null;
+  };
 
-      {aiError && (
-        <div role="alert" className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2">
-          <p className="flex items-start gap-2 text-destructive">
-            <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            <span>{aiError}</span>
-          </p>
-          {canManage && (
-            <Button size="sm" variant="outline" onClick={handleRetry} disabled={busy}>
-              <RotateCcw />
-              Retry
-            </Button>
-          )}
-          {!canManage && <p className="text-xs text-muted-foreground">The language&apos;s manager can retry it.</p>}
-        </div>
-      )}
-
-      {inTextReview && (
+  const currentBody = (id: AiStepId) => {
+    if (id === 'text-review') {
+      return (
         <>
           <p className="text-muted-foreground">
             {approverIds.length} of {required} approvals. The text moves on when {required} people approve it.
@@ -179,13 +224,127 @@ export function AiWorkflowPanel({ user, canManage }: { user: SessionUser; canMan
             </p>
           )}
         </>
-      )}
+      );
+    }
+    if (id === 'audio-review') {
+      return (
+        <>
+          <p className="text-muted-foreground">
+            The AI took out what a narrator should not read. One person reads the audio text and approves it.
+          </p>
+          <Button size="sm" variant="outline" onClick={() => requestTranslationView('audio')}>
+            <AudioLines />
+            Open the audio text
+          </Button>
+          {canReview && (
+            <Button size="sm" onClick={handleApproveAudio} disabled={busy || openCount > 0}>
+              <ThumbsUp />
+              Approve audio text
+            </Button>
+          )}
+          {canReview && openCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Resolve the {openCount} open comment{openCount === 1 ? '' : 's'} first.
+            </p>
+          )}
+        </>
+      );
+    }
+    return running ? <p className="text-muted-foreground">{running}</p> : null;
+  };
 
-      {isAi && status === DocumentStatus.AUDIO_REVIEW && (
-        <p className="text-muted-foreground">
-          Check the Audio text tab. When it reads well, choose Approve audio text in the status menu.
-        </p>
-      )}
+  return (
+    // A row of the panel's summary card, which draws the border and the padding.
+    <section aria-label="AI workflow" className="flex flex-col gap-3 text-sm">
+      <div className="flex items-center gap-2 font-medium">
+        <Sparkles className="size-4 text-hue-blue" aria-hidden />
+        AI workflow
+      </div>
+
+      <ol className="flex flex-col" aria-label="Steps">
+        {steps.map((step, index) => {
+          const isLast = index === steps.length - 1;
+          const active = step.state === 'current' || step.state === 'failed';
+          const note = step.state === 'done' ? doneNote(step.id) : null;
+          return (
+            <li
+              key={step.id}
+              aria-current={active ? 'step' : undefined}
+              className="grid grid-cols-[1.25rem_1fr] gap-x-2"
+            >
+              <div className="flex flex-col items-center">
+                <StepMark state={step.state} working={step.actor !== 'team'} />
+                {!isLast && <span className="my-1 w-px flex-1 bg-border" aria-hidden />}
+              </div>
+              <div className={cn('flex min-w-0 flex-col gap-2', !isLast && 'pb-3')}>
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
+                  <span
+                    className={cn(
+                      'rounded-sm px-1.5 text-[11px] font-medium leading-5',
+                      ACTOR_CLASS[step.actor],
+                      step.state === 'upcoming' && 'opacity-60',
+                    )}
+                  >
+                    {AI_ACTOR_LABEL[step.actor]}
+                  </span>
+                  <span className={cn(active && 'font-medium', step.state === 'upcoming' && 'text-muted-foreground')}>
+                    {step.title}
+                  </span>
+                  <span className="sr-only">({STATE_LABEL[step.state]})</span>
+                </p>
+
+                {note && <p className="text-xs text-muted-foreground">{note}</p>}
+
+                {step.state === 'current' && currentBody(step.id)}
+
+                {step.state === 'failed' && (
+                  <div
+                    role="alert"
+                    className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2"
+                  >
+                    <p className="text-destructive">{aiError}</p>
+                    {canManage && (
+                      <Button size="sm" variant="outline" onClick={handleRetry} disabled={busy}>
+                        <RotateCcw />
+                        Retry
+                      </Button>
+                    )}
+                    {!canManage && (
+                      <p className="text-xs text-muted-foreground">The language&apos;s manager can retry it.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </section>
+  );
+}
+
+const ACTOR_CLASS: Record<AiStepActor, string> = {
+  ai: 'bg-hue-blue/10 text-hue-blue',
+  team: 'bg-hue-amber/10 text-hue-amber',
+  app: 'bg-muted text-muted-foreground',
+};
+
+const STATE_LABEL: Record<AiStepState, string> = {
+  done: 'done',
+  current: 'in progress',
+  failed: 'failed',
+  upcoming: 'not started',
+};
+
+/** The mark on the step's rail. A step the AI or the app is running spins; one that waits on people does not. */
+function StepMark({ state, working }: { state: AiStepState; working: boolean }) {
+  const className = 'mt-0.5 size-4 shrink-0';
+  if (state === 'done') return <CheckCircle2 className={cn(className, 'text-success')} aria-hidden />;
+  if (state === 'failed') return <AlertCircle className={cn(className, 'text-destructive')} aria-hidden />;
+  if (state === 'upcoming') return <Circle className={cn(className, 'text-muted-foreground/50')} aria-hidden />;
+  return working ? (
+    <Loader2 className={cn(className, 'animate-spin text-hue-blue')} aria-hidden />
+  ) : (
+    <CircleDot className={cn(className, 'text-hue-amber')} aria-hidden />
   );
 }

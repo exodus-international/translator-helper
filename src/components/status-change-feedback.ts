@@ -19,7 +19,7 @@ type StatusChangeResponse = Awaited<ReturnType<typeof updateDocumentVersionStatu
 export type StatusChangeOutcome = Exclude<StatusChangeResponse, StatusChangeRefusal>;
 
 /** Where the move was made from, for analytics. */
-export type StatusChangeVia = 'dropdown' | 'kanban_dnd';
+export type StatusChangeVia = 'dropdown' | 'kanban_dnd' | 'ai_panel';
 
 export interface StatusChangeFeedbackDeps {
   toast: Pick<typeof toast, 'loading' | 'dismiss' | 'success' | 'error'>;

@@ -121,7 +121,12 @@ export default function ReviewClient({
         hideDetails
         sidebarActions={
           <>
-            <AiWorkflowPanel user={user} canManage={canDeploy} />
+            <AiWorkflowPanel
+              user={user}
+              canManage={canDeploy}
+              canReview={canChangeStatus}
+              hasAudio={Boolean(audioTextVersionId)}
+            />
             <ReviewWorkflowActions document={document} />
           </>
         }
@@ -213,7 +218,8 @@ function ReviewWorkflowActions({ document }: { document: any }) {
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+    // A row of the panel's summary card, which draws the border and the padding.
+    <div className="flex flex-col gap-2">
       {targetVersion?.status === DocumentStatus.PENDING_REVIEW && targetVersion?.workflow !== TranslationWorkflow.AI && (
         <Button
           size="sm"

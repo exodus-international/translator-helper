@@ -366,7 +366,7 @@ function TranslateWorkflowActions({
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+    <div className="flex flex-col gap-2">
       {canHandToAi && (
         <Button size="sm" className="w-full justify-start" onClick={handleHandToAi} disabled={busy}>
           {handingToAi ? <Loader2 className="animate-spin" /> : <Sparkles />}
