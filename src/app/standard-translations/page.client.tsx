@@ -33,7 +33,10 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { deleteStandardTranslationAction } from '@/domain/standard-translation/standard-translation.actions';
+import {
+  deleteStandardTranslationAction,
+  getStandardTranslationMoveConflictAction,
+} from '@/domain/standard-translation/standard-translation.actions';
 import type {
   StandardTranslationRow,
   StandardTranslationsPage,
@@ -42,6 +45,7 @@ import type { ScopeSelection } from '@/domain/standard-translation/standard-tran
 import { formatExactDateTime, formatLastActive } from '@/lib/format';
 import { buildListSearchParams, DEFAULT_PAGE_SIZE } from '@/lib/list-params';
 import { entryLabel } from './entry-label';
+import { MoveToGeneralDialog, type PendingMove } from './move-to-general-dialog';
 import { scopeParam, withCompletedProjects } from './scope';
 import { ScopeFilter } from './scope-filter';
 
@@ -77,6 +81,7 @@ export default function StandardTranslationsClient({
   // A null entry is a new one.
   const editing = useDialogTarget<StandardTranslationRow | null>();
   const deleting = useDialogTarget<StandardTranslationRow>();
+  const moving = useDialogTarget<PendingMove>();
 
   if (!language || !list) {
     return (
@@ -120,6 +125,17 @@ export default function StandardTranslationsClient({
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The standard translation could not be deleted');
+    }
+  };
+
+  // The clash is looked up first, so the dialog opens already asking the
+  // right question.
+  const handleMove = async (entry: StandardTranslationRow) => {
+    try {
+      const conflict = await getStandardTranslationMoveConflictAction(entry.id);
+      moving.show({ entry, conflict });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The standard translation could not be moved');
     }
   };
 
@@ -239,6 +255,7 @@ export default function StandardTranslationsClient({
                       <RowMenu
                         entry={entry}
                         onEdit={() => editing.show(entry)}
+                        onMove={() => handleMove(entry)}
                         onDelete={() => deleting.show(entry)}
                       />
                     </TableCell>
@@ -302,6 +319,17 @@ export default function StandardTranslationsClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MoveToGeneralDialog
+        open={moving.open}
+        pending={moving.target}
+        languageName={language.name}
+        onOpenChange={(open) => !open && moving.hide()}
+        onMoved={() => {
+          moving.hide();
+          router.refresh();
+        }}
+      />
     </>
   );
 }
@@ -339,10 +367,12 @@ function UpdatedBy({ entry }: { entry: StandardTranslationRow }) {
 function RowMenu({
   entry,
   onEdit,
+  onMove,
   onDelete,
 }: {
   entry: StandardTranslationRow;
   onEdit: () => void;
+  onMove: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -355,6 +385,7 @@ function RowMenu({
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
           <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+          {entry.sourceProject && <DropdownMenuItem onClick={onMove}>Move to all projects</DropdownMenuItem>}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
