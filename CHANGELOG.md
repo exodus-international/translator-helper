@@ -1,3 +1,9 @@
+## [1.6.1](https://github.com/exodus-international/translator-helper/compare/v1.6.0...v1.6.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **bible:** call the Responses endpoint so the chat works on gpt-6 ([#340](https://github.com/exodus-international/translator-helper/issues/340)) ([587ef2e](https://github.com/exodus-international/translator-helper/commit/587ef2e1af9593f3c40a3e533a744cd505e1e801))
 # [1.6.0](https://github.com/exodus-international/translator-helper/compare/v1.5.0...v1.6.0) (2026-11-24)
 
 
