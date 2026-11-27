@@ -214,3 +214,23 @@ test('a translation that has its verse_tag, or a passage the Bible lacks, adds n
   assert.equal(missingVerseTagItem(DAY('verse_tag:'), { ref: 'Romans 8:35-39', status: 'out_of_range', notes: [] }), null);
   assert.equal(missingVerseTagItem('# Čitanje\n\n*Tekst.*\n', ROMANS), null);
 });
+
+test('replacing a reading with the official text keeps its paragraphs and <br> line breaks', () => {
+  const paragraphs = `<span style="display:block;">Jak 2,1-4</span>
+
+*Braćo moja, vjeru u Gospoda imajte.*
+
+*Jer ako uđe u vaš zbor čovjek.*
+`;
+  const [item] = check(paragraphs);
+  assert.equal(item.quote?.kind, 'reading');
+  assert.equal(quoteEdit(item)!.insert, '*Braćo moja, vjeru u Gospodina imajte.*\n\n*Jer ako uđe u vaš zbor čovjek.*');
+
+  const stanza = `<span style="display:block;">Jak 2,1-4</span>
+
+*Braćo moja, vjeru u Gospoda imajte. <br>
+Jer ako uđe u vaš zbor čovjek.*
+`;
+  const [broken] = check(stanza);
+  assert.equal(quoteEdit(broken)!.insert, '*Braćo moja, vjeru u Gospodina imajte. <br>\nJer ako uđe u vaš zbor čovjek.*');
+});
