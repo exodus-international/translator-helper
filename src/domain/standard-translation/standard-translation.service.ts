@@ -1,4 +1,4 @@
-import { diffWords, similarity } from '@/domain/scripture/citations';
+import { similarity } from '@/domain/scripture/citations';
 // Scripture's threshold: below it, a line is another text, not a variant of the entry.
 import { MIN_SIMILARITY } from '@/domain/scripture/scripture.service';
 import { frontmatterBlock } from '@/lib/frontmatter';
@@ -7,6 +7,7 @@ import { renderInLayout, type LayoutNotice } from './layout';
 import { findOccurrences, type Occurrence } from './match';
 import { sourceKeyOf, stripLayout } from './match-form';
 import { buildStandardPrompt, type StandardPromptParts } from './prompt';
+import { changedWords } from './standard-translation.check';
 import type { StandardTranslationMatch } from './standard-translation.repository';
 import { findTermOccurrences } from './stem';
 
@@ -380,24 +381,4 @@ function nearMisses(
     );
   }
   return notices;
-}
-
-/** How many words differ: a word replaced by another counts once. */
-function changedWords(current: string, official: string): number {
-  let changed = 0;
-  let deleted = 0;
-  let inserted = 0;
-  const flush = () => {
-    changed += Math.max(deleted, inserted);
-    deleted = 0;
-    inserted = 0;
-  };
-  for (const part of diffWords(current, official)) {
-    const count = part.text.split(' ').length;
-    if (part.type === 'equal') flush();
-    else if (part.type === 'delete') deleted += count;
-    else inserted += count;
-  }
-  flush();
-  return changed;
 }

@@ -44,26 +44,54 @@ function stemOf(word: string): string {
 const ADJACENT = /^[^\p{L}\p{N}\n]*$/u;
 
 /**
+ * A text read once, to find terms in: its words, indexed by their first
+ * letters, so finding a term looks only at the words that could start it.
+ * The editor's check looks for every term of a dictionary on the same lines;
+ * reading them again for each term would cost the dictionary's size times the
+ * text's.
+ */
+export function termFinder(text: string): (term: string) => Array<{ from: number; to: number }> {
+  const words = wordsOf(text);
+  // Word indexes by their first 1 to MIN_STEM letters: a stem of n letters
+  // (shorter only for a short word) is looked up by its first min(n, MIN_STEM).
+  const byPrefix = new Map<string, number[]>();
+  words.forEach((word, index) => {
+    const letters = [...word.text];
+    for (let length = 1; length <= Math.min(MIN_STEM, letters.length); length++) {
+      const prefix = letters.slice(0, length).join('');
+      const holders = byPrefix.get(prefix);
+      if (holders) holders.push(index);
+      else byPrefix.set(prefix, [index]);
+    }
+  });
+
+  return (term) => {
+    const stems = wordsOf(term).map((word) => stemOf(word.text));
+    if (stems.length === 0) return [];
+    const lead = [...stems[0]].slice(0, MIN_STEM).join('');
+    const found: Array<{ from: number; to: number }> = [];
+    let next = 0;
+    for (const start of byPrefix.get(lead) ?? []) {
+      if (start < next || start + stems.length > words.length) continue;
+      const matches = stems.every((stem, i) => {
+        const word = words[start + i];
+        if (!word.text.startsWith(stem)) return false;
+        return i === 0 || ADJACENT.test(text.slice(words[start + i - 1].to, word.from));
+      });
+      if (matches) {
+        found.push({ from: words[start].from, to: words[start + stems.length - 1].to });
+        next = start + stems.length;
+      }
+    }
+    return found;
+  };
+}
+
+/**
  * Every place the term occurs in the text, in any of its forms, as raw offsets
  * from the first word's start to the last word's end. Occurrences don't
  * overlap. A term with no words is never found.
  */
 export function findTermOccurrences(text: string, term: string): Array<{ from: number; to: number }> {
-  const stems = wordsOf(term).map((word) => stemOf(word.text));
-  if (stems.length === 0) return [];
-
-  const words = wordsOf(text);
-  const found: Array<{ from: number; to: number }> = [];
-  for (let start = 0; start + stems.length <= words.length; start++) {
-    const matches = stems.every((stem, i) => {
-      const word = words[start + i];
-      if (!word.text.startsWith(stem)) return false;
-      return i === 0 || ADJACENT.test(text.slice(words[start + i - 1].to, word.from));
-    });
-    if (matches) {
-      found.push({ from: words[start].from, to: words[start + stems.length - 1].to });
-      start += stems.length - 1;
-    }
-  }
-  return found;
+  return termFinder(text)(term);
 }
