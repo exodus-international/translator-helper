@@ -95,6 +95,24 @@ When('I type the lines {string} and {string} over the replacement', async ({ pag
   await page.keyboard.type(second);
 });
 
+Then(
+  'in the translation {string} should come before {string} and {string} after it',
+  async ({ page }, before: string, mark: string, after: string) => {
+    await expect
+      .poll(async () => {
+        const text = await translationText(page);
+        const at = text.indexOf(mark);
+        return {
+          markFound: at >= 0,
+          // The only copy of the first text is above the mark: the one below it was changed.
+          before: text.indexOf(before) >= 0 && text.lastIndexOf(before) < at,
+          after: text.indexOf(after) > at,
+        };
+      })
+      .toEqual({ markFound: true, before: true, after: true });
+  },
+);
+
 Then('the translation should not read {string}', async ({ page }, text: string) => {
   await expect.poll(() => translationText(page)).not.toContain(text);
 });

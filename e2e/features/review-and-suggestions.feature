@@ -82,7 +82,9 @@ Feature: Review and suggestions
     And the translation should not read "Tri stupa za danas"
 
   # A suggestion points at its text by line and column. Applying another one
-  # above it adds a line, and the first must still change its own words.
+  # above it adds a line, and the first must still change its own words. The
+  # added line repeats those words, so they cannot be found again by looking
+  # for them: only a range that moved with the edit lands on the right copy.
   @reviewer @business-critical
   Scenario: A suggestion still changes its own words after the text above it grew
     Given I open "Day 1 - The Call" in Croatian
@@ -91,12 +93,12 @@ Feature: Review and suggestions
     And I save the suggestion
     Then the feedback should mention "Odreknite se"
     When I select the row reading "Jutarnje razmatranje" and suggest an edit
-    And I type the lines "## Jutarnje" and "## razmatranje dana" over the replacement
+    And I type the lines "## Jutarnje razmatranje dana" and "2. **Askeza**: Zapocnite svoj post od alkohola i slatkisa." over the replacement
     And I save the suggestion
     Then the feedback should mention "razmatranje dana"
     When I apply the suggestion proposing "razmatranje dana"
-    Then the translation should read "## razmatranje dana"
+    Then the translation should read "## Jutarnje razmatranje dana"
     When I apply the suggestion proposing "Odreknite se"
     Then the translation should read "2. **Askeza**: Odreknite se"
     And the translation should read "1. **Molitva**: Provedite 20 minuta u tihoj molitvi."
-    And the translation should not read "Zapocnite svoj post"
+    And in the translation "Zapocnite svoj post" should come before "Tri stupa" and "Odreknite se" after it

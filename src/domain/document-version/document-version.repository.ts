@@ -143,37 +143,42 @@ export async function createDocumentVersion(data: {
 }
 
 export async function updateDocumentVersion(id: string, content: string, userId: string) {
-  // Get current version
-  const current = await prisma.documentVersion.findUnique({
-    where: { id },
-  });
+  // One transaction, holding the version's row from the read to the write.
+  // Two saves that arrive together (an autosave while a suggestion is being
+  // applied) would otherwise both start from the same old text: one bump of
+  // the counter would be lost, and suggestions would be moved for an edit
+  // that is not the one stored.
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "document_version" WHERE id = ${id} FOR UPDATE`;
+    const current = await tx.documentVersion.findUnique({ where: { id } });
 
-  if (!current) {
-    throw new Error('Document version not found');
-  }
+    if (!current) {
+      throw new Error('Document version not found');
+    }
 
-  // Suggestions point at the text by line and column: move them with the edit.
-  const suggestions =
-    content === current.content
-      ? []
-      : await prisma.suggestion.findMany({
-          where: { documentVersionId: id, startLine: { not: null } },
-          select: {
-            id: true,
-            status: true,
-            startLine: true,
-            startColumn: true,
-            endLine: true,
-            endColumn: true,
-            anchorText: true,
-            proposedText: true,
-          },
-        });
-  const moved = followContentChange(current.content, content, suggestions);
+    // Suggestions point at the text by line and column: move them with the edit.
+    const suggestions =
+      content === current.content
+        ? []
+        : await tx.suggestion.findMany({
+            where: { documentVersionId: id, startLine: { not: null } },
+            select: {
+              id: true,
+              status: true,
+              startLine: true,
+              startColumn: true,
+              endLine: true,
+              endColumn: true,
+              anchorText: true,
+              proposedText: true,
+            },
+          });
+    for (const { id: suggestionId, ...range } of followContentChange(current.content, content, suggestions)) {
+      await tx.suggestion.update({ where: { id: suggestionId }, data: range });
+    }
 
-  // Update with incremented version (status unchanged — transitions are explicit)
-  const [updated] = await prisma.$transaction([
-    prisma.documentVersion.update({
+    // Update with incremented version (status unchanged — transitions are explicit)
+    return tx.documentVersion.update({
       where: { id },
       data: {
         content,
@@ -187,10 +192,8 @@ export async function updateDocumentVersion(id: string, content: string, userId:
         user: userBrief,
         reviewer: userBrief,
       },
-    }),
-    ...moved.map(({ id: suggestionId, ...range }) => prisma.suggestion.update({ where: { id: suggestionId }, data: range })),
-  ]);
-  return updated;
+    });
+  });
 }
 
 export async function updateDocumentVersionStatus(id: string, status: DocumentStatus, reviewerId?: string) {
