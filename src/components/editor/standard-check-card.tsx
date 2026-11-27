@@ -8,25 +8,97 @@ import type { Edit } from '@/domain/scripture/scripture-check';
 import { buildStandardCheck, type StandardState } from '@/domain/standard-translation/standard-translation.check';
 import { useEditorStore } from '@/lib/stores/editor-provider';
 import { ArrowUpRight, ChevronDown, Replace } from 'lucide-react';
-import { useMemo } from 'react';
+import type { EditorView } from '@codemirror/view';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { applyEdits, revealRange } from './cm-scripture';
 import { applyToText, standardRowDetail, standardRowName, type StandardRowItem } from './standard-check-rows';
 import type { StandardHost } from './standard-host';
 
+/** How long a pause in typing comes before the check runs again, as for Scripture's card. */
+const CHECK_DELAY_MS = 600;
+/** How long a change from the panel waits for the translation editor it asked for. */
+const EDITOR_WAIT_MS = 1_500;
+
 /**
- * The standard translation check of the translation as it is now: every
- * occurrence in the source of an entry the document can use, against the same
- * lines of the translation. Re-read on every change, as the editor's
- * highlights are; empty without a host.
+ * Runs `work` with the translation editor, asking for it first when it isn't
+ * on screen and waiting up to EDITOR_WAIT_MS for it; `fallback` runs if it
+ * never comes. `host` is read on every frame, as the editor registers itself.
  */
-export function useStandardCheck(host: StandardHost | null): StandardRowItem[] {
-  const content = useEditorStore((s) => s.content);
+function waitForEditor(
+  host: () => Pick<StandardHost, 'view' | 'requestEditor'>,
+  work: (view: EditorView) => void,
+  fallback?: () => void,
+) {
+  const current = host().view;
+  if (current) return work(current);
+  host().requestEditor?.();
+  const started = Date.now();
+  const poll = () => {
+    const view = host().view;
+    if (view) return work(view);
+    if (Date.now() - started > EDITOR_WAIT_MS) return fallback?.();
+    requestAnimationFrame(poll);
+  };
+  requestAnimationFrame(poll);
+}
+
+/**
+ * Whether the source uses any entry the document can use: whether the panel
+ * has a card to show. Read from the source alone, which typing doesn't change,
+ * so the panel doesn't re-render on every keystroke.
+ */
+export function useSourceUsesStandards(host: StandardHost | null): boolean {
   const source = host?.sourceContent;
   const entries = host?.entries;
   return useMemo(
-    () => (source !== undefined && entries ? buildStandardCheck({ source, translation: content, entries }) : []),
-    [source, entries, content],
+    () => source !== undefined && !!entries && buildStandardCheck({ source, translation: '', entries }).length > 0,
+    [source, entries],
+  );
+}
+
+/**
+ * The standard translation check of the translation: every occurrence in the
+ * source of an entry the document can use, against the same lines of the
+ * translation. It runs after a pause in typing, as the editor's highlights and
+ * Scripture's card do; typing must not wait on a check of the whole document.
+ */
+function useStandardCheck(host: StandardHost): { items: StandardRowItem[]; checkedText: string } {
+  const content = useEditorStore((s) => s.content);
+  const [settled, setSettled] = useState(content);
+  useEffect(() => {
+    if (settled === content) return;
+    const timer = setTimeout(() => setSettled(content), CHECK_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [content, settled]);
+  const { sourceContent: source, entries } = host;
+  const items = useMemo(
+    () => buildStandardCheck({ source, translation: settled, entries }),
+    [source, entries, settled],
+  );
+  return { items, checkedText: settled };
+}
+
+/** The card with its check: kept apart so only this re-renders while the translator types. */
+export function StandardCheckPanel({
+  host,
+  open,
+  onOpenChange,
+}: {
+  host: StandardHost;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { items, checkedText } = useStandardCheck(host);
+  return (
+    <StandardCheckCard
+      host={host}
+      items={items}
+      checkedText={checkedText}
+      languageCode={host.language.code}
+      open={open}
+      onOpenChange={onOpenChange}
+    />
   );
 }
 
@@ -51,13 +123,16 @@ const BADGE: Record<StandardState, { label: string; variant: 'success' | 'warnin
 export function StandardCheckCard({
   host,
   items,
+  checkedText,
   languageCode,
   open,
   onOpenChange,
 }: {
-  host: Pick<StandardHost, 'view' | 'editable'>;
-  /** From `useStandardCheck`, on the store's current text. */
+  host: Pick<StandardHost, 'view' | 'editable' | 'requestEditor'>;
+  /** From `useStandardCheck`, on `checkedText`. */
   items: StandardRowItem[];
+  /** The translation the items were checked in: their ranges are offsets into it. */
+  checkedText: string;
   /** For the link to the language's dictionary; without it the page picks the language. */
   languageCode: string | null;
   open: boolean;
@@ -65,24 +140,45 @@ export function StandardCheckCard({
 }) {
   const content = useEditorStore((s) => s.content);
   const setContent = useEditorStore((s) => s.setContent);
+  // Read by the wait for the editor, which outlives the render that started it.
+  const hostRef = useRef(host);
+  const contentRef = useRef(content);
+  useLayoutEffect(() => {
+    hostRef.current = host;
+    contentRef.current = content;
+  });
 
-  const edit = (edits: Edit[]): number => {
-    const view = host.view;
-    if (view) {
-      const applied = applyEdits(view, edits);
-      view.focus();
-      return applied;
-    }
-    const next = applyToText(content, edits);
-    if (next.applied) setContent(next.text);
-    return next.applied;
-  };
+  /**
+   * Runs with the translation editor, bringing it on screen first if need be
+   * (the Preview tab, or a review not yet in edit mode), as Scripture's card
+   * does. A change made around the editor would sit unsaved where the
+   * reviewer can't see it; only if the editor never comes is the stored text
+   * changed instead.
+   */
+  const withEditor = (work: (view: EditorView) => void, fallback?: () => void) =>
+    waitForEditor(() => hostRef.current, work, fallback);
+
+  const edit = (edits: Edit[], done?: (applied: number) => void) =>
+    withEditor(
+      (view) => {
+        const applied = applyEdits(view, edits);
+        view.focus();
+        done?.(applied);
+      },
+      () => {
+        const next = applyToText(contentRef.current, edits);
+        if (next.applied) setContent(next.text);
+        done?.(next.applied);
+      },
+    );
 
   const reveal = (item: StandardRowItem) => {
-    if (!host.view || !item.range) return;
+    const range = item.range;
+    if (!range) return;
     // The ranges are offsets into the store's text, which the check read; the
     // text they held finds the place again if the editor has moved on since.
-    revealRange(host.view, item.range.from, item.range.to, content.slice(item.range.from, item.range.to));
+    const expected = checkedText.slice(range.from, range.to);
+    withEditor((view) => revealRange(view, range.from, range.to, expected));
   };
 
   const toCheck = items.filter((item) => item.state !== 'used').length;
@@ -122,7 +218,7 @@ export function StandardCheckCard({
                 <StandardRow
                   key={`${item.entry.id}:${item.source.from}`}
                   item={item}
-                  onReveal={host.view && item.range ? () => reveal(item) : undefined}
+                  onReveal={item.range && (host.view || host.requestEditor) ? () => reveal(item) : undefined}
                   onUse={host.editable && change ? () => edit([change]) : undefined}
                 />
               );
@@ -135,8 +231,9 @@ export function StandardCheckCard({
               disabled={!host.editable || edits.length === 0}
               onClick={() => {
                 // One transaction for them all, so one undo takes them all back.
-                const applied = edit(edits);
-                if (applied) toast.success(`Applied ${applied} standard ${applied === 1 ? 'text' : 'texts'}`);
+                edit(edits, (applied) => {
+                  if (applied) toast.success(`Applied ${applied} standard ${applied === 1 ? 'text' : 'texts'}`);
+                });
               }}
             >
               Apply all standard texts

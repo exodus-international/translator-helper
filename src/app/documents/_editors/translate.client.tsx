@@ -99,6 +99,7 @@ export default function TranslateClient({
         documentId={document.id}
         language={targetLanguage ? { id: targetLanguageId, code: targetLanguage.code, name: targetLanguage.name } : null}
         sourceContent={sourceVersion?.content ?? ''}
+        requestEditor={showTranslationEditor}
       >
         <DocumentEditor
           document={document}

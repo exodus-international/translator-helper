@@ -23,6 +23,7 @@ export function StandardProvider({
   language,
   sourceContent,
   editable = true,
+  requestEditor,
   load = getStandardTranslationsForDocumentAction,
   children,
 }: {
@@ -31,6 +32,8 @@ export function StandardProvider({
   language: { id: string; code: string; name: string } | null;
   sourceContent: string;
   editable?: boolean;
+  /** Brings the translation editor on screen, for a tool used from Preview. */
+  requestEditor?: () => void;
   /** The action that reads the entries, replaceable so a test can provide them. */
   load?: typeof getStandardTranslationsForDocumentAction;
   children: ReactNode;
@@ -80,12 +83,13 @@ export function StandardProvider({
             view,
             registerView,
             editable: canEdit,
+            requestEditor,
             reportEditable,
             editEntry,
             addEntry,
           }
         : null,
-    [language, data, sourceContent, view, registerView, canEdit, editEntry, addEntry],
+    [language, data, sourceContent, view, registerView, canEdit, requestEditor, editEntry, addEntry],
   );
 
   if (!value) return <>{children}</>;

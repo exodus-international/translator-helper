@@ -3,13 +3,13 @@ import test, { afterEach } from 'node:test';
 import { history, undo } from '@codemirror/commands';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { sourceKeyOf } from '@/domain/standard-translation/match-form';
 import type { StandardState } from '@/domain/standard-translation/standard-translation.check';
 import { EditorProvider, useEditorStore } from '@/lib/stores/editor-provider';
 import type { EditorStoreDeps } from '@/lib/stores/editor-store';
-import { StandardCheckCard, useStandardCheck } from './standard-check-card';
+import { StandardCheckCard, StandardCheckPanel, useSourceUsesStandards } from './standard-check-card';
 import type { StandardRowItem } from './standard-check-rows';
 import type { StandardHost } from './standard-host';
 
@@ -107,12 +107,14 @@ function renderCard({
   editable = true,
   items = ITEMS,
   languageCode = 'hr' as string | null,
+  requestEditor = undefined as (() => void) | undefined,
 } = {}) {
   render(
     <Store>
       <StandardCheckCard
-        host={{ view, editable }}
+        host={{ view, editable, requestEditor }}
         items={items}
+        checkedText={TRANSLATION}
         languageCode={languageCode}
         open
         onOpenChange={() => {}}
@@ -169,15 +171,31 @@ test('Apply all writes every changed standard text in, as one undo step', async 
   assert.equal(view.state.doc.toString(), TRANSLATION);
 });
 
-test('without the editor on screen, the standard text is written into the stored translation', async () => {
+test('without the editor on screen, the panel asks for it before changing anything', async () => {
+  const user = userEvent.setup();
+  let asked = 0;
+  const rows = renderCard({ view: null, requestEditor: () => asked++ });
+
+  await user.click(within(rows[2]).getByRole('button', { name: 'Use' }));
+
+  // A review not in edit mode shows a read-only pane: the change waits for the editor.
+  assert.equal(asked, 1);
+  assert.equal(screen.getByRole('status', { name: 'Store content' }).textContent, TRANSLATION);
+});
+
+test('if the editor never comes, the standard text is written into the stored translation', async () => {
   const user = userEvent.setup();
   const rows = renderCard({ view: null });
 
   await user.click(within(rows[2]).getByRole('button', { name: 'Use' }));
 
-  assert.equal(
-    screen.getByRole('status', { name: 'Store content' }).textContent,
-    TRANSLATION.replace('Slava Ocu.', 'Slava Ocu i Sinu.'),
+  await waitFor(
+    () =>
+      assert.equal(
+        screen.getByRole('status', { name: 'Store content' }).textContent,
+        TRANSLATION.replace('Slava Ocu.', 'Slava Ocu i Sinu.'),
+      ),
+    { timeout: 3_000 },
   );
 });
 
@@ -192,6 +210,45 @@ test('clicking an item selects it in the editor', async () => {
   assert.equal(view.state.sliceDoc(from, to), 'znakom križa');
   // A Missing item has nothing in the translation to show.
   assert.equal(within(rows[4]).queryAllByRole('button').length, 0);
+});
+
+test('clicking an item right after the text moved still selects it, not what now sits at its old place', async () => {
+  const user = userEvent.setup();
+  const view = editorView();
+  const moved = `Nova crta.\n${TRANSLATION}`;
+  render(
+    <Store>
+      <StandardCheckCard
+        host={{ view, editable: true }}
+        items={ITEMS}
+        checkedText={TRANSLATION}
+        languageCode="hr"
+        open
+        onOpenChange={() => {}}
+      />
+      <TypeIn text={moved} />
+    </Store>,
+  );
+  // Typed above it since the check ran, in the editor and the store alike:
+  // the item's offsets are into the text the check read.
+  view.dispatch({ changes: { from: 0, insert: 'Nova crta.\n' } });
+  await user.click(screen.getByRole('button', { name: 'Type' }));
+
+  const rows = within(screen.getByRole('list', { name: 'Standard translations' })).getAllByRole('listitem');
+  await user.click(within(rows[1]).getByRole('button', { name: /znakom križa/ }));
+
+  const { from, to } = view.state.selection.main;
+  assert.equal(view.state.sliceDoc(from, to), 'znakom križa');
+});
+
+test('on the Preview tab, clicking an item brings the translation editor up', async () => {
+  const user = userEvent.setup();
+  let asked = 0;
+  const rows = renderCard({ view: null, requestEditor: () => asked++ });
+
+  await user.click(within(rows[1]).getByRole('button', { name: /znakom križa/ }));
+
+  assert.equal(asked, 1);
 });
 
 test('read-only, it lists but changes nothing', () => {
@@ -217,8 +274,8 @@ test('Manage opens the language’s standard translations', () => {
 
 // ─── The check the panel shows it for ─────────────────────
 
-function CheckCount({ host }: { host: StandardHost | null }) {
-  return <output aria-label="Items">{useStandardCheck(host).length}</output>;
+function SourceUses({ host }: { host: StandardHost | null }) {
+  return <output aria-label="Items">{String(useSourceUsesStandards(host))}</output>;
 }
 
 const host = (sourceContent: string): StandardHost => ({
@@ -252,11 +309,11 @@ const host = (sourceContent: string): StandardHost => ({
   addEntry: () => {},
 });
 
-test('the check finds what the source uses, and nothing without a host or a use', () => {
+test('the panel shows the card when the source uses an entry, and not without a host or a use', () => {
   const count = (h: StandardHost | null) => {
     render(
       <Store>
-        <CheckCount host={h} />
+        <SourceUses host={h} />
       </Store>,
     );
     const text = screen.getByRole('status', { name: 'Items' }).textContent;
@@ -264,7 +321,35 @@ test('the check finds what the source uses, and nothing without a host or a use'
     return text;
   };
 
-  assert.equal(count(host('Begin with the Sign of the Cross.')), '1');
-  assert.equal(count(host('Begin in silence.')), '0');
-  assert.equal(count(null), '0');
+  assert.equal(count(host('Begin with the Sign of the Cross.')), 'true');
+  assert.equal(count(host('Begin in silence.')), 'false');
+  assert.equal(count(null), 'false');
+});
+
+// ─── The check runs after a pause in typing ───────────────
+
+function TypeIn({ text }: { text: string }) {
+  const setContent = useEditorStore((s) => s.setContent);
+  return (
+    <button type="button" onClick={() => setContent(text)}>
+      Type
+    </button>
+  );
+}
+
+test('the panel checks the translation again only after a pause in typing', async () => {
+  const user = userEvent.setup();
+  render(
+    <Store>
+      <StandardCheckPanel host={host('Begin with the Sign of the Cross.')} open onOpenChange={() => {}} />
+      <TypeIn text="Započni znakom križa." />
+    </Store>,
+  );
+  const state = () => within(screen.getByRole('list', { name: 'Standard translations' })).getAllByRole('listitem')[0];
+  assert.match(state().textContent ?? '', /Missing/);
+
+  await user.click(screen.getByRole('button', { name: 'Type' }));
+  // Typing doesn't wait on a check of the whole document.
+  assert.match(state().textContent ?? '', /Missing/);
+  await waitFor(() => assert.match(state().textContent ?? '', /Used/), { timeout: 2_000 });
 });

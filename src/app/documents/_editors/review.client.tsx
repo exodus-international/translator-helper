@@ -82,6 +82,7 @@ export default function ReviewClient({
               : null
           }
         sourceContent={sourceVersion?.content ?? ''}
+        requestEditor={showTranslationEditor}
         editable={initialTargetVersion.status === DocumentStatus.PENDING_REVIEW}
       >
         <DocumentEditor

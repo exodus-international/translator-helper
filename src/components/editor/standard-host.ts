@@ -44,6 +44,8 @@ export interface StandardHost {
   editable: boolean;
   /** The editor's live answer to `editable`, as the version's status moves while the page is open. */
   reportEditable: (editable: boolean) => void;
+  /** Brings the translation editor on screen (from Preview, say). */
+  requestEditor?: () => void;
   /** Opens the dialog on an entry; on save the entries are read again. */
   editEntry: (entry: StandardTranslationEditorEntry) => void;
   /**

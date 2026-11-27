@@ -31,7 +31,7 @@ import { useState, type ReactNode } from 'react';
 import { ThreadSidebar } from '../thread-sidebar';
 import { ScriptureCheckCard } from './scripture-check-card';
 import { useScriptureHost } from './scripture-context';
-import { StandardCheckCard, useStandardCheck } from './standard-check-card';
+import { StandardCheckPanel, useSourceUsesStandards } from './standard-check-card';
 import { useStandardHost } from './standard-host';
 
 export interface DocumentPanelProps {
@@ -101,8 +101,7 @@ export function DocumentPanel({
   const [scriptureOpen, setScriptureOpen] = useState(false);
   // Only for a member of the language's team, and only once the source uses one of its entries.
   const standardHost = useStandardHost();
-  const standardItems = useStandardCheck(standardHost);
-  const standard = standardHost && standardItems.length > 0 ? standardHost : null;
+  const standard = useSourceUsesStandards(standardHost) ? standardHost : null;
   const [standardOpen, setStandardOpen] = useState(false);
 
   return (
@@ -262,13 +261,7 @@ export function DocumentPanel({
           {scripture && <ScriptureCheckCard open={scriptureOpen} onOpenChange={setScriptureOpen} />}
 
           {standard && (
-            <StandardCheckCard
-              host={standard}
-              items={standardItems}
-              languageCode={standard.language.code}
-              open={standardOpen}
-              onOpenChange={setStandardOpen}
-            />
+            <StandardCheckPanel host={standard} open={standardOpen} onOpenChange={setStandardOpen} />
           )}
 
           {threads.show && (
