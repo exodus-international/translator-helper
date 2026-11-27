@@ -222,6 +222,22 @@ export interface Edit {
   expected: string;
 }
 
+/**
+ * Edits applied to a string, back to front so earlier offsets hold, for when
+ * there is no editor to make them in. An edit whose text has changed since is
+ * skipped. Shared by the Scripture and standard translation cards.
+ */
+export function applyToText(text: string, edits: Edit[]): { text: string; applied: number } {
+  let out = text;
+  let applied = 0;
+  for (const edit of [...edits].sort((a, b) => b.from - a.from)) {
+    if (out.slice(edit.from, edit.to) !== edit.expected) continue;
+    out = out.slice(0, edit.from) + edit.insert + out.slice(edit.to);
+    applied++;
+  }
+  return { text: out, applied };
+}
+
 export const notationEdit = (item: CheckItem): Edit | null =>
   item.notation === 'missing-tag'
     ? (item.fix ?? null)

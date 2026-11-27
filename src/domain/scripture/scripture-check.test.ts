@@ -3,6 +3,7 @@ import test from 'node:test';
 import type { PassageResult } from '@/domain/bible/bible.types';
 import { citationKey, findCitations } from './citations';
 import {
+  applyToText,
   buildCheckItems,
   fixAllNotationEdits,
   missingVerseTagItem,
@@ -213,4 +214,13 @@ test('a translation that has its verse_tag, or a passage the Bible lacks, adds n
   assert.equal(missingVerseTagItem(DAY('verse_tag:'), null), null);
   assert.equal(missingVerseTagItem(DAY('verse_tag:'), { ref: 'Romans 8:35-39', status: 'out_of_range', notes: [] }), null);
   assert.equal(missingVerseTagItem('# Čitanje\n\n*Tekst.*\n', ROMANS), null);
+});
+
+test('edits made in a string skip text that has changed since', () => {
+  const edits = [
+    { from: 0, to: 3, insert: 'One', expected: 'one' },
+    { from: 4, to: 7, insert: 'Two', expected: 'xxx' },
+    { from: 8, to: 13, insert: 'Three', expected: 'three' },
+  ];
+  assert.deepEqual(applyToText('one two three', edits), { text: 'One two Three', applied: 2 });
 });

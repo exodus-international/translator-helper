@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { Edit } from '@/domain/scripture/scripture-check';
+import { applyToText, type Edit } from '@/domain/scripture/scripture-check';
 import { buildStandardCheck, type StandardState } from '@/domain/standard-translation/standard-translation.check';
 import { useEditorStore } from '@/lib/stores/editor-provider';
 import { ArrowUpRight, ChevronDown, Replace } from 'lucide-react';
@@ -12,7 +12,7 @@ import type { EditorView } from '@codemirror/view';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { applyEdits, revealRange } from './cm-scripture';
-import { applyToText, standardRowDetail, standardRowName, type StandardRowItem } from './standard-check-rows';
+import { standardRowDetail, standardRowName, type StandardRowItem } from './standard-check-rows';
 import type { StandardHost } from './standard-host';
 
 /** How long a pause in typing comes before the check runs again, as for Scripture's card. */

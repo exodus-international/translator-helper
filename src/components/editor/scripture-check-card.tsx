@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import type { PassageResult } from '@/domain/bible/bible.types';
 import { findCitations } from '@/domain/scripture/citations';
 import {
+  applyToText,
   buildCheckItems,
   fixAllNotationEdits,
   missingVerseTagItem,
@@ -30,18 +31,6 @@ import { resolvePassages, retryFailedPassages } from './scripture-client';
 
 const CHECK_DELAY_MS = 600;
 const EDITOR_WAIT_MS = 1_500;
-
-/** Applies edits to a string, back to front so earlier offsets hold. */
-function applyToText(text: string, edits: Edit[]): { text: string; applied: number } {
-  let out = text;
-  let applied = 0;
-  for (const edit of [...edits].sort((a, b) => b.from - a.from)) {
-    if (out.slice(edit.from, edit.to) !== edit.expected) continue;
-    out = out.slice(0, edit.from) + edit.insert + out.slice(edit.to);
-    applied++;
-  }
-  return { text: out, applied };
-}
 
 /**
  * A passage as it should sit where it goes: a paragraph of its own at the

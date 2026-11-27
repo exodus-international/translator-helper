@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { StandardState } from '@/domain/standard-translation/standard-translation.check';
-import { applyToText, standardRowDetail, standardRowName, type StandardRowItem } from './standard-check-rows';
+import { standardRowDetail, standardRowName, type StandardRowItem } from './standard-check-rows';
 
 function item(
   state: StandardState,
@@ -44,13 +44,4 @@ test('a term is named by its wording, anything else by its name or source', () =
   assert.equal(standardRowName(item('used', { kind: 'term', name: 'Sign' })), 'znak križa');
   assert.equal(standardRowName(item('used', { name: 'Sign' })), 'Sign');
   assert.equal(standardRowName(item('used')), 'Sign of the Cross');
-});
-
-test('edits made in a string skip text that has changed since', () => {
-  const edits = [
-    { from: 0, to: 3, insert: 'One', expected: 'one' },
-    { from: 4, to: 7, insert: 'Two', expected: 'xxx' },
-    { from: 8, to: 13, insert: 'Three', expected: 'three' },
-  ];
-  assert.deepEqual(applyToText('one two three', edits), { text: 'One two Three', applied: 2 });
 });
