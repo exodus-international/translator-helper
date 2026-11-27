@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFrontmatter } from './frontmatter';
+import { frontmatterBlock, parseFrontmatter } from './frontmatter';
 
 describe('parseFrontmatter', () => {
   it('returns the text untouched when there is no frontmatter', () => {
@@ -46,5 +46,17 @@ describe('parseFrontmatter', () => {
   it('treats an unclosed delimiter as plain content', () => {
     const text = '---\ntitle: never closed';
     assert.deepEqual(parseFrontmatter(text), { data: {}, content: text });
+  });
+});
+
+describe('frontmatterBlock', () => {
+  it('returns the block as written, BOM and delimiters included', () => {
+    const block = '\uFEFF---\r\ntitle: Day 1\r\n---';
+    assert.equal(frontmatterBlock(`${block}\n# Day 1`), block);
+  });
+
+  it('returns nothing when there is no frontmatter or it is never closed', () => {
+    assert.equal(frontmatterBlock('# Day 1\n---\n'), '');
+    assert.equal(frontmatterBlock('---\ntitle: Day 1\n'), '');
   });
 });

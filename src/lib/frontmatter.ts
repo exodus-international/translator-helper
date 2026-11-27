@@ -10,8 +10,17 @@ export type Frontmatter = {
 // - strip a UTF-8 BOM before matching (gray-matter did the same)
 // - content excludes exactly one newline after the closing delimiter
 const FRONTMATTER_DELIMITER = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---/;
+const RAW_BLOCK = /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---/;
 const LEADING_NEWLINE = /^\r?\n/;
 const BOM = 0xfeff;
+
+/**
+ * The frontmatter exactly as written, BOM and delimiters included, or '' when
+ * there is none: what text processors skip and put back untouched.
+ */
+export function frontmatterBlock(text: string): string {
+  return RAW_BLOCK.exec(text)?.[0] ?? '';
+}
 
 export function parseFrontmatter(text: string): Frontmatter {
   if (text.charCodeAt(0) === BOM) text = text.slice(1);

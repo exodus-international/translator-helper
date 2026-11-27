@@ -1,4 +1,4 @@
-import { parseFrontmatter } from '@/lib/frontmatter';
+import { frontmatterBlock, parseFrontmatter } from '@/lib/frontmatter';
 import {
   findCitations,
   findQuotedText,
@@ -41,7 +41,7 @@ const MAX_HINT_CHARS = 2_000;
 // MIN_SIMILARITY it is shortened or another translation: the full passage goes in,
 // with a notice. Below MIN_SAME_PASSAGE it is likely another passage altogether --
 // a lectionary psalm numbered differently -- and is left to the model.
-const MIN_SIMILARITY = 0.9;
+export const MIN_SIMILARITY = 0.9;
 const MIN_SAME_PASSAGE = 0.6;
 // A quotation is the whole passage when it has this share of the passage's words.
 const MIN_WHOLE_QUOTE = 0.95;
@@ -200,7 +200,7 @@ export async function prepareScripture(
 ): Promise<PreparedScripture> {
   if (PLACEHOLDER.test(source)) return unchanged(source);
 
-  const frontmatter = source.match(FRONTMATTER)?.[0] ?? '';
+  const frontmatter = frontmatterBlock(source);
   const lines = source.slice(frontmatter.length).split('\n');
   const { data } = parseFrontmatter(source);
   let verseTag = typeof data.verse_tag === 'string' && data.verse_tag.trim() ? normalizeCitation(data.verse_tag) : null;

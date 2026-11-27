@@ -1,4 +1,7 @@
 import { diffWords, similarity } from '@/domain/scripture/citations';
+// Scripture's threshold: below it, a line is another text, not a variant of the entry.
+import { MIN_SIMILARITY } from '@/domain/scripture/scripture.service';
+import { frontmatterBlock } from '@/lib/frontmatter';
 import { renderInLayout, type LayoutNotice } from './layout';
 import { findOccurrences, type Occurrence } from './match';
 import { sourceKeyOf, stripLayout } from './match-form';
@@ -21,15 +24,11 @@ import { findTermOccurrences } from './stem';
  * caller decides.
  */
 
-// The same threshold as Scripture's (`MIN_SIMILARITY` in scripture.service.ts):
-// below it, a line is another text, not a variant of the entry.
-const MIN_SIMILARITY = 0.9;
 // A near miss on a shorter entry would mostly be noise: "Hail Mary" is like many short lines.
 const MIN_NEAR_MISS_WORDS = 4;
 const MAX_NEAR_MISS_PAIRS = 200_000;
 const MAX_LABEL_LENGTH = 60;
 
-const FRONTMATTER = /^﻿?---[ \t]*\r?\n[\s\S]*?\r?\n---/;
 const PLACEHOLDER_PREFIX = '{{std:';
 const PLACEHOLDERS = /\{\{std:\d+\}\}/g;
 const LOOKBACK = 200;
@@ -99,7 +98,7 @@ export function prepareStandardTranslations(
 ): PreparedStandardTranslations {
   if (entries.length === 0 || prepared.includes(PLACEHOLDER_PREFIX)) return unchanged(prepared);
 
-  const frontmatter = prepared.match(FRONTMATTER)?.[0] ?? '';
+  const frontmatter = frontmatterBlock(prepared);
   const body = prepared.slice(frontmatter.length);
   const occurrences = findOccurrences(body, entries);
   const notices = missedEntries(body, entries, occurrences, options.original);
@@ -256,7 +255,7 @@ function missedEntries(
   if (missed.size === 0) return [];
 
   const notices: string[] = [];
-  const originalBody = original.slice(original.match(FRONTMATTER)?.[0].length ?? 0);
+  const originalBody = original.slice(frontmatterBlock(original).length);
   if (originalBody !== body) {
     // Matched with every entry, so a longer one still claims its text: an
     // entry missed because a longer one took it was not taken by Scripture.
