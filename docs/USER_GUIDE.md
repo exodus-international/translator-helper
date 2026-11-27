@@ -16,6 +16,7 @@ This guide covers how translators and deployers work with the Translation Helper
   - [Dashboard Overview](#dashboard-overview)
   - [Starting a Translation](#starting-a-translation)
   - [Using the Translation Editor](#using-the-translation-editor)
+  - [Standard Translations](#standard-translations)
   - [Saving and Submitting](#saving-and-submitting)
   - [Handling Review Feedback](#handling-review-feedback)
 - [Reviewer Workflow](#reviewer-workflow)
@@ -237,6 +238,30 @@ The translation interface has two panels:
 - Preserve Markdown syntax: `**bold**`, `*italic*`, `> blockquotes`, `# headings`
 - Keep frontmatter keys in English, only translate their values
 - Press **F11** for Zen mode (full-screen editor, fewer distractions)
+
+### Standard Translations
+
+Each language team keeps a dictionary of **standard translations**: prayers, forms and phrases it always translates the
+same way, such as the *Glory Be* or *Liturgy of the Hours*. An entry applies to every project in the language, or to one
+project only; a project entry wins over a general one with the same source.
+
+- **Standard translations** in the sidebar lists the dictionary, one tab per language. Every member of the language team
+  can add, edit, delete and move entries; entries of completed projects are hidden until you ask for them.
+- To add one from a document, select the text in the **source** pane and choose **Add standard translation**. The
+  translation is taken from the same lines of your translation; check it before saving. Layout (blockquote markers,
+  italics around lines, pause markers) is left out: each document keeps its own.
+- **Fixed form** makes an entry be used exactly as written even inside a sentence. Use it for words that never change
+  form, like *Amen* or *Exodus 90*.
+
+**AI translation** inserts a standard translation as written when the text stands on its own (a line, a heading, a
+sentence, a quotation) and keeps the layout of the place it is used. Inside a sentence, where the grammar may change its
+ending, it is a *term*: the AI keeps the wording and adapts its form. Scripture always comes from the Bible, never from a
+standard translation. Warnings after the draft say what to check.
+
+**In the editor**, the translation highlights standard text: a solid violet highlight where it is used as written, a
+dotted violet underline for a term, and amber where the translation differs from the standard. Hover a highlight for its
+card; **Use standard text** writes the standard wording in, in one undo step. The **Standard translations** card in the
+document panel lists every standard text the source uses (Used, Changed or Missing) and can apply them all at once.
 
 ### Saving and Submitting
 
