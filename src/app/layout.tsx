@@ -76,9 +76,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
-  // The AI instructions entry is for people with a language to instruct, which
-  // is every admin and anyone assigned to one. This runs on every request for
-  // every signed-in user, so it asks for a number rather than the rows.
+  // The AI instructions and standard translations entries are for people with a
+  // language to work on, which is every admin and anyone assigned to one. This
+  // runs on every request for every signed-in user, so it asks for a number
+  // rather than the rows.
   const isAdmin = user?.role === 'ADMIN';
   const [instructionLanguages, managedLanguages] = user
     ? await Promise.all([countUserTargetLanguages(user.id), countManagedLanguages(user.id)])

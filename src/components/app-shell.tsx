@@ -51,6 +51,7 @@ import { useTrailStore, type TrailCrumb } from '@/lib/page-trail';
 import { SessionUser } from '@/lib/session';
 import {
   Bell,
+  BookMarked,
   BookOpenText,
   Bug,
   ChevronsUpDown,
@@ -83,6 +84,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   admin: 'Admin',
   bible: 'Bible',
   instructions: 'AI instructions',
+  'standard-translations': 'Standard translations',
   languages: 'Languages',
   settings: 'Settings',
   profile: 'Profile',
@@ -176,6 +178,14 @@ const ROOT_NAV_ITEMS: NavItem[] = [
 // guidance and everyone on the language can read it, so it sits with the work
 // rather than in the Admin group.
 const INSTRUCTIONS_NAV_ITEM: NavItem = { href: '/instructions', label: 'AI instructions', icon: ScrollText };
+
+// The language team's dictionary: read by the same people as the instructions,
+// and written by every member of the team, so it follows them in the sidebar.
+const STANDARD_TRANSLATIONS_NAV_ITEM: NavItem = {
+  href: '/standard-translations',
+  label: 'Standard translations',
+  icon: BookMarked,
+};
 
 // Languages sits at /languages rather than under /admin: the page is a place of
 // its own, and its URL is what stops the language-wide effect of a change from
@@ -401,7 +411,7 @@ function AppSidebar(
             ...ROOT_NAV_ITEMS,
             // An admin gets Languages in the Admin group below instead.
             ...(canSeeLanguages && !isAdmin ? [LANGUAGES_NAV_ITEM] : []),
-            ...(canReadInstructions ? [INSTRUCTIONS_NAV_ITEM] : []),
+            ...(canReadInstructions ? [INSTRUCTIONS_NAV_ITEM, STANDARD_TRANSLATIONS_NAV_ITEM] : []),
           ]}
         />
         {isAdmin && <SidebarNavGroup items={ADMIN_NAV_ITEMS} label="Admin" />}
@@ -417,7 +427,7 @@ function AppSidebar(
 
 interface AppShellProps {
   user: SessionUser | null;
-  /** Admins, and anyone assigned to at least one language. */
+  /** Admins, and anyone assigned to at least one language: AI instructions and standard translations. */
   canReadInstructions?: boolean;
   /** Admins, and anyone who manages at least one language. */
   canSeeLanguages?: boolean;
