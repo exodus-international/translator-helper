@@ -31,6 +31,13 @@ interface Span {
 }
 
 interface Line {
+  /** The raw line, without its newline. */
+  start: number;
+  end: number;
+  /** Where a list marker or heading would start, after indentation and blockquote markers. */
+  marker: number;
+  /** Where the prefix ends. */
+  body: number;
   /** The wording, between the prefix and what trails it; empty for a comment-only line. */
   from: number;
   to: number;
@@ -149,11 +156,12 @@ function readLayout(raw: string): { lines: Line[]; cuts: Cut[] } {
     start = end + 1;
     const inComment = commentAt(lineStart);
     if (!inComment && BLANK_ONLY.test(text)) {
-      lines.push({ from: lineStart, to: lineStart, blank: true });
+      lines.push({ start: lineStart, end, marker: end, body: end, from: end, to: end, blank: true });
       continue;
     }
 
     let pos = inComment ? Math.min(inComment.to, end) : lineStart;
+    let marker = lineStart;
     const eat = (pattern: RegExp, part: LayoutPart) => {
       const match = pattern.exec(raw.slice(pos, end));
       if (!match) return false;
@@ -164,12 +172,15 @@ function readLayout(raw: string): { lines: Line[]; cuts: Cut[] } {
     if (!inComment) {
       eat(INDENT, 'indentation');
       eat(QUOTE, 'blockquote');
+      marker = pos;
       if (!eat(LIST, 'list')) eat(HEADING, 'heading');
       if (BLANK_ONLY.test(raw.slice(pos, end))) {
-        lines.push({ from: pos, to: pos, blank: true });
+        lines.push({ start: lineStart, end, marker, body: pos, from: pos, to: pos, blank: true });
         continue;
       }
     }
+    // The rest of a comment from the line above is no prefix.
+    const body = inComment ? lineStart : pos;
 
     let to = end;
     // A hard break only breaks a line that something follows.
@@ -187,7 +198,7 @@ function readLayout(raw: string): { lines: Line[]; cuts: Cut[] } {
     while (to > pos && isFiller(to - 1)) to--;
     let from = pos;
     while (from < to && isFiller(from)) from++;
-    lines.push({ from, to, blank: false });
+    lines.push({ start: lineStart, end, marker, body, from, to, blank: false });
   }
 
   // Paragraphs run between blank lines; a comment-only line doesn't end one.
@@ -310,4 +321,76 @@ export function stripLayout(raw: string): { text: string; removed: LayoutPart[] 
     text: out.join('\n'),
     removed: LAYOUT_PARTS.filter((part) => cuts.some((cut) => cut.part === part)),
   };
+}
+
+// ─── Reading each line's layout ───────────────────────────
+
+/**
+ * One raw line, cut where its layout meets its wording, so an entry's wording
+ * can take the wording's place (`layout.ts`). The fields, in this order, make
+ * up the raw line.
+ */
+export interface LineLayout {
+  /** Nothing after the prefix: a stanza break. */
+  blank: boolean;
+  /** Indentation and blockquote markers. */
+  prefix: string;
+  /** A list marker or heading, with the space after it. */
+  marker: string;
+  /** Spaces and comments between the prefix and the wording. */
+  lead: string;
+  /**
+   * Emphasis around the whole line, or opening on the first line of the
+   * paragraph it wraps; `close` ends it, on the paragraph's last line.
+   */
+  open: string;
+  /** The wording, formatting inside it included; empty on a line that holds only a comment. */
+  text: string;
+  close: string;
+  /** Everything after: spaces, comments, a hard break. */
+  tail: string;
+}
+
+/** Each line of `raw`, cut into its layout and its wording as `toMatchForm` and `stripLayout` read them. */
+export function readLines(raw: string): LineLayout[] {
+  const { lines, cuts } = readLayout(raw);
+  // Wrappers are the only emphasis cuts: pairs at the ends of a line or paragraph.
+  const opens = new Map<number, number>();
+  const closes = new Map<number, number>();
+  for (const cut of cuts) {
+    if (cut.part !== 'emphasis') continue;
+    opens.set(cut.from, cut.to);
+    closes.set(cut.to, cut.from);
+  }
+
+  return lines.map((line): LineLayout => {
+    // Nested wrappers ("**_Amen._**") are a cut each, end to end.
+    let close = line.to;
+    for (let at = closes.get(close); at !== undefined && at >= line.from; at = closes.get(close)) close = at;
+    let open = line.from;
+    for (let at = opens.get(open); at !== undefined && at <= close; at = opens.get(open)) open = at;
+    return {
+      blank: line.blank,
+      prefix: raw.slice(line.start, line.marker),
+      marker: raw.slice(line.marker, line.body),
+      lead: raw.slice(line.body, line.from),
+      open: raw.slice(line.from, open),
+      text: raw.slice(open, close),
+      close: raw.slice(close, line.to),
+      tail: raw.slice(line.to, line.end),
+    };
+  });
+}
+
+/**
+ * The emphasis inside wording, as the length of each delimiter run in order:
+ * "Pray, **Mother of God**, *now*" gives [2, 2, 1, 1]. `*` and `_` count
+ * alike: either spelling is the same formatting.
+ */
+export function emphasisOf(text: string): number[] {
+  const runs: number[] = [];
+  for (const run of text.matchAll(DELIMITER_RUN)) {
+    if (isDelimiter(text, run.index, run.index + run[0].length)) runs.push(run[0].length);
+  }
+  return runs;
 }

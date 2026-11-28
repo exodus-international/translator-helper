@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, Lock, ScrollText, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { updateLanguageInstructionsAction } from '@/domain/language/language.actions';
 import { TRANSLATION_INSTRUCTIONS_MAX_LENGTH } from '@/domain/language/language.types';
+import { STANDARD_PROMPT_LEAD } from '@/domain/standard-translation/prompt';
 import { buildSystemPromptSegments, type PromptFormat } from '@/domain/translation/translation.prompt';
 import { capture } from '@/lib/analytics';
 
@@ -212,6 +214,25 @@ export default function InstructionsClient({
               )}
             </PromptBlock>
 
+            {format === 'markdown' && (
+              <PromptBlock
+                label="Standard translations"
+                note="only when a document uses them"
+                footer={
+                  <>
+                    When a document uses the team&apos;s{' '}
+                    <Link href="/standard-translations" className="text-primary underline-offset-4 hover:underline">
+                      standard translations
+                    </Link>
+                    , the request also carries this section, followed by the placeholders and terms that document
+                    uses.
+                  </>
+                }
+              >
+                {STANDARD_PROMPT_LEAD}
+              </PromptBlock>
+            )}
+
             {format === 'yaml' && (
               <div className="border-warning/40 bg-warning/10 flex items-start gap-2 rounded-lg border px-3 py-2.5">
                 <TriangleAlert className="text-warning mt-0.5 size-3.5 shrink-0" aria-hidden />
@@ -268,11 +289,14 @@ function PromptBlock({
   label,
   note,
   emphasised,
+  footer,
   children,
 }: {
   label: string;
   note?: string;
   emphasised?: boolean;
+  /** Said about the text, below it. */
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -289,6 +313,7 @@ function PromptBlock({
         {note && <span className="text-muted-foreground text-[10px]">{note}</span>}
       </div>
       <pre className="max-h-48 overflow-auto font-mono text-[11px] leading-4 whitespace-pre-wrap">{children}</pre>
+      {footer && <p className="text-muted-foreground mt-1.5 text-xs">{footer}</p>}
     </div>
   );
 }

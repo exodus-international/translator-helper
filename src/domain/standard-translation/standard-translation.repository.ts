@@ -36,6 +36,38 @@ export async function getStandardTranslationById(id: string): Promise<StandardTr
   return prisma.standardTranslation.findUnique({ where: { id }, select: rowSelect });
 }
 
+/** What matching a document needs of an entry. */
+const matchSelect = {
+  id: true,
+  name: true,
+  sourceText: true,
+  sourceKey: true,
+  targetText: true,
+  fixedForm: true,
+  sourceProjectId: true,
+} satisfies Prisma.StandardTranslationSelect;
+
+export type StandardTranslationMatch = Prisma.StandardTranslationGetPayload<{ select: typeof matchSelect }>;
+
+/**
+ * The entries a document in the language can use: the general ones, and its
+ * own project's when it has one. Another project's entries never reach it,
+ * which is also why a completed project's entries need no status of their own.
+ */
+export async function listEntriesForTranslation(
+  languageId: string,
+  sourceProjectId: string | null,
+): Promise<StandardTranslationMatch[]> {
+  return prisma.standardTranslation.findMany({
+    where: {
+      languageId,
+      OR: [{ sourceProjectId: null }, ...(sourceProjectId ? [{ sourceProjectId }] : [])],
+    },
+    select: matchSelect,
+    orderBy: { id: 'asc' },
+  });
+}
+
 /** A project of the language, as the Scope filter lists it. */
 interface ScopeProject {
   id: string;

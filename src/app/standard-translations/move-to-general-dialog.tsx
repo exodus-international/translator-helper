@@ -18,7 +18,7 @@ import { moveStandardTranslationToGeneralAction } from '@/domain/standard-transl
 import type { StandardTranslationRow } from '@/domain/standard-translation/standard-translation.repository';
 import type { MoveKeep } from '@/domain/standard-translation/standard-translation.types';
 import { capture } from '@/lib/analytics';
-import { entryLabel } from './entry-label';
+import { entryLabel } from '@/domain/standard-translation/entry-label';
 
 /** A project entry about to become general, and the general entry with the same source, if any. */
 export interface PendingMove {

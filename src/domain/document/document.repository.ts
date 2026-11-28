@@ -108,6 +108,12 @@ export async function getDocumentById(id: string): Promise<DocumentDetail | null
   });
 }
 
+/** The project a document belongs to, or null when it has none or there is no such document. */
+export async function getDocumentSourceProjectId(id: string): Promise<string | null> {
+  const document = await prisma.document.findUnique({ where: { id }, select: { sourceProjectId: true } });
+  return document?.sourceProjectId ?? null;
+}
+
 /**
  * Resolves the URL form /documents/{project}/{slug}/... to a document.
  *

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { sourceKeyOf, stripLayout, toMatchForm, type LayoutPart } from './match-form';
+import { readLines, sourceKeyOf, stripLayout, toMatchForm, type LayoutPart, type LineLayout } from './match-form';
 
 const keyOf = (raw: string) => toMatchForm(raw).key;
 
@@ -217,6 +217,50 @@ test('text with no layout comes back unchanged', () => {
   const raw = 'Glory be to the Father,\nand to the Son.\n\nAmen.';
 
   assert.deepEqual(stripLayout(raw), { text: raw, removed: [] });
+});
+
+// ─── readLines ────────────────────────────────────────────
+
+const LINE: LineLayout = { blank: false, prefix: '', marker: '', lead: '', open: '', text: '', close: '', tail: '' };
+
+test('readLines cuts the Glory Be into blockquote, italics around each line, wording and pause marker', () => {
+  assert.deepEqual(readLines(GLORY_BE), [
+    {
+      ...LINE,
+      prefix: '> ',
+      open: '*',
+      text: 'Glory be to the Father, and to the Son, and to the Holy Spirit,',
+      close: '*',
+    },
+    {
+      ...LINE,
+      prefix: '> ',
+      open: '*',
+      text: 'as it was in the beginning, is now, and ever shall be, world without end. Amen.',
+      close: '*',
+      tail: ' <!-- pause-duration="10s" -->',
+    },
+  ]);
+});
+
+test('readLines opens italics around a paragraph on its first line and closes them on its last', () => {
+  assert.deepEqual(readLines('*Let us remember  \nthat we are in His presence.* <!-- pause -->'), [
+    { ...LINE, open: '*', text: 'Let us remember', tail: '  ' },
+    { ...LINE, text: 'that we are in His presence.', close: '*', tail: ' <!-- pause -->' },
+  ]);
+});
+
+test('readLines reads a list marker, a blank quoted line and a comment-only line', () => {
+  assert.deepEqual(readLines('> 1. Our Father,\n>\n>    hallowed be thy name.\n> <!-- pause -->'), [
+    { ...LINE, prefix: '> ', marker: '1. ', text: 'Our Father,' },
+    { ...LINE, blank: true, prefix: '>' },
+    { ...LINE, prefix: '>    ', text: 'hallowed be thy name.' },
+    { ...LINE, prefix: '> ', tail: '<!-- pause -->' },
+  ]);
+});
+
+test('readLines reads nested wrappers as one opening and one closing', () => {
+  assert.deepEqual(readLines('**_Amen._**'), [{ ...LINE, open: '**_', text: 'Amen.', close: '_**' }]);
 });
 
 // A quadratic scan took seconds on these (a regex backtracking over a long
