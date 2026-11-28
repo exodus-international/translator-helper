@@ -99,31 +99,35 @@ export function StandardProvider({
     [language, data, sourceContent, view, registerView, canEdit, requestEditor, editEntry, addEntry],
   );
 
-  if (!value) return <>{children}</>;
   const prefill = dialog && 'prefill' in dialog ? dialog.prefill : null;
   const editing = dialog && 'entry' in dialog ? dialog.entry : null;
   // From a document the choice is the design's: all projects (where an entry
   // starts) or this document's project, plus the project an edited entry
   // already belongs to.
-  const offered = value.projects.filter(
-    (project) => project.id === value.sourceProjectId || project.id === editing?.sourceProjectId,
-  );
+  const offered =
+    value?.projects.filter(
+      (project) => project.id === value.sourceProjectId || project.id === editing?.sourceProjectId,
+    ) ?? [];
+  // Always the same tree, the entries loaded or not: wrapping the editor only
+  // once they arrive would remount it, and with it whatever it held unsaved.
   return (
     <StandardContext.Provider value={value}>
       {children}
-      <StandardTranslationDialog
-        open={dialog !== null}
-        onOpenChange={(open) => !open && setDialog(null)}
-        language={value.language}
-        projects={offered}
-        entry={editing}
-        initial={prefill ? { ...prefill, sourceProjectId: null } : undefined}
-        hint={prefill?.hint}
-        onSaved={() => {
-          setDialog(null);
-          setAttempt((n) => n + 1);
-        }}
-      />
+      {value && (
+        <StandardTranslationDialog
+          open={dialog !== null}
+          onOpenChange={(open) => !open && setDialog(null)}
+          language={value.language}
+          projects={offered}
+          entry={editing}
+          initial={prefill ? { ...prefill, sourceProjectId: null } : undefined}
+          hint={prefill?.hint}
+          onSaved={() => {
+            setDialog(null);
+            setAttempt((n) => n + 1);
+          }}
+        />
+      )}
     </StandardContext.Provider>
   );
 }

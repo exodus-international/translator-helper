@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { afterEach, mock } from 'node:test';
+import { useEffect } from 'react';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { sourceKeyOf } from '@/domain/standard-translation/match-form';
 import type { StandardTranslationEditorEntry } from '@/domain/standard-translation/standard-translation.repository';
@@ -75,4 +76,26 @@ test('entries that could not be read leave the editor without the tools, and say
   } finally {
     error.mock.restore();
   }
+});
+
+test('the editor inside stays mounted when the entries arrive, keeping what it holds', async () => {
+  let mounts = 0;
+  function Editor() {
+    useEffect(() => {
+      mounts++;
+    }, []);
+    return <Tools />;
+  }
+  render(
+    <StandardProvider
+      documentId="6f1c2d3e-0000-4000-8000-0000000000d1"
+      language={croatian}
+      sourceContent=""
+      load={async () => ({ entries: [glory], projects: [], sourceProjectId: null })}
+    >
+      <Editor />
+    </StandardProvider>,
+  );
+  await waitFor(() => assert.equal(screen.getByRole('status', { name: 'Tools' }).textContent, 'Glory Be'));
+  assert.equal(mounts, 1);
 });
