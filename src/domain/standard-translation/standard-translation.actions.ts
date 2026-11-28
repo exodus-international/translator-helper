@@ -1,19 +1,22 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { authorize } from '@/lib/authorize';
+import { authorize, ForbiddenError } from '@/lib/authorize';
 import { parseInput } from '@/lib/validation';
 import { languageScopeSchema } from '@/domain/user-language/user-language.types';
+import { getDocumentSourceProjectId } from '@/domain/document/document.repository';
 import {
   createStandardTranslation,
   deleteStandardTranslation,
   getMoveConflict,
+  listEditorEntries,
   moveStandardTranslationToGeneral,
   updateStandardTranslation,
 } from './standard-translation.repository';
 import { authorizeEntry } from './standard-translation.permissions';
 import {
   createStandardTranslationSchema,
+  documentEntriesSchema,
   moveStandardTranslationSchema,
   updateStandardTranslationSchema,
 } from './standard-translation.types';
@@ -72,4 +75,26 @@ export async function moveStandardTranslationToGeneralAction(id: string, input: 
   const kept = await moveStandardTranslationToGeneral(id, keep, user.id);
   revalidatePath(PAGE_PATH);
   return kept;
+}
+
+/**
+ * The standard translations a document's editor highlights and checks: the
+ * language's general entries and the document's project's, for the team of
+ * that language (and admins), who are also the ones who may change them.
+ *
+ * Someone outside the team may still open the editor: for them it answers
+ * null rather than failing, so the editor can tell "none for you" from an
+ * error, whose message production builds don't pass on.
+ */
+export async function getStandardTranslationsForDocumentAction(input: unknown) {
+  const { documentId, languageId } = parseInput(documentEntriesSchema, input);
+  try {
+    await authorize({ language: languageId, role: 'member' });
+  } catch (error) {
+    if (error instanceof ForbiddenError) return null;
+    throw error;
+  }
+
+  const sourceProjectId = await getDocumentSourceProjectId(documentId);
+  return { ...(await listEditorEntries(languageId, sourceProjectId)), sourceProjectId };
 }

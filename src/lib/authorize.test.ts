@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { Role, ProjectRole } from '@/generated/prisma/enums';
 import type { SessionUser } from './session';
-import { createAuthorize, type AuthorizeDeps } from './authorize';
+import { createAuthorize, ForbiddenError, type AuthorizeDeps } from './authorize';
 
 // ─── Test fixtures ───────────────────────────────────────────
 
@@ -317,5 +317,22 @@ describe('authorize { language, role }', () => {
     await authorize({ language: CROATIAN, role: 'manager' });
 
     assert.deepStrictEqual(seen, [CROATIAN]);
+  });
+});
+
+describe('refusals', () => {
+  it('are ForbiddenErrors, whatever was asked for, so a caller can tell them from a failure', async () => {
+    const authorize = createAuthorize(
+      createDeps({ getUserRolesInProject: async () => [], getUserRoleForLanguage: async () => null }),
+    );
+
+    const asked = [
+      'admin',
+      { project: 'project-1', role: 'member' },
+      { language: 'language-hr', role: 'member' },
+    ] as const;
+    for (const permission of asked) {
+      await assert.rejects(() => authorize(permission), ForbiddenError);
+    }
   });
 });

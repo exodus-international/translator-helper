@@ -14,6 +14,7 @@ import { capture } from '@/lib/analytics';
 import { isRefusal } from '@/lib/action-refusal';
 import { useActiveLanguage, useAnalyticsProjectGroup } from '@/components/analytics-project-group';
 import { ScriptureProvider } from '@/components/editor/scripture-context';
+import { StandardProvider } from '@/components/editor/standard-context';
 import type { SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { canReviewClient, isAdminClient } from '@/lib/permissions-client';
 import { SessionUser } from '@/lib/session';
@@ -73,77 +74,89 @@ export default function ReviewClient({
       editable={initialTargetVersion.status === DocumentStatus.PENDING_REVIEW}
       requestEditor={showTranslationEditor}
     >
-      <DocumentEditor
-        viewerRef={viewerRef}
-        document={document}
-        sourceVersion={sourceVersion}
-        targetVersion={initialTargetVersion}
-        initialSuggestions={initialSuggestions}
-        translationProjectId={translationProjectId}
-        targetLanguageId={initialTargetVersion.languageId ?? ''}
-        user={user}
-        canDeploy={canDeploy}
-        canChangeStatus={canChangeStatus}
-        audioTextVersionId={audioTextVersionId}
-        variant="review"
-        targetLanguageName={targetLanguage?.name ?? null}
-        canEditSource={(tv) => isAdminClient(user) && !isApprovedOrLater(tv)}
-        canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
-        disableReopen={(tv) => isApprovedOrLater(tv)}
-        reviewConfig={{
-          canEdit: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW,
-          renderEditActions: ({ exitEditMode }) => <ReviewEditActions exitEditMode={exitEditMode} />,
-        }}
-        onEditSuggestion={async (suggestionId, data) => {
-          try {
-            const result = await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
-            if (isRefusal(result)) {
-              toast.error(result.refused.message);
-              return;
-            }
-            capture('suggestion_edited');
-            toast.success('Suggestion updated!');
-          } catch (error: any) {
-            toast.error(error.message || 'Failed to edit suggestion');
+      <StandardProvider
+        documentId={document.id}
+        language={
+            targetLanguage
+              ? { id: initialTargetVersion.languageId, code: targetLanguage.code, name: targetLanguage.name }
+              : null
           }
-        }}
-        hideDetails
-        sidebarActions={<ReviewWorkflowActions document={document} />}
-        sidebarSummary={
-          <>
-            <AudioStatus
-              documentVersionId={initialTargetVersion.id}
-              currentVersion={initialTargetVersion.version}
-              status={initialTargetVersion.status}
-              compact
-            />
-            <GitHubStatus
-              documentVersionId={initialTargetVersion.id}
-              isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-              compact
-            />
-          </>
-        }
-        sidebarDetails={
-          <>
-            <AudioStatus
-              documentVersionId={initialTargetVersion.id}
-              currentVersion={initialTargetVersion.version}
-              status={initialTargetVersion.status}
-              frame="section"
-            />
-            <GitHubStatus
-              documentVersionId={initialTargetVersion.id}
-              isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-              frame="section"
-            />
-            {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
-              <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />
-            )}
-          </>
-        }
-        sidebarDetailsDefaultOpen={initialTargetVersion.status === DocumentStatus.DEPLOYED}
-      />
+        sourceContent={sourceVersion?.content ?? ''}
+        requestEditor={showTranslationEditor}
+        editable={initialTargetVersion.status === DocumentStatus.PENDING_REVIEW}
+      >
+        <DocumentEditor
+          viewerRef={viewerRef}
+          document={document}
+          sourceVersion={sourceVersion}
+          targetVersion={initialTargetVersion}
+          initialSuggestions={initialSuggestions}
+          translationProjectId={translationProjectId}
+          targetLanguageId={initialTargetVersion.languageId ?? ''}
+          user={user}
+          canDeploy={canDeploy}
+          canChangeStatus={canChangeStatus}
+          audioTextVersionId={audioTextVersionId}
+          variant="review"
+          targetLanguageName={targetLanguage?.name ?? null}
+          canEditSource={(tv) => isAdminClient(user) && !isApprovedOrLater(tv)}
+          canCreateSuggestions={(tv) => canReviewClient(user) && !isApprovedOrLater(tv)}
+          disableReopen={(tv) => isApprovedOrLater(tv)}
+          reviewConfig={{
+            canEdit: (tv) => tv?.status === DocumentStatus.PENDING_REVIEW,
+            renderEditActions: ({ exitEditMode }) => <ReviewEditActions exitEditMode={exitEditMode} />,
+          }}
+          onEditSuggestion={async (suggestionId, data) => {
+            try {
+              const result = await editSuggestionAction({ suggestionId, comment: data.comment, proposedText: data.proposedText });
+              if (isRefusal(result)) {
+                toast.error(result.refused.message);
+                return;
+              }
+              capture('suggestion_edited');
+              toast.success('Suggestion updated!');
+            } catch (error: any) {
+              toast.error(error.message || 'Failed to edit suggestion');
+            }
+          }}
+          hideDetails
+          sidebarActions={<ReviewWorkflowActions document={document} />}
+          sidebarSummary={
+            <>
+              <AudioStatus
+                documentVersionId={initialTargetVersion.id}
+                currentVersion={initialTargetVersion.version}
+                status={initialTargetVersion.status}
+                compact
+              />
+              <GitHubStatus
+                documentVersionId={initialTargetVersion.id}
+                isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+                compact
+              />
+            </>
+          }
+          sidebarDetails={
+            <>
+              <AudioStatus
+                documentVersionId={initialTargetVersion.id}
+                currentVersion={initialTargetVersion.version}
+                status={initialTargetVersion.status}
+                frame="section"
+              />
+              <GitHubStatus
+                documentVersionId={initialTargetVersion.id}
+                isDeployed={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+                frame="section"
+              />
+              {(initialTargetVersion.activityLogs?.length ?? 0) > 0 && (
+                <ActivityLog entries={initialTargetVersion.activityLogs} frame="section" />
+              )}
+            </>
+          }
+          sidebarDetailsDefaultOpen={initialTargetVersion.status === DocumentStatus.DEPLOYED}
+        />
+      </StandardProvider>
     </ScriptureProvider>
   );
 }

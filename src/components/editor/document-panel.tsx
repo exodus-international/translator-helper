@@ -19,6 +19,7 @@ import {
   AlertCircle,
   BookMarked,
   BookOpen,
+  BookOpenCheck,
   ChevronDown,
   Maximize2,
   MessageSquare,
@@ -30,6 +31,8 @@ import { useState, type ReactNode } from 'react';
 import { ThreadSidebar } from '../thread-sidebar';
 import { ScriptureCheckCard } from './scripture-check-card';
 import { useScriptureHost } from './scripture-context';
+import { StandardCheckPanel, useSourceUsesStandards } from './standard-check-card';
+import { useStandardHost } from './standard-host';
 
 export interface DocumentPanelProps {
   /** Folded, the panel is a rail; this is what the rail says and offers. */
@@ -96,6 +99,10 @@ export function DocumentPanel({
   // Only a page that knows the translation's language offers the check.
   const scripture = useScriptureHost();
   const [scriptureOpen, setScriptureOpen] = useState(false);
+  // Only for a member of the language's team, and only once the source uses one of its entries.
+  const standardHost = useStandardHost();
+  const standard = useSourceUsesStandards(standardHost) ? standardHost : null;
+  const [standardOpen, setStandardOpen] = useState(false);
 
   return (
     <Sidebar
@@ -160,6 +167,20 @@ export function DocumentPanel({
               >
                 <BookMarked />
                 <span>Scripture</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {standard && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Standard translations"
+                onClick={() => {
+                  setStandardOpen(true);
+                  if (!panelOpen) toggleSidebar();
+                }}
+              >
+                <BookOpenCheck />
+                <span>Standard translations</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
@@ -238,6 +259,10 @@ export function DocumentPanel({
           )}
 
           {scripture && <ScriptureCheckCard open={scriptureOpen} onOpenChange={setScriptureOpen} />}
+
+          {standard && (
+            <StandardCheckPanel host={standard} open={standardOpen} onOpenChange={setStandardOpen} />
+          )}
 
           {threads.show && (
             <div id="document-panel-threads" className="flex min-h-[16rem] scroll-mt-3 flex-1 flex-col">

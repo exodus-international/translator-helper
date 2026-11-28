@@ -21,6 +21,7 @@ import {
   PrismaClient,
 } from '../src/generated/prisma/client';
 import { daysAgo, daysFromNow } from './seed-data/datasets';
+import { sourceKeyOf } from '../src/domain/standard-translation/match-form';
 import { REQUIRED_DATABASE } from '../tests/test-database';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -101,6 +102,37 @@ Nelekejte se, když je modlitba suchá nebo těžká. Otcové pouště tomu ří
 - Ozval jsem se tento týden svým bratrům?
 `;
 
+// Day 45 in Czech, drafted against the team's standard translations: the
+// morning heading is the standard one, "prayer life" is the standard term in
+// its sentence, and the evening heading is a word short of the standard text.
+const MIDPOINT_CS = `# Den 45 – Zamyšlení v polovině cesty
+
+> „Nebuďme unaveni v konání dobra, neboť v pravý čas budeme sklízet, nepolevíme-li.“ — Galatským 6,9
+
+## Ranní zamyšlení
+
+Dosáhl jsi poloviny cesty. Zastav se na chvíli a uvědom si, co v tobě Bůh za těchto 45 dní vykonal. Nejsi tentýž muž, který tuto cestu začal.
+
+### Ohlédni se zpět a pohleď vpřed
+
+**Co se změnilo?** Zvaž svůj modlitební život, svou sebekázeň, své vztahy. Zapiš si tři konkrétní změny, kterých sis všiml.
+
+**Co zbývá?** Druhá polovina bývá často těžší než první. Obnov dnes své odhodlání.
+
+## Večerní zpytování
+
+- Za co jsem z prvních 45 dní nejvděčnější?
+- Co bylo mým největším zápasem?
+- Jakou milost potřebuji na dalších 45 dní?
+`;
+
+/** The Czech team's standard translations the Day 45 draft is checked against. */
+const STANDARD_CS = [
+  { name: 'Morning heading', sourceText: 'Morning Reflection', targetText: 'Ranní zamyšlení' },
+  { name: 'Evening heading', sourceText: 'Evening Examination', targetText: 'Večerní zpytování svědomí' },
+  { name: null, sourceText: 'prayer life', targetText: 'modlitební život' },
+];
+
 async function user(email: string) {
   return prisma.user.findUniqueOrThrow({ where: { email }, select: { id: true, name: true } });
 }
@@ -135,6 +167,7 @@ async function main() {
   const ashWednesdayCs = await version('lent-ash-wednesday', 'cs');
   const thirdSundayCs = await version('lent-day-20', 'cs');
   const day1De = await version('ex90-day-1', 'de');
+  const midpointCs = await version('ex90-day-45', 'cs');
 
   // --- Deadlines: one overdue, one due tomorrow, one review with its own date ---
 
@@ -168,6 +201,24 @@ async function main() {
       assignedById: admin.id,
       assignedAt: hoursAgo(26),
     },
+  });
+
+  // --- Standard translations: the Czech team's, and a draft to check them in ---
+
+  const czech = await prisma.language.findUniqueOrThrow({ where: { code: 'cs' }, select: { id: true } });
+  await prisma.standardTranslation.deleteMany({ where: { languageId: czech.id } });
+  await prisma.standardTranslation.createMany({
+    data: STANDARD_CS.map((entry) => ({
+      ...entry,
+      languageId: czech.id,
+      sourceKey: sourceKeyOf(entry.sourceText),
+      createdById: translator.id,
+      updatedById: translator.id,
+    })),
+  });
+  await prisma.documentVersion.update({
+    where: { id: midpointCs.id },
+    data: { userId: translator.id, status: DocumentStatus.IN_PROGRESS, content: MIDPOINT_CS },
   });
 
   // --- Notifications -----------------------------------------------------------
@@ -322,7 +373,9 @@ async function main() {
   });
 
   const count = await prisma.notification.count();
-  console.log(`Demo layer added: ${count} notifications, 1 overdue translation, 1 due tomorrow, 1 review deadline.`);
+  console.log(
+    `Demo layer added: ${count} notifications, 1 overdue translation, 1 due tomorrow, 1 review deadline, ${STANDARD_CS.length} Czech standard translations.`,
+  );
 }
 
 main()

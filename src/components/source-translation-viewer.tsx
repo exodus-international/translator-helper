@@ -42,6 +42,7 @@ import { SuggestionForm } from './suggestion-form';
 import { CopyAllButton } from './editor/copy-all-button';
 import { FormattingToolbar } from './editor/formatting-toolbar';
 import { useFormattingToolbar } from './editor/use-formatting-toolbar';
+import { StandardSelectionToolbar, useStandardSelectionToolbar } from './editor/standard-selection-toolbar';
 import { SuggestionInlineToolbar } from './suggestion-inline-toolbar';
 import { AudioTextPanel } from '@/components/audio-text-panel';
 import type { AudioTranscriptState } from '@/domain/audio/audio.types';
@@ -609,6 +610,15 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
       containerRef: translationContainerRef,
       enabled: formattingEnabled,
     });
+    // The read-only source's one selection action. Not while the source is
+    // edited, where formatting owns the selection, nor in YAML, which has no
+    // prose to keep a standard translation of.
+    const sourceStandard = useStandardSelectionToolbar({
+      editorRef: sourceEditorRef,
+      containerRef: sourceContainerRef,
+      translationContent,
+      enabled: !isSourceEditing && !isYaml,
+    });
 
     return (
       <>
@@ -713,6 +723,13 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   onFormat={sourceFormatting.onFormat}
                 />
               )}
+              {sourceStandard.position && (
+                <StandardSelectionToolbar
+                  position={sourceStandard.position}
+                  containerRef={sourceContainerRef}
+                  onAdd={sourceStandard.onAdd}
+                />
+              )}
               {isSourceEditing ? (
                 <RawEditorPane
                   ariaLabel="Source text"
@@ -749,6 +766,7 @@ const SourceTranslationViewerInner = forwardRef<SourceTranslationViewerHandle, S
                   value={sourceContent}
                   readOnly
                   language={contentLanguage}
+                  onSelectionChange={sourceStandard.onSelectionChange}
                   currentLine={sourceLine}
                   highlightLine={syncedSourceLine}
                   onCursorChange={handleSourceCursorChange}

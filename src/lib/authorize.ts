@@ -23,6 +23,15 @@ interface AuthResult {
   projectRoles?: ProjectRole[];
 }
 
+/**
+ * The signed-in user lacks the permission asked for. Its own type, so a caller
+ * that answers a refusal differently from a failure (an editor showing no
+ * tools to someone outside a language's team) doesn't read the message.
+ */
+export class ForbiddenError extends Error {
+  override name = 'ForbiddenError';
+}
+
 // ─── Role hierarchy ──────────────────────────────────────────
 
 const ROLE_HIERARCHY: Record<ProjectPermissionRole, ProjectRole[]> = {
@@ -65,7 +74,7 @@ export function createAuthorize(deps: AuthorizeDeps = defaultDeps) {
 
       if (permission === 'admin' || permission === 'can:manage-folders' || permission === 'can:manage-languages') {
         if (!isAdmin) {
-          throw new Error(`Forbidden: requires '${permission}' permission`);
+          throw new ForbiddenError(`Forbidden: requires '${permission}' permission`);
         }
         return { user };
       }
@@ -81,7 +90,7 @@ export function createAuthorize(deps: AuthorizeDeps = defaultDeps) {
       const allowed = languageRole !== null && ROLE_HIERARCHY[permission.role].includes(languageRole);
 
       if (!allowed) {
-        throw new Error(`Forbidden: requires '${permission.role}' permission in language`);
+        throw new ForbiddenError(`Forbidden: requires '${permission.role}' permission in language`);
       }
 
       return { user, projectRoles: [languageRole] };
@@ -107,7 +116,7 @@ export function createAuthorize(deps: AuthorizeDeps = defaultDeps) {
 
       if (!hasPermission) {
         const roleNames = rolesToCheck.join(' or ');
-        throw new Error(`Forbidden: requires '${roleNames}' permission in project`);
+        throw new ForbiddenError(`Forbidden: requires '${roleNames}' permission in project`);
       }
 
       return { user, projectRoles };

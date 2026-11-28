@@ -12,6 +12,7 @@ import { EditorDialogs } from '@/components/editor-dialogs';
 import { StatusDropdown } from '@/components/status-dropdown';
 import { SourceTranslationViewer, SourceTranslationViewerHandle } from '@/components/source-translation-viewer';
 import { useScriptureHost } from '@/components/editor/scripture-context';
+import { useStandardHost } from '@/components/editor/standard-host';
 import { Badge } from '@/components/ui/badge';
 import {
   Stepper,
@@ -404,15 +405,17 @@ function RouteGuardOnStatusChange({ variant }: { variant: 'review' | 'translate'
 }
 
 /**
- * Tells the Scripture panel whether the translation can be edited, from the
- * live version: a review approved while the page is open stops it offering
- * changes it could not make.
+ * Tells the Scripture and standard translation panels whether the translation
+ * can be edited, from the live version: a review approved while the page is
+ * open stops them offering changes they could not make.
  */
 function ReportScriptureEditable({ canEdit }: { canEdit?: CapFn }) {
   const report = useScriptureHost()?.reportEditable;
+  const reportStandard = useStandardHost()?.reportEditable;
   const targetVersion = useEditorStore((s) => s.targetVersion);
   const editable = canEdit === undefined ? true : Boolean(evalCap(canEdit, targetVersion));
   useEffect(() => report?.(editable), [report, editable]);
+  useEffect(() => reportStandard?.(editable), [reportStandard, editable]);
   return null;
 }
 

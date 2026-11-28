@@ -6,7 +6,7 @@ import type { CodeEditorHandle } from '@/components/editor/code-editor';
 import { EditorImplementationProvider, type EditorComponent } from '@/components/editor/editor-implementation';
 import { SourceProjectStatus } from '@/generated/prisma/enums';
 import type { StandardTranslationRow } from '@/domain/standard-translation/standard-translation.repository';
-import { StandardTranslationDialog } from './standard-translation-dialog';
+import { StandardTranslationDialog, type StandardTranslationInitial } from './standard-translation-dialog';
 
 /**
  * What the add/edit dialog sends: wording without layout, said out loud when
@@ -43,7 +43,17 @@ const divineMercy: StandardTranslationRow = {
 
 type Calls = { create: unknown[]; update: [string, unknown][] };
 
-function renderDialog({ entry, create }: { entry?: StandardTranslationRow; create?: () => Promise<never> } = {}) {
+function renderDialog({
+  entry,
+  initial,
+  hint,
+  create,
+}: {
+  entry?: StandardTranslationRow;
+  initial?: StandardTranslationInitial;
+  hint?: string;
+  create?: () => Promise<never>;
+} = {}) {
   const calls: Calls = { create: [], update: [] };
   render(
     <EditorImplementationProvider editor={textareaEditor}>
@@ -53,6 +63,8 @@ function renderDialog({ entry, create }: { entry?: StandardTranslationRow; creat
         language={croatian}
         projects={[exodus]}
         entry={entry}
+        initial={initial}
+        hint={hint}
         create={
           create ??
           (async (input) => {
@@ -70,8 +82,8 @@ function renderDialog({ entry, create }: { entry?: StandardTranslationRow; creat
   return calls;
 }
 
-const sourceBox = () => screen.getByLabelText('Source · English');
-const translationBox = () => screen.getByLabelText('Standard translation · Croatian');
+const sourceBox = () => screen.getByLabelText('Source · English') as HTMLTextAreaElement;
+const translationBox = () => screen.getByLabelText('Standard translation · Croatian') as HTMLTextAreaElement;
 const save = () => fireEvent.click(screen.getByRole('button', { name: 'Save standard translation' }));
 
 test('text typed with layout is saved as its wording, and the dialog says what it left out', async () => {
@@ -106,6 +118,42 @@ test('plain wording shows no notice', () => {
   fireEvent.change(translationBox(), { target: { value: 'Slava Ocu.' } });
 
   assert.equal(screen.queryAllByText(/left out/).length, 0);
+  assert.equal(screen.queryAllByText(/Taken from/).length, 0);
+  assert.equal((screen.getByRole('radio', { name: /All projects in Croatian/ }) as HTMLInputElement).checked, true);
+});
+
+test('text picked out of a document starts the dialog, says where it came from and what it left out', async () => {
+  const calls = renderDialog({
+    initial: {
+      sourceText: 'Glory be to the Father.',
+      targetText: 'Slava Ocu.',
+      removed: ['blockquote', 'emphasis'],
+      sourceProjectId: exodus.id,
+    },
+    hint: 'Taken from line 7 of the translation. Check it before saving.',
+  });
+
+  assert.equal(sourceBox().value, 'Glory be to the Father.');
+  assert.equal(translationBox().value, 'Slava Ocu.');
+  assert.ok(screen.getByText('Taken from line 7 of the translation. Check it before saving.'));
+  assert.ok(
+    screen.getByText(
+      'Blockquote markers and the emphasis around the text were left out. Each document keeps its own layout; only the wording is saved.',
+    ),
+  );
+  assert.equal((screen.getByRole('radio', { name: /Only Exodus 90/ }) as HTMLInputElement).checked, true);
+
+  save();
+  await waitFor(() => assert.equal(calls.create.length, 1));
+  assert.deepEqual(calls.create[0], {
+    languageId: croatian.id,
+    sourceProjectId: exodus.id,
+    name: '',
+    sourceText: 'Glory be to the Father.',
+    targetText: 'Slava Ocu.',
+    fixedForm: false,
+    note: '',
+  });
 });
 
 test('an edit sends the entry without a language', async () => {

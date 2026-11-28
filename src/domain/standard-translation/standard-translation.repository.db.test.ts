@@ -19,6 +19,7 @@ import {
   deleteStandardTranslation,
   getMoveConflict,
   getStandardTranslationById,
+  listEditorEntries,
   listEntriesForTranslation,
   listStandardTranslations,
   moveStandardTranslationToGeneral,
@@ -546,6 +547,28 @@ describe('listEntriesForTranslation', () => {
       assert.deepEqual(await listEntriesForTranslation(d.language.id, null), []);
     } finally {
       await other.cleanup();
+      await d.cleanup();
+    }
+  });
+});
+
+describe('listEditorEntries', () => {
+  it("gives the editor the document's entries with their keys, and the language's projects", async () => {
+    const d = await dictionary();
+    try {
+      await d.add({ sourceText: 'Glory Be' });
+      await d.add({ sourceText: 'Amen', sourceProjectId: d.alpha.id });
+      await d.add({ sourceText: 'Our Father', sourceProjectId: d.beta.id });
+
+      const { entries, projects } = await listEditorEntries(d.language.id, d.alpha.id);
+
+      assert.deepEqual(entries.map((e) => [e.sourceText, e.sourceKey]).sort(), [
+        ['Amen', sourceKeyOf('Amen')],
+        ['Glory Be', sourceKeyOf('Glory Be')],
+      ]);
+      assert.equal(entries.find((e) => e.sourceText === 'Amen')?.sourceProject?.name, d.alpha.name);
+      assert.deepEqual(projects.map((p) => p.id).sort(), [d.alpha.id, d.beta.id, d.done.id].sort());
+    } finally {
       await d.cleanup();
     }
   });
