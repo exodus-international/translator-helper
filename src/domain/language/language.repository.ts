@@ -226,12 +226,13 @@ export async function getLanguageMemberSummary(languageId: string) {
 
 /** Exactly what `prisma.language.delete` would cascade into. */
 export async function countLanguageDependents(languageId: string): Promise<LanguageDependents> {
-  const [versions, translationProjects, memberships, invitations] = await Promise.all([
+  const [versions, translationProjects, memberships, invitations, standardTranslations] = await Promise.all([
     prisma.documentVersion.count({ where: { languageId } }),
     prisma.translationProject.count({ where: { languageId } }),
     prisma.userLanguage.count({ where: { languageId } }),
     prisma.invitationLanguage.count({ where: { languageId } }),
+    prisma.standardTranslation.count({ where: { languageId } }),
   ]);
 
-  return { versions, translationProjects, memberships, invitations };
+  return { versions, translationProjects, memberships, invitations, standardTranslations };
 }

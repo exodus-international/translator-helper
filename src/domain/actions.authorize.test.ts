@@ -135,6 +135,17 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     updateSourceProjectAction: ['authenticated'],
     deleteSourceProjectAction: ['can:manage-folders'],
   },
+  // Every member of the language team, in any role; for an existing entry the
+  // language is the stored entry's, not one from the input
+  // (standard-translation.permissions.test.ts).
+  'standard-translation/standard-translation.actions.ts': {
+    createStandardTranslationAction: ['language:member'],
+    // Then authorizeEntry: a member of the stored entry's language.
+    updateStandardTranslationAction: ['authenticated'],
+    deleteStandardTranslationAction: ['authenticated'],
+    getStandardTranslationMoveConflictAction: ['authenticated'],
+    moveStandardTranslationToGeneralAction: ['authenticated'],
+  },
   'suggestion/suggestion.actions.ts': {
     getSuggestionsByDocumentVersionAction: ['authenticated'],
     createSuggestionAction: ['authenticated', 'project:reviewer', 'admin'],

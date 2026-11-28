@@ -1,6 +1,6 @@
 /**
  * `prisma.language.delete` cascades into DocumentVersion, TranslationProject,
- * UserLanguage and InvitationLanguage. One trash icon behind one generic
+ * UserLanguage, InvitationLanguage and StandardTranslation. One trash icon behind one generic
  * confirm could therefore wipe every translation ever written in a language,
  * with no undo and no backup path in this app.
  *
@@ -14,6 +14,8 @@ export interface LanguageDependents {
   translationProjects: number;
   memberships: number;
   invitations: number;
+  /** A team can build its dictionary before translating anything, so these can exist without versions. */
+  standardTranslations: number;
 }
 
 export type LanguageDeletionPlan =
@@ -44,6 +46,7 @@ export function planLanguageDeletion(
       [dependents.translationProjects, 'translation project'],
       [dependents.memberships, 'membership'],
       [dependents.invitations, 'pending invitation'],
+      [dependents.standardTranslations, 'standard translation'],
     ])}. This cannot be undone.`,
     confirmationPhrase: language.name,
   };

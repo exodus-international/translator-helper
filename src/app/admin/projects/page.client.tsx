@@ -39,6 +39,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { buildProjectTranslationsPath } from '@/domain/source-project/source-project-url';
+import { deleteProjectDescription } from '@/domain/source-project/source-project-delete';
 
 interface ProjectsClientProps {
   sourceProjects: SourceProjectListItem[];
@@ -115,6 +116,7 @@ export default function ProjectsClient({
               _count: sourceProjects.find((sp) => sp.id === updated.id)?._count || {
                 documents: 0,
                 translationProjects: 0,
+                standardTranslations: 0,
               },
             }
           : p,
@@ -317,7 +319,7 @@ export default function ProjectsClient({
                 </Button>
                 <DeleteConfirmDialog
                   title="Delete Source Project"
-                  description={`Are you sure you want to delete "${project.name}"? This action cannot be undone.`}
+                  description={deleteProjectDescription(project.name, project._count.standardTranslations)}
                   onConfirm={() => handleDelete(project.id, project._count.documents)}
                 />
               </div>

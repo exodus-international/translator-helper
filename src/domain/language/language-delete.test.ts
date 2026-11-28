@@ -5,7 +5,13 @@ import { assertLanguageDeletable, planLanguageDeletion, type LanguageDependents 
 const CROATIAN = { name: 'Croatian', isSource: false };
 const ENGLISH = { name: 'English', isSource: true };
 
-const EMPTY: LanguageDependents = { versions: 0, translationProjects: 0, memberships: 0, invitations: 0 };
+const EMPTY: LanguageDependents = {
+  versions: 0,
+  translationProjects: 0,
+  memberships: 0,
+  invitations: 0,
+  standardTranslations: 0,
+};
 
 describe('planLanguageDeletion', () => {
   it('refuses a language that holds translations, and names how many', () => {
@@ -41,12 +47,13 @@ describe('planLanguageDeletion', () => {
       translationProjects: 1,
       memberships: 0,
       invitations: 2,
+      standardTranslations: 40,
     });
 
     assert.equal(plan.allowed, true);
     assert.equal(
       plan.allowed === true && plan.summary,
-      'Croatian has no translations. Deleting it also removes 1 translation project, 0 memberships and 2 pending invitations. This cannot be undone.',
+      'Croatian has no translations. Deleting it also removes 1 translation project, 0 memberships, 2 pending invitations and 40 standard translations. This cannot be undone.',
     );
     assert.equal(plan.allowed === true && plan.confirmationPhrase, 'Croatian');
   });

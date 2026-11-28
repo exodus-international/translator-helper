@@ -162,6 +162,8 @@ model User {
   notificationsCaused    Notification[]           @relation("NotificationActor")
   notificationPrefs      NotificationPreference[]
   bibleImports           BibleTranslation[]       @relation("BibleTranslationImports")
+  standardsCreated       StandardTranslation[]    @relation("StandardTranslationCreatedBy")
+  standardsUpdated       StandardTranslation[]    @relation("StandardTranslationUpdatedBy")
 
   @@map("user")
 }
@@ -217,14 +219,14 @@ model Verification {
 }
 
 model Language {
-  id                      String               @id @default(uuid())
-  code                    String               @unique // e.g., "en", "cs", "de"
+  id                      String                @id @default(uuid())
+  code                    String                @unique // e.g., "en", "cs", "de"
   name                    String // e.g., "English", "Czech", "German"
-  translationInstructions String?              @db.Text
+  translationInstructions String?               @db.Text
   branchName              String?
   /// Documents are authored in the source language and translated out of it.
   /// Read by listTargetLanguages() instead of comparing `code` to "en".
-  isSource                Boolean              @default(false)
+  isSource                Boolean               @default(false)
   audioProvider           AudioProvider?
   audioVoice              String? // provider voice id, e.g. "cs-CZ-AntoninNeural"
   /// Narration speaking rate as a factor, e.g. "0.85". Null uses the app default.
@@ -238,13 +240,14 @@ model Language {
   /// Null means STANDARD.
   audioQuality            AudioQuality?
   /// Sample the settings page reads aloud when tuning the voice. Null uses the built-in sample for the language.
-  audioPreviewText        String?              @db.Text
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
+  audioPreviewText        String?               @db.Text
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
   documentVersions        DocumentVersion[]
   translationProjects     TranslationProject[]
   users                   UserLanguage[]
   invitations             InvitationLanguage[]
+  standardTranslations    StandardTranslation[]
 
   @@map("language")
 }
@@ -260,18 +263,19 @@ model Folder {
 }
 
 model SourceProject {
-  id                  String               @id @default(uuid())
-  name                String               @unique
-  description         String?              @db.Text
-  slug                String               @unique // URL segment: /projects/{slug}, /documents/{slug}/...
-  repositoryDirectory String?              @unique // Folder in the content repository; null means this project is not deployed to GitHub
-  acronym             String? // Short prefix for auto-named DAY titles, e.g. "SML" in "SML - DAY 03 - ..."
-  status              SourceProjectStatus  @default(ACTIVE)
-  audioDocumentTypes  DocumentType[]       @default([DAY, DAILY_CONTENT])
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  documents           Document[]
-  translationProjects TranslationProject[]
+  id                   String                @id @default(uuid())
+  name                 String                @unique
+  description          String?               @db.Text
+  slug                 String                @unique // URL segment: /projects/{slug}, /documents/{slug}/...
+  repositoryDirectory  String?               @unique // Folder in the content repository; null means this project is not deployed to GitHub
+  acronym              String? // Short prefix for auto-named DAY titles, e.g. "SML" in "SML - DAY 03 - ..."
+  status               SourceProjectStatus   @default(ACTIVE)
+  audioDocumentTypes   DocumentType[]        @default([DAY, DAILY_CONTENT])
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  documents            Document[]
+  translationProjects  TranslationProject[]
+  standardTranslations StandardTranslation[]
 
   @@map("source_project")
 }
@@ -291,6 +295,46 @@ model TranslationProject {
   // composite unique's sourceProjectId-first ordering does not serve it.
   @@index([languageId])
   @@map("translation_project")
+}
+
+/// A team's fixed translation of a prayer, form or phrase in one target
+/// language: AI translation inserts it instead of translating the text again,
+/// and the editor highlights it. General when `sourceProjectId` is null, for
+/// one project otherwise; a project entry wins over a general one with the
+/// same `sourceKey`.
+model StandardTranslation {
+  id              String         @id @default(uuid())
+  /// The target language.
+  languageId      String
+  language        Language       @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  /// Null means every project in the language. Cascade, not SetNull: with
+  /// SetNull a deleted project's entries would quietly become general ones.
+  sourceProjectId String?
+  sourceProject   SourceProject? @relation(fields: [sourceProjectId], references: [id], onDelete: Cascade)
+  /// Shown in lists and cards, e.g. "Glory Be".
+  name            String?
+  /// The wording only: line prefixes, wrapping emphasis and pause markers removed.
+  sourceText      String         @db.Text
+  /// The simplified form matching uses, computed from `sourceText` on the server.
+  sourceKey       String         @db.Text
+  targetText      String         @db.Text
+  /// Verbatim everywhere, even inside a sentence ("Amen", "Exodus 90").
+  fixedForm       Boolean        @default(false)
+  note            String?        @db.Text
+  createdById     String?
+  createdBy       User?          @relation("StandardTranslationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById     String?
+  updatedBy       User?          @relation("StandardTranslationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // The migration creates this index NULLS NOT DISTINCT (Postgres 15+), so two
+  // general entries of a language can't share a source. Prisma can't express
+  // that; keep the clause if this index is ever regenerated.
+  // Leads with languageId, so it also serves the per-language lists.
+  @@unique([languageId, sourceProjectId, sourceKey])
+  @@index([sourceProjectId])
+  @@map("standard_translation")
 }
 
 model Document {

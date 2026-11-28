@@ -31,6 +31,7 @@ const sourceProjectListInclude = {
     select: {
       documents: true,
       translationProjects: true,
+      standardTranslations: true,
     },
   },
 } satisfies Prisma.SourceProjectInclude;
